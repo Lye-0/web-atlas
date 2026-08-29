@@ -5,7 +5,7 @@ type: decision
 status: active
 maturity: candidate
 created: 2026-08-29
-last_verified: 2026-08-29
+last_verified: 2026-08-30
 source_commit: feb8316
 related_files:
   - src/components/map/StackMap.tsx
