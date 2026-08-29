@@ -1,10 +1,9 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { categoryById, stacks } from '../../data';
-import type { StackEntry } from '../../types';
+import { categoryById, dictionaryVisualGroups, stacks } from '../../data';
 import { getRootCategoryId } from '../../utils/categoryHierarchy';
-import { presentText } from '../../utils/presentationText';
 import { categoryPath, stackPath } from '../../utils/routes';
+import { stackStatusLabels } from '../../utils/stackStatus';
 
 interface StackFilter {
   id: string;
@@ -14,31 +13,8 @@ interface StackFilter {
 
 const stackFilters: StackFilter[] = [
   { id: 'all', label: 'すべて' },
-  {
-    id: 'language-runtime',
-    label: '言語と実行基盤',
-    rootCategoryIds: ['markup-language', 'stylesheet-language', 'programming-language', 'runtime', 'package-manager'],
-  },
-  {
-    id: 'application',
-    label: 'UIとアプリケーション',
-    rootCategoryIds: ['framework', 'library', 'ui-component-system', 'build-tool', 'auth-service'],
-  },
-  { id: 'data', label: 'データとストレージ', rootCategoryIds: ['database', 'storage'] },
-  { id: 'quality', label: '品質と検証', rootCategoryIds: ['testing', 'code-quality'] },
-  {
-    id: 'delivery',
-    label: '開発と配信',
-    rootCategoryIds: ['version-control', 'development-platform', 'ci-cd', 'container', 'deployment-platform'],
-  },
+  ...dictionaryVisualGroups.map(({ id, label, rootCategoryIds }) => ({ id, label, rootCategoryIds })),
 ];
-
-const statusLabel: Record<StackEntry['status'], string> = {
-  active: '',
-  experimental: '実験的',
-  legacy: 'レガシー',
-  deprecated: '非推奨',
-};
 
 export function StackTable() {
   const [filterId, setFilterId] = useState('all');
@@ -72,11 +48,11 @@ export function StackTable() {
             <div className="stack-index-row" role="listitem" key={stack.id}>
               <Link className="stack-index-main" to={stackPath(stack.id)}>
                 <strong>{stack.name}</strong>
-                <span>{presentText(stack.summary)}</span>
+                <span>{stack.summary}</span>
               </Link>
               <div className="stack-index-meta">
                 {category && <Link className="stack-index-category" to={categoryPath(category.id)}>{category.name}</Link>}
-                {stack.status !== 'active' && <span className={`stack-status stack-status-${stack.status}`}>{statusLabel[stack.status]}</span>}
+                {stack.status !== 'active' && <span className={`stack-status stack-status-${stack.status}`}>{stackStatusLabels[stack.status]}</span>}
               </div>
             </div>
           );

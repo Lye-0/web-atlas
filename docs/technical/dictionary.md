@@ -58,9 +58,19 @@ Category・Stackの一覧、Mapノード、詳細ページ内の関連リンク�
 
 ## A/B/C の生成
 
-- Mapは `stackMap` の階層を再帰描画し、Category / Stack のIDから正規データを解決する。親子関係はDOMのborderとconnectorで表現し、Three.jsやReact Three Fiberは実装依存に含めない。
-- Categoriesは `categories` を一覧表示し、選択したCategoryの `stacksForCategory`、下位Category、差分説明、関連Categoryを表示する。
-- Stacksは `stacks` を一覧表示し、Category lookup、features、use cases、relationships、related stacks、公式URL、Analyzer用識別子を表示する。
+- Mapは `stackMap` の階層を再帰描画し、`dictionaryVisualGroups` で大分類を整理する。Category / Stack のIDから正規データを解決し、親子関係はDOMのborderとconnectorで表現する。Three.jsやReact Three Fiberは実装依存に含めない。
+- CategoriesはMapと同じ `dictionaryVisualGroups` で索引を整理し、選択したCategoryの `stacksForCategory`、下位Category、差分説明、関連Categoryを表示する。
+- Stacksは `stacks` を一覧表示し、Category lookup、features、use cases、relationships、related stacks、公式URL、Analyzer用識別子を表示する。Stacks filterも同じ大分類を利用する。
+
+## Phase 1.2 Presentation Contract
+
+Phase 1.2では、Map・Categories・Stacks filterが同じ5つの表示グループを共有する。これは正規のCategory taxonomyや `parentCategoryId` を置き換えるものではなく、画面上のナビゲーションを揃えるためのpresentation groupingである。
+
+- `src/data/dictionaryGroups.ts` が「言語と実行基盤」「UIとアプリケーション」「データとストレージ」「品質と検証」「開発と配信」と、各グループに属するroot Category IDを一元管理する。
+- `validateDictionaryVisualGroups` は、存在しないCategory、rootでないCategory、重複登録、未登録のroot Categoryを起動時に検出する。
+- 利用者向けのsummary・description・role・use case・relationship文は `src/data/categories.ts` と `src/data/stacks.ts` の正規データに直接保持する。表示時に大量の文字列置換を行う補助層は使用しない。
+- MapはWeb開発全体の俯瞰、Categoriesは分類概念の理解、Stacksは個別技術の理解を担当する。Mapの通常ノードではsummaryを繰り返さず、Stacks一覧ではactive statusとstable IDを主役にしない。
+- `categoryId`、`packageNames`、`aliases`、`relatedStackIds`、`relationships` などAnalyzer接続用metadataは正規データに残し、Stack詳細の開発者向けメタデータで確認できる。
 
 ## Search
 
@@ -82,7 +92,7 @@ Stable ID、`categoryId`、package名、alias、関連ID、relationship metadata
 
 ## Verification anchors
 
-- `src/data/validateDictionary.test.ts`: 43 Category / 48 Stack、参照整合性、重複検出
+- `src/data/validateDictionary.test.ts`: 43 Category / 48 Stack、参照整合性、重複検出、5大visual groupのroot割り当て検証
 - `src/utils/search.test.ts`: 名称・alias・package名検索と検索順位
 - `src/utils/routes.test.ts`: stable ID lookupとURL生成
 - `package.json`: `build`、`lint`、`typecheck`、`test` の品質ゲート

@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { categories, stackMap, stacks, validateDictionary } from './index';
+import {
+  categories,
+  dictionaryVisualGroups,
+  stackMap,
+  stacks,
+  validateDictionary,
+  validateDictionaryVisualGroups,
+} from './index';
 
 describe('dictionary data', () => {
   it('contains the complete Phase 1 catalogue without broken references', () => {
@@ -54,5 +61,19 @@ describe('dictionary data', () => {
       'Category sample-category is not present in the map',
       'Stack sample-stack is not present in the map',
     ]));
+  });
+
+  it('keeps every canonical root category in exactly one visual group', () => {
+    expect(validateDictionaryVisualGroups(dictionaryVisualGroups, categories)).toEqual([]);
+
+    const brokenGroups = dictionaryVisualGroups.map((group) => ({
+      ...group,
+      rootCategoryIds: [...group.rootCategoryIds],
+    }));
+    brokenGroups[1].rootCategoryIds.push(brokenGroups[0].rootCategoryIds[0]);
+
+    expect(validateDictionaryVisualGroups(brokenGroups, categories)).toContain(
+      `Root category is assigned to multiple visual groups: ${brokenGroups[0].rootCategoryIds[0]}`,
+    );
   });
 });

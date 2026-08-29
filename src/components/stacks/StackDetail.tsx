@@ -1,8 +1,8 @@
 import { Link } from 'react-router-dom';
 import { categoryById, stackById } from '../../data';
 import type { RelationKind, StackEntry } from '../../types';
-import { presentText } from '../../utils/presentationText';
 import { categoryPath, stackPath } from '../../utils/routes';
+import { stackStatusLabels } from '../../utils/stackStatus';
 
 const relationLabels: Record<RelationKind, string> = {
   'built-on': '基盤にする',
@@ -45,11 +45,11 @@ export function StackDetail({ stack }: { stack: StackEntry }) {
         <header className="detail-header" id="overview">
           <p className="eyebrow">技術</p>
           <h1 id="stack-title">{stack.name}</h1>
-          <p className="detail-summary">{presentText(stack.summary)}</p>
-          <p className="detail-description">{presentText(stack.description)}</p>
+          <p className="detail-summary">{stack.summary}</p>
+          <p className="detail-description">{stack.description}</p>
           <div className="stack-meta-row">
             {category && <Link className="detail-category-link" to={categoryPath(category.id)}>{category.name} <span aria-hidden="true">↗</span></Link>}
-            {stack.status !== 'active' && <span className={`stack-status stack-status-${stack.status}`}>{stack.status}</span>}
+            {stack.status !== 'active' && <span className={`stack-status stack-status-${stack.status}`}>{stackStatusLabels[stack.status]}</span>}
           </div>
         </header>
 
@@ -57,7 +57,7 @@ export function StackDetail({ stack }: { stack: StackEntry }) {
           <p className="section-kicker">役割</p>
           <h2 id="responsibilities-title">何を担当するか</h2>
           <ul className="clean-list">
-            {stack.responsibilities.map((responsibility) => <li key={responsibility}>{presentText(responsibility)}</li>)}
+            {stack.responsibilities.map((responsibility) => <li key={responsibility}>{responsibility}</li>)}
           </ul>
         </section>
 
@@ -65,7 +65,7 @@ export function StackDetail({ stack }: { stack: StackEntry }) {
           <p className="section-kicker">特徴</p>
           <h2 id="features-title">主な特徴</h2>
           <ul className="feature-list">
-            {stack.features.map((feature) => <li key={feature}>{presentText(feature)}</li>)}
+            {stack.features.map((feature) => <li key={feature}>{feature}</li>)}
           </ul>
         </section>
 
@@ -73,7 +73,7 @@ export function StackDetail({ stack }: { stack: StackEntry }) {
           <p className="section-kicker">利用場面</p>
           <h2 id="use-cases-title">使われる場面</h2>
           <ul className="clean-list">
-            {stack.useCases.map((useCase) => <li key={useCase}>{presentText(useCase)}</li>)}
+            {stack.useCases.map((useCase) => <li key={useCase}>{useCase}</li>)}
           </ul>
         </section>
 
@@ -93,8 +93,8 @@ export function StackDetail({ stack }: { stack: StackEntry }) {
                       <span className="relationship-arrow" aria-hidden="true">→</span>
                       <Link to={stackPath(relationship.target.id)} className="relationship-target">{relationship.target.name}</Link>
                     </div>
-                    {relationship.label && relationship.label !== relation && <p className="relationship-context">{presentText(relationship.label)}</p>}
-                    {relationship.explanation && <p>{presentText(relationship.explanation)}</p>}
+                    {relationship.label && relationship.label !== relation && <p className="relationship-context">{relationship.label}</p>}
+                    {relationship.explanation && <p>{relationship.explanation}</p>}
                   </div>
                 );
               })}
@@ -111,7 +111,7 @@ export function StackDetail({ stack }: { stack: StackEntry }) {
                 <Link className="document-link-row" key={related.id} to={stackPath(related.id)}>
                   <span className="document-link-copy">
                     <strong>{related.name}</strong>
-                    <span>{presentText(related.summary)}</span>
+                    <span>{related.summary}</span>
                   </span>
                   <span aria-hidden="true">↗</span>
                 </Link>

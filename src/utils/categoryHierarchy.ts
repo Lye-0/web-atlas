@@ -26,6 +26,10 @@ export const categoryTrees: CategoryTreeNode[] = categories
   .filter((category) => !category.parentCategoryId)
   .map(makeTree);
 
+export const categoryTreeById = new Map(
+  categoryTrees.map((tree) => [tree.category.id, tree]),
+);
+
 export function getRootCategoryId(categoryId: CategoryId): CategoryId {
   let current = categoryById.get(categoryId);
   const visited = new Set<CategoryId>();

@@ -107,12 +107,16 @@ export function DictionarySearch() {
                 onMouseEnter={() => setActiveIndex(index)}
                 onClick={close}
               >
-                <span className={`result-kind result-kind-${result.kind}`}>{result.kind === 'stack' ? '技術' : '分類'}</span>
                 <span className="result-main">
-                  <span className="result-name">{result.name}</span>
+                  <span className="result-heading">
+                    <span className="result-name">{result.name}</span>
+                    <span className={`result-kind result-kind-${result.kind}`}>{result.kind === 'stack' ? '技術' : '分類'}</span>
+                  </span>
                   <span className="result-summary">{result.summary}</span>
+                  {(result.matchedField === 'alias' || result.matchedField === 'package') && (
+                    <span className="result-match">{fieldLabel[result.matchedField]}で一致</span>
+                  )}
                 </span>
-                {result.matchedField !== 'name' && <span className="result-match">{fieldLabel[result.matchedField]}</span>}
               </Link>
             ))
           ) : (

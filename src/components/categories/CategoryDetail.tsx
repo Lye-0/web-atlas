@@ -1,7 +1,6 @@
 import { Link } from 'react-router-dom';
 import { categories, stacksForCategory } from '../../data';
 import type { CategoryEntry } from '../../types';
-import { presentText } from '../../utils/presentationText';
 import { categoryPath, stackPath } from '../../utils/routes';
 
 const pageSections = [
@@ -32,8 +31,8 @@ export function CategoryDetail({ category }: { category: CategoryEntry }) {
         <header className="detail-header" id="overview">
           <p className="eyebrow">分類</p>
           <h1 id="category-title">{category.name}</h1>
-          <p className="detail-summary">{presentText(category.summary)}</p>
-          <p className="detail-description">{presentText(category.description)}</p>
+          <p className="detail-summary">{category.summary}</p>
+          <p className="detail-description">{category.description}</p>
           {parentCategory && (
             <p className="detail-context">
               上位分類：<Link to={categoryPath(parentCategory.id)}>{parentCategory.name}</Link>
@@ -44,14 +43,14 @@ export function CategoryDetail({ category }: { category: CategoryEntry }) {
         <section className="document-section" id="role" aria-labelledby="role-title">
           <p className="section-kicker">役割</p>
           <h2 id="role-title">主な役割</h2>
-          <p>{presentText(category.role)}</p>
+          <p>{category.role}</p>
         </section>
 
         <section className="document-section" id="use-cases" aria-labelledby="use-cases-title">
           <p className="section-kicker">利用場面</p>
           <h2 id="use-cases-title">使われる場面</h2>
           <ul className="clean-list">
-            {category.useCases.map((useCase) => <li key={useCase}>{presentText(useCase)}</li>)}
+            {category.useCases.map((useCase) => <li key={useCase}>{useCase}</li>)}
           </ul>
         </section>
 
@@ -64,7 +63,7 @@ export function CategoryDetail({ category }: { category: CategoryEntry }) {
                 <Link className="document-link-row" key={child.id} to={categoryPath(child.id)}>
                   <span className="document-link-copy">
                     <strong>{child.name}</strong>
-                    <span>{presentText(child.summary)}</span>
+                    <span>{child.summary}</span>
                   </span>
                   <span aria-hidden="true">↗</span>
                 </Link>
@@ -80,7 +79,7 @@ export function CategoryDetail({ category }: { category: CategoryEntry }) {
             {category.differences.map((item) => (
               <div className="comparison-row" key={item.against}>
                 <h3>{item.against}との違い</h3>
-                <p>{presentText(item.explanation)}</p>
+                <p>{item.explanation}</p>
               </div>
             ))}
           </div>
@@ -95,7 +94,7 @@ export function CategoryDetail({ category }: { category: CategoryEntry }) {
                 <Link className="document-link-row" key={stack.id} to={stackPath(stack.id)}>
                   <span className="document-link-copy">
                     <strong>{stack.name}</strong>
-                    <span>{presentText(stack.summary)}</span>
+                    <span>{stack.summary}</span>
                   </span>
                   <span aria-hidden="true">↗</span>
                 </Link>
