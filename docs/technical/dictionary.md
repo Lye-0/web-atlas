@@ -25,6 +25,9 @@ fallback させる。backend Worker、binding、DB、Auth、APIは持たない�
 - `pnpm preview:cloudflare`: build後に `wrangler dev` でWorkers配信をローカル確認
 - `pnpm deploy`: build後に `wrangler deploy` でCloudflareへ公開
 
+GitHubからの自動公開（Workers Builds）のProduction / Preview設定は
+[`docs/technical/deployment.md`](deployment.md) に分離して記録する。
+
 ## データモデルと不変条件
 
 `CategoryEntry` と `StackEntry` は安定した `id` を持ち、表示名の変更とは独立して URL と将来の Analyzer から参照できる。Stack は少なくとも次の接続用メタデータを持つ。
