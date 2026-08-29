@@ -12,6 +12,14 @@
 - files: `wrangler.jsonc`, `package.json`, `.gitignore` …
 - memory: `agent-knowledge/entries/2026-08-29-cloudflare-static-assets-d9030ea.md`
 
+### Cloudflare Workers BuildsのGitHub連携契約
+- id: `rm-20260829-workers-builds-github`
+- type: `decision`
+- maturity: `candidate`
+- tags: `cloudflare`, `workers-builds`, `github`, `preview`, `pnpm`, `deployment`
+- files: `package.json`, `pnpm-lock.yaml`, `wrangler.jsonc` …
+- memory: `agent-knowledge/entries/2026-08-29-workers-builds-github-35978d2.md`
+
 ## dictionary
 
 ### Dictionaryの正規データ契約
