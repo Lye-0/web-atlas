@@ -1595,6 +1595,20 @@ summary:focus-visible {
   .map-visual-group::before {
     display: none;
   }
+
+  .map-root-node::after,
+  .map-visual-groups::after {
+    display: block;
+  }
+
+  .map-root-node::after {
+    height: 28px;
+  }
+
+  .map-visual-groups::after {
+    top: -28px;
+    height: 28px;
+  }
 }
 
 @media (max-width: 620px) {
