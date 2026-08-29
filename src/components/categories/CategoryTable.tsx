@@ -1,36 +1,52 @@
 import { Link } from 'react-router-dom';
-import { categories, stacksForCategory } from '../../data';
+import type { CategoryTreeNode } from '../../utils/categoryHierarchy';
+import { categoryTrees } from '../../utils/categoryHierarchy';
+import { presentText } from '../../utils/presentationText';
 import { categoryPath } from '../../utils/routes';
+
+function CategoryTreeItem({ node }: { node: CategoryTreeNode }) {
+  const { category, children } = node;
+
+  return (
+    <li className="category-index-item">
+      <Link className="category-index-link" to={categoryPath(category.id)} title={presentText(category.description)}>
+        <span className="category-index-marker" aria-hidden="true" />
+        <span className="category-index-copy">
+          <strong>{category.name}</strong>
+          <span>{presentText(category.summary)}</span>
+        </span>
+        <span className="category-index-arrow" aria-hidden="true">↗</span>
+      </Link>
+      {children.length > 0 && (
+        <ul className="category-index-children">
+          {children.map((child) => <CategoryTreeItem key={child.category.id} node={child} />)}
+        </ul>
+      )}
+    </li>
+  );
+}
 
 export function CategoryTable() {
   return (
-    <div className="table-shell">
-      <table className="data-table category-table">
-        <caption className="sr-only">Dictionaryのカテゴリー一覧</caption>
-        <thead>
-          <tr>
-            <th scope="col">Category</th>
-            <th scope="col">概要</th>
-            <th scope="col">主な役割</th>
-            <th scope="col" className="table-count-col">Stacks</th>
-          </tr>
-        </thead>
-        <tbody>
-          {categories.map((category) => (
-            <tr key={category.id}>
-              <th scope="row">
-                <Link className="table-primary-link" to={categoryPath(category.id)}>
-                  <span>{category.name}</span>
-                  {category.parentCategoryId && <span className="table-parent">下位分類</span>}
-                </Link>
-              </th>
-              <td>{category.summary}</td>
-              <td>{category.role}</td>
-              <td className="table-count-col">{stacksForCategory(category.id).length}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="category-index" aria-label="カテゴリーの階層一覧">
+      {categoryTrees.map(({ category, children }) => (
+        <section className="category-index-group" key={category.id} aria-labelledby={`category-group-${category.id}`}>
+          <Link className="category-index-root" to={categoryPath(category.id)} title={presentText(category.description)}>
+            <span className="category-index-root-marker" aria-hidden="true" />
+            <span className="category-index-root-copy">
+              <span className="category-index-type">分類</span>
+              <strong id={`category-group-${category.id}`}>{category.name}</strong>
+            </span>
+            <span className="category-index-root-summary">{presentText(category.summary)}</span>
+            <span className="category-index-arrow" aria-hidden="true">↗</span>
+          </Link>
+          {children.length > 0 && (
+            <ul className="category-index-children category-index-children-root">
+              {children.map((child) => <CategoryTreeItem key={child.category.id} node={child} />)}
+            </ul>
+          )}
+        </section>
+      ))}
     </div>
   );
 }

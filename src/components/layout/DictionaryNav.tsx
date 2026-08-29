@@ -2,9 +2,9 @@ import { NavLink } from 'react-router-dom';
 import { dictionaryRoutes } from '../../utils/routes';
 
 const links = [
-  { to: dictionaryRoutes.map, label: 'Map', hint: '全体像' },
-  { to: dictionaryRoutes.categories, label: 'Categories', hint: '分類を知る' },
-  { to: dictionaryRoutes.stacks, label: 'Stacks', hint: '技術を知る' },
+  { to: dictionaryRoutes.map, label: 'Map', title: '技術の全体像' },
+  { to: dictionaryRoutes.categories, label: 'Categories', title: '分類を理解する' },
+  { to: dictionaryRoutes.stacks, label: 'Stacks', title: '個別の技術を調べる' },
 ];
 
 export function DictionaryNav() {
@@ -16,9 +16,9 @@ export function DictionaryNav() {
           to={link.to}
           className={({ isActive }) => `nav-link${isActive ? ' is-active' : ''}`}
           end={link.to === dictionaryRoutes.map}
+          title={link.title}
         >
           <span>{link.label}</span>
-          <span className="nav-link-hint">{link.hint}</span>
         </NavLink>
       ))}
     </nav>

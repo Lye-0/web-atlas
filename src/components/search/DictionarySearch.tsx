@@ -5,8 +5,8 @@ import type { SearchResult } from '../../types';
 
 const fieldLabel: Record<SearchResult['matchedField'], string> = {
   name: '名称',
-  alias: 'alias',
-  package: 'package',
+  alias: '別名',
+  package: 'パッケージ名',
   summary: '概要',
 };
 
@@ -27,6 +27,19 @@ export function DictionarySearch() {
   useEffect(() => {
     setActiveIndex(0);
   }, [query]);
+
+  useEffect(() => {
+    const handleShortcut = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        inputRef.current?.focus();
+        setIsOpen(true);
+      }
+    };
+
+    window.addEventListener('keydown', handleShortcut);
+    return () => window.removeEventListener('keydown', handleShortcut);
+  }, []);
 
   const close = () => {
     setIsOpen(false);
@@ -66,7 +79,7 @@ export function DictionarySearch() {
         id="dictionary-search"
         className="search-input"
         type="search"
-        placeholder="Search dictionary"
+        placeholder="技術や分類を検索"
         value={query}
         autoComplete="off"
         onFocus={() => setIsOpen(true)}
@@ -80,7 +93,7 @@ export function DictionarySearch() {
         role="combobox"
         aria-autocomplete="list"
       />
-      <kbd className="search-shortcut">⌘ K</kbd>
+      <kbd className="search-shortcut">⌘ / Ctrl K</kbd>
       {isOpen && query.trim() && (
         <div className="search-popover" id="dictionary-search-results" role="listbox" aria-label="検索結果">
           {results.length > 0 ? (
@@ -94,18 +107,18 @@ export function DictionarySearch() {
                 onMouseEnter={() => setActiveIndex(index)}
                 onClick={close}
               >
-                <span className={`result-kind result-kind-${result.kind}`}>{result.kind === 'stack' ? 'Stack' : 'Category'}</span>
+                <span className={`result-kind result-kind-${result.kind}`}>{result.kind === 'stack' ? '技術' : '分類'}</span>
                 <span className="result-main">
                   <span className="result-name">{result.name}</span>
                   <span className="result-summary">{result.summary}</span>
                 </span>
-                <span className="result-match">{fieldLabel[result.matchedField]}</span>
+                {result.matchedField !== 'name' && <span className="result-match">{fieldLabel[result.matchedField]}</span>}
               </Link>
             ))
           ) : (
             <p className="search-empty">該当する項目がありません。</p>
           )}
-          <p className="search-help">↑↓で移動 · Enterで開く · Escで閉じる</p>
+          <p className="search-help">↑↓で移動・Enterで開く・Escで閉じる</p>
         </div>
       )}
     </div>

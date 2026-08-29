@@ -6,7 +6,7 @@ interface NotFoundPageProps {
 }
 
 export function NotFoundPage({ kind, requestedId }: NotFoundPageProps = {}) {
-  const label = kind === 'category' ? 'Category' : kind === 'stack' ? 'Stack' : 'ページ';
+  const label = kind === 'category' ? '分類' : kind === 'stack' ? '技術' : 'ページ';
   return (
     <section className="not-found" aria-labelledby="not-found-title">
       <p className="eyebrow">404 / NOT FOUND</p>
@@ -16,9 +16,9 @@ export function NotFoundPage({ kind, requestedId }: NotFoundPageProps = {}) {
         {' '}IDを確認するか、Dictionaryの一覧から探してください。
       </p>
       <div className="not-found-actions">
-        <Link className="primary-action" to="/dictionary/map">Stack Mapへ</Link>
-        <Link className="outlined-action" to="/dictionary/categories">Categories</Link>
-        <Link className="outlined-action" to="/dictionary/stacks">Stacks</Link>
+        <Link className="primary-action" to="/dictionary/map">Mapへ</Link>
+        <Link className="outlined-action" to="/dictionary/categories">分類一覧</Link>
+        <Link className="outlined-action" to="/dictionary/stacks">技術一覧</Link>
       </div>
     </section>
   );

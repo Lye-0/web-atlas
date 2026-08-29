@@ -1,87 +1,153 @@
 import { Link } from 'react-router-dom';
-import { getCategory, getStack } from '../../data';
+import { getCategory, getStack, stackMap } from '../../data';
 import type { MapNode } from '../../types';
+import { presentText } from '../../utils/presentationText';
 import { categoryPath, stackPath } from '../../utils/routes';
-import { stackMap } from '../../data';
 
-interface MapNodeViewProps {
-  node: MapNode;
-  depth?: number;
+interface VisualMapGroup {
+  id: string;
+  label: string;
+  description: string;
+  nodeIds: string[];
 }
 
-function MapNodeView({ node, depth = 0 }: MapNodeViewProps) {
+const visualGroups: VisualMapGroup[] = [
+  {
+    id: 'language-runtime',
+    label: '言語と実行基盤',
+    description: 'コードを書く・動かす・依存を揃える',
+    nodeIds: ['languages', 'runtime', 'package-manager'],
+  },
+  {
+    id: 'application',
+    label: 'UIとアプリケーション',
+    description: '画面、アプリの構成、開発ツール',
+    nodeIds: ['framework', 'library', 'ui-component-system', 'build-tool', 'auth-service'],
+  },
+  {
+    id: 'data',
+    label: 'データとストレージ',
+    description: 'データを扱い、保存する仕組み',
+    nodeIds: ['database', 'storage'],
+  },
+  {
+    id: 'quality',
+    label: '品質と検証',
+    description: '動作を確かめ、コードを整える',
+    nodeIds: ['testing', 'code-quality'],
+  },
+  {
+    id: 'delivery',
+    label: '開発と配信',
+    description: '変更を共有し、実行環境へ届ける',
+    nodeIds: ['version-control', 'development-platform', 'ci-cd', 'container', 'deployment-platform'],
+  },
+];
+
+const rootChildren = stackMap.kind === 'group' ? stackMap.children : [];
+
+const getNodeKey = (node: MapNode) => {
+  if (node.kind === 'group') return node.id;
+  if (node.kind === 'category') return node.categoryId;
+  return node.stackId;
+};
+
+const nodeById = new Map(rootChildren.map((node) => [getNodeKey(node), node]));
+
+function MapNodeView({ node }: { node: MapNode }) {
   if (node.kind === 'group') {
     return (
-      <section className={`map-group map-group-depth-${depth}`} aria-labelledby={`map-group-${node.id}`}>
-        <div className="map-group-heading">
-          <span className="map-branch-mark" aria-hidden="true" />
-          <div>
-            <h3 id={`map-group-${node.id}`} className="map-group-title">
-              {node.label}
-            </h3>
-            {node.description && <p className="map-group-description">{node.description}</p>}
-          </div>
+      <li className="map-tree-group-node">
+        <div className="map-subgroup-heading">
+          <span className="map-group-marker" aria-hidden="true" />
+          <span>{node.label}</span>
         </div>
-        <div className="map-children">
-          {node.children.map((child) => (
-            <MapNodeView key={child.kind === 'category' ? child.categoryId : child.kind === 'stack' ? child.stackId : child.id} node={child} depth={depth + 1} />
-          ))}
-        </div>
-      </section>
+        <ul className="map-tree-list map-tree-list-nested">
+          {node.children.map((child) => <MapNodeView key={getNodeKey(child)} node={child} />)}
+        </ul>
+      </li>
     );
   }
 
   if (node.kind === 'category') {
     const category = getCategory(node.categoryId);
     if (!category) return null;
-    const hasNestedCategories = node.children.some((child) => child.kind === 'category');
+
     return (
-      <section className={`map-category${hasNestedCategories ? ' map-category-parent' : ''}`} aria-labelledby={`map-category-${category.id}`}>
-        <Link to={categoryPath(category.id)} className="map-category-node" id={`map-category-${category.id}`}>
-          <span className="map-node-type">Category</span>
-          <span className="map-node-name">{category.name}</span>
-          <span className="map-node-summary">{category.summary}</span>
+      <li className="map-tree-item map-tree-category-item">
+        <Link
+          to={categoryPath(category.id)}
+          className="map-node map-category-node"
+          title={presentText(category.summary)}
+        >
+          <span className="map-node-marker" aria-hidden="true" />
+          <span className="map-node-copy">
+            <span className="map-node-type">分類</span>
+            <span className="map-node-name">{category.name}</span>
+          </span>
         </Link>
         {node.children.length > 0 && (
-          <div className="map-children map-category-children">
-            {node.children.map((child) => (
-              <MapNodeView key={child.kind === 'category' ? child.categoryId : child.kind === 'stack' ? child.stackId : child.id} node={child} depth={depth + 1} />
-            ))}
-          </div>
+          <ul className="map-tree-list map-tree-list-nested">
+            {node.children.map((child) => <MapNodeView key={getNodeKey(child)} node={child} />)}
+          </ul>
         )}
-      </section>
+      </li>
     );
   }
 
   const stack = getStack(node.stackId);
   if (!stack) return null;
+
   return (
-    <Link to={stackPath(stack.id)} className="map-stack-node">
-      <span className="stack-node-dot" aria-hidden="true" />
-      <span className="map-node-name">{stack.name}</span>
-      <span className="map-node-summary">{stack.summary}</span>
-    </Link>
+    <li className="map-tree-item map-tree-stack-item">
+      <Link to={stackPath(stack.id)} className="map-node map-stack-node" title={presentText(stack.summary)}>
+        <span className="map-node-marker" aria-hidden="true" />
+        <span className="map-node-copy">
+          <span className="map-node-type">技術</span>
+          <span className="map-node-name">{stack.name}</span>
+        </span>
+      </Link>
+    </li>
   );
 }
 
 export function StackMap() {
   return (
-    <div className="stack-map" aria-label="Web開発周辺スタックの分類マップ">
+    <div className="stack-map" role="region" aria-label="Web開発技術の分類マップ">
       <div className="map-root-node">
-        <span className="map-node-type">ROOT</span>
-        <span className="map-root-title">Web開発周辺スタック</span>
-        <span className="map-root-subtitle">分類から具体的な技術へ、役割の違いをたどる</span>
+        <span className="map-node-type">全体</span>
+        <strong>Web開発</strong>
+        <span>分類から具体的な技術へ、関係をたどる</span>
       </div>
-      <div className="map-root-children">
-        {(
-          (stackMapRootChildren as MapNode[])
-        ).map((node) => (
-          <MapNodeView key={node.kind === 'category' ? node.categoryId : node.kind === 'stack' ? node.stackId : node.id} node={node} />
-        ))}
+
+      <div className="map-visual-groups">
+        {visualGroups.map((group) => {
+          const nodes = group.nodeIds
+            .map((nodeId) => nodeById.get(nodeId))
+            .filter((node): node is MapNode => Boolean(node));
+
+          return (
+            <section className="map-visual-group" key={group.id} aria-labelledby={`map-visual-group-${group.id}`}>
+              <header className="map-visual-group-heading">
+                <span className="map-group-marker" aria-hidden="true" />
+                <div>
+                  <h3 id={`map-visual-group-${group.id}`}>{group.label}</h3>
+                  <p>{group.description}</p>
+                </div>
+              </header>
+              <ul className="map-tree-list">
+                {nodes.map((node) => <MapNodeView key={getNodeKey(node)} node={node} />)}
+              </ul>
+            </section>
+          );
+        })}
+      </div>
+
+      <div className="map-legend" role="group" aria-label="マップの凡例">
+        <span><span className="map-legend-marker map-legend-category" aria-hidden="true" />分類</span>
+        <span><span className="map-legend-marker map-legend-stack" aria-hidden="true" />技術</span>
+        <span className="map-legend-note">名称を選ぶと詳細を開きます。説明は各詳細ページで確認できます。</span>
       </div>
     </div>
   );
 }
-
-// Kept as a small adapter so the visual root can stay separate from the map's data contract.
-const stackMapRootChildren = stackMap.kind === 'group' ? stackMap.children : [];

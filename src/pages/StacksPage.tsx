@@ -4,23 +4,21 @@ import { StackTable } from '../components/stacks/StackTable';
 export function StacksPage() {
   return (
     <div className="page-stack">
-      <section className="page-hero">
+      <section className="page-intro">
         <div>
-          <p className="eyebrow">03 / TECHNOLOGIES</p>
+          <p className="eyebrow">03 / 技術</p>
           <h1>Stacks</h1>
-          <p className="hero-copy">
-            Vite、React、D1、R2のような具体的な技術が、Web開発のどこで何を担当するのかを調べられます。
-          </p>
+          <p className="intro-copy">個別技術の役割・特徴・関係を調べます。</p>
         </div>
-        <Link className="outlined-action" to="/dictionary/map">Mapを見る <span aria-hidden="true">↗</span></Link>
+        <Link className="intro-link" to="/dictionary/map">Mapを見る <span aria-hidden="true">↗</span></Link>
       </section>
-      <section className="panel">
-        <div className="panel-heading">
+      <section className="dictionary-section" aria-labelledby="stacks-title">
+        <div className="section-heading">
           <div>
-            <p className="eyebrow">STACK INDEX</p>
-            <h2>技術一覧</h2>
+            <p className="section-kicker">技術の索引</p>
+            <h2 id="stacks-title">技術一覧</h2>
           </div>
-          <p className="panel-heading-note">名称、分類、役割を一覧し、詳細ページで関係性をたどれます。</p>
+          <p className="section-note">名称と概要から探し、詳細ページで関係をたどれます。</p>
         </div>
         <StackTable />
       </section>

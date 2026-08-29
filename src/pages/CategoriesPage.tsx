@@ -4,23 +4,21 @@ import { CategoryTable } from '../components/categories/CategoryTable';
 export function CategoriesPage() {
   return (
     <div className="page-stack">
-      <section className="page-hero">
+      <section className="page-intro">
         <div>
-          <p className="eyebrow">02 / CONCEPTS</p>
+          <p className="eyebrow">02 / 分類</p>
           <h1>Categories</h1>
-          <p className="hero-copy">
-            「フレームワークとライブラリは何が違う？」を、技術の名前ではなく役割と境界から理解するための分類辞書です。
-          </p>
+          <p className="intro-copy">分類概念から、技術の役割と違いを理解します。</p>
         </div>
-        <Link className="outlined-action" to="/dictionary/map">Mapを見る <span aria-hidden="true">↗</span></Link>
+        <Link className="intro-link" to="/dictionary/map">Mapを見る <span aria-hidden="true">↗</span></Link>
       </section>
-      <section className="panel">
-        <div className="panel-heading">
+      <section className="dictionary-section" aria-labelledby="categories-title">
+        <div className="section-heading">
           <div>
-            <p className="eyebrow">CATEGORY INDEX</p>
-            <h2>分類一覧</h2>
+            <p className="section-kicker">分類の階層</p>
+            <h2 id="categories-title">分類一覧</h2>
           </div>
-          <p className="panel-heading-note">分類名を選ぶと、役割・違い・具体的なStackを読めます。</p>
+          <p className="section-note">上位分類から下位分類へたどり、詳細ページで比較を読めます。</p>
         </div>
         <CategoryTable />
       </section>

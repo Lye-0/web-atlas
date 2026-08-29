@@ -1,5 +1,6 @@
 import { categories, stacks } from '../data';
 import type { SearchResult } from '../types';
+import { presentText } from './presentationText';
 import { categoryPath, stackPath } from './routes';
 
 const normalize = (value: string) => value.trim().toLocaleLowerCase('ja-JP');
@@ -37,7 +38,7 @@ export function searchDictionary(query: string, limit = 8): SearchResult[] {
           id: category.id,
           kind: 'category',
           name: category.name,
-          summary: category.summary,
+          summary: presentText(category.summary),
           href: categoryPath(category.id),
           matchedField: score === nameScore ? 'name' : score === aliasScore ? 'alias' : 'summary',
         },
@@ -58,7 +59,7 @@ export function searchDictionary(query: string, limit = 8): SearchResult[] {
           id: stack.id,
           kind: 'stack',
           name: stack.name,
-          summary: stack.summary,
+          summary: presentText(stack.summary),
           href: stackPath(stack.id),
           matchedField:
             score === nameScore ? 'name' : score === aliasScore ? 'alias' : score === packageScore ? 'package' : 'summary',

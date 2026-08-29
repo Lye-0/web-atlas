@@ -26,7 +26,7 @@ export default function App() {
       </PageContainer>
       <footer className="app-footer">
         <span>Web Atlas / Dictionary</span>
-        <span>Phase 1 · Knowledge base for the future Analyzer</span>
+        <span>Phase 1 · Technical Dictionary</span>
       </footer>
     </div>
   );

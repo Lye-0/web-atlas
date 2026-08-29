@@ -6,7 +6,7 @@ export function AppHeader() {
   return (
     <header className="app-header">
       <div className="header-inner">
-        <Link to="/dictionary/map" className="brand" aria-label="Web Atlas Dictionary home">
+        <Link to="/dictionary/map" className="brand" aria-label="Web Atlas Dictionaryのホーム">
           <span className="brand-mark" aria-hidden="true">
             <span />
             <span />

@@ -70,6 +70,16 @@ Category・Stackの一覧、Mapノード、詳細ページ内の関連リンク�
 
 黒基調の静かなReference UIとし、色だけに意味を依存させない。semantic HTML、visible focus、keyboard操作、適切なlink / heading階層、モバイルでの一覧のカード化、`prefers-reduced-motion` を維持する。Mapはモバイルで極端に縮小せず、縦方向へ流れるレスポンシブ構造にする。
 
+## Phase 1.1 Presentation Contract
+
+Phase 1.1 は正規Dictionaryデータを変更せず、3画面の役割と情報の見せ方を整理する。画面ごとの責務は次のとおりとする。
+
+- **Map**: Web開発技術の全体像を見る画面。表示は大分類、Category、Stack、親子関係を中心とし、通常状態でsummaryを繰り返さない。
+- **Categories**: 分類概念を理解する画面。親子階層を字下げと接続線で示し、分類の詳細ページで役割・比較・代表Stackを読む。
+- **Stacks**: 個別技術を理解する画面。一覧は名称・Category・概要に絞り、Category filterで探し、詳細ページで責務・特徴・利用場面・関係・公式サイトを読む。
+
+Stable ID、`categoryId`、package名、alias、関連ID、relationship metadataは正規データに残す。一覧やMapでは利用者向け情報を優先し、Stack詳細の「開発者向けメタデータ」に折りたたんで表示する。relationshipのkindは利用者向けには日本語の関係ラベルへ変換する。既存のBrowserRouter、Deep Link、Not Found、検索、Browser historyの契約は維持する。
+
 ## Verification anchors
 
 - `src/data/validateDictionary.test.ts`: 43 Category / 48 Stack、参照整合性、重複検出
