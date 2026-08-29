@@ -38,6 +38,14 @@
 - files: `src/types/dictionary.ts`, `src/data/categories.ts`, `src/data/stacks.ts` …
 - memory: `agent-knowledge/entries/2026-08-29-dictionary-data-contract-e3526cf.md`
 
+### DictionaryのPresentation Contract
+- id: `rm-20260829-dictionary-presentation-contract`
+- type: `decision`
+- maturity: `candidate`
+- tags: `dictionary`, `presentation`, `map`, `categories`, `stacks`, `analyzer`, `accessibility`
+- files: `src/components/map/StackMap.tsx`, `src/components/categories/CategoryTable.tsx`, `src/components/stacks/StackTable.tsx` …
+- memory: `agent-knowledge/entries/2026-08-29-dictionary-presentation-contract-3f555b9.md`
+
 ## Search guidance
 
 Use topic, tags, related paths, filenames, and text search such as `rg` to shortlist entries.
