@@ -6,7 +6,7 @@ status: active
 maturity: candidate
 created: 2026-08-29
 last_verified: 2026-08-29
-source_commit: "3f555b9"
+source_commit: feb8316
 related_files:
   - src/components/map/StackMap.tsx
   - src/components/categories/CategoryTable.tsx
@@ -15,7 +15,8 @@ related_files:
   - src/components/stacks/StackDetail.tsx
   - src/components/search/DictionarySearch.tsx
   - src/utils/categoryHierarchy.ts
-  - src/utils/presentationText.ts
+  - src/data/dictionaryGroups.ts
+  - src/utils/stackStatus.ts
   - docs/technical/dictionary.md
 tags:
   - dictionary
@@ -33,14 +34,15 @@ promoted_to: null
 
 ## Conclusion
 
-Phase 1.1のDictionary UIは、同じ正規データを画面ごとの役割に合わせて見せる。Mapは説明を読む画面ではなく、5つの視覚グループと親子接続でWeb開発の全体像を俯瞰する。Categoriesは親子階層から分類概念と比較へ進む索引、Stacksは名称・Category・概要から個別技術の詳細へ進む索引とする。Mapの通常ノードではsummaryを表示せず、一覧ではstable IDとactive statusを主役にしない。
+Phase 1.2のDictionary UIは、同じ正規データを画面ごとの役割に合わせて見せる。Mapは説明を読む画面ではなく、5つの視覚グループと親子接続でWeb開発の全体像を俯瞰する。CategoriesはMapと同じ5大グループの親子階層から分類概念と比較へ進む索引、Stacksは共通グループのfilterと名称・Category・概要から個別技術の詳細へ進む索引とする。Mapの通常ノードではsummaryを表示せず、一覧ではstable IDとactive statusを主役にしない。
 
-Analyzer接続用の`categoryId`、`packageNames`、`aliases`、`relatedStackIds`、`relationships`は正規データから削除しない。Stack詳細の「開発者向けメタデータ」に折りたたみ、relationship kindは日本語ラベルでsource / relation / targetとして表示する。表示文の技術語はPresentation層で自然な日本語へ寄せるが、stable ID、routing、Deep Link、検索対象の正規データ契約は維持する。
+Analyzer接続用の`categoryId`、`packageNames`、`aliases`、`relatedStackIds`、`relationships`は正規データから削除しない。Stack詳細の「開発者向けメタデータ」に折りたたみ、relationship kindは日本語ラベルでsource / relation / targetとして表示する。利用者向けの文章は正規Dictionaryデータに自然な日本語で直接保持し、表示時の大量文字列置換には依存しない。stable ID、routing、Deep Link、検索対象の正規データ契約は維持する。
 
 ## Scope
 
 Applicable:
 - Phase 1 DictionaryのMap、Categories、Stacks、詳細、検索の表示設計
+- Map・Categories・Stacks filterで共有する5大visual groupの表示設計
 - Desktop / Mobileの情報密度、階層表現、visible focus、reduced motion
 
 Do not apply:
@@ -51,12 +53,13 @@ Do not apply:
 ## Evidence
 
 - `src/components/map/StackMap.tsx` の表示専用visual groupとsummary非表示のMap node
+- `src/data/dictionaryGroups.ts` のpresentation groupingとroot Category検証
 - `src/components/categories/CategoryTable.tsx` と `src/utils/categoryHierarchy.ts` の親子階層一覧
 - `src/components/stacks/StackTable.tsx` の大分類filterとactive status条件表示
 - `src/components/stacks/StackDetail.tsx` の日本語relationship、公式サイト、折りたたみmetadata
 - `src/components/search/DictionarySearch.tsx` の日本語placeholder、結果表示、Ctrl / Cmd + K focus
-- `docs/technical/dictionary.md` のPhase 1.1 Presentation Contract
-- `pnpm build`、`pnpm lint`、`pnpm typecheck`、`pnpm test` の成功（8 tests）
+- `docs/technical/dictionary.md` のPhase 1.1 / 1.2 Presentation Contract
+- `pnpm build`、`pnpm lint`、`pnpm typecheck`、`pnpm test` の成功（9 tests）
 - `agent-browser`でMap、Categories、Stacks、Category / Stack詳細、404、Search、390px viewport、Browser back / forwardを確認し、横スクロールとARIA violationがないことを確認
 
 ## Verification
