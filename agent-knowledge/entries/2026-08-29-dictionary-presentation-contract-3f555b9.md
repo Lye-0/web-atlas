@@ -6,7 +6,7 @@ status: active
 maturity: candidate
 created: 2026-08-29
 last_verified: 2026-08-30
-source_commit: feb8316
+source_commit: 2e46c45
 related_files:
   - src/components/map/StackMap.tsx
   - src/components/categories/CategoryTable.tsx
