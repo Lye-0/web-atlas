@@ -4,6 +4,14 @@
 
 ## deployment
 
+### Workers Buildsでのpnpm install script許可
+- id: `rm-20260829-cloudflare-pnpm-build-scripts`
+- type: `failure`
+- maturity: `candidate`
+- tags: `cloudflare`, `workers-builds`, `pnpm`, `allow-builds`, `esbuild`, `workerd`
+- files: `pnpm-workspace.yaml`, `package.json`, `pnpm-lock.yaml` …
+- memory: `agent-knowledge/entries/2026-08-29-cloudflare-pnpm-build-scripts-786ffc9.md`
+
 ### Cloudflare Workers Static Assetsの公開契約
 - id: `rm-20260829-cloudflare-static-assets`
 - type: `decision`
