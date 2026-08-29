@@ -9,6 +9,22 @@ pnpm install
 pnpm dev
 ```
 
+`pnpm dev` は Vite の開発サーバーを起動します。Cloudflare Workers Static Assets
+としての配信確認は、build後に Wrangler を使う次のコマンドで行えます。
+
+```bash
+pnpm preview:cloudflare
+```
+
+Cloudflareへ公開するには、Cloudflareアカウントへ `pnpm wrangler login` でログインしたうえで実行します。
+
+```bash
+pnpm deploy
+```
+
+`wrangler.jsonc` は Vite の `dist` を静的assetとして登録し、SPAのクライアント側routeへ
+`index.html`をfallbackさせます。backend Worker、DB、Auth、APIはこの公開設定には含めません。
+
 品質確認:
 
 ```bash

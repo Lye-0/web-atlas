@@ -128,6 +128,11 @@ dist
 # pnpm
 .pnpm-store
 
+# Wrangler local state and development secrets
+.wrangler/
+.dev.vars*
+!.dev.vars.example
+
 # yarn v3
 .pnp.*
 .yarn/*

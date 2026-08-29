@@ -14,6 +14,17 @@ Phase 1 の責務は Dictionary の表示・検索・相互リンク・データ
 - `src/data/index.ts` が起動時にデータ検証を実行し、ID lookup mapとCategory別のStack取得を公開する。
 - `src/pages/` はルート単位の画面、`src/components/` はレイアウト・検索・Map・詳細表示のUIを担当する。
 
+## 公開構成
+
+Vite の build 出力 `dist` を Cloudflare Workers Static Assets から配信する。ルートの
+`wrangler.jsonc` は `assets.directory` を `./dist` に固定し、`not_found_handling` を
+`single-page-application` に設定することで、BrowserRouter の deep link を `index.html` に
+fallback させる。backend Worker、binding、DB、Auth、APIは持たない静的構成である。
+
+- `pnpm dev`: Vite の開発サーバー
+- `pnpm preview:cloudflare`: build後に `wrangler dev` でWorkers配信をローカル確認
+- `pnpm deploy`: build後に `wrangler deploy` でCloudflareへ公開
+
 ## データモデルと不変条件
 
 `CategoryEntry` と `StackEntry` は安定した `id` を持ち、表示名の変更とは独立して URL と将来の Analyzer から参照できる。Stack は少なくとも次の接続用メタデータを持つ。
