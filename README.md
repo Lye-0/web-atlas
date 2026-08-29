@@ -25,6 +25,9 @@ pnpm deploy
 `wrangler.jsonc` は Vite の `dist` を静的assetとして登録し、SPAのクライアント側routeへ
 `index.html`をfallbackさせます。backend Worker、DB、Auth、APIはこの公開設定には含めません。
 
+`pnpm-workspace.yaml` では、pnpm 11のinstall時スクリプト制御により、Vite / Wranglerの実行に
+必要な `esbuild` と `workerd` だけを許可しています。
+
 ### Cloudflare Workers Builds（GitHub自動公開）
 
 GitHub Actionsを使わず、Cloudflare Workers BuildsのGitHub連携で自動公開できます。

@@ -19,6 +19,8 @@ account IDを保存しない。
 - `mise.toml` で Node.js `24.18.0` と pnpm `11.24.0` を既に固定しているため、今回のために
   version管理fileを追加しない。
 - `package-lock.json` は生成しない。依存関係のlockfileは `pnpm-lock.yaml` のみを使う。
+- `pnpm-workspace.yaml` の `allowBuilds` では、Vite / Wranglerの実行に必要な `esbuild` と
+  `workerd` のinstall scriptだけを許可する。他の依存パッケージのinstall scriptは許可しない。
 - `.github/workflows/` は追加しない。Workers BuildsがGitHubから直接buildとdeployを実行する。
 
 手動公開用の `pnpm run deploy`（build + `wrangler deploy`）は残す。Workers Buildsでは
