@@ -14,10 +14,10 @@ export function MapPage() {
         </div>
         <div className="intro-actions">
           <Link className="intro-link" to={dictionaryRoutes.categories}>
-            分類から読む <span aria-hidden="true">↗</span>
+            分類から読む <span aria-hidden="true">→</span>
           </Link>
           <Link className="intro-link" to={dictionaryRoutes.stacks}>
-            技術から読む <span aria-hidden="true">↗</span>
+            技術から読む <span aria-hidden="true">→</span>
           </Link>
         </div>
       </section>

@@ -76,6 +76,14 @@ Phase 1.2では、Map・Categories・Stacks filterが同じ5つの表示グル�
 
 `searchDictionary` はCategoryの名称・alias・概要と、Stackの名称・alias・package名・概要を正規化して検索する。名称、alias、package名、概要の順に高いスコアを付け、上位8件を返す。`DictionarySearch` は矢印キー、Enter、Escapeを扱い、選択時はReact Routerで対応URLへ遷移する。
 
+## Phase 1.3 Presentation Contract
+
+MapのDesktop表示は5列均等配置を使わず、`Web開発`を起点に中央の縦幹と左右2レーンで5大visual groupを表示する。左レーンは「UIとアプリケーション」「品質と検証」、右レーンは「言語と実行基盤」「データとストレージ」「開発と配信」とし、各groupは`dictionaryVisualGroups`の`side` / `order`を使って配置する。Mapのコネクタは通常のdividerより明確にし、Category / Stackの内部Treeは既存のmarkerと字下げを維持する。
+
+Mapは`max-width: 1100px`以下で左右レーンを圧縮せず、1列の縦Treeへ切り替える。Rootから5大groupへの縦接続は狭幅でも残し、長いCategory / Stack名を文字サイズの縮小で解決せず、通常の単語境界で折り返す。Mapの通常ノードではsummaryを表示しない。
+
+Stacksの「すべて」は同じ5大visual groupごとに区切って表示し、個別filter選択時はgroup見出しを重複させない。Stack名の近くにCategoryリンクを置き、`active` statusは隠し、例外statusだけを共通日本語ラベルで表示する。内部Dictionaryリンクの矢印は`→`、公式サイトなど外部リンクは`↗`とする。Categoriesの階層とDetailのDocument構造は維持する。
+
 ## UI・アクセシビリティ方針
 
 黒基調の静かなReference UIとし、色だけに意味を依存させない。semantic HTML、visible focus、keyboard操作、適切なlink / heading階層、モバイルでの一覧のカード化、`prefers-reduced-motion` を維持する。Mapはモバイルで極端に縮小せず、縦方向へ流れるレスポンシブ構造にする。

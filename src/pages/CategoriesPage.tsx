@@ -10,7 +10,7 @@ export function CategoriesPage() {
           <h1>Categories</h1>
           <p className="intro-copy">分類概念から、技術の役割と違いを理解します。</p>
         </div>
-        <Link className="intro-link" to="/dictionary/map">Mapを見る <span aria-hidden="true">↗</span></Link>
+        <Link className="intro-link" to="/dictionary/map">Mapを見る <span aria-hidden="true">→</span></Link>
       </section>
       <section className="dictionary-section" aria-labelledby="categories-title">
         <div className="section-heading">

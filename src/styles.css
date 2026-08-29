@@ -8,11 +8,12 @@
   --line-soft: rgba(105, 123, 120, 0.28);
   --text: #eff4f1;
   --text-soft: #c5cfcb;
-  --muted: #8e9b96;
-  --subtle: #697773;
+  --muted: #a1ada8;
+  --subtle: #788780;
   --accent: #acdcca;
   --accent-strong: #d2f0e3;
   --warm: #d8ba91;
+  --connector: rgba(143, 172, 163, 0.62);
   --content-width: 1320px;
   --reading-width: 880px;
   --radius-sm: 5px;
@@ -471,17 +472,17 @@ summary:focus-visible {
 }
 
 .stack-map {
-  padding-top: 22px;
+  padding-top: 16px;
 }
 
 .map-root-node {
   position: relative;
   display: grid;
   gap: 2px;
-  width: max-content;
-  min-width: min(340px, 100%);
+  width: min(100%, 460px);
+  min-width: 0;
   margin: 0 auto;
-  padding: 10px 0 10px 16px;
+  padding: 10px 18px;
   border-left: 3px solid var(--accent);
 }
 
@@ -490,8 +491,8 @@ summary:focus-visible {
   top: 100%;
   left: 50%;
   width: 1px;
-  height: 54px;
-  background: var(--line-soft);
+  height: 32px;
+  background: var(--connector);
   content: "";
 }
 
@@ -508,57 +509,69 @@ summary:focus-visible {
 }
 
 .map-visual-groups {
+  --map-trunk: 56px;
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.35fr) minmax(0, 1.05fr) minmax(0, 0.95fr) minmax(0, 1.1fr);
-  grid-template-areas: "language-runtime application data quality delivery";
+  grid-template-columns: minmax(0, 1fr) var(--map-trunk) minmax(0, 1fr);
   align-items: start;
-  gap: 30px 24px;
-  margin-top: 54px;
-  padding-top: 25px;
+  gap: 0;
+  margin-top: 32px;
 }
 
-.map-visual-groups::before {
+.map-visual-lane {
+  display: grid;
+  align-content: start;
+  gap: 34px;
+  min-width: 0;
+}
+
+.map-visual-lane-left {
+  grid-column: 1;
+}
+
+.map-central-trunk {
+  position: relative;
+  grid-column: 2;
+  align-self: stretch;
+  min-height: 100%;
+}
+
+.map-central-trunk::before {
   position: absolute;
   top: 0;
-  right: 4%;
-  left: 4%;
-  height: 1px;
-  background: var(--line-soft);
-  content: "";
-}
-
-.map-visual-groups::after {
-  position: absolute;
-  top: -54px;
+  bottom: 0;
   left: 50%;
-  width: 1px;
-  height: 54px;
-  background: var(--line-soft);
+  width: 2px;
+  background: var(--connector);
   content: "";
 }
 
-.map-visual-group-language-runtime { grid-area: language-runtime; }
-.map-visual-group-application { grid-area: application; }
-.map-visual-group-data { grid-area: data; }
-.map-visual-group-quality { grid-area: quality; }
-.map-visual-group-delivery { grid-area: delivery; }
+.map-visual-lane-right {
+  grid-column: 3;
+}
 
 .map-visual-group {
   position: relative;
   min-width: 0;
-  padding-top: 12px;
-  border-top: 2px solid rgba(216, 186, 145, 0.48);
+  padding: 0 0 6px;
 }
 
-.map-visual-group::before {
+.map-visual-lane-left .map-visual-group::after,
+.map-visual-lane-right .map-visual-group::after {
   position: absolute;
-  top: -25px;
-  left: 50%;
-  width: 1px;
-  height: 25px;
-  background: var(--line-soft);
+  top: 24px;
+  width: calc(var(--map-trunk) / 2);
+  height: 2px;
+  background: var(--connector);
   content: "";
+}
+
+.map-visual-lane-left .map-visual-group::after {
+  right: calc(var(--map-trunk) / -2);
+}
+
+.map-visual-lane-right .map-visual-group::after {
+  left: calc(var(--map-trunk) / -2);
 }
 
 .map-visual-group-heading {
@@ -597,7 +610,7 @@ summary:focus-visible {
   gap: 4px;
   padding: 0 0 0 17px;
   margin: 15px 0 0;
-  border-left: 1px solid var(--line-soft);
+  border-left: 1px solid var(--connector);
   list-style: none;
 }
 
@@ -606,6 +619,7 @@ summary:focus-visible {
   margin-top: 4px;
   margin-left: 19px;
   padding-left: 14px;
+  border-left-color: var(--connector);
 }
 
 .map-tree-item,
@@ -621,7 +635,7 @@ summary:focus-visible {
   left: -18px;
   width: 17px;
   height: 1px;
-  background: var(--line-soft);
+  background: var(--connector);
   content: "";
 }
 
@@ -670,6 +684,8 @@ summary:focus-visible {
   font-size: 0.9rem;
   font-weight: 620;
   line-height: 1.45;
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 
 .map-subgroup-heading {
@@ -824,7 +840,7 @@ summary:focus-visible {
 .category-index-root:hover .category-index-arrow,
 .category-index-link:hover .category-index-arrow {
   color: var(--accent);
-  transform: translate(2px, -2px);
+  transform: translateX(3px);
 }
 
 .category-index-children {
@@ -889,6 +905,39 @@ summary:focus-visible {
   min-width: 0;
 }
 
+.stack-index-groups {
+  display: grid;
+  gap: 34px;
+}
+
+.stack-index-visual-group {
+  min-width: 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.stack-index-visual-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 3px;
+}
+
+.stack-index-visual-heading h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 1.08rem;
+  font-weight: 670;
+  line-height: 1.45;
+}
+
+.stack-index-visual-heading p {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
 .stack-toolbar {
   display: flex;
   align-items: center;
@@ -927,7 +976,7 @@ summary:focus-visible {
 
 .stack-index-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(170px, 0.34fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 24px;
   min-width: 0;
@@ -937,26 +986,39 @@ summary:focus-visible {
 
 .stack-index-main {
   display: grid;
+  grid-template-columns: max-content max-content;
+  grid-template-areas:
+    "title category"
+    "summary summary";
+  align-items: baseline;
+  column-gap: 12px;
   min-width: 0;
   gap: 3px;
+}
+
+.stack-index-title {
+  grid-area: title;
+  min-width: 0;
+  color: var(--text);
   text-decoration: none;
 }
 
-.stack-index-main strong {
+.stack-index-title strong {
   color: var(--text);
   font-size: 0.99rem;
   font-weight: 660;
   line-height: 1.45;
 }
 
-.stack-index-main span {
+.stack-index-title:hover strong {
+  color: var(--accent-strong);
+}
+
+.stack-index-summary {
+  grid-area: summary;
   color: var(--muted);
   font-size: 0.87rem;
   line-height: 1.55;
-}
-
-.stack-index-main:hover strong {
-  color: var(--accent-strong);
 }
 
 .stack-index-meta {
@@ -968,6 +1030,8 @@ summary:focus-visible {
 }
 
 .stack-index-category {
+  grid-area: category;
+  justify-self: start;
   color: var(--warm);
   font-size: 0.82rem;
   text-decoration: none;
@@ -1498,20 +1562,49 @@ summary:focus-visible {
   }
 
   .map-visual-groups {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-areas:
-      "language-runtime application"
-      "data quality"
-      "delivery delivery";
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0;
     margin-top: 28px;
-    padding-top: 0;
+    padding-left: 28px;
   }
 
-  .map-root-node::after,
-  .map-visual-groups::before,
-  .map-visual-groups::after,
-  .map-visual-group::before {
+  .map-root-node {
+    width: 100%;
+    margin: 0;
+  }
+
+  .map-root-node::after {
+    left: 12px;
+    height: 28px;
+    background: var(--connector);
+  }
+
+  .map-visual-lane {
+    display: contents;
+  }
+
+  .map-central-trunk {
     display: none;
+  }
+
+  .map-visual-groups::before {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 12px;
+    width: 2px;
+    background: var(--connector);
+    content: "";
+  }
+
+  .map-visual-lane-left .map-visual-group::after,
+  .map-visual-lane-right .map-visual-group::after {
+    top: 23px;
+    left: -16px;
+    width: 16px;
+    height: 2px;
+    background: var(--connector);
   }
 
   .detail-layout {
@@ -1578,36 +1671,15 @@ summary:focus-visible {
   }
 
   .map-visual-groups {
-    grid-template-areas:
-      "language-runtime"
-      "application"
-      "data"
-      "quality"
-      "delivery";
+    grid-template-areas: none;
   }
 
   .category-index-group-list {
     grid-template-columns: 1fr;
   }
 
-  .map-visual-groups::before,
-  .map-visual-groups::after,
-  .map-visual-group::before {
-    display: none;
-  }
-
-  .map-root-node::after,
-  .map-visual-groups::after {
-    display: block;
-  }
-
-  .map-root-node::after {
-    height: 28px;
-  }
-
-  .map-visual-groups::after {
-    top: -28px;
-    height: 28px;
+  .map-visual-group {
+    padding-bottom: 18px;
   }
 }
 
@@ -1710,9 +1782,9 @@ summary:focus-visible {
   }
 
   .map-visual-groups {
-    gap: 21px;
-    margin-top: 22px;
-    padding-top: 19px;
+    gap: 0;
+    margin-top: 28px;
+    padding-top: 0;
   }
 
   .map-visual-group {
@@ -1808,11 +1880,20 @@ summary:focus-visible {
     padding: 14px 0;
   }
 
+  .stack-index-main {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "title"
+      "category"
+      "summary";
+    row-gap: 3px;
+  }
+
   .stack-index-meta {
     justify-content: flex-start;
   }
 
-  .stack-index-main span {
+  .stack-index-summary {
     font-size: 0.86rem;
   }
 

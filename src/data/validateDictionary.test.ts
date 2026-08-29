@@ -75,5 +75,14 @@ describe('dictionary data', () => {
     expect(validateDictionaryVisualGroups(brokenGroups, categories)).toContain(
       `Root category is assigned to multiple visual groups: ${brokenGroups[0].rootCategoryIds[0]}`,
     );
+
+    const duplicatedOrderGroups = dictionaryVisualGroups.map((group) => ({
+      ...group,
+      rootCategoryIds: [...group.rootCategoryIds],
+    }));
+    duplicatedOrderGroups[2].order = duplicatedOrderGroups[0].order;
+    expect(validateDictionaryVisualGroups(duplicatedOrderGroups, categories)).toContain(
+      `Visual group order is duplicated on ${duplicatedOrderGroups[2].side}: ${duplicatedOrderGroups[2].order}`,
+    );
   });
 });

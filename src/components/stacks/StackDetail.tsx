@@ -48,7 +48,7 @@ export function StackDetail({ stack }: { stack: StackEntry }) {
           <p className="detail-summary">{stack.summary}</p>
           <p className="detail-description">{stack.description}</p>
           <div className="stack-meta-row">
-            {category && <Link className="detail-category-link" to={categoryPath(category.id)}>{category.name} <span aria-hidden="true">↗</span></Link>}
+            {category && <Link className="detail-category-link" to={categoryPath(category.id)}>{category.name} <span aria-hidden="true">→</span></Link>}
             {stack.status !== 'active' && <span className={`stack-status stack-status-${stack.status}`}>{stackStatusLabels[stack.status]}</span>}
           </div>
         </header>
@@ -113,7 +113,7 @@ export function StackDetail({ stack }: { stack: StackEntry }) {
                     <strong>{related.name}</strong>
                     <span>{related.summary}</span>
                   </span>
-                  <span aria-hidden="true">↗</span>
+                  <span aria-hidden="true">→</span>
                 </Link>
               ))}
             </div>

@@ -10,7 +10,7 @@ export function StacksPage() {
           <h1>Stacks</h1>
           <p className="intro-copy">個別技術の役割・特徴・関係を調べます。</p>
         </div>
-        <Link className="intro-link" to="/dictionary/map">Mapを見る <span aria-hidden="true">↗</span></Link>
+        <Link className="intro-link" to="/dictionary/map">Mapを見る <span aria-hidden="true">→</span></Link>
       </section>
       <section className="dictionary-section" aria-labelledby="stacks-title">
         <div className="section-heading">

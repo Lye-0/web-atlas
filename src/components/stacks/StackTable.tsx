@@ -16,15 +16,46 @@ const stackFilters: StackFilter[] = [
   ...dictionaryVisualGroups.map(({ id, label, rootCategoryIds }) => ({ id, label, rootCategoryIds })),
 ];
 
+function isStackInGroup(stack: (typeof stacks)[number], rootCategoryIds: string[]) {
+  return rootCategoryIds.includes(getRootCategoryId(stack.categoryId));
+}
+
+function StackRow({ stack }: { stack: (typeof stacks)[number] }) {
+  const category = categoryById.get(stack.categoryId);
+
+  return (
+    <div className="stack-index-row" role="listitem">
+      <div className="stack-index-main">
+        <Link className="stack-index-title" to={stackPath(stack.id)}>
+          <strong>{stack.name}</strong>
+        </Link>
+        {category && <Link className="stack-index-category" to={categoryPath(category.id)}>{category.name}</Link>}
+        <span className="stack-index-summary">{stack.summary}</span>
+      </div>
+      <div className="stack-index-meta">
+        {stack.status !== 'active' && <span className={`stack-status stack-status-${stack.status}`}>{stackStatusLabels[stack.status]}</span>}
+      </div>
+    </div>
+  );
+}
+
 export function StackTable() {
   const [filterId, setFilterId] = useState('all');
   const selectedFilter = stackFilters.find((filter) => filter.id === filterId) ?? stackFilters[0];
   const visibleStacks = useMemo(
     () => stacks.filter((stack) => {
       if (!selectedFilter.rootCategoryIds) return true;
-      return selectedFilter.rootCategoryIds.includes(getRootCategoryId(stack.categoryId));
+      return isStackInGroup(stack, selectedFilter.rootCategoryIds);
     }),
     [selectedFilter],
+  );
+
+  const groupedStacks = useMemo(
+    () => dictionaryVisualGroups.map((group) => ({
+      group,
+      stacks: stacks.filter((stack) => isStackInGroup(stack, group.rootCategoryIds)),
+    })),
+    [],
   );
 
   return (
@@ -41,23 +72,28 @@ export function StackTable() {
         <span className="stack-result-count" aria-live="polite">{visibleStacks.length}件</span>
       </div>
 
-      <div className="stack-index-list" role="list" aria-label="技術一覧">
-        {visibleStacks.map((stack) => {
-          const category = categoryById.get(stack.categoryId);
-          return (
-            <div className="stack-index-row" role="listitem" key={stack.id}>
-              <Link className="stack-index-main" to={stackPath(stack.id)}>
-                <strong>{stack.name}</strong>
-                <span>{stack.summary}</span>
-              </Link>
-              <div className="stack-index-meta">
-                {category && <Link className="stack-index-category" to={categoryPath(category.id)}>{category.name}</Link>}
-                {stack.status !== 'active' && <span className={`stack-status stack-status-${stack.status}`}>{stackStatusLabels[stack.status]}</span>}
+      {filterId === 'all' ? (
+        <div className="stack-index-groups">
+          {groupedStacks.map(({ group, stacks: groupStacks }) => (
+            <section className="stack-index-visual-group" key={group.id} aria-labelledby={`stack-visual-group-${group.id}`}>
+              <header className="stack-index-visual-heading">
+                <span className="category-index-root-marker" aria-hidden="true" />
+                <div>
+                  <h3 id={`stack-visual-group-${group.id}`}>{group.label}</h3>
+                  <p>{group.description}</p>
+                </div>
+              </header>
+              <div className="stack-index-list" role="list" aria-label={`${group.label}の技術一覧`}>
+                {groupStacks.map((stack) => <StackRow key={stack.id} stack={stack} />)}
               </div>
-            </div>
-          );
-        })}
-      </div>
+            </section>
+          ))}
+        </div>
+      ) : (
+        <div className="stack-index-list" role="list" aria-label="技術一覧">
+          {visibleStacks.map((stack) => <StackRow key={stack.id} stack={stack} />)}
+        </div>
+      )}
 
       {visibleStacks.length === 0 && <p className="empty-state">この分類に該当する技術はありません。</p>}
     </div>

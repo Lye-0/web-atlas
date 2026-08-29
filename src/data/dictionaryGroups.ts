@@ -4,6 +4,8 @@ export interface DictionaryVisualGroup {
   id: string;
   label: string;
   description: string;
+  side: 'left' | 'right';
+  order: number;
   rootCategoryIds: string[];
 }
 
@@ -16,30 +18,40 @@ export const dictionaryVisualGroups: DictionaryVisualGroup[] = [
     id: 'language-runtime',
     label: '言語と実行基盤',
     description: 'コードを書く・動かす・依存を揃える',
+    side: 'right',
+    order: 1,
     rootCategoryIds: ['markup-language', 'stylesheet-language', 'programming-language', 'runtime', 'package-manager'],
   },
   {
     id: 'application',
     label: 'UIとアプリケーション',
     description: '画面、アプリの構成、開発ツール',
+    side: 'left',
+    order: 2,
     rootCategoryIds: ['framework', 'library', 'ui-component-system', 'build-tool', 'auth-service'],
   },
   {
     id: 'data',
     label: 'データとストレージ',
     description: 'データを扱い、保存する仕組み',
+    side: 'right',
+    order: 3,
     rootCategoryIds: ['database', 'storage'],
   },
   {
     id: 'quality',
     label: '品質と検証',
     description: '動作を確かめ、コードを整える',
+    side: 'left',
+    order: 4,
     rootCategoryIds: ['testing', 'code-quality'],
   },
   {
     id: 'delivery',
     label: '開発と配信',
     description: '変更を共有し、実行環境へ届ける',
+    side: 'right',
+    order: 5,
     rootCategoryIds: ['version-control', 'development-platform', 'ci-cd', 'container', 'deployment-platform'],
   },
 ];
@@ -53,10 +65,25 @@ export function validateDictionaryVisualGroups(
   const rootCategoryIds = new Set(categories.filter((category) => !category.parentCategoryId).map((category) => category.id));
   const seenGroupIds = new Set<string>();
   const seenRootCategoryIds = new Set<string>();
+  const seenOrdersBySide = new Map<DictionaryVisualGroup['side'], Set<number>>();
 
   for (const group of groups) {
     if (seenGroupIds.has(group.id)) errors.push(`Visual group ID is duplicated: ${group.id}`);
     seenGroupIds.add(group.id);
+
+    if (group.side !== 'left' && group.side !== 'right') {
+      errors.push(`Visual group has an invalid side: ${group.id}`);
+    }
+    if (!Number.isInteger(group.order) || group.order < 1) {
+      errors.push(`Visual group has an invalid order: ${group.id}`);
+    } else {
+      const orders = seenOrdersBySide.get(group.side) ?? new Set<number>();
+      if (orders.has(group.order)) {
+        errors.push(`Visual group order is duplicated on ${group.side}: ${group.order}`);
+      }
+      orders.add(group.order);
+      seenOrdersBySide.set(group.side, orders);
+    }
 
     if (group.rootCategoryIds.length === 0) errors.push(`Visual group has no root category: ${group.id}`);
 

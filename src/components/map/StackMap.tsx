@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { dictionaryVisualGroups, getCategory, getStack, stackMap } from '../../data';
+import type { DictionaryVisualGroup } from '../../data/dictionaryGroups';
 import type { MapNode } from '../../types';
 import { categoryPath, stackPath } from '../../utils/routes';
 
@@ -23,6 +24,10 @@ const collectCategoryNodes = (node: MapNode) => {
 };
 
 rootChildren.forEach(collectCategoryNodes);
+
+const groupsBySide = (side: DictionaryVisualGroup['side']) => dictionaryVisualGroups
+  .filter((group) => group.side === side)
+  .sort((a, b) => a.order - b.order);
 
 function MapNodeView({ node }: { node: MapNode }) {
   if (node.kind === 'group') {
@@ -79,7 +84,35 @@ function MapNodeView({ node }: { node: MapNode }) {
   );
 }
 
+function MapVisualGroup({ group }: { group: DictionaryVisualGroup }) {
+  const nodes = group.rootCategoryIds
+    .map((categoryId) => categoryNodeById.get(categoryId))
+    .filter((node): node is Extract<MapNode, { kind: 'category' }> => Boolean(node));
+
+  return (
+    <section
+      className={`map-visual-group map-visual-group-${group.id}`}
+      style={{ order: group.order }}
+      aria-labelledby={`map-visual-group-${group.id}`}
+    >
+      <header className="map-visual-group-heading">
+        <span className="map-group-marker" aria-hidden="true" />
+        <div>
+          <h3 id={`map-visual-group-${group.id}`}>{group.label}</h3>
+          <p>{group.description}</p>
+        </div>
+      </header>
+      <ul className="map-tree-list">
+        {nodes.map((node) => <MapNodeView key={getNodeKey(node)} node={node} />)}
+      </ul>
+    </section>
+  );
+}
+
 export function StackMap() {
+  const leftGroups = groupsBySide('left');
+  const rightGroups = groupsBySide('right');
+
   return (
     <div className="stack-map" role="region" aria-label="Web開発技術の分類マップ">
       <div className="map-root-node">
@@ -88,30 +121,13 @@ export function StackMap() {
       </div>
 
       <div className="map-visual-groups">
-        {dictionaryVisualGroups.map((group) => {
-          const nodes = group.rootCategoryIds
-            .map((categoryId) => categoryNodeById.get(categoryId))
-            .filter((node): node is Extract<MapNode, { kind: 'category' }> => Boolean(node));
-
-          return (
-            <section
-              className={`map-visual-group map-visual-group-${group.id}`}
-              key={group.id}
-              aria-labelledby={`map-visual-group-${group.id}`}
-            >
-              <header className="map-visual-group-heading">
-                <span className="map-group-marker" aria-hidden="true" />
-                <div>
-                  <h3 id={`map-visual-group-${group.id}`}>{group.label}</h3>
-                  <p>{group.description}</p>
-                </div>
-              </header>
-              <ul className="map-tree-list">
-                {nodes.map((node) => <MapNodeView key={getNodeKey(node)} node={node} />)}
-              </ul>
-            </section>
-          );
-        })}
+        <div className="map-visual-lane map-visual-lane-left">
+          {leftGroups.map((group) => <MapVisualGroup key={group.id} group={group} />)}
+        </div>
+        <div className="map-central-trunk" aria-hidden="true" />
+        <div className="map-visual-lane map-visual-lane-right">
+          {rightGroups.map((group) => <MapVisualGroup key={group.id} group={group} />)}
+        </div>
       </div>
 
       <div className="map-legend" role="group" aria-label="マップの凡例">
