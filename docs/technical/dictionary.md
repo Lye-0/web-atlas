@@ -72,7 +72,7 @@ Phase 1.2では、Map・Categories・Stacks filterが同じ5つの表示グル�
 - MapはWeb開発全体の俯瞰、Categoriesは分類概念の理解、Stacksは個別技術の理解を担当する。Mapの通常ノードではsummaryを繰り返さず、Stacks一覧ではactive statusとstable IDを主役にしない。
 - `categoryId`、`packageNames`、`aliases`、`relatedStackIds`、`relationships` などAnalyzer接続用metadataは正規データに残し、Stack詳細の開発者向けメタデータで確認できる。
 
-Categoriesの一覧は、5大visual groupをmarkerlessで強いGroup Headingとして表示し、その下にparent Category、child Categoryを並べる。parent Categoryはsquare markerとstrong row / block、child Categoryはindentとnested connectorを持つ。Categoriesでは分類の意味を読むためsummaryを読みやすいsecondary textとして表示し、Mapのsummary非表示とは役割を分ける。Desktopは意味のある2columnを維持し、`max-width: 820px`では1columnに切り替えてCategory name + internal arrowとsummaryを2段に分ける。Group dividerはCategory row dividerより強く、nested connectorはsummaryより弱い階層表現とする。
+Categoriesの一覧は、5大visual groupをmarkerlessで強いGroup Headingとして表示し、その下にparent Category、child Categoryを並べる。parent Categoryはsquare markerとstrong row / block、child Categoryはindentとnested connectorを持つ。Categoriesでは分類の意味を読むためsummaryを読みやすいsecondary textとして表示し、Mapのsummary非表示とは役割を分ける。Desktopは意味のある2columnを維持し、`max-width: 820px`では1columnに切り替えてCategory name + arrowとsummaryを2段に分ける。Category Detailへ進む一覧内のCategory rowは`↗`、Group dividerはCategory row dividerより強く、nested connectorはsummaryより弱い階層表現とする。
 
 ## Search
 
@@ -84,7 +84,7 @@ MapのDesktop表示は5列均等配置を使わず、`Web開発`を起点に中�
 
 Mapは`max-width: 1100px`以下で左右レーンを圧縮せず、1列の縦Treeへ切り替える。Rootから5大groupへの縦接続は狭幅でも残し、長いCategory / Stack名を文字サイズの縮小で解決せず、通常の単語境界で折り返す。Mapの通常ノードではsummaryを表示しない。
 
-Stacksの「すべて」は同じ5大visual groupごとに区切って表示し、個別filter選択時はgroup見出しを重複させない。Stack名の近くにCategoryリンクを置き、`active` statusは隠し、例外statusだけを共通日本語ラベルで表示する。内部Dictionaryリンクの矢印は`→`、公式サイトなど外部リンクは`↗`とする。Categoriesの階層とDetailのDocument構造は維持する。
+Stacksの「すべて」は同じ5大visual groupごとに区切って表示し、個別filter選択時はgroup見出しを重複させない。Stack名の近くにCategoryリンクを置き、`active` statusは隠し、例外statusだけを共通日本語ラベルで表示する。通常の内部Dictionaryリンクの矢印は`→`、Categories一覧のCategory Detail rowは`↗`、公式サイトなど外部リンクは`↗`とする。Categoriesの階層とDetailのDocument構造は維持する。
 
 ## Phase 1.3.1 Presentation Contract
 

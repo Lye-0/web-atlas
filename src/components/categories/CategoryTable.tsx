@@ -13,9 +13,9 @@ function CategoryTreeItem({ node }: { node: CategoryTreeNode }) {
         <span className="category-index-marker" aria-hidden="true" />
         <span className="category-index-copy">
           <strong>{category.name}</strong>
-          <span>{category.summary}</span>
         </span>
-        <span className="category-index-arrow" aria-hidden="true">→</span>
+        <span className="category-index-summary">{category.summary}</span>
+        <span className="category-index-arrow" aria-hidden="true">↗</span>
       </Link>
       {children.length > 0 && (
         <ul className="category-index-children">
@@ -58,8 +58,8 @@ export function CategoryTable() {
                     <span className="category-index-root-copy">
                       <strong>{category.name}</strong>
                     </span>
-                    <span className="category-index-root-summary">{category.summary}</span>
-                    <span className="category-index-arrow" aria-hidden="true">→</span>
+                    <span className="category-index-summary">{category.summary}</span>
+                    <span className="category-index-arrow" aria-hidden="true">↗</span>
                   </Link>
                   {children.length > 0 && (
                     <ul className="category-index-children category-index-children-root">
