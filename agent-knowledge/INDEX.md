@@ -46,6 +46,14 @@
 - files: `src/components/map/StackMap.tsx`, `src/components/categories/CategoryTable.tsx`, `src/components/stacks/StackTable.tsx` …
 - memory: `agent-knowledge/entries/2026-08-29-dictionary-presentation-contract-3f555b9.md`
 
+### Dictionary Mapの左右mirror契約
+- id: `rm-20260830-dictionary-map-mirror`
+- type: `decision`
+- maturity: `reused`
+- tags: `dictionary`, `presentation`, `map`, `mirror`, `responsive`, `accessibility`
+- files: `src/components/map/StackMap.tsx`, `src/styles.css`, `src/data/dictionaryGroups.ts` …
+- memory: `agent-knowledge/entries/2026-08-30-dictionary-map-mirror-7c2d1a.md`
+
 ## Search guidance
 
 Use topic, tags, related paths, filenames, and text search such as `rg` to shortlist entries.

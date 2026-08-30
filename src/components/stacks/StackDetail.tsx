@@ -34,7 +34,7 @@ export function StackDetail({ stack }: { stack: StackEntry }) {
   const officialHostname = stack.officialUrl ? new URL(stack.officialUrl).hostname : undefined;
 
   return (
-    <article className="detail-layout" aria-labelledby="stack-title">
+    <article className="stack-detail detail-layout" aria-labelledby="stack-title">
       <div className="detail-main">
         <div className="breadcrumb">
           <Link to="/dictionary/stacks">Stacks</Link>
@@ -43,12 +43,16 @@ export function StackDetail({ stack }: { stack: StackEntry }) {
         </div>
 
         <header className="detail-header" id="overview">
-          <p className="eyebrow">技術</p>
           <h1 id="stack-title">{stack.name}</h1>
           <p className="detail-summary">{stack.summary}</p>
           <p className="detail-description">{stack.description}</p>
           <div className="stack-meta-row">
-            {category && <Link className="detail-category-link" to={categoryPath(category.id)}>{category.name} <span aria-hidden="true">→</span></Link>}
+            {category && (
+              <Link className="detail-category-link" to={categoryPath(category.id)}>
+                {category.name}
+                <span className="detail-category-arrow" aria-hidden="true">↗</span>
+              </Link>
+            )}
             {stack.status !== 'active' && <span className={`stack-status stack-status-${stack.status}`}>{stackStatusLabels[stack.status]}</span>}
           </div>
         </header>
@@ -64,7 +68,7 @@ export function StackDetail({ stack }: { stack: StackEntry }) {
         <section className="document-section" id="features" aria-labelledby="features-title">
           <p className="section-kicker">特徴</p>
           <h2 id="features-title">主な特徴</h2>
-          <ul className="feature-list">
+          <ul className={`feature-list${stack.features.length >= 4 ? ' feature-list-dense' : ''}`}>
             {stack.features.map((feature) => <li key={feature}>{feature}</li>)}
           </ul>
         </section>
@@ -86,12 +90,15 @@ export function StackDetail({ stack }: { stack: StackEntry }) {
                 const relation = relationLabels[relationship.kind];
                 return (
                   <div className="relationship-item" key={`${relationship.kind}-${relationship.targetStackId}`}>
-                    <div className="relationship-row" aria-label={`${stack.name} ${relation} ${relationship.target.name}`}>
+                    <div className="relationship-row" role="group" aria-label={`${stack.name} ${relation} ${relationship.target.name}`}>
                       <span className="relationship-source">{stack.name}</span>
-                      <span className="relationship-arrow" aria-hidden="true">→</span>
+                      <span className="relationship-arrow relationship-arrow-before" aria-hidden="true">──</span>
                       <span className="relationship-kind">{relation}</span>
-                      <span className="relationship-arrow" aria-hidden="true">→</span>
-                      <Link to={stackPath(relationship.target.id)} className="relationship-target">{relationship.target.name}</Link>
+                      <span className="relationship-arrow relationship-arrow-after" aria-hidden="true">→</span>
+                      <Link to={stackPath(relationship.target.id)} className="relationship-target">
+                        {relationship.target.name}
+                        <span className="relationship-target-arrow" aria-hidden="true">↗</span>
+                      </Link>
                     </div>
                     {relationship.label && relationship.label !== relation && <p className="relationship-context">{relationship.label}</p>}
                     {relationship.explanation && <p>{relationship.explanation}</p>}
@@ -113,7 +120,7 @@ export function StackDetail({ stack }: { stack: StackEntry }) {
                     <strong>{related.name}</strong>
                     <span>{related.summary}</span>
                   </span>
-                  <span aria-hidden="true">→</span>
+                  <span className="document-link-arrow" aria-hidden="true">↗</span>
                 </Link>
               ))}
             </div>

@@ -72,6 +72,8 @@ Phase 1.2では、Map・Categories・Stacks filterが同じ5つの表示グル�
 - MapはWeb開発全体の俯瞰、Categoriesは分類概念の理解、Stacksは個別技術の理解を担当する。Mapの通常ノードではsummaryを繰り返さず、Stacks一覧ではactive statusとstable IDを主役にしない。
 - `categoryId`、`packageNames`、`aliases`、`relatedStackIds`、`relationships` などAnalyzer接続用metadataは正規データに残し、Stack詳細の開発者向けメタデータで確認できる。
 
+Categoriesの一覧は、5大visual groupをmarkerlessで強いGroup Headingとして表示し、その下にparent Category、child Categoryを並べる。parent Categoryはsquare markerとstrong row / block、child Categoryはindentとnested connectorを持つ。Categoriesでは分類の意味を読むためsummaryを読みやすいsecondary textとして表示し、Mapのsummary非表示とは役割を分ける。Desktopは意味のある2columnを維持し、`max-width: 820px`では1columnに切り替えてCategory name + arrowとsummaryを2段に分ける。Category Detailへ進む一覧内のCategory rowは`↗`、Group dividerはCategory row dividerより強く、nested connectorはsummaryより弱い階層表現とする。
+
 ## Search
 
 `searchDictionary` はCategoryの名称・alias・概要と、Stackの名称・alias・package名・概要を正規化して検索する。名称、alias、package名、概要の順に高いスコアを付け、上位8件を返す。`DictionarySearch` は矢印キー、Enter、Escapeを扱い、選択時はReact Routerで対応URLへ遷移する。
@@ -82,11 +84,37 @@ MapのDesktop表示は5列均等配置を使わず、`Web開発`を起点に中�
 
 Mapは`max-width: 1100px`以下で左右レーンを圧縮せず、1列の縦Treeへ切り替える。Rootから5大groupへの縦接続は狭幅でも残し、長いCategory / Stack名を文字サイズの縮小で解決せず、通常の単語境界で折り返す。Mapの通常ノードではsummaryを表示しない。
 
-Stacksの「すべて」は同じ5大visual groupごとに区切って表示し、個別filter選択時はgroup見出しを重複させない。Stack名の近くにCategoryリンクを置き、`active` statusは隠し、例外statusだけを共通日本語ラベルで表示する。内部Dictionaryリンクの矢印は`→`、公式サイトなど外部リンクは`↗`とする。Categoriesの階層とDetailのDocument構造は維持する。
+Stacksの「すべて」は同じ5大visual groupごとに区切って表示し、個別filter選択時はgroup見出しを重複させない。Stack一覧はStack名の近くにCategory labelを置き、row全体をStack Detailへの単一リンクとして`↗`を表示する。`active` statusは隠し、例外statusだけを共通日本語ラベルで表示する。通常の内部Dictionaryリンクの矢印は`→`、Categories一覧のCategory Detail rowとStacks一覧のStack Detail rowは`↗`、公式サイトなど外部リンクも`↗`とする。Categoriesの階層とDetailのDocument構造は維持する。
+
+## Phase 1.3.1 Presentation Contract
+
+Phase 1.3.1では、中央幹型のDesktop Mapを維持したまま、左レーンを右レーンの視覚的mirrorとして扱う。右レーンは「中央幹 → group → Category → Stack」、左レーンは「Stack ← Category ← group ← 中央幹」の方向で、左右のgroup heading、marker、Tree connectorがそれぞれ中央幹側を向く。5大visual groupのheadingはMap専用のmarkerlessな構造見出しとし、group descriptionはMap上に表示しない。
+
+左レーンのTreeは、`min-width: 1101px`で`padding-right`、`right`側のpseudo connector、`row-reverse`のmarker配置を使って明示的に反転する。各Tree `li` の縦線とbranch線は別のpseudo elementで描画し、`li:last-child`では縦線を自身のbranch位置で止める。`transform: scaleX(-1)`、Canvas、SVG座標のJavaScript計算は使わない。group branchはmarkerlessなheading行へ接続し、中央幹を装飾線ではなく5大groupの親構造線として見せる。
+
+Mapのセクション見出しは`構造`とし、`Web開発`はTree Rootに1回だけ表示する。Rootには装飾用accent barを置かず、Root文字の直下から実際のconnectorを開始する。Root connector、中央幹、NarrowのGroup幹は共通の2pxで連続させる。Wideでは中央幹のレイアウト列を`84px`、Group headingから子Tree縦線までを`10px`として、中央幹から子Tree縦線までの間隔を確保する。Root descriptionはMapに表示せず、Categoryは四角marker、Stackは円形markerを維持しつつ、Categoryをやや強く、Stackをやや控えめに表示する。Mapの階層indentはgroup、Category、child branchごとに確保し、desktopの目安は`30px / 26px / 20px`、Groupからchild treeまでのgapは`24px`とする。長い名称は通常の単語境界で折り返す。
+
+`max-width: 1100px`では中央幹を隠し、左レーンの反転を解除して、Rootから5大groupへ続く通常方向の1列Vertical Treeへ戻す。狭幅のRootは`padding-left: 0`とし、Root文字とconnectorをコンテンツ外側へ寄せ、`--map-mobile-root-offset: 8px`でRoot幹を文字のW中央付近へ寄せる。`--map-mobile-group-offset: 28px`でRoot / Group幹を外側の一本に接続し、Group headingから子Tree縦線まで`10px`を確保して、その縦線を先頭文字の中央付近へ置く。狭幅では`map-mobile-group-list`の`ul > li`としてgroupを`dictionaryVisualGroups`のpresentation metadata（`order`）順に描画し、Rootの縦線と各groupのbranchを静的CSSで接続する。canonical taxonomyやCategory / Stack ID、Analyzer metadataは変更しない。
+
+## Phase 1.3.2 Presentation Contract
+
+Stacks一覧は多数の技術を走査する索引として、Desktopでは`Stack名 + Category label | Summary | ↗`の3領域を1行にまとめる。Stack名をprimary / semibold、Categoryをwarm系の補助label、Summaryを読みやすいsecondary textとし、Stack row dividerは`line-soft`、5大visual groupの境界はそれより強くする。Group HeadingはStack rowより大きく強いaccent見出しとし、Group間の余白でSectionの切り替わりを示す。`max-width: 820px`以下ではStack名 + `↗`、Category、Summaryの3段に切り替え、CategoryがStack名やSummaryの横幅を圧迫しないようにする。Stack rowは全体をStack Detailへの単一focusable linkとし、Category labelはnested interactive elementを避けるため一覧では非リンク表示にする。Filterはlabel・select・件数を一つのcontrol areaとして扱い、`active` statusは非表示、例外statusだけを表示する。canonical data、`dictionaryVisualGroups`、Map / Categories / Detailの構造は変更しない。
 
 ## UI・アクセシビリティ方針
 
 黒基調の静かなReference UIとし、色だけに意味を依存させない。semantic HTML、visible focus、keyboard操作、適切なlink / heading階層、モバイルでの一覧のカード化、`prefers-reduced-motion` を維持する。Mapはモバイルで極端に縮小せず、縦方向へ流れるレスポンシブ構造にする。
+
+## Category Detail Presentation Contract
+
+Category DetailはDocument構造を維持し、Desktopでは読み幅を保ったMain Contentと近接したSidebarを同じGrid内に配置する。H1とSection間隔は一覧画面より落ち着いた密度とし、Section label、Sidebar heading、比較labelは本文との階層差を保ちながら読み取れるコントラストを確保する。Category / Stack Detailへ進む「具体的な技術」「関連する分類」のrowは全体をfocusableなlinkとして`↗`を表示し、戻るlinkは`←`を維持する。
+
+Mobile / NarrowではCategory DetailのDocument本文を1列で流し、「このページ」のTOCを非表示にする。「関連する分類」はSidebarではなく本文後の通常Sectionとして残し、全幅row・十分なtap area・右側の`↗`・dividerで表示する。Breadcrumb直下の重複する種別eyebrowはCategory / Stack Detailの両方から除去し、本文・metadata・relationship構造は変更しない。Category Detail専用CSSで実装し、Map、Categories / Stacks一覧、canonical dataには波及させない。
+
+## Stack Detail Presentation Contract
+
+Stack DetailはCategory Detailと同じDictionary DetailのMain + Sidebar、読み幅、column gap、Section spacing、small label、divider、TOC、visible focusのルールを共有する。Stack固有のCategory / Related Stack / Relationship targetへの内部Detail導線は`↗`、Stacks一覧への戻るlinkは`←`、公式サイトの外部導線も`↗`とする。Related Stack rowは名前・summary・arrowを含む全体を単一focusable linkとして表示する。
+
+「主な特徴」は少数項目を1列、多数項目（4件以上）をDesktop 2列、Narrowを1列とする。RelationshipはSource / Relation / Targetを一つのrow groupにまとめ、幅不足時だけ自然にwrapする。Mobile / NarrowではTOCを非表示にし、本文を上から下へ読む。Developer metadata、Analyzer metadata、Summary / Description、bullet、Relationship dataは変更しない。
 
 ## Phase 1.1 Presentation Contract
 

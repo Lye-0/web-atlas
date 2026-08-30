@@ -20,7 +20,7 @@ export function CategoryDetail({ category }: { category: CategoryEntry }) {
   const categoryStacks = stacksForCategory(category.id);
 
   return (
-    <article className="detail-layout" aria-labelledby="category-title">
+    <article className="category-detail detail-layout" aria-labelledby="category-title">
       <div className="detail-main">
         <div className="breadcrumb">
           <Link to="/dictionary/categories">Categories</Link>
@@ -29,7 +29,6 @@ export function CategoryDetail({ category }: { category: CategoryEntry }) {
         </div>
 
         <header className="detail-header" id="overview">
-          <p className="eyebrow">分類</p>
           <h1 id="category-title">{category.name}</h1>
           <p className="detail-summary">{category.summary}</p>
           <p className="detail-description">{category.description}</p>
@@ -65,7 +64,7 @@ export function CategoryDetail({ category }: { category: CategoryEntry }) {
                     <strong>{child.name}</strong>
                     <span>{child.summary}</span>
                   </span>
-                  <span aria-hidden="true">→</span>
+                  <span className="document-link-arrow" aria-hidden="true">↗</span>
                 </Link>
               ))}
             </div>
@@ -96,7 +95,7 @@ export function CategoryDetail({ category }: { category: CategoryEntry }) {
                     <strong>{stack.name}</strong>
                     <span>{stack.summary}</span>
                   </span>
-                  <span aria-hidden="true">→</span>
+                  <span className="document-link-arrow" aria-hidden="true">↗</span>
                 </Link>
               ))}
             </div>
@@ -117,7 +116,7 @@ export function CategoryDetail({ category }: { category: CategoryEntry }) {
         <nav className="detail-related" aria-label="関連する分類">
           <p className="aside-heading">関連する分類</p>
           {relatedCategories.length > 0 ? relatedCategories.map((related) => (
-            <Link key={related.id} to={categoryPath(related.id)}>{related.name}<span aria-hidden="true">→</span></Link>
+            <Link key={related.id} to={categoryPath(related.id)}>{related.name}<span className="detail-related-arrow" aria-hidden="true">↗</span></Link>
           )) : <span className="muted-copy">関連分類はありません。</span>}
         </nav>
       </aside>
