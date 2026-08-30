@@ -521,7 +521,7 @@ summary:focus-visible {
 .map-visual-lane {
   display: grid;
   align-content: start;
-  gap: 34px;
+  gap: 26px;
   min-width: 0;
 }
 
@@ -559,7 +559,7 @@ summary:focus-visible {
 .map-visual-lane-left .map-visual-group::after,
 .map-visual-lane-right .map-visual-group::after {
   position: absolute;
-  top: 24px;
+  top: 10px;
   width: calc(var(--map-trunk) / 2);
   height: 2px;
   background: var(--connector);
@@ -703,6 +703,48 @@ summary:focus-visible {
   width: 7px;
   height: 7px;
   margin-top: 0;
+}
+
+@media (min-width: 1101px) {
+  .map-visual-lane-left .map-visual-group,
+  .map-visual-lane-left .map-visual-group-heading,
+  .map-visual-lane-left .map-node,
+  .map-visual-lane-left .map-subgroup-heading {
+    text-align: right;
+  }
+
+  .map-visual-lane-left .map-visual-group-heading,
+  .map-visual-lane-left .map-node,
+  .map-visual-lane-left .map-subgroup-heading {
+    flex-direction: row-reverse;
+    justify-content: flex-start;
+  }
+
+  .map-visual-lane-left .map-node-copy {
+    justify-content: flex-end;
+    text-align: right;
+  }
+
+  .map-visual-lane-left .map-tree-list {
+    padding: 0 17px 0 0;
+    border-right: 1px solid var(--connector);
+    border-left: 0;
+  }
+
+  .map-visual-lane-left .map-tree-list-nested {
+    margin-right: 19px;
+    margin-left: 0;
+    padding-right: 14px;
+    padding-left: 0;
+    border-right-color: var(--connector);
+    border-left: 0;
+  }
+
+  .map-visual-lane-left .map-tree-item::before,
+  .map-visual-lane-left .map-tree-group-node::before {
+    right: -18px;
+    left: auto;
+  }
 }
 
 .map-legend {
@@ -1602,6 +1644,7 @@ summary:focus-visible {
   .map-visual-lane-right .map-visual-group::after {
     top: 23px;
     left: -16px;
+    right: auto;
     width: 16px;
     height: 2px;
     background: var(--connector);
