@@ -6,7 +6,7 @@ status: active
 maturity: reused
 created: 2026-08-30
 last_verified: 2026-08-30
-source_commit: "9f203cf"
+source_commit: "52a150d"
 related_files:
   - src/components/map/StackMap.tsx
   - src/styles.css
@@ -33,6 +33,8 @@ Mapのセクション見出しは`構造`、Tree Rootは`Web開発`の1回だけ
 
 最終visual調整では、Group直下のchild treeに`--map-group-to-children-gap: 24px`を確保し、desktopのgroup / Category / child branch indentは`30px / 26px / 20px`を維持する。Group headingはmarkerless・accent色・`1.12rem / 720`、Categoryは四角marker・primary色・`0.94rem / 660`、Stackは円形marker・より軽い表示として、Root / Group / Category / Stackの4段階をタイポグラフィとspacingでも区別する。
 
+狭幅のRootは`padding-left: 0`とRoot pseudo connectorの`left: 0`でコンテンツ外側へ寄せ、`--map-mobile-group-offset: 28px`でRoot / Group幹を外側の一本に接続する。これにより子Treeの縦線は幹から28px内側に置く。Wideは`--map-trunk-gap: 84px`の中央レイアウト列で、中央幹から子Tree縦線まで42pxを確保する。
+
 ## Scope
 
 Applicable:
@@ -51,10 +53,11 @@ Do not apply:
 - `src/styles.css`のTree `li` connectorにある非末尾の縦線、末尾の`:last-child`停止、branch線の分離
 - `src/styles.css`のRootに装飾barを持たせず、文字直下のpseudo connectorと`30px / 26px / 20px`のdesktop階層indentを使う定義
 - `src/styles.css`の`--map-trunk-width: 2px`、`--map-group-to-children-gap: 24px`、Group / Categoryの階層別typographyと、Group直下リストへのgap適用
+- `src/styles.css`の`--map-trunk-gap: 84px`、`--map-mobile-group-offset: 28px`、狭幅Rootの`padding-left: 0` / connector `left: 0`
 - `src/styles.css`の`@media (max-width: 1100px)`にある中央幹非表示、Group単位の通常方向connector、最終Groupでの停止、Root接続、左側right offset解除
 - `src/components/map/StackMap.tsx`のsemanticなRoot / group / Category / Stack構造と、presentation `order`順のmobile group list
 - `src/data/dictionaryGroups.ts`の`side` / `order` presentation metadata
-- 1600 / 1440 / 1280 / 1100 / 1024 / 900 / 768 / 390pxでのブラウザ確認。1600 / 1440 / 1280pxは2レーン、1100px以下は1列、全幅でhorizontal overflowなし。1440 / 1100 / 390pxではconnectorを目視確認
+- 1600 / 1440 / 1280 / 1100 / 1024 / 900 / 820 / 768 / 390pxでのブラウザ確認。1600 / 1440 / 1280pxは2レーンで中央幹から子Tree縦線まで42px、1100px以下は1列でRoot / Group幹から子Tree縦線まで28px、全幅でhorizontal overflowなし。1440 / 1280 / 390pxではconnectorとRoot位置を目視確認
 - Categories、Stacks、Category Detail、HTML / React Detail、404、Search候補からReactへのDeep Link、Browser back / forwardを今回再確認
 - `pnpm install --frozen-lockfile`、`pnpm build`、`pnpm lint`、`pnpm typecheck`、`pnpm test`（3 files / 9 tests）、`pnpm exec wrangler deploy --dry-run`（4 assets、bindingなし）の成功
 
