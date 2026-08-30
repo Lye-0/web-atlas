@@ -1252,25 +1252,32 @@ summary:focus-visible {
   gap: clamp(38px, 7vw, 92px);
 }
 
-.category-detail.detail-layout {
+.category-detail.detail-layout,
+.stack-detail.detail-layout {
   justify-content: start;
   gap: clamp(28px, 4vw, 56px);
 }
 
-.category-detail .detail-header h1 {
+.category-detail .detail-header h1,
+.stack-detail .detail-header h1 {
   font-size: clamp(2rem, 3.6vw, 2.95rem);
 }
 
-.category-detail .document-section {
+.category-detail .document-section,
+.stack-detail .document-section {
   padding: 27px 0 30px;
 }
 
-.category-detail .section-kicker {
+.category-detail .section-kicker,
+.stack-detail .section-kicker {
   color: var(--muted);
 }
 
 .category-detail .document-link-arrow,
-.category-detail .detail-related-arrow {
+.category-detail .detail-related-arrow,
+.stack-detail .document-link-arrow,
+.stack-detail .detail-category-arrow,
+.stack-detail .relationship-target-arrow {
   color: var(--accent);
   font-size: 1rem;
   font-weight: 650;
@@ -1279,33 +1286,41 @@ summary:focus-visible {
 }
 
 .category-detail .document-link-row:hover .document-link-arrow,
-.category-detail .detail-related a:hover .detail-related-arrow {
+.category-detail .detail-related a:hover .detail-related-arrow,
+.stack-detail .document-link-row:hover .document-link-arrow,
+.stack-detail .detail-category-link:hover .detail-category-arrow,
+.stack-detail .relationship-target:hover .relationship-target-arrow {
   color: var(--accent-strong);
   transform: translate(2px, -2px);
 }
 
 .category-detail .document-link-row:focus-visible,
-.category-detail .detail-related a:focus-visible {
+.category-detail .detail-related a:focus-visible,
+.stack-detail .document-link-row:focus-visible {
   outline-offset: -2px;
 }
 
-.category-detail .detail-aside {
+.category-detail .detail-aside,
+.stack-detail .detail-aside {
   gap: 34px;
 }
 
 .category-detail .detail-toc,
-.category-detail .detail-related {
+.category-detail .detail-related,
+.stack-detail .detail-toc {
   gap: 10px;
   border-left-color: rgba(143, 172, 163, 0.42);
 }
 
 .category-detail .detail-toc .aside-heading,
-.category-detail .detail-related .aside-heading {
+.category-detail .detail-related .aside-heading,
+.stack-detail .detail-toc .aside-heading {
   color: var(--muted);
 }
 
 .category-detail .detail-toc a,
-.category-detail .detail-related a {
+.category-detail .detail-related a,
+.stack-detail .detail-toc a {
   color: var(--text-soft);
   line-height: 1.6;
 }
@@ -1313,6 +1328,61 @@ summary:focus-visible {
 .category-detail .comparison-row {
   grid-template-columns: minmax(145px, 0.32fr) minmax(0, 1fr);
   gap: 20px;
+}
+
+.stack-detail .detail-category-link {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+}
+
+.stack-detail .document-link-row:hover {
+  border-bottom-color: rgba(143, 172, 163, 0.5);
+}
+
+.stack-detail .feature-list {
+  grid-template-columns: 1fr;
+}
+
+.stack-detail .feature-list-dense {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.stack-detail .relationship-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 6px 9px;
+}
+
+.stack-detail .relationship-source,
+.stack-detail .relationship-target {
+  min-width: 0;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+.stack-detail .relationship-target {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.stack-detail .relationship-kind {
+  order: initial;
+  width: auto;
+  padding-left: 0;
+}
+
+.stack-detail .relationship-arrow-before {
+  color: var(--subtle);
+  letter-spacing: -0.08em;
+}
+
+.stack-detail .relationship-arrow-after {
+  color: var(--subtle);
 }
 
 .detail-main {
@@ -1868,7 +1938,8 @@ summary:focus-visible {
     gap: 42px;
   }
 
-  .category-detail.detail-layout {
+  .category-detail.detail-layout,
+  .stack-detail.detail-layout {
     grid-template-columns: minmax(0, 1fr) minmax(145px, 165px);
     gap: 36px;
   }
@@ -1930,6 +2001,12 @@ summary:focus-visible {
     font-size: clamp(1.9rem, 10vw, 2.55rem);
   }
 
+  .stack-detail .detail-header h1 {
+    font-size: clamp(1.8rem, 8.3vw, 2.45rem);
+    overflow-wrap: normal;
+    word-break: normal;
+  }
+
   .category-detail .detail-aside {
     display: block;
     padding-top: 30px;
@@ -1956,6 +2033,18 @@ summary:focus-visible {
     min-height: 46px;
     padding: 10px 0;
     border-bottom: 1px solid var(--line-soft);
+  }
+
+  .stack-detail .detail-aside {
+    display: none;
+  }
+
+  .stack-detail .detail-toc {
+    display: none;
+  }
+
+  .stack-detail .feature-list {
+    grid-template-columns: 1fr;
   }
 
   .category-index {
@@ -2286,7 +2375,8 @@ summary:focus-visible {
     padding: 26px 0 29px;
   }
 
-  .category-detail .document-section {
+  .category-detail .document-section,
+  .stack-detail .document-section {
     padding: 26px 0 29px;
   }
 
@@ -2320,10 +2410,6 @@ summary:focus-visible {
     order: 3;
     width: 100%;
     padding-left: 1px;
-  }
-
-  .relationship-row .relationship-arrow:nth-of-type(2) {
-    display: none;
   }
 
   .relationship-context {

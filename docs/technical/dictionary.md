@@ -110,6 +110,12 @@ Category DetailはDocument構造を維持し、Desktopでは読み幅を保っ�
 
 Mobile / NarrowではCategory DetailのDocument本文を1列で流し、「このページ」のTOCを非表示にする。「関連する分類」はSidebarではなく本文後の通常Sectionとして残し、全幅row・十分なtap area・右側の`↗`・dividerで表示する。Breadcrumb直下の重複する種別eyebrowはCategory / Stack Detailの両方から除去し、本文・metadata・relationship構造は変更しない。Category Detail専用CSSで実装し、Map、Categories / Stacks一覧、canonical dataには波及させない。
 
+## Stack Detail Presentation Contract
+
+Stack DetailはCategory Detailと同じDictionary DetailのMain + Sidebar、読み幅、column gap、Section spacing、small label、divider、TOC、visible focusのルールを共有する。Stack固有のCategory / Related Stack / Relationship targetへの内部Detail導線は`↗`、Stacks一覧への戻るlinkは`←`、公式サイトの外部導線も`↗`とする。Related Stack rowは名前・summary・arrowを含む全体を単一focusable linkとして表示する。
+
+「主な特徴」は少数項目を1列、多数項目（4件以上）をDesktop 2列、Narrowを1列とする。RelationshipはSource / Relation / Targetを一つのrow groupにまとめ、幅不足時だけ自然にwrapする。Mobile / NarrowではTOCを非表示にし、本文を上から下へ読む。Developer metadata、Analyzer metadata、Summary / Description、bullet、Relationship dataは変更しない。
+
 ## Phase 1.1 Presentation Contract
 
 Phase 1.1 は正規Dictionaryデータを変更せず、3画面の役割と情報の見せ方を整理する。画面ごとの責務は次のとおりとする。
