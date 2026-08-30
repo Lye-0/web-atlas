@@ -51,7 +51,7 @@ Do not apply:
 - `src/components/map/StackMap.tsx`のsemanticなRoot / group / Category / Stack構造と、presentation `order`順のmobile group list
 - `src/data/dictionaryGroups.ts`の`side` / `order` presentation metadata
 - 1600 / 1440 / 1280 / 1100 / 1024 / 900 / 768 / 390pxでのブラウザ確認。1600 / 1440 / 1280pxは2レーン、1100px以下は1列、全幅でhorizontal overflowなし。1440 / 1100 / 390pxではconnectorを目視確認
-- Categories、Stacks、Category Detail、HTML / React Detail、404を今回再確認。Search、Deep Link、Browser back / forwardは今回の変更対象外で、追加のlive操作確認はしていない
+- Categories、Stacks、Category Detail、HTML / React Detail、404、Search候補からReactへのDeep Link、Browser back / forwardを今回再確認
 - `pnpm install --frozen-lockfile`、`pnpm build`、`pnpm lint`、`pnpm typecheck`、`pnpm test`（3 files / 9 tests）、`pnpm exec wrangler deploy --dry-run`（4 assets、bindingなし）の成功
 
 ## Verification
