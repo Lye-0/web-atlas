@@ -12,7 +12,7 @@ export function CategoriesPage() {
         </div>
         <Link className="intro-link" to="/dictionary/map">Mapを見る <span aria-hidden="true">→</span></Link>
       </section>
-      <section className="dictionary-section" aria-labelledby="categories-title">
+      <section className="dictionary-section categories-section" aria-labelledby="categories-title">
         <div className="section-heading">
           <div>
             <p className="section-kicker">分類の階層</p>

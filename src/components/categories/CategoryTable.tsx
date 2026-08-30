@@ -49,7 +49,10 @@ export function CategoryTable() {
             </header>
             <div className="category-index-group-list">
               {rootTrees.map(({ category, children }) => (
-                <section className="category-index-group" key={category.id}>
+                <section
+                  className={`category-index-group${children.length > 0 ? ' category-index-group-has-children' : ''}`}
+                  key={category.id}
+                >
                   <Link className="category-index-root" to={categoryPath(category.id)} title={category.description}>
                     <span className="category-index-root-marker" aria-hidden="true" />
                     <span className="category-index-root-copy">

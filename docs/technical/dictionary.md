@@ -72,6 +72,8 @@ Phase 1.2では、Map・Categories・Stacks filterが同じ5つの表示グル�
 - MapはWeb開発全体の俯瞰、Categoriesは分類概念の理解、Stacksは個別技術の理解を担当する。Mapの通常ノードではsummaryを繰り返さず、Stacks一覧ではactive statusとstable IDを主役にしない。
 - `categoryId`、`packageNames`、`aliases`、`relatedStackIds`、`relationships` などAnalyzer接続用metadataは正規データに残し、Stack詳細の開発者向けメタデータで確認できる。
 
+Categoriesの一覧は、5大visual groupをmarkerlessで強いGroup Headingとして表示し、その下にparent Category、child Categoryを並べる。parent Categoryはsquare markerとstrong row / block、child Categoryはindentとnested connectorを持つ。Categoriesでは分類の意味を読むためsummaryを読みやすいsecondary textとして表示し、Mapのsummary非表示とは役割を分ける。Desktopは意味のある2columnを維持し、`max-width: 820px`では1columnに切り替えてCategory name + internal arrowとsummaryを2段に分ける。Group dividerはCategory row dividerより強く、nested connectorはsummaryより弱い階層表現とする。
+
 ## Search
 
 `searchDictionary` はCategoryの名称・alias・概要と、Stackの名称・alias・package名・概要を正規化して検索する。名称、alias、package名、概要の順に高いスコアを付け、上位8件を返す。`DictionarySearch` は矢印キー、Enter、Escapeを扱い、選択時はReact Routerで対応URLへ遷移する。

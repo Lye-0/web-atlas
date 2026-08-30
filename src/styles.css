@@ -440,6 +440,17 @@ summary:focus-visible {
   min-width: 0;
 }
 
+.categories-section .section-heading {
+  display: grid;
+  justify-items: start;
+  gap: 7px;
+}
+
+.categories-section .section-note {
+  max-width: 620px;
+  text-align: left;
+}
+
 .section-heading {
   display: flex;
   align-items: end;
@@ -830,36 +841,43 @@ summary:focus-visible {
 }
 
 .category-index {
+  --category-connector: rgba(143, 172, 163, 0.48);
+  --category-summary: var(--text-soft);
   display: grid;
-  gap: 34px;
+  gap: 42px;
 }
 
 .category-index-visual-group {
   min-width: 0;
-  padding-top: 18px;
+  padding-top: 22px;
   border-top: 1px solid var(--line);
 }
 
 .category-index-visual-heading {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  margin-bottom: 4px;
+  gap: 0;
+  margin-bottom: 18px;
+}
+
+.category-index-visual-heading > .category-index-root-marker {
+  display: none;
 }
 
 .category-index-visual-heading h3 {
   margin: 0;
-  color: var(--text);
-  font-size: 1.08rem;
-  font-weight: 670;
+  color: var(--accent-strong);
+  font-size: 1.18rem;
+  font-weight: 720;
+  letter-spacing: -0.01em;
   line-height: 1.45;
 }
 
 .category-index-visual-heading p {
-  margin: 3px 0 0;
-  color: var(--muted);
-  font-size: 0.82rem;
-  line-height: 1.5;
+  margin: 6px 0 0;
+  color: var(--text-soft);
+  font-size: 0.84rem;
+  line-height: 1.55;
 }
 
 .category-index-group-list {
@@ -871,16 +889,22 @@ summary:focus-visible {
 
 .category-index-group {
   min-width: 0;
-  padding: 18px 0 19px;
-  border-bottom: 1px solid var(--line);
+  padding: 16px 0 18px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.category-index-group-has-children {
+  padding-bottom: 24px;
 }
 
 .category-index-root {
-  display: grid;
-  grid-template-columns: auto minmax(0, 0.7fr) minmax(0, 1fr) auto;
+  display: flex;
   align-items: center;
-  gap: 10px;
+  width: 100%;
   min-width: 0;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
   color: var(--text);
   text-decoration: none;
 }
@@ -891,6 +915,7 @@ summary:focus-visible {
 }
 
 .category-index-root-marker {
+  flex: 0 0 auto;
   width: 10px;
   height: 10px;
   border: 2px solid var(--warm);
@@ -900,27 +925,36 @@ summary:focus-visible {
 .category-index-root-copy,
 .category-index-copy {
   display: grid;
+  flex: 0 1 20rem;
+  max-width: 42%;
   min-width: 0;
   gap: 2px;
 }
 
 .category-index-root-copy strong {
-  overflow: hidden;
-  font-size: 0.98rem;
-  font-weight: 670;
-  line-height: 1.45;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.4;
+  overflow-wrap: break-word;
 }
 
 .category-index-root-summary,
 .category-index-copy > span {
-  color: var(--muted);
-  font-size: 0.82rem;
-  line-height: 1.5;
+  color: var(--category-summary);
+  font-size: 0.84rem;
+  line-height: 1.55;
+  overflow-wrap: break-word;
+}
+
+.category-index-root-summary {
+  flex: 0 1 38ch;
+  max-width: 38ch;
+  min-width: 0;
 }
 
 .category-index-arrow {
+  flex: 0 0 auto;
   color: var(--subtle);
   font-size: 0.95rem;
   transition: color 140ms ease, transform 140ms ease;
@@ -934,15 +968,16 @@ summary:focus-visible {
 
 .category-index-children {
   display: grid;
-  gap: 1px;
-  padding: 2px 0 0 22px;
-  margin: 12px 0 0 4px;
-  border-left: 1px solid var(--line-soft);
+  gap: 3px;
+  padding: 8px 0 0 26px;
+  margin: 16px 0 0 5px;
+  border-left: 1px solid var(--category-connector);
   list-style: none;
 }
 
 .category-index-children .category-index-children {
-  margin-top: 2px;
+  margin-top: 6px;
+  padding-left: 22px;
 }
 
 .category-index-item {
@@ -951,11 +986,11 @@ summary:focus-visible {
 
 .category-index-item::before {
   position: absolute;
-  top: 22px;
-  left: -22px;
-  width: 21px;
+  top: 25px;
+  left: -26px;
+  width: 25px;
   height: 1px;
-  background: var(--line-soft);
+  background: var(--category-connector);
   content: "";
 }
 
@@ -965,8 +1000,8 @@ summary:focus-visible {
   align-items: center;
   gap: 9px;
   min-width: 0;
-  min-height: 43px;
-  padding: 5px 7px;
+  min-height: 42px;
+  padding: 6px 8px;
   border-radius: var(--radius-sm);
   text-decoration: none;
   transition: background 140ms ease, color 140ms ease;
@@ -977,6 +1012,7 @@ summary:focus-visible {
 }
 
 .category-index-marker {
+  flex: 0 0 auto;
   width: 7px;
   height: 7px;
   border: 2px solid var(--warm);
@@ -986,8 +1022,9 @@ summary:focus-visible {
 .category-index-copy strong {
   color: var(--text);
   font-size: 0.9rem;
-  font-weight: 620;
+  font-weight: 650;
   line-height: 1.4;
+  overflow-wrap: break-word;
 }
 
 .stack-index {
@@ -1783,6 +1820,55 @@ summary:focus-visible {
     grid-template-columns: 1fr;
   }
 
+  .category-index-root {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-rows: auto auto;
+    align-items: start;
+    row-gap: 5px;
+    padding: 6px 4px;
+  }
+
+  .category-index-root-copy {
+    max-width: none;
+  }
+
+  .category-index-root-copy strong {
+    font-size: 0.98rem;
+  }
+
+  .category-index-root-summary {
+    grid-row: 2;
+    grid-column: 2 / -1;
+    max-width: none;
+    font-size: 0.84rem;
+  }
+
+  .category-index-link {
+    grid-template-rows: auto auto;
+    align-items: start;
+    row-gap: 5px;
+    min-height: 0;
+    padding: 6px 4px;
+  }
+
+  .category-index-link .category-index-copy {
+    display: contents;
+    max-width: none;
+  }
+
+  .category-index-link .category-index-copy strong {
+    grid-column: 2;
+    grid-row: 1;
+    display: block;
+  }
+
+  .category-index-link .category-index-copy > span {
+    grid-column: 2 / -1;
+    grid-row: 2;
+    font-size: 0.84rem;
+  }
+
   .map-visual-group {
     padding-bottom: 24px;
   }
@@ -1936,28 +2022,37 @@ summary:focus-visible {
     padding: 15px 0 17px;
   }
 
-  .category-index-root {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    align-items: start;
+  .category-index-group-has-children {
+    padding-bottom: 23px;
   }
 
-  .category-index-root-summary {
-    grid-column: 2 / -1;
-    font-size: 0.82rem;
+  .category-index-visual-heading {
+    margin-bottom: 20px;
+  }
+
+  .category-index-visual-heading h3 {
+    font-size: 1.12rem;
   }
 
   .category-index-children {
-    padding-left: 17px;
-    margin-left: 3px;
+    padding-left: 22px;
+    margin-top: 18px;
+    margin-left: 5px;
+  }
+
+  .category-index-children .category-index-children {
+    padding-left: 19px;
+    margin-top: 6px;
   }
 
   .category-index-item::before {
-    left: -18px;
-    width: 17px;
+    top: 26px;
+    left: -22px;
+    width: 21px;
   }
 
   .category-index-copy > span {
-    font-size: 0.8rem;
+    font-size: 0.84rem;
   }
 
   .stack-toolbar {
