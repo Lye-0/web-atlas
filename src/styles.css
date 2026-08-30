@@ -473,9 +473,9 @@ summary:focus-visible {
 
 .stack-map {
   --map-group-gap: 34px;
-  --map-group-indent: 26px;
-  --map-category-indent: 22px;
-  --map-branch-indent: 16px;
+  --map-group-indent: 30px;
+  --map-category-indent: 26px;
+  --map-branch-indent: 20px;
   padding-top: 16px;
 }
 
@@ -485,8 +485,7 @@ summary:focus-visible {
   width: min(100%, 260px);
   min-width: 0;
   margin: 0 auto;
-  padding: 10px 18px;
-  border-left: 3px solid var(--accent);
+  padding: 4px 18px;
   text-align: center;
 }
 
