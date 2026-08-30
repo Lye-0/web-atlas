@@ -88,7 +88,7 @@ Stacksの「すべて」は同じ5大visual groupごとに区切って表示し�
 
 Phase 1.3.1では、中央幹型のDesktop Mapを維持したまま、左レーンを右レーンの視覚的mirrorとして扱う。右レーンは「中央幹 → group → Category → Stack」、左レーンは「Stack ← Category ← group ← 中央幹」の方向で、左右のgroup heading、marker、Tree connectorがそれぞれ中央幹側を向く。
 
-左レーンのTreeは、`min-width: 1101px`で`border-right`、`padding-right`、`right`側のpseudo connector、`row-reverse`のmarker配置を使って明示的に反転する。`transform: scaleX(-1)`、Canvas、SVG座標のJavaScript計算は使わない。group branchはheading markerの高さへ接続し、中央幹を装飾線ではなく5大groupの親構造線として見せる。
+左レーンのTreeは、`min-width: 1101px`で`padding-right`、`right`側のpseudo connector、`row-reverse`のmarker配置を使って明示的に反転する。各Tree `li` の縦線とbranch線は別のpseudo elementで描画し、`li:last-child`では縦線を自身のbranch位置で止める。`transform: scaleX(-1)`、Canvas、SVG座標のJavaScript計算は使わない。group branchはheading markerの高さへ接続し、中央幹を装飾線ではなく5大groupの親構造線として見せる。
 
 `max-width: 1100px`では中央幹を隠し、左レーンの反転を解除して、Rootから5大groupへ続く通常方向の1列Vertical Treeへ戻す。狭幅でのgroup順序は`dictionaryVisualGroups`のpresentation metadata（`order`）から解決し、canonical taxonomyやCategory / Stack ID、Analyzer metadataは変更しない。
 
