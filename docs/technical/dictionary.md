@@ -90,9 +90,9 @@ Phase 1.3.1では、中央幹型のDesktop Mapを維持したまま、左レー�
 
 左レーンのTreeは、`min-width: 1101px`で`padding-right`、`right`側のpseudo connector、`row-reverse`のmarker配置を使って明示的に反転する。各Tree `li` の縦線とbranch線は別のpseudo elementで描画し、`li:last-child`では縦線を自身のbranch位置で止める。`transform: scaleX(-1)`、Canvas、SVG座標のJavaScript計算は使わない。group branchはmarkerlessなheading行へ接続し、中央幹を装飾線ではなく5大groupの親構造線として見せる。
 
-Mapのセクション見出しは`構造`とし、`Web開発`はTree Rootに1回だけ表示する。Rootには装飾用accent barを置かず、Root文字の直下から実際のconnectorを開始する。Root connector、中央幹、NarrowのGroup幹は共通の2pxで連続させる。Root descriptionはMapに表示せず、Categoryは四角marker、Stackは円形markerを維持しつつ、Categoryをやや強く、Stackをやや控えめに表示する。Mapの階層indentはgroup、Category、child branchごとに確保し、desktopの目安は`30px / 26px / 20px`、Groupからchild treeまでのgapは`24px`とする。長い名称は通常の単語境界で折り返す。
+Mapのセクション見出しは`構造`とし、`Web開発`はTree Rootに1回だけ表示する。Rootには装飾用accent barを置かず、Root文字の直下から実際のconnectorを開始する。Root connector、中央幹、NarrowのGroup幹は共通の2pxで連続させる。Wideでは中央幹のレイアウト列を`84px`として中央幹から子Tree縦線までの間隔を確保する。Root descriptionはMapに表示せず、Categoryは四角marker、Stackは円形markerを維持しつつ、Categoryをやや強く、Stackをやや控えめに表示する。Mapの階層indentはgroup、Category、child branchごとに確保し、desktopの目安は`30px / 26px / 20px`、Groupからchild treeまでのgapは`24px`とする。長い名称は通常の単語境界で折り返す。
 
-`max-width: 1100px`では中央幹を隠し、左レーンの反転を解除して、Rootから5大groupへ続く通常方向の1列Vertical Treeへ戻す。狭幅では`map-mobile-group-list`の`ul > li`としてgroupを`dictionaryVisualGroups`のpresentation metadata（`order`）順に描画し、Rootの縦線と各groupのbranchを静的CSSで接続する。canonical taxonomyやCategory / Stack ID、Analyzer metadataは変更しない。
+`max-width: 1100px`では中央幹を隠し、左レーンの反転を解除して、Rootから5大groupへ続く通常方向の1列Vertical Treeへ戻す。狭幅のRootは`padding-left: 0`とし、Root文字とconnectorをコンテンツ外側へ寄せる。`--map-mobile-group-offset: 28px`でRoot / Group幹を外側の一本に接続し、子Treeの縦線をその内側へ離す。狭幅では`map-mobile-group-list`の`ul > li`としてgroupを`dictionaryVisualGroups`のpresentation metadata（`order`）順に描画し、Rootの縦線と各groupのbranchを静的CSSで接続する。canonical taxonomyやCategory / Stack ID、Analyzer metadataは変更しない。
 
 ## UI・アクセシビリティ方針
 

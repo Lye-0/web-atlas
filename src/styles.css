@@ -473,6 +473,8 @@ summary:focus-visible {
 
 .stack-map {
   --map-trunk-width: 2px;
+  --map-trunk-gap: 84px;
+  --map-mobile-group-offset: 28px;
   --map-group-gap: 34px;
   --map-group-to-children-gap: 24px;
   --map-group-indent: 30px;
@@ -509,10 +511,9 @@ summary:focus-visible {
 }
 
 .map-visual-groups {
-  --map-trunk: 56px;
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) var(--map-trunk) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) var(--map-trunk-gap) minmax(0, 1fr);
   align-items: start;
   gap: 0;
   margin-top: 32px;
@@ -560,18 +561,18 @@ summary:focus-visible {
 .map-visual-lane-right .map-visual-group::after {
   position: absolute;
   top: 10px;
-  width: calc(var(--map-trunk) / 2);
+  width: calc(var(--map-trunk-gap) / 2);
   height: 2px;
   background: var(--connector);
   content: "";
 }
 
 .map-visual-lane-left .map-visual-group::after {
-  right: calc(var(--map-trunk) / -2);
+  right: calc(var(--map-trunk-gap) / -2);
 }
 
 .map-visual-lane-right .map-visual-group::after {
-  left: calc(var(--map-trunk) / -2);
+  left: calc(var(--map-trunk-gap) / -2);
 }
 
 .map-mobile-groups {
@@ -1677,7 +1678,7 @@ summary:focus-visible {
     position: absolute;
     top: 0;
     bottom: 0;
-    left: -16px;
+    left: calc(-1 * var(--map-mobile-group-offset));
     width: var(--map-trunk-width);
     background: var(--connector);
     content: "";
@@ -1690,8 +1691,8 @@ summary:focus-visible {
   .map-mobile-group-item::after {
     position: absolute;
     top: var(--map-group-branch-offset);
-    left: -16px;
-    width: 16px;
+    left: calc(-1 * var(--map-mobile-group-offset));
+    width: var(--map-mobile-group-offset);
     height: 2px;
     background: var(--connector);
     content: "";
@@ -1700,11 +1701,13 @@ summary:focus-visible {
   .map-root-node {
     width: 100%;
     margin: 0;
+    padding-left: 0;
+    padding-right: 18px;
     text-align: left;
   }
 
   .map-root-node::after {
-    left: 12px;
+    left: 0;
     height: 28px;
     background: var(--connector);
   }
