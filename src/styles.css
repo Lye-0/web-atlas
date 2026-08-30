@@ -475,6 +475,8 @@ summary:focus-visible {
   --map-trunk-width: 2px;
   --map-trunk-gap: 84px;
   --map-mobile-group-offset: 28px;
+  --map-mobile-root-offset: 8px;
+  --map-group-child-offset: 10px;
   --map-group-gap: 34px;
   --map-group-to-children-gap: 24px;
   --map-group-indent: 30px;
@@ -623,6 +625,7 @@ summary:focus-visible {
 
 .map-visual-group > .map-tree-list {
   margin-top: var(--map-group-to-children-gap);
+  margin-left: var(--map-group-child-offset);
 }
 
 .map-tree-item,
@@ -765,6 +768,8 @@ summary:focus-visible {
 
   .map-visual-lane-left .map-tree-list {
     padding: 0 var(--map-tree-indent) 0 0;
+    margin-left: 0;
+    margin-right: var(--map-group-child-offset);
     border-left: 0;
   }
 
@@ -1678,7 +1683,7 @@ summary:focus-visible {
     position: absolute;
     top: 0;
     bottom: 0;
-    left: calc(-1 * var(--map-mobile-group-offset));
+    left: calc(-1 * var(--map-mobile-group-offset) + var(--map-mobile-root-offset));
     width: var(--map-trunk-width);
     background: var(--connector);
     content: "";
@@ -1691,8 +1696,8 @@ summary:focus-visible {
   .map-mobile-group-item::after {
     position: absolute;
     top: var(--map-group-branch-offset);
-    left: calc(-1 * var(--map-mobile-group-offset));
-    width: var(--map-mobile-group-offset);
+    left: calc(-1 * var(--map-mobile-group-offset) + var(--map-mobile-root-offset));
+    width: calc(var(--map-mobile-group-offset) - var(--map-mobile-root-offset));
     height: 2px;
     background: var(--connector);
     content: "";
@@ -1707,7 +1712,7 @@ summary:focus-visible {
   }
 
   .map-root-node::after {
-    left: 0;
+    left: var(--map-mobile-root-offset);
     height: 28px;
     background: var(--connector);
   }
