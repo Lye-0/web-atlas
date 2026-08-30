@@ -472,7 +472,9 @@ summary:focus-visible {
 }
 
 .stack-map {
+  --map-trunk-width: 2px;
   --map-group-gap: 34px;
+  --map-group-to-children-gap: 24px;
   --map-group-indent: 30px;
   --map-category-indent: 26px;
   --map-branch-indent: 20px;
@@ -493,7 +495,7 @@ summary:focus-visible {
   position: absolute;
   top: 100%;
   left: 50%;
-  width: 1px;
+  width: var(--map-trunk-width);
   height: 32px;
   background: var(--connector);
   content: "";
@@ -502,7 +504,7 @@ summary:focus-visible {
 .map-root-node strong {
   color: var(--text);
   font-size: 1.25rem;
-  font-weight: 680;
+  font-weight: 720;
   line-height: 1.35;
 }
 
@@ -539,7 +541,7 @@ summary:focus-visible {
   top: 0;
   bottom: 0;
   left: 50%;
-  width: 2px;
+  width: var(--map-trunk-width);
   background: var(--connector);
   content: "";
 }
@@ -583,8 +585,8 @@ summary:focus-visible {
 .map-visual-group-heading h3 {
   margin: 0;
   color: var(--accent-strong);
-  font-size: 1.08rem;
-  font-weight: 700;
+  font-size: 1.12rem;
+  font-weight: 720;
   letter-spacing: -0.01em;
   line-height: 1.4;
 }
@@ -616,6 +618,10 @@ summary:focus-visible {
   margin-top: 4px;
   margin-left: var(--map-category-indent);
   padding-left: var(--map-tree-indent);
+}
+
+.map-visual-group > .map-tree-list {
+  margin-top: var(--map-group-to-children-gap);
 }
 
 .map-tree-item,
@@ -706,7 +712,8 @@ summary:focus-visible {
 }
 
 .map-category-node .map-node-name {
-  font-weight: 650;
+  font-size: 0.94rem;
+  font-weight: 660;
 }
 
 .map-stack-node .map-node-name {
@@ -1671,7 +1678,7 @@ summary:focus-visible {
     top: 0;
     bottom: 0;
     left: -16px;
-    width: 2px;
+    width: var(--map-trunk-width);
     background: var(--connector);
     content: "";
   }
