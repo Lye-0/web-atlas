@@ -6,7 +6,7 @@ status: active
 maturity: reused
 created: 2026-08-30
 last_verified: 2026-08-30
-source_commit: "8a82a00"
+source_commit: "9f203cf"
 related_files:
   - src/components/map/StackMap.tsx
   - src/styles.css
@@ -27,9 +27,11 @@ promoted_to: null
 
 ## Conclusion
 
-DesktopのDictionary Mapは中央幹型2レーンを維持し、右レーンを「中央幹からgroup・Category・Stackへ進むTree」、左レーンをその視覚的mirrorとして「中央幹から左へgroup・Category・Stackが分岐するTree」とする。Rootは装飾用accent barを持たない独立した強いheadingとし、文字直下から中央幹connectorを開始する。左レーンはCSSの`padding-right`、`right`側pseudo connector、`flex-direction: row-reverse`で反転し、`transform: scaleX(-1)`やJavaScriptの座標計算には依存しない。5大visual groupはmarkerlessなheadingとして中央幹へ接続し、Mapにはgroup descriptionを表示しない。Tree connectorは親`ul`の連続borderではなく、各`li`の縦線とbranch線を分けて描画し、非末尾は兄弟間を縦に接続し、`li:last-child`は自身のbranch位置で縦線を止める。Categoryは四角marker、Stackは円形markerを維持し、前者をやや強く後者をやや控えめに表示する。
+DesktopのDictionary Mapは中央幹型2レーンを維持し、右レーンを「中央幹からgroup・Category・Stackへ進むTree」、左レーンをその視覚的mirrorとして「中央幹から左へgroup・Category・Stackが分岐するTree」とする。Rootは装飾用accent barを持たない独立した強いheadingとし、文字直下から中央幹connectorを開始する。左レーンはCSSの`padding-right`、`right`側pseudo connector、`flex-direction: row-reverse`で反転し、`transform: scaleX(-1)`やJavaScriptの座標計算には依存しない。5大visual groupはmarkerlessなheadingとして中央幹へ接続し、Mapにはgroup descriptionを表示しない。Tree connectorは親`ul`の連続borderではなく、各`li`の縦線とbranch線を分けて描画し、非末尾は兄弟間を縦に接続し、`li:last-child`は自身のbranch位置で縦線を止める。Categoryは四角marker、Stackは円形markerを維持し、前者をやや強く後者をやや控えめに表示する。Root connector、中央幹、NarrowのGroup幹は`--map-trunk-width: 2px`で統一し、Root直下に装飾barや補助線を重ねない。
 
 Mapのセクション見出しは`構造`、Tree Rootは`Web開発`の1回だけとする。Root descriptionは表示しない。狭幅ではmirrorを解除する。`max-width: 1100px`で中央幹を隠し、`map-mobile-group-list`の`ul > li`を`dictionaryVisualGroups.order`順に描画して、Rootから5大visual groupを追える1列Vertical Treeとして表示する。Rootの縦線とgroup branchは静的CSSで接続し、Group単位の縦線も最後のGroup見出しで止め、配下のCategory / Stackまで不要に延長しない。
+
+最終visual調整では、Group直下のchild treeに`--map-group-to-children-gap: 24px`を確保し、desktopのgroup / Category / child branch indentは`30px / 26px / 20px`を維持する。Group headingはmarkerless・accent色・`1.12rem / 720`、Categoryは四角marker・primary色・`0.94rem / 660`、Stackは円形marker・より軽い表示として、Root / Group / Category / Stackの4段階をタイポグラフィとspacingでも区別する。
 
 ## Scope
 
@@ -48,6 +50,7 @@ Do not apply:
 - `src/styles.css`の`@media (min-width: 1101px)`にある左レーンの`row-reverse`、`padding-right`、`right`側connector
 - `src/styles.css`のTree `li` connectorにある非末尾の縦線、末尾の`:last-child`停止、branch線の分離
 - `src/styles.css`のRootに装飾barを持たせず、文字直下のpseudo connectorと`30px / 26px / 20px`のdesktop階層indentを使う定義
+- `src/styles.css`の`--map-trunk-width: 2px`、`--map-group-to-children-gap: 24px`、Group / Categoryの階層別typographyと、Group直下リストへのgap適用
 - `src/styles.css`の`@media (max-width: 1100px)`にある中央幹非表示、Group単位の通常方向connector、最終Groupでの停止、Root接続、左側right offset解除
 - `src/components/map/StackMap.tsx`のsemanticなRoot / group / Category / Stack構造と、presentation `order`順のmobile group list
 - `src/data/dictionaryGroups.ts`の`side` / `order` presentation metadata
