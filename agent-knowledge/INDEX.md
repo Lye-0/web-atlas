@@ -49,7 +49,7 @@
 ### Dictionary Mapの左右mirror契約
 - id: `rm-20260830-dictionary-map-mirror`
 - type: `decision`
-- maturity: `candidate`
+- maturity: `reused`
 - tags: `dictionary`, `presentation`, `map`, `mirror`, `responsive`, `accessibility`
 - files: `src/components/map/StackMap.tsx`, `src/styles.css`, `src/data/dictionaryGroups.ts` …
 - memory: `agent-knowledge/entries/2026-08-30-dictionary-map-mirror-7c2d1a.md`
