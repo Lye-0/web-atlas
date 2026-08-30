@@ -25,8 +25,7 @@ export function MapPage() {
       <section className="dictionary-section map-section" aria-labelledby="map-title">
         <div className="section-heading">
           <div>
-            <p className="section-kicker">構造</p>
-            <h2 id="map-title">Web開発</h2>
+            <h2 id="map-title">構造</h2>
           </div>
           <p className="section-note">{categories.length}分類・{stacks.length}技術。線は親子関係を示します。</p>
         </div>

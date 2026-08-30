@@ -29,6 +29,8 @@ const groupsBySide = (side: DictionaryVisualGroup['side']) => dictionaryVisualGr
   .filter((group) => group.side === side)
   .sort((a, b) => a.order - b.order);
 
+const groupsByOrder = [...dictionaryVisualGroups].sort((a, b) => a.order - b.order);
+
 function MapNodeView({ node }: { node: MapNode }) {
   if (node.kind === 'group') {
     return (
@@ -96,16 +98,26 @@ function MapVisualGroup({ group }: { group: DictionaryVisualGroup }) {
       aria-labelledby={`map-visual-group-${group.id}`}
     >
       <header className="map-visual-group-heading">
-        <span className="map-group-marker" aria-hidden="true" />
-        <div>
-          <h3 id={`map-visual-group-${group.id}`}>{group.label}</h3>
-          <p>{group.description}</p>
-        </div>
+        <h3 id={`map-visual-group-${group.id}`}>{group.label}</h3>
       </header>
       <ul className="map-tree-list">
         {nodes.map((node) => <MapNodeView key={getNodeKey(node)} node={node} />)}
       </ul>
     </section>
+  );
+}
+
+function MapVerticalTree({ groups }: { groups: DictionaryVisualGroup[] }) {
+  return (
+    <div className="map-mobile-groups">
+      <ul className="map-mobile-group-list">
+        {groups.map((group) => (
+          <li className="map-mobile-group-item" key={group.id}>
+            <MapVisualGroup group={group} />
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -117,7 +129,6 @@ export function StackMap() {
     <div className="stack-map" role="region" aria-label="Web開発技術の分類マップ">
       <div className="map-root-node">
         <strong>Web開発</strong>
-        <span>分類から具体的な技術へ、関係をたどる</span>
       </div>
 
       <div className="map-visual-groups">
@@ -129,6 +140,8 @@ export function StackMap() {
           {rightGroups.map((group) => <MapVisualGroup key={group.id} group={group} />)}
         </div>
       </div>
+
+      <MapVerticalTree groups={groupsByOrder} />
 
       <div className="map-legend" role="group" aria-label="マップの凡例">
         <span><span className="map-legend-marker map-legend-category" aria-hidden="true" />分類</span>
