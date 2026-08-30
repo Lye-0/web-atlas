@@ -104,6 +104,12 @@ Stacks一覧は多数の技術を走査する索引として、Desktopでは`Sta
 
 黒基調の静かなReference UIとし、色だけに意味を依存させない。semantic HTML、visible focus、keyboard操作、適切なlink / heading階層、モバイルでの一覧のカード化、`prefers-reduced-motion` を維持する。Mapはモバイルで極端に縮小せず、縦方向へ流れるレスポンシブ構造にする。
 
+## Category Detail Presentation Contract
+
+Category DetailはDocument構造を維持し、Desktopでは読み幅を保ったMain Contentと近接したSidebarを同じGrid内に配置する。H1とSection間隔は一覧画面より落ち着いた密度とし、Section label、Sidebar heading、比較labelは本文との階層差を保ちながら読み取れるコントラストを確保する。Category / Stack Detailへ進む「具体的な技術」「関連する分類」のrowは全体をfocusableなlinkとして`↗`を表示し、戻るlinkは`←`を維持する。
+
+Mobile / NarrowではCategory DetailのDocument本文を1列で流し、「このページ」のTOCを非表示にする。「関連する分類」はSidebarではなく本文後の通常Sectionとして残し、全幅row・十分なtap area・右側の`↗`・dividerで表示する。Breadcrumb直下の重複する種別eyebrowはCategory / Stack Detailの両方から除去し、本文・metadata・relationship構造は変更しない。Category Detail専用CSSで実装し、Map、Categories / Stacks一覧、canonical dataには波及させない。
+
 ## Phase 1.1 Presentation Contract
 
 Phase 1.1 は正規Dictionaryデータを変更せず、3画面の役割と情報の見せ方を整理する。画面ごとの責務は次のとおりとする。

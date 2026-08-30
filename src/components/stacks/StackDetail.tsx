@@ -34,7 +34,7 @@ export function StackDetail({ stack }: { stack: StackEntry }) {
   const officialHostname = stack.officialUrl ? new URL(stack.officialUrl).hostname : undefined;
 
   return (
-    <article className="detail-layout" aria-labelledby="stack-title">
+    <article className="stack-detail detail-layout" aria-labelledby="stack-title">
       <div className="detail-main">
         <div className="breadcrumb">
           <Link to="/dictionary/stacks">Stacks</Link>
@@ -43,7 +43,6 @@ export function StackDetail({ stack }: { stack: StackEntry }) {
         </div>
 
         <header className="detail-header" id="overview">
-          <p className="eyebrow">技術</p>
           <h1 id="stack-title">{stack.name}</h1>
           <p className="detail-summary">{stack.summary}</p>
           <p className="detail-description">{stack.description}</p>
