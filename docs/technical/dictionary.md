@@ -84,6 +84,14 @@ Mapは`max-width: 1100px`以下で左右レーンを圧縮せず、1列の縦Tre
 
 Stacksの「すべて」は同じ5大visual groupごとに区切って表示し、個別filter選択時はgroup見出しを重複させない。Stack名の近くにCategoryリンクを置き、`active` statusは隠し、例外statusだけを共通日本語ラベルで表示する。内部Dictionaryリンクの矢印は`→`、公式サイトなど外部リンクは`↗`とする。Categoriesの階層とDetailのDocument構造は維持する。
 
+## Phase 1.3.1 Presentation Contract
+
+Phase 1.3.1では、中央幹型のDesktop Mapを維持したまま、左レーンを右レーンの視覚的mirrorとして扱う。右レーンは「中央幹 → group → Category → Stack」、左レーンは「Stack ← Category ← group ← 中央幹」の方向で、左右のgroup heading、marker、Tree connectorがそれぞれ中央幹側を向く。
+
+左レーンのTreeは、`min-width: 1101px`で`border-right`、`padding-right`、`right`側のpseudo connector、`row-reverse`のmarker配置を使って明示的に反転する。`transform: scaleX(-1)`、Canvas、SVG座標のJavaScript計算は使わない。group branchはheading markerの高さへ接続し、中央幹を装飾線ではなく5大groupの親構造線として見せる。
+
+`max-width: 1100px`では中央幹を隠し、左レーンの反転を解除して、Rootから5大groupへ続く通常方向の1列Vertical Treeへ戻す。狭幅でのgroup順序は`dictionaryVisualGroups`のpresentation metadata（`order`）から解決し、canonical taxonomyやCategory / Stack ID、Analyzer metadataは変更しない。
+
 ## UI・アクセシビリティ方針
 
 黒基調の静かなReference UIとし、色だけに意味を依存させない。semantic HTML、visible focus、keyboard操作、適切なlink / heading階層、モバイルでの一覧のカード化、`prefers-reduced-motion` を維持する。Mapはモバイルで極端に縮小せず、縦方向へ流れるレスポンシブ構造にする。
