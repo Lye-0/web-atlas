@@ -6,7 +6,7 @@ status: active
 maturity: reused
 created: 2026-08-30
 last_verified: 2026-08-30
-source_commit: "a6c34c8"
+source_commit: "f55ba84"
 related_files:
   - src/components/map/StackMap.tsx
   - src/styles.css
