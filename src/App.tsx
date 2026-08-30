@@ -1,12 +1,14 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppHeader } from './components/layout/AppHeader';
 import { PageContainer } from './components/layout/PageContainer';
+import { AnalyzerPage } from './pages/AnalyzerPage';
 import { CategoriesPage } from './pages/CategoriesPage';
 import { CategoryDetailPage } from './pages/CategoryDetailPage';
 import { MapPage } from './pages/MapPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { StackDetailPage } from './pages/StackDetailPage';
 import { StacksPage } from './pages/StacksPage';
+import { analyzerRoutes } from './utils/routes';
 
 export default function App() {
   return (
@@ -15,6 +17,8 @@ export default function App() {
       <PageContainer>
         <Routes>
           <Route path="/" element={<Navigate to="/dictionary/map" replace />} />
+          <Route path="/analyzer" element={<Navigate to={analyzerRoutes.architecture} replace />} />
+          <Route path="/analyzer/:view" element={<AnalyzerPage />} />
           <Route path="/dictionary" element={<Navigate to="/dictionary/map" replace />} />
           <Route path="/dictionary/map" element={<MapPage />} />
           <Route path="/dictionary/categories" element={<CategoriesPage />} />
