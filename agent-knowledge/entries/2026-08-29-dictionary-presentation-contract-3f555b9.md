@@ -6,7 +6,7 @@ status: active
 maturity: candidate
 created: 2026-08-29
 last_verified: 2026-08-30
-source_commit: 226c332
+source_commit: 0d6b53d
 related_files:
   - src/components/map/StackMap.tsx
   - src/components/categories/CategoryTable.tsx
@@ -38,7 +38,7 @@ Phase 1.3のDictionary UIは、Phase 1.2の役割分担と5大visual groupを維
 
 Analyzer接続用の`categoryId`、`packageNames`、`aliases`、`relatedStackIds`、`relationships`は正規データから削除しない。Stack詳細の「開発者向けメタデータ」に折りたたみ、relationship kindは日本語ラベルでsource / relation / targetとして表示する。利用者向けの文章は正規Dictionaryデータに自然な日本語で直接保持し、表示時の大量文字列置換には依存しない。stable ID、routing、Deep Link、検索対象の正規データ契約は維持する。内部Dictionaryリンクは`→`、公式サイトなど外部リンクは`↗`で区別する。
 
-Categoriesは「分類の意味・役割・違いを読む」画面として、5大visual groupをmarkerlessで強いGroup Headingにする。Parent Categoryはsquare marker付きのstrong row / block、Child Categoryはindent付きのnested rowとし、summaryは重要情報として読みやすいsecondary textで表示する。Desktopは意味のある2column、`max-width: 820px`以下は1columnでCategory name + internal arrow / summaryの2段構成とする。Mapは構造を見る画面、Categoriesは分類の意味・違いを読む画面という役割分担を維持する。
+Categoriesは「分類の意味・役割・違いを読む」画面として、5大visual groupをmarkerlessで強いGroup Headingにする。Parent Categoryはsquare marker付きのstrong row / block、Child Categoryはindent付きのnested rowとし、summaryは重要情報として読みやすいsecondary textで表示する。Desktopは意味のある2column、`max-width: 820px`以下は1columnでCategory name + arrow / summaryの2段構成とする。Categories一覧のCategory Detail rowは親子を問わず`↗`を使い、Parent / Childは共通row構造のままTree線・indent・Typographyで階層差を示す。Mapは構造を見る画面、Categoriesは分類の意味・違いを読む画面という役割分担を維持する。
 
 ## Scope
 
@@ -64,10 +64,11 @@ Do not apply:
 - `src/components/stacks/StackDetail.tsx` の日本語relationship、公式サイト、折りたたみmetadata
 - `src/components/search/DictionarySearch.tsx` の日本語placeholder、結果表示、Ctrl / Cmd + K focus
 - `docs/technical/dictionary.md` のPhase 1.1 / 1.2 Presentation Contract
-- `src/components/categories/CategoryTable.tsx` と `src/styles.css` のCategories専用階層・divider・connector・Responsive調整（`226c332`）
+- `src/components/categories/CategoryTable.tsx` と `src/styles.css` のCategories専用arrow・共通row・階層・divider・connector・Responsive調整（`0d6b53d`）
 - `pnpm build`、`pnpm lint`、`pnpm typecheck`、`pnpm test` の成功（9 tests）
 - `pnpm install --frozen-lockfile` と `pnpm exec wrangler deploy --dry-run` の成功
 - `agent-browser`で`/dictionary/categories`を1600 / 1440 / 1280 / 1100 / 1024 / 900 / 820 / 768 / 390pxで確認し、900px以上の2column、820px以下の1column・2段row、横overflowなしを確認
+- `agent-browser`でParent / Child rowを確認し、Wideのarrow X位置一致、`↗` 43件統一、Child indent、Sibling gap、最終Childの縦線停止を確認
 - `agent-browser`でMap、Categories、Stacks、Category / Stack詳細、404、Search、390px viewport、Browser back / forwardを確認し、横スクロールとARIA violationがないことを確認
 - `agent-browser`でMapを1600 / 1440 / 1280 / 1200 / 1100 / 1024 / 900 / 820 / 768 / 390pxで確認し、1100px以下の1列化、長い名称の折り返し、横overflowなしを確認
 
@@ -75,7 +76,7 @@ Do not apply:
 
 1. `pnpm build`、`pnpm lint`、`pnpm typecheck`、`pnpm test`を実行する。
 2. `/dictionary/map`でsummaryが通常表示されず、全Category / StackがID参照で表示されることを確認する。
-3. `/dictionary/categories`で5大Group Heading、parent / child階層、summary、Desktop 2column、`max-width: 820px`以下の1column・2段rowを確認し、`/dictionary/stacks`では階層、filter、metadata非表示、active status非表示を確認する。
+3. `/dictionary/categories`で5大Group Heading、parent / child共通row、`↗` arrow、summary、Desktop 2column、`max-width: 820px`以下の1column・2段rowを確認し、`/dictionary/stacks`では階層、filter、metadata非表示、active status非表示を確認する。
 4. `/dictionary/stacks/:stackId`でrelationshipのsource / relation / target、公式サイト、metadata折りたたみを確認する。
 5. Search、Deep Link、Not Found、Browser back / forward、390px前後の横幅を再確認する。
-6. Mapは1600px以上の左右2レーンと、1100px以下の1列Vertical Treeを確認する。内部リンクが`→`、外部リンクが`↗`であることも確認する。
+6. Mapは1600px以上の左右2レーンと、1100px以下の1列Vertical Treeを確認する。通常の内部リンクが`→`、Categories一覧のCategory Detail rowと外部リンクが`↗`であることも確認する。
