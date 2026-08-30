@@ -84,7 +84,7 @@ MapのDesktop表示は5列均等配置を使わず、`Web開発`を起点に中�
 
 Mapは`max-width: 1100px`以下で左右レーンを圧縮せず、1列の縦Treeへ切り替える。Rootから5大groupへの縦接続は狭幅でも残し、長いCategory / Stack名を文字サイズの縮小で解決せず、通常の単語境界で折り返す。Mapの通常ノードではsummaryを表示しない。
 
-Stacksの「すべて」は同じ5大visual groupごとに区切って表示し、個別filter選択時はgroup見出しを重複させない。Stack名の近くにCategoryリンクを置き、`active` statusは隠し、例外statusだけを共通日本語ラベルで表示する。通常の内部Dictionaryリンクの矢印は`→`、Categories一覧のCategory Detail rowは`↗`、公式サイトなど外部リンクは`↗`とする。Categoriesの階層とDetailのDocument構造は維持する。
+Stacksの「すべて」は同じ5大visual groupごとに区切って表示し、個別filter選択時はgroup見出しを重複させない。Stack一覧はStack名の近くにCategory labelを置き、row全体をStack Detailへの単一リンクとして`↗`を表示する。`active` statusは隠し、例外statusだけを共通日本語ラベルで表示する。通常の内部Dictionaryリンクの矢印は`→`、Categories一覧のCategory Detail rowとStacks一覧のStack Detail rowは`↗`、公式サイトなど外部リンクも`↗`とする。Categoriesの階層とDetailのDocument構造は維持する。
 
 ## Phase 1.3.1 Presentation Contract
 
@@ -95,6 +95,10 @@ Phase 1.3.1では、中央幹型のDesktop Mapを維持したまま、左レー�
 Mapのセクション見出しは`構造`とし、`Web開発`はTree Rootに1回だけ表示する。Rootには装飾用accent barを置かず、Root文字の直下から実際のconnectorを開始する。Root connector、中央幹、NarrowのGroup幹は共通の2pxで連続させる。Wideでは中央幹のレイアウト列を`84px`、Group headingから子Tree縦線までを`10px`として、中央幹から子Tree縦線までの間隔を確保する。Root descriptionはMapに表示せず、Categoryは四角marker、Stackは円形markerを維持しつつ、Categoryをやや強く、Stackをやや控えめに表示する。Mapの階層indentはgroup、Category、child branchごとに確保し、desktopの目安は`30px / 26px / 20px`、Groupからchild treeまでのgapは`24px`とする。長い名称は通常の単語境界で折り返す。
 
 `max-width: 1100px`では中央幹を隠し、左レーンの反転を解除して、Rootから5大groupへ続く通常方向の1列Vertical Treeへ戻す。狭幅のRootは`padding-left: 0`とし、Root文字とconnectorをコンテンツ外側へ寄せ、`--map-mobile-root-offset: 8px`でRoot幹を文字のW中央付近へ寄せる。`--map-mobile-group-offset: 28px`でRoot / Group幹を外側の一本に接続し、Group headingから子Tree縦線まで`10px`を確保して、その縦線を先頭文字の中央付近へ置く。狭幅では`map-mobile-group-list`の`ul > li`としてgroupを`dictionaryVisualGroups`のpresentation metadata（`order`）順に描画し、Rootの縦線と各groupのbranchを静的CSSで接続する。canonical taxonomyやCategory / Stack ID、Analyzer metadataは変更しない。
+
+## Phase 1.3.2 Presentation Contract
+
+Stacks一覧は多数の技術を走査する索引として、Desktopでは`Stack名 + Category label | Summary | ↗`の3領域を1行にまとめる。Stack名をprimary / semibold、Categoryをwarm系の補助label、Summaryを読みやすいsecondary textとし、Stack row dividerは`line-soft`、5大visual groupの境界はそれより強くする。Group HeadingはStack rowより大きく強いaccent見出しとし、Group間の余白でSectionの切り替わりを示す。`max-width: 820px`以下ではStack名 + `↗`、Category、Summaryの3段に切り替え、CategoryがStack名やSummaryの横幅を圧迫しないようにする。Stack rowは全体をStack Detailへの単一focusable linkとし、Category labelはnested interactive elementを避けるため一覧では非リンク表示にする。Filterはlabel・select・件数を一つのcontrol areaとして扱い、`active` statusは非表示、例外statusだけを表示する。canonical data、`dictionaryVisualGroups`、Map / Categories / Detailの構造は変更しない。
 
 ## UI・アクセシビリティ方針
 

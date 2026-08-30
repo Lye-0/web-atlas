@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { categoryById, dictionaryVisualGroups, stacks } from '../../data';
 import { getRootCategoryId } from '../../utils/categoryHierarchy';
-import { categoryPath, stackPath } from '../../utils/routes';
+import { stackPath } from '../../utils/routes';
 import { stackStatusLabels } from '../../utils/stackStatus';
 
 interface StackFilter {
@@ -25,16 +25,17 @@ function StackRow({ stack }: { stack: (typeof stacks)[number] }) {
 
   return (
     <div className="stack-index-row" role="listitem">
-      <div className="stack-index-main">
-        <Link className="stack-index-title" to={stackPath(stack.id)}>
-          <strong>{stack.name}</strong>
-        </Link>
-        {category && <Link className="stack-index-category" to={categoryPath(category.id)}>{category.name}</Link>}
+      <Link className="stack-index-row-link" to={stackPath(stack.id)}>
+        <div className="stack-index-main">
+          <span className="stack-index-title-line">
+            <strong className="stack-index-title">{stack.name}</strong>
+            {stack.status !== 'active' && <span className={`stack-status stack-status-${stack.status}`}>{stackStatusLabels[stack.status]}</span>}
+          </span>
+          {category && <span className="stack-index-category">{category.name}</span>}
+        </div>
         <span className="stack-index-summary">{stack.summary}</span>
-      </div>
-      <div className="stack-index-meta">
-        {stack.status !== 'active' && <span className={`stack-status stack-status-${stack.status}`}>{stackStatusLabels[stack.status]}</span>}
-      </div>
+        <span className="stack-index-arrow" aria-hidden="true">↗</span>
+      </Link>
     </div>
   );
 }
@@ -61,14 +62,16 @@ export function StackTable() {
   return (
     <div className="stack-index">
       <div className="stack-toolbar">
-        <label htmlFor="stack-category-filter">分類で絞り込む</label>
-        <select
-          id="stack-category-filter"
-          value={filterId}
-          onChange={(event) => setFilterId(event.target.value)}
-        >
-          {stackFilters.map((filter) => <option key={filter.id} value={filter.id}>{filter.label}</option>)}
-        </select>
+        <div className="stack-filter-control">
+          <label htmlFor="stack-category-filter">分類で絞り込む</label>
+          <select
+            id="stack-category-filter"
+            value={filterId}
+            onChange={(event) => setFilterId(event.target.value)}
+          >
+            {stackFilters.map((filter) => <option key={filter.id} value={filter.id}>{filter.label}</option>)}
+          </select>
+        </div>
         <span className="stack-result-count" aria-live="polite">{visibleStacks.length}件</span>
       </div>
 
@@ -77,7 +80,6 @@ export function StackTable() {
           {groupedStacks.map(({ group, stacks: groupStacks }) => (
             <section className="stack-index-visual-group" key={group.id} aria-labelledby={`stack-visual-group-${group.id}`}>
               <header className="stack-index-visual-heading">
-                <span className="category-index-root-marker" aria-hidden="true" />
                 <div>
                   <h3 id={`stack-visual-group-${group.id}`}>{group.label}</h3>
                   <p>{group.description}</p>
