@@ -6,7 +6,7 @@ status: active
 maturity: reused
 created: 2026-08-30
 last_verified: 2026-08-30
-source_commit: "f55ba84"
+source_commit: "8a82a00"
 related_files:
   - src/components/map/StackMap.tsx
   - src/styles.css
@@ -27,7 +27,7 @@ promoted_to: null
 
 ## Conclusion
 
-DesktopのDictionary Mapは中央幹型2レーンを維持し、右レーンを「中央幹からgroup・Category・Stackへ進むTree」、左レーンをその視覚的mirrorとして「中央幹から左へgroup・Category・Stackが分岐するTree」とする。左レーンはCSSの`padding-right`、`right`側pseudo connector、`flex-direction: row-reverse`で反転し、`transform: scaleX(-1)`やJavaScriptの座標計算には依存しない。5大visual groupはmarkerlessなheadingとして中央幹へ接続し、Mapにはgroup descriptionを表示しない。Tree connectorは親`ul`の連続borderではなく、各`li`の縦線とbranch線を分けて描画し、非末尾は兄弟間を縦に接続し、`li:last-child`は自身のbranch位置で縦線を止める。Categoryは四角marker、Stackは円形markerを維持し、前者をやや強く後者をやや控えめに表示する。
+DesktopのDictionary Mapは中央幹型2レーンを維持し、右レーンを「中央幹からgroup・Category・Stackへ進むTree」、左レーンをその視覚的mirrorとして「中央幹から左へgroup・Category・Stackが分岐するTree」とする。Rootは装飾用accent barを持たない独立した強いheadingとし、文字直下から中央幹connectorを開始する。左レーンはCSSの`padding-right`、`right`側pseudo connector、`flex-direction: row-reverse`で反転し、`transform: scaleX(-1)`やJavaScriptの座標計算には依存しない。5大visual groupはmarkerlessなheadingとして中央幹へ接続し、Mapにはgroup descriptionを表示しない。Tree connectorは親`ul`の連続borderではなく、各`li`の縦線とbranch線を分けて描画し、非末尾は兄弟間を縦に接続し、`li:last-child`は自身のbranch位置で縦線を止める。Categoryは四角marker、Stackは円形markerを維持し、前者をやや強く後者をやや控えめに表示する。
 
 Mapのセクション見出しは`構造`、Tree Rootは`Web開発`の1回だけとする。Root descriptionは表示しない。狭幅ではmirrorを解除する。`max-width: 1100px`で中央幹を隠し、`map-mobile-group-list`の`ul > li`を`dictionaryVisualGroups.order`順に描画して、Rootから5大visual groupを追える1列Vertical Treeとして表示する。Rootの縦線とgroup branchは静的CSSで接続し、Group単位の縦線も最後のGroup見出しで止め、配下のCategory / Stackまで不要に延長しない。
 
@@ -47,6 +47,7 @@ Do not apply:
 
 - `src/styles.css`の`@media (min-width: 1101px)`にある左レーンの`row-reverse`、`padding-right`、`right`側connector
 - `src/styles.css`のTree `li` connectorにある非末尾の縦線、末尾の`:last-child`停止、branch線の分離
+- `src/styles.css`のRootに装飾barを持たせず、文字直下のpseudo connectorと`30px / 26px / 20px`のdesktop階層indentを使う定義
 - `src/styles.css`の`@media (max-width: 1100px)`にある中央幹非表示、Group単位の通常方向connector、最終Groupでの停止、Root接続、左側right offset解除
 - `src/components/map/StackMap.tsx`のsemanticなRoot / group / Category / Stack構造と、presentation `order`順のmobile group list
 - `src/data/dictionaryGroups.ts`の`side` / `order` presentation metadata
@@ -57,6 +58,6 @@ Do not apply:
 ## Verification
 
 1. `pnpm build`、`pnpm lint`、`pnpm typecheck`、`pnpm test`を実行する。
-2. `/dictionary/map`を1600 / 1440 / 1280pxで開き、左Treeが中央幹方向へ反転し、右Treeの方向、markerless group heading、connector contrast、非末尾/末尾branch形状が維持されていることを確認する。
+2. `/dictionary/map`を1600 / 1440 / 1280 / 1200pxで開き、Root直下から中央幹が始まり、左Treeが中央幹方向へ反転し、右Treeの方向、markerless group heading、connector contrast、非末尾/末尾branch形状が維持されていることを確認する。
 3. 1100 / 1024 / 900 / 820 / 768 / 390pxで中央幹が隠れ、通常方向の1列Tree、Root接続、5大group順、最後のGroupでの幹停止、horizontal overflowなしを確認する。
 4. `/dictionary/categories`、`/dictionary/stacks`、各Detail、Search、404、Deep Link、Browser historyにMap CSSの波及がないことを確認する。
