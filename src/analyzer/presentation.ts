@@ -63,18 +63,13 @@ export function analyzerViewCounts(view: AnalyzerViewModel, visibleNodes: Analyz
 
 export function presentAnalyzerView(view: AnalyzerViewModel, options: AnalyzerPresentationOptions): AnalyzerViewModel {
   const nodeById = new Map(view.nodes.map((node) => [node.id, node]));
+  const parentByChildId = new Map(view.nodes.flatMap((node) => node.presentation?.parentId
+    ? [[node.id, node.presentation.parentId] as const]
+    : []));
   const hasSearch = Boolean(options.search.trim());
   const searchMatchedIds = new Set(hasSearch
     ? view.nodes.filter((node) => nodeMatchesSearch(node, options.search)).map((node) => node.id)
     : []);
-  const expandedGroupIds = new Set<string>();
-  view.nodes.filter((node) => node.presentation?.role === 'summary').forEach((summary) => {
-    const childIds = summary.presentation?.childNodeIds ?? [];
-    const searchExpanded = hasSearch && childIds.some((childId) => searchMatchedIds.has(childId)
-      || options.selectedNodeId === childId
-      || (options.filter !== 'all' && nodeById.get(childId)?.type === options.filter));
-    if (options.expandedPresentationIds.has(summary.id) || searchExpanded) expandedGroupIds.add(summary.id);
-  });
 
   const selectedContextIds = new Set<string>();
   if (options.selectedNodeId) {
@@ -92,6 +87,28 @@ export function presentAnalyzerView(view: AnalyzerViewModel, options: AnalyzerPr
     }
   }
 
+  const presentationAncestorIdsFor = (nodeId: string): string[] => {
+    const ancestors: string[] = [];
+    const visited = new Set<string>();
+    let parentId = parentByChildId.get(nodeId);
+    while (parentId && !visited.has(parentId)) {
+      ancestors.push(parentId);
+      visited.add(parentId);
+      parentId = parentByChildId.get(parentId);
+    }
+    return ancestors;
+  };
+  const relevantNode = (nodeId: string): boolean => searchMatchedIds.has(nodeId)
+    || options.selectedNodeId === nodeId
+    || selectedContextIds.has(nodeId)
+    || (options.filter !== 'all' && nodeById.get(nodeId)?.type === options.filter);
+  const expandedGroupIds = new Set<string>();
+  view.nodes.filter((node) => node.presentation?.role === 'summary').forEach((summary) => {
+    const hasRelevantDescendant = view.nodes.some((node) => relevantNode(node.id)
+      && presentationAncestorIdsFor(node.id).includes(summary.id));
+    if (options.expandedPresentationIds.has(summary.id) || hasRelevantDescendant) expandedGroupIds.add(summary.id);
+  });
+
   const presentationVisibleIds = new Set<string>();
   view.nodes.forEach((node) => {
     if (node.presentation?.role === 'summary'
@@ -103,35 +120,45 @@ export function presentAnalyzerView(view: AnalyzerViewModel, options: AnalyzerPr
       presentationVisibleIds.add(node.id);
       return;
     }
-    if (expandedGroupIds.has(parentId)
-      || searchMatchedIds.has(node.id)
-      || options.selectedNodeId === node.id
-      || selectedContextIds.has(node.id)
-      || (options.filter !== 'all' && node.type === options.filter)) presentationVisibleIds.add(node.id);
+    const ancestors = presentationAncestorIdsFor(node.id);
+    const pathExpanded = ancestors.every((ancestorId) => expandedGroupIds.has(ancestorId));
+    if (pathExpanded || relevantNode(node.id)) presentationVisibleIds.add(node.id);
   });
 
   const visibleNodes = view.nodes.filter((node) => presentationVisibleIds.has(node.id)
     && (options.filter === 'all' || node.type === options.filter || selectedContextIds.has(node.id)));
   const visibleIds = new Set(visibleNodes.map((node) => node.id));
-  const parentByChildId = new Map(view.nodes.flatMap((node) => node.presentation?.parentId
-    ? [[node.id, node.presentation.parentId] as const]
-    : []));
   const resolvedEdges = new Map<string, AnalyzerViewEdge>();
+  const presentationPathExpanded = (presentationId: string): boolean => {
+    const visited = new Set<string>();
+    let currentId: string | undefined = presentationId;
+    while (currentId && !visited.has(currentId)) {
+      if (!expandedGroupIds.has(currentId)) return false;
+      visited.add(currentId);
+      currentId = parentByChildId.get(currentId);
+    }
+    return true;
+  };
 
   view.edges.forEach((edge) => {
     const parentId = edge.presentation?.parentId;
     if (edge.presentation?.displayKind === 'bundle'
       && parentId
-      && expandedGroupIds.has(parentId)
+      && presentationPathExpanded(parentId)
       && edge.id !== options.selectedEdgeId) return;
     if (edge.presentation?.initiallyHidden
-      && (!parentId || !expandedGroupIds.has(parentId))
+      && (!parentId || !presentationPathExpanded(parentId))
       && edge.id !== options.selectedEdgeId) return;
 
     const resolveEndpoint = (nodeId: string): string | undefined => {
-      if (visibleIds.has(nodeId)) return nodeId;
-      const childParentId = parentByChildId.get(nodeId);
-      return childParentId && visibleIds.has(childParentId) ? childParentId : undefined;
+      const visited = new Set<string>();
+      let currentId: string | undefined = nodeId;
+      while (currentId && !visited.has(currentId)) {
+        if (visibleIds.has(currentId)) return currentId;
+        visited.add(currentId);
+        currentId = parentByChildId.get(currentId);
+      }
+      return undefined;
     };
     const sourceId = resolveEndpoint(edge.sourceId);
     const targetId = resolveEndpoint(edge.targetId);

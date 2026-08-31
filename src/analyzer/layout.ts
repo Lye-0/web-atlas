@@ -1,4 +1,5 @@
 import type { AnalyzerCluster, AnalyzerViewModel, AnalyzerViewNode } from './types';
+import { ANALYZER_COMMAND_COMMON_LANE_ID } from './projectors';
 
 export const ANALYZER_NODE_WIDTH = 244;
 export const ANALYZER_NODE_HEIGHT = 106;
@@ -56,6 +57,7 @@ export interface PositionedBand {
   y: number;
   width: number;
   height: number;
+  presentationId?: string;
 }
 
 export interface AnalyzerLayout {
@@ -194,59 +196,85 @@ function commandNodeOrder(node: AnalyzerViewNode): number {
 function commandFlowLayout(view: AnalyzerViewModel, expandedNodeIds: ReadonlySet<string>): AnalyzerLayout {
   const rankByNodeId = new Map(view.nodes.map((node) => [node.id, Math.max(0, Math.round(metadataNumber(node, 'executionRank') ?? 0))]));
   const maxRank = Math.max(0, ...rankByNodeId.values());
-  const nodesByRank = Array.from({ length: maxRank + 1 }, () => [] as AnalyzerViewNode[]);
-  view.nodes.forEach((node) => nodesByRank[rankByNodeId.get(node.id) ?? 0]?.push(node));
-
   const positionedNodes: PositionedNode[] = [];
+  const laneGroups = new Map<string, AnalyzerViewNode[]>();
+  view.nodes.forEach((node) => {
+    const laneId = metadataString(node, 'laneId') || ANALYZER_COMMAND_COMMON_LANE_ID;
+    const laneNodes = laneGroups.get(laneId) ?? [];
+    laneNodes.push(node);
+    laneGroups.set(laneId, laneNodes);
+  });
+
+  const orderedLaneGroups = [...laneGroups.entries()].sort(([firstId, firstNodes], [secondId, secondNodes]) => {
+    if (firstId === ANALYZER_COMMAND_COMMON_LANE_ID) return -1;
+    if (secondId === ANALYZER_COMMAND_COMMON_LANE_ID) return 1;
+    const firstRank = Math.min(...firstNodes.map((node) => rankByNodeId.get(node.id) ?? 0));
+    const secondRank = Math.min(...secondNodes.map((node) => rankByNodeId.get(node.id) ?? 0));
+    if (firstRank !== secondRank) return firstRank - secondRank;
+    const firstLabel = firstNodes.find((node) => metadataString(node, 'laneLabel'))?.metadata.laneLabel;
+    const secondLabel = secondNodes.find((node) => metadataString(node, 'laneLabel'))?.metadata.laneLabel;
+    return String(firstLabel ?? firstId).localeCompare(String(secondLabel ?? secondId));
+  });
+
+  const width = Math.max(900, SIDE_PADDING * 2 + (maxRank + 1) * ANALYZER_NODE_WIDTH + maxRank * COMMAND_COLUMN_GAP);
+  let laneCursor = COMMAND_TOP;
   let maxBottom = COMMAND_TOP;
-  nodesByRank.forEach((nodes, rank) => {
-    nodes.sort((first, second) => {
+  const lanes = orderedLaneGroups.map(([id, laneNodes]) => {
+    const sortedNodes = [...laneNodes].sort((first, second) => {
+      const rankOrder = (rankByNodeId.get(first.id) ?? 0) - (rankByNodeId.get(second.id) ?? 0);
+      if (rankOrder !== 0) return rankOrder;
       const branchOrder = metadataString(first, 'branchPath').localeCompare(metadataString(second, 'branchPath'));
       if (branchOrder !== 0) return branchOrder;
       const typeOrder = commandNodeOrder(first) - commandNodeOrder(second);
       return typeOrder !== 0 ? typeOrder : first.label.localeCompare(second.label);
     });
-    const x = SIDE_PADDING + rank * (ANALYZER_NODE_WIDTH + COMMAND_COLUMN_GAP);
-    let y = COMMAND_TOP;
-    nodes.forEach((node) => {
-      const height = nodeHeight(node, expandedNodeIds);
-      positionedNodes.push({ node, x, y, height });
-      y += height + COMMAND_ROW_GAP;
+    const nodesByRank = new Map<number, AnalyzerViewNode[]>();
+    sortedNodes.forEach((node) => {
+      const rank = rankByNodeId.get(node.id) ?? 0;
+      const rankNodes = nodesByRank.get(rank) ?? [];
+      rankNodes.push(node);
+      nodesByRank.set(rank, rankNodes);
     });
-    maxBottom = Math.max(maxBottom, y - COMMAND_ROW_GAP);
-  });
-
-  const width = Math.max(900, SIDE_PADDING * 2 + (maxRank + 1) * ANALYZER_NODE_WIDTH + maxRank * COMMAND_COLUMN_GAP);
-  const height = Math.max(420, maxBottom + 38);
-  const laneGroups = new Map<string, PositionedNode[]>();
-  positionedNodes.forEach((positionedNode) => {
-    const laneId = positionedNode.node.metadata.laneId;
-    if (typeof laneId !== 'string') return;
-    const laneNodes = laneGroups.get(laneId) ?? [];
-    laneNodes.push(positionedNode);
-    laneGroups.set(laneId, laneNodes);
-  });
-  const lanes = [...laneGroups.entries()].map(([id, laneNodes]) => {
-    const label = laneNodes.find((positionedNode) => typeof positionedNode.node.metadata.laneLabel === 'string')?.node.metadata.laneLabel;
-    const summaryStepCount = laneNodes.find((positionedNode) => typeof positionedNode.node.metadata.stepCount === 'number')?.node.metadata.stepCount;
+    const rankStackHeight = Math.max(0, ...[...nodesByRank.values()].map((rankNodes) => {
+      const contentHeight = rankNodes.reduce((total, node) => total + nodeHeight(node, expandedNodeIds), 0);
+      return contentHeight + Math.max(0, rankNodes.length - 1) * COMMAND_ROW_GAP;
+    }));
+    nodesByRank.forEach((rankNodes, rank) => {
+      let y = laneCursor;
+      rankNodes.forEach((node) => {
+        const height = nodeHeight(node, expandedNodeIds);
+        positionedNodes.push({ node, x: SIDE_PADDING + rank * (ANALYZER_NODE_WIDTH + COMMAND_COLUMN_GAP), y, height });
+        y += height + COMMAND_ROW_GAP;
+      });
+    });
+    const top = sortedNodes.length > 0 ? laneCursor : COMMAND_TOP;
+    const bottom = top + rankStackHeight;
+    const laneTop = Math.max(46, top - 18);
+    const laneHeight = Math.max(52, bottom - laneTop + 36);
+    maxBottom = Math.max(maxBottom, laneTop + laneHeight);
+    laneCursor = laneTop + laneHeight + 34;
+    const label = laneNodes.find((node) => typeof node.metadata.laneLabel === 'string')?.metadata.laneLabel;
+    const summaryStepCount = laneNodes.find((node) => typeof node.metadata.stepCount === 'number')?.metadata.stepCount;
     const stepCount = typeof summaryStepCount === 'number' ? summaryStepCount : laneNodes.length;
-    const top = Math.min(...laneNodes.map((positionedNode) => positionedNode.y));
-    const bottom = Math.max(...laneNodes.map((positionedNode) => positionedNode.y + positionedNode.height));
     return {
       id,
       label: `${typeof label === 'string' ? label : id} · ${stepCount} STEPS`,
       x: 20,
-      y: Math.max(46, top - 18),
+      y: laneTop,
       width: Math.max(560, width - 40),
-      height: Math.max(52, bottom - Math.max(46, top - 18) + 36),
+      height: laneHeight,
     };
   });
+
+  const height = Math.max(420, maxBottom + 12);
+  const laneWidth = Math.max(560, width - 40);
+  const normalizedLanes = lanes.map((lane) => ({ ...lane, width: laneWidth }));
   return {
     width,
     height,
     nodes: positionedNodes,
     clusters: [],
-    lanes,
+    lanes: normalizedLanes,
     bands: [],
   };
 }
@@ -254,7 +282,9 @@ function commandFlowLayout(view: AnalyzerViewModel, expandedNodeIds: ReadonlySet
 interface DependencyExternalGroup {
   id: string;
   label: string;
+  summary?: AnalyzerViewNode;
   nodes: AnalyzerViewNode[];
+  presentationId?: string;
 }
 
 function dependencyExternalGroups(view: AnalyzerViewModel, nodes: AnalyzerViewNode[]): DependencyExternalGroup[] {
@@ -270,7 +300,32 @@ function dependencyExternalGroups(view: AnalyzerViewModel, nodes: AnalyzerViewNo
   });
 
   const groups = new Map<string, DependencyExternalGroup>();
+  view.nodes
+    .filter((node) => node.type === 'external-package' && node.presentation?.role === 'summary' && typeof node.metadata.externalGroupId === 'string')
+    .forEach((summary) => {
+      const groupId = String(summary.metadata.externalGroupId);
+      groups.set(groupId, {
+        id: groupId,
+        label: typeof summary.metadata.externalGroupLabel === 'string' ? summary.metadata.externalGroupLabel : summary.label,
+        summary,
+        nodes: [],
+        presentationId: summary.id,
+      });
+    });
   nodes.filter((node) => node.type === 'external-package' && node.presentation?.role !== 'summary').forEach((node) => {
+    const metadataGroupId = node.metadata.externalGroupId;
+    if (typeof metadataGroupId === 'string') {
+      const existing = groups.get(metadataGroupId);
+      const group = existing ?? {
+        id: metadataGroupId,
+        label: typeof node.metadata.externalGroupLabel === 'string' ? node.metadata.externalGroupLabel : metadataGroupId,
+        nodes: [],
+        presentationId: typeof node.metadata.externalGroupPresentationId === 'string' ? node.metadata.externalGroupPresentationId : undefined,
+      };
+      group.nodes.push(node);
+      groups.set(metadataGroupId, group);
+      return;
+    }
     const sourceIds = [...(sourcesByExternalId.get(node.id) ?? [])].sort();
     const shared = sourceIds.length > 1;
     const groupId = shared ? 'shared' : sourceIds[0] ?? 'unlinked';
@@ -308,7 +363,7 @@ function dependencyFlowLayout(view: AnalyzerViewModel, expandedNodeIds: Readonly
     if (cluster.id === 'dependencies:external' && nodes.some((node) => node.type === 'external-package')) {
       const width = 40 + ANALYZER_NODE_WIDTH;
       const y = 20;
-      const anchorNodes = nodes.filter((node) => node.presentation?.role === 'summary');
+      const anchorNodes = nodes.filter((node) => node.presentation?.role === 'summary' && typeof node.metadata.externalGroupId !== 'string');
       const externalGroups = dependencyExternalGroups(view, nodes);
       let cursor = y + TOP_PADDING;
       anchorNodes.forEach((node) => {
@@ -317,10 +372,15 @@ function dependencyFlowLayout(view: AnalyzerViewModel, expandedNodeIds: Readonly
         cursor += height + NODE_GAP;
       });
       externalGroups.forEach((group) => {
+        const groupSummary = group.summary && nodes.some((node) => node.id === group.summary?.id) ? group.summary : undefined;
+        const groupNodes = [
+          ...(groupSummary ? [groupSummary] : []),
+          ...group.nodes,
+        ];
         const groupY = cursor - 8;
         const groupHeight = DEPENDENCY_EXTERNAL_GROUP_HEADER
-          + group.nodes.reduce((total, node) => total + nodeHeight(node, expandedNodeIds), 0)
-          + Math.max(0, group.nodes.length - 1) * NODE_GAP
+          + groupNodes.reduce((total, node) => total + nodeHeight(node, expandedNodeIds), 0)
+          + Math.max(0, groupNodes.length - 1) * NODE_GAP
           + DEPENDENCY_EXTERNAL_GROUP_BOTTOM;
         positionedBands.push({
           id: `dependency-band:${group.id}`,
@@ -330,9 +390,10 @@ function dependencyFlowLayout(view: AnalyzerViewModel, expandedNodeIds: Readonly
           y: groupY,
           width: width - 20,
           height: groupHeight,
+          ...(group.presentationId ? { presentationId: group.presentationId } : {}),
         });
         let nodeY = groupY + DEPENDENCY_EXTERNAL_GROUP_HEADER;
-        group.nodes.forEach((node) => {
+        groupNodes.forEach((node) => {
           const height = nodeHeight(node, expandedNodeIds);
           positionedNodes.push({ node, x: x + 20, y: nodeY, height });
           nodeY += height + NODE_GAP;

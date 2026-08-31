@@ -130,11 +130,40 @@ export function AnalyzerPage() {
     }
   }, [expandedPresentationIds, model, selectedEdgeId, selectedNodeId]);
 
-  const toggleExternal = useCallback(() => {
-    togglePresentation(ANALYZER_EXTERNAL_SUMMARY_ID);
-  }, [togglePresentation]);
+  const externalPresentationIds = useMemo(() => model?.nodes
+    .filter((node) => node.presentation?.role === 'summary'
+      && (node.id === ANALYZER_EXTERNAL_SUMMARY_ID || typeof node.metadata.externalGroupId === 'string'))
+    .map((node) => node.id) ?? [], [model]);
+  const externalExpanded = Boolean(model
+    && expandedPresentationIds.has(ANALYZER_EXTERNAL_SUMMARY_ID)
+    && externalPresentationIds.every((presentationId) => expandedPresentationIds.has(presentationId)));
 
-  const externalExpanded = expandedPresentationIds.has(ANALYZER_EXTERNAL_SUMMARY_ID);
+  const toggleExternal = useCallback(() => {
+    if (!model) return;
+    const isExpanded = externalPresentationIds.length > 0
+      && externalPresentationIds.every((presentationId) => expandedPresentationIds.has(presentationId));
+    const next = new Set(expandedPresentationIds);
+    externalPresentationIds.forEach((presentationId) => {
+      if (isExpanded) next.delete(presentationId);
+      else next.add(presentationId);
+    });
+    setExpandedPresentationIds(next);
+    if (isExpanded) {
+      const selectedNodeIsDescendant = Boolean(selectedNodeId && presentationOwnsNode(model, ANALYZER_EXTERNAL_SUMMARY_ID, selectedNodeId));
+      const selectedEdgeTouchesDescendant = Boolean(selectedEdgeId && (() => {
+        const selectedEdge = model.edges.find((edge) => edge.id === selectedEdgeId);
+        return selectedEdge
+          ? presentationOwnsNode(model, ANALYZER_EXTERNAL_SUMMARY_ID, selectedEdge.sourceId)
+            || presentationOwnsNode(model, ANALYZER_EXTERNAL_SUMMARY_ID, selectedEdge.targetId)
+          : false;
+      })());
+      if (selectedNodeIsDescendant || selectedEdgeTouchesDescendant) {
+        setSelectedNodeId(ANALYZER_EXTERNAL_SUMMARY_ID);
+        setSelectedEdgeId(undefined);
+        setDetailOpen(true);
+      }
+    }
+  }, [expandedPresentationIds, externalPresentationIds, model, selectedEdgeId, selectedNodeId]);
 
   const resetPresentation = useCallback(() => {
     setExpandedPresentationIds(new Set());

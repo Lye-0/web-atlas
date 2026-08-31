@@ -3,7 +3,7 @@ import { parseCommandExpression } from './commandParser';
 import { makeEvidence, positionAt } from './evidence';
 import { isAnalyzerSourcePath, isExcludedPath, sourceFilesFromInput } from './fileDiscovery';
 import { parseDotnetProject, parsePackageJson, parsePnpmWorkspace, parseWranglerConfig } from './parsers';
-import { projectArchitecture, projectCommand, projectDependencies, projectWorkspace } from './projectors';
+import { ANALYZER_COMMAND_COMMON_LANE_ID, projectArchitecture, projectCommand, projectDependencies, projectWorkspace } from './projectors';
 import { analyzerSummarySubtitle, presentationOwnsNode, presentAnalyzerView } from './presentation';
 import { scanProjectFiles } from './scan';
 import { packageIdForPath, scriptIdFor, type AnalyzerSourceFile, type AnalyzerViewModel } from './types';
@@ -293,7 +293,7 @@ describe('Analyzer scan and projectors', () => {
     expect(dependencies.nodes.map((node) => node.id)).toEqual(expect.arrayContaining(['package:.', 'package:apps/web', 'technology:react', 'external-package:mystery-lib']));
     expect(dependencies.nodes.map((node) => node.id)).toContain('dependencies:external:summary');
     expect(dependencies.nodes.map((node) => node.id)).not.toContain('technology:pnpm');
-    expect(dependencies.nodes.find((node) => node.id === 'external-package:mystery-lib')?.presentation?.parentId).toBe('dependencies:external:summary');
+    expect(dependencies.nodes.find((node) => node.id === 'external-package:mystery-lib')?.presentation?.parentId).toMatch(/^dependencies:external:source:/);
     expect(dependencies.edges.some((edge) => edge.metadata.dependencyType === 'workspaceDependency')).toBe(true);
     expect(dependencies.edges.some((edge) => edge.presentation?.displayKind === 'bundle')).toBe(true);
     expect(command.entryScriptId).toBe(scriptIdFor(packageIdForPath('.'), 'dev'));
@@ -310,27 +310,38 @@ describe('Analyzer scan and projectors', () => {
     const dependencies = projectDependencies(store);
     const options = { expandedPresentationIds: new Set<string>(), filter: 'all', search: '' };
     const collapsed = presentAnalyzerView(dependencies, options);
+    const sourceSummary = dependencies.nodes.find((node) => node.presentation?.role === 'summary' && typeof node.metadata.externalGroupId === 'string');
     const expanded = presentAnalyzerView(dependencies, { ...options, expandedPresentationIds: new Set(['dependencies:external:summary']) });
+    const sourceExpanded = sourceSummary
+      ? presentAnalyzerView(dependencies, { ...options, expandedPresentationIds: new Set(['dependencies:external:summary', sourceSummary.id]) })
+      : expanded;
     const collapsedAgain = presentAnalyzerView(dependencies, options);
     const searchRevealed = presentAnalyzerView(dependencies, { ...options, search: 'mystery-lib' });
 
+    expect(sourceSummary).toBeDefined();
     expect(dependencies.nodes.map((node) => node.id)).toContain('external-package:mystery-lib');
     expect(collapsed.nodes.map((node) => node.id)).toContain('dependencies:external:summary');
     expect(collapsed.nodes.map((node) => node.id)).not.toContain('external-package:mystery-lib');
-    expect(expanded.nodes.map((node) => node.id)).toContain('external-package:mystery-lib');
+    expect(expanded.nodes.map((node) => node.id)).toContain(sourceSummary?.id);
+    expect(expanded.nodes.map((node) => node.id)).not.toContain('external-package:mystery-lib');
     expect(expanded.nodes.map((node) => node.id)).not.toContain('dependencies:external:summary');
+    expect(sourceExpanded.nodes.map((node) => node.id)).toContain('external-package:mystery-lib');
+    expect(sourceExpanded.nodes.map((node) => node.id)).not.toContain(sourceSummary?.id);
     expect(collapsedAgain.nodes.map((node) => node.id)).not.toContain('external-package:mystery-lib');
     expect(searchRevealed.nodes.map((node) => node.id)).toContain('external-package:mystery-lib');
     expect(collapsed.edges.some((edge) => edge.targetId === 'dependencies:external:summary')).toBe(true);
     expect(collapsed.edges.some((edge) => edge.presentation?.displayKind === 'bundle')).toBe(true);
-    expect(expanded.edges.some((edge) => edge.targetId === 'external-package:mystery-lib')).toBe(true);
-    expect(expanded.edges.some((edge) => edge.presentation?.displayKind === 'bundle')).toBe(false);
-    expect(expanded.counts?.visibleNodes).toBe(expanded.counts?.totalNodes);
+    expect(expanded.edges.some((edge) => edge.targetId === sourceSummary?.id)).toBe(true);
+    expect(expanded.edges.some((edge) => edge.presentation?.displayKind === 'bundle')).toBe(true);
+    expect(sourceExpanded.edges.some((edge) => edge.targetId === 'external-package:mystery-lib')).toBe(true);
+    expect(sourceExpanded.edges.some((edge) => edge.presentation?.displayKind === 'bundle')).toBe(false);
+    expect(sourceExpanded.counts?.visibleNodes).toBe(sourceExpanded.counts?.totalNodes);
     const summary = dependencies.nodes.find((node) => node.id === 'dependencies:external:summary');
     expect(summary).toBeDefined();
     expect(analyzerSummarySubtitle(summary!, false)).toContain('expand for details');
     expect(analyzerSummarySubtitle(summary!, true)).toContain('expanded · Collapse');
     expect(presentationOwnsNode(dependencies, 'dependencies:external:summary', 'external-package:mystery-lib')).toBe(true);
+    expect(presentationOwnsNode(dependencies, sourceSummary!.id, 'external-package:mystery-lib')).toBe(true);
   });
 
   it('keeps Architecture Overview concise while retaining expandable detail Facts', async () => {
@@ -375,6 +386,12 @@ describe('Analyzer scan and projectors', () => {
     expect(branches).toHaveLength(2);
     expect(branches[0]?.x).toBe(branches[1]?.x);
     expect(branches[0]?.y).not.toBe(branches[1]?.y);
+    expect(entry.node.metadata.laneId).toBe(ANALYZER_COMMAND_COMMON_LANE_ID);
+    expect(rootScript.node.metadata.laneId).toBe(ANALYZER_COMMAND_COMMON_LANE_ID);
+    expect(concurrently.node.metadata.laneId).toBe(ANALYZER_COMMAND_COMMON_LANE_ID);
+    expect(entry.y).toBe(rootScript.y);
+    expect(rootScript.y).toBe(concurrently.y);
+    expect(layout.lanes.some((lane) => lane.label.startsWith('COMMON · '))).toBe(true);
     command.edges
       .filter((edge) => ['expands-to', 'resolves-to', 'starts'].includes(edge.kind))
       .forEach((edge) => {
@@ -398,7 +415,7 @@ describe('Analyzer scan and projectors', () => {
     expect(webBranch).toBeDefined();
     expect(collapsed.nodes.some((node) => node.label === 'pnpm exec vite')).toBe(false);
     expect(collapsed.counts).toEqual({ visibleNodes: 5, totalNodes: 10, hiddenNodes: 5 });
-    expect(layoutAnalyzerView(collapsed).lanes).toHaveLength(2);
+    expect(layoutAnalyzerView(collapsed).lanes).toHaveLength(3);
     expect(expanded.nodes.some((node) => node.label === 'pnpm exec vite')).toBe(true);
     expect(expanded.nodes.some((node) => node.id === webBranch?.id)).toBe(false);
     expect(expanded.counts?.hiddenNodes).toBeLessThan(collapsed.counts?.hiddenNodes ?? 0);

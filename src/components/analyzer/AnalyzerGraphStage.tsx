@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
-import { ANALYZER_DEFAULT_TRANSFORM, ANALYZER_NODE_WIDTH, analyzerFocusDepths, analyzerSummaryExpanded, analyzerSummarySubtitle, displayedZoomLevelForNode, fitAnalyzerTransform, focusAnalyzerTransform, layoutAnalyzerView, nodeMatchesSearch, presentAnalyzerView, semanticZoomLevelForScale, type AnalyzerGraphTransform, type AnalyzerViewCounts, type AnalyzerViewEdge, type AnalyzerViewModel, type PositionedNode } from '../../analyzer';
+import { ANALYZER_DEFAULT_TRANSFORM, ANALYZER_NODE_WIDTH, analyzerFocusedEdgeEmphasis, analyzerFocusDepths, analyzerSummaryExpanded, analyzerSummarySubtitle, displayedZoomLevelForNode, fitAnalyzerTransform, focusAnalyzerTransform, layoutAnalyzerView, nodeMatchesSearch, presentAnalyzerView, semanticZoomLevelForScale, type AnalyzerGraphTransform, type AnalyzerViewCounts, type AnalyzerViewEdge, type AnalyzerViewModel, type PositionedNode } from '../../analyzer';
 import { nodeTypeLabels } from '../../analyzer';
 import { EvidencePreview } from './EvidenceCodeBlock';
 
@@ -254,11 +254,25 @@ export function AnalyzerGraphStage({
     const contextPositions = selectedNodeId
       ? [...new Set([
           selectedNodeId,
-          ...filteredView.edges.flatMap((edge) => {
-            if (edge.sourceId === selectedNodeId) return [edge.targetId];
-            if (edge.targetId === selectedNodeId) return [edge.sourceId];
-            return [];
-          }),
+          ...(() => {
+            const candidates = filteredView.edges.filter((edge) => edge.sourceId === selectedNodeId || edge.targetId === selectedNodeId);
+            const emphasisRank = (edge: AnalyzerViewEdge): number => {
+              const emphasis = filteredView.view === 'architecture'
+                ? analyzerFocusedEdgeEmphasis(filteredView, edge, selectedNodeId)
+                : edge.presentation?.emphasis;
+              return emphasis === 'primary' ? 0 : emphasis === 'secondary' ? 1 : emphasis === 'deep' ? 2 : 3;
+            };
+            const ordered = [...candidates].sort((first, second) => {
+              const emphasisOrder = emphasisRank(first) - emphasisRank(second);
+              if (emphasisOrder !== 0) return emphasisOrder;
+              const firstDirection = first.sourceId === selectedNodeId ? 0 : 1;
+              const secondDirection = second.sourceId === selectedNodeId ? 0 : 1;
+              return firstDirection - secondDirection;
+            });
+            const outgoing = ordered.find((edge) => edge.sourceId === selectedNodeId);
+            const incoming = ordered.find((edge) => edge.targetId === selectedNodeId);
+            return [outgoing, incoming, ...ordered].flatMap((edge) => edge ? [edge.sourceId === selectedNodeId ? edge.targetId : edge.sourceId] : []).slice(0, 4);
+          })(),
         ])]
         .map((nodeId) => positionedById.get(nodeId))
         .filter((positionedNode): positionedNode is PositionedNode => Boolean(positionedNode))
@@ -280,7 +294,7 @@ export function AnalyzerGraphStage({
       if (deltaX === 0 && deltaY === 0) return current;
       return { ...current, x: nextX, y: current.y + deltaY };
     });
-  }, [filteredView.edges, positionedById, selectedNodeId, viewportSize]);
+  }, [filteredView, positionedById, selectedNodeId, viewportSize]);
 
   useLayoutEffect(() => {
     const element = stageRef.current;
@@ -493,19 +507,30 @@ export function AnalyzerGraphStage({
                 </section>
               );
             })}
-            {layout.bands.map((band) => (
-              <div key={band.id} className={`analyzer-layout-band analyzer-layout-band-${band.kind}`} style={{ left: band.x, top: band.y, width: band.width, height: band.height }} aria-label={band.label}>
-                <span>{band.label}</span>
-              </div>
-            ))}
+            {layout.bands.map((band) => {
+              const bandExpanded = Boolean(band.presentationId && expandedPresentationIds.has(band.presentationId));
+              const bandSummaryVisible = Boolean(band.presentationId && filteredView.nodes.some((node) => node.id === band.presentationId));
+              return (
+                <div key={band.id} className={`analyzer-layout-band analyzer-layout-band-${band.kind}${bandExpanded ? ' is-expanded' : ''}`} style={{ left: band.x, top: band.y, width: band.width, height: band.height }} aria-label={band.label}>
+                  {band.presentationId && (!bandSummaryVisible || bandExpanded) ? (
+                    <button type="button" className="analyzer-band-toggle" onClick={() => onTogglePresentation(band.presentationId!)} aria-expanded={bandExpanded}>
+                      {band.label} · {bandExpanded ? 'Collapse' : 'Expand'}
+                    </button>
+                  ) : <span>{band.label}</span>}
+                </div>
+              );
+            })}
             {layout.lanes.map((lane) => {
               const presentationId = `command:lane:${lane.id}`;
               const laneExpanded = expandedPresentationIds.has(presentationId);
+              const laneSummary = view.nodes.some((node) => node.id === presentationId && node.presentation?.role === 'summary');
               return (
                 <div key={lane.id} className={`analyzer-command-lane${laneExpanded ? ' is-expanded' : ''}`} style={{ left: lane.x, top: lane.y, width: lane.width, height: lane.height }} aria-label={`${lane.label} execution lane`}>
-                  <button type="button" className="analyzer-lane-toggle" onClick={() => onTogglePresentation(presentationId)} aria-expanded={laneExpanded}>
-                    {lane.label}
-                  </button>
+                  {laneSummary ? (
+                    <button type="button" className="analyzer-lane-toggle" onClick={() => onTogglePresentation(presentationId)} aria-expanded={laneExpanded}>
+                      {lane.label}
+                    </button>
+                  ) : <span className="analyzer-lane-label">{lane.label}</span>}
                 </div>
               );
             })}
@@ -544,7 +569,7 @@ export function AnalyzerGraphStage({
               return (
                 <div
                   key={node.id}
-                  className={`analyzer-node node-type-${node.type} zoom-${nodeZoom}${summary ? ' is-summary' : ''}${summary && summaryExpanded ? ' is-expanded' : ''}${selected ? ' is-selected' : ''}${connected ? ' is-connected' : ''}${focusClass}${hasEvidencePreview ? ' has-evidence-preview' : ''}${matches && search.trim() ? ' is-match' : ''}${dimmed ? ' is-dimmed' : ''}`}
+                  className={`analyzer-node node-type-${node.type} zoom-${nodeZoom}${summary ? ' is-summary' : ''}${summary && summaryExpanded ? ' is-expanded is-presentation-anchor' : ''}${selected ? ' is-selected' : ''}${connected ? ' is-connected' : ''}${focusClass}${hasEvidencePreview ? ' has-evidence-preview' : ''}${matches && search.trim() ? ' is-match' : ''}${dimmed ? ' is-dimmed' : ''}`}
                   style={nodeStyle(positionedNode)}
                   onClick={() => summary ? togglePresentation(node.id) : onSelectNode(node.id)}
                   onMouseEnter={() => setHoveredNodeId(node.id)}

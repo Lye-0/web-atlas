@@ -21,6 +21,7 @@ import {
 } from './types';
 
 export const ANALYZER_EXTERNAL_SUMMARY_ID = 'dependencies:external:summary';
+export const ANALYZER_COMMAND_COMMON_LANE_ID = 'command-lane:common';
 
 function nodeSubtitle(fact: AnalyzerFact): string | undefined {
   if (fact.kind === 'project') return 'Selected local project folder';
@@ -476,7 +477,7 @@ export function projectCommand(store: AnalyzerProjectStore, requestedEntryScript
         executionRank: context.executionRank + 1,
         executionDepth: context.executionDepth + 1,
         branchPath: `${context.branchPath}.${index + 1}`,
-        ...(context.laneId
+        ...(context.laneId && context.laneId !== ANALYZER_COMMAND_COMMON_LANE_ID
           ? { laneId: context.laneId, ...(context.laneLabel ? { laneLabel: context.laneLabel } : {}) }
           : { laneId: `command-lane:${commandId}:${index + 1}`, laneLabel: commandBranchLabel(child, index) }),
       }));
@@ -561,7 +562,7 @@ export function projectCommand(store: AnalyzerProjectStore, requestedEntryScript
       subtitle: entry.packageName,
       clusterId: 'command:user',
       evidenceIds: entry.evidenceIds,
-      metadata: { commandType: 'user-command', scriptId: entry.id, packagePath: entry.packagePath, packageName: entry.packageName, executionRank: 0, executionDepth: 0, branchPath: 'root' },
+      metadata: { commandType: 'user-command', scriptId: entry.id, packagePath: entry.packagePath, packageName: entry.packageName, executionRank: 0, executionDepth: 0, branchPath: 'root', laneId: ANALYZER_COMMAND_COMMON_LANE_ID, laneLabel: 'COMMON' },
     };
     nodes.set(entryNode.id, entryNode);
     addViewEdge(edges, {
@@ -573,7 +574,7 @@ export function projectCommand(store: AnalyzerProjectStore, requestedEntryScript
       evidenceIds: entry.evidenceIds,
       metadata: { entry: true },
     });
-    buildScript(entry, { executionRank: 1, executionDepth: 1, branchPath: 'root' });
+    buildScript(entry, { executionRank: 1, executionDepth: 1, branchPath: 'root', laneId: ANALYZER_COMMAND_COMMON_LANE_ID, laneLabel: 'COMMON' });
   }
 
   const rawNodeList = [...nodes.values()];
@@ -585,7 +586,9 @@ export function projectCommand(store: AnalyzerProjectStore, requestedEntryScript
     laneNodes.push(node);
     laneGroups.set(laneId, laneNodes);
   });
-  const laneSummaries = [...laneGroups.entries()].map(([laneId, laneNodes]) => {
+  const laneSummaries = [...laneGroups.entries()]
+    .filter(([laneId]) => laneId !== ANALYZER_COMMAND_COMMON_LANE_ID)
+    .map(([laneId, laneNodes]) => {
     const laneLabel = laneNodes.find((node) => typeof node.metadata.laneLabel === 'string')?.metadata.laneLabel;
     const executionRank = Math.min(...laneNodes.map((node) => typeof node.metadata.executionRank === 'number' ? node.metadata.executionRank : Number.MAX_SAFE_INTEGER));
     const summary = summaryNode(
@@ -608,7 +611,7 @@ export function projectCommand(store: AnalyzerProjectStore, requestedEntryScript
         branchPath: `lane:${laneId}`,
       },
     };
-  });
+    });
   const summaryIdByLane = new Map(laneSummaries.flatMap((summary) => {
     const laneId = summary.metadata.laneId;
     return typeof laneId === 'string' ? [[laneId, summary.id] as const] : [];
@@ -647,39 +650,132 @@ export function projectDependencies(store: AnalyzerProjectStore): AnalyzerViewMo
     ));
   const externalNodes = baseNodes.filter((node) => node.type === 'external-package');
   const externalSummaryId = ANALYZER_EXTERNAL_SUMMARY_ID;
-  const nodes = externalNodes.length > 0
-    ? [
-        ...markPresentationChildren(baseNodes, externalSummaryId, new Set(externalNodes.map((node) => node.id))),
-        summaryNode(externalSummaryId, 'External Packages', `${externalNodes.length} packages`, 'external-package', 'dependencies:external', externalNodes),
-      ]
-    : baseNodes;
   const dependencyEdges = edgesForRelations(store, baseNodes, (relation) => relation.kind === 'depends-on');
   const externalDependencyEdges = dependencyEdges.filter((edge) => externalNodes.some((node) => node.id === edge.targetId));
-  const externalEdgesBySource = new Map<string, AnalyzerViewEdge[]>();
+  const sourceIdsByExternalId = new Map<string, string[]>();
   externalDependencyEdges.forEach((edge) => {
-    const sourceEdges = externalEdgesBySource.get(edge.sourceId) ?? [];
-    sourceEdges.push(edge);
-    externalEdgesBySource.set(edge.sourceId, sourceEdges);
+    const sourceIds = sourceIdsByExternalId.get(edge.targetId) ?? [];
+    if (!sourceIds.includes(edge.sourceId)) sourceIds.push(edge.sourceId);
+    sourceIdsByExternalId.set(edge.targetId, sourceIds);
   });
-  const childEdges = externalDependencyEdges.map((edge) => ({
-    ...edge,
-    presentation: { parentId: externalSummaryId, initiallyHidden: true },
-  }));
-  const bundleEdges = externalEdgesBySource.size > 0
-    ? [...externalEdgesBySource.entries()].map(([sourceId, sourceEdges]) => ({
-        id: `view-edge:external-bundle:${sourceId}`,
-        sourceId,
-        targetId: externalSummaryId,
-        kind: 'depends-on' as const,
-        label: `${sourceEdges.length} external ${sourceEdges.length === 1 ? 'dependency' : 'dependencies'}`,
-        evidenceIds: [...new Set(sourceEdges.flatMap((edge) => edge.evidenceIds))],
+  const sourceGroupKeyByExternalId = new Map<string, string>();
+  const sourceGroups = new Map<string, { label: string; sourceIds: string[]; nodes: AnalyzerViewNode[] }>();
+  externalNodes.forEach((node) => {
+    const sourceIds = [...(sourceIdsByExternalId.get(node.id) ?? [])].sort();
+    const groupKey = sourceIds.length > 1 ? 'shared' : sourceIds[0] ?? 'unlinked';
+    const sourceLabels = sourceIds.map((sourceId) => baseNodes.find((candidate) => candidate.id === sourceId)?.label ?? sourceId);
+    const label = sourceIds.length > 1
+      ? 'Shared External'
+      : sourceLabels[0]
+        ? `${sourceLabels[0]} Dependencies`
+        : 'Other External';
+    const group = sourceGroups.get(groupKey) ?? { label, sourceIds: [], nodes: [] };
+    sourceIds.forEach((sourceId) => {
+      if (!group.sourceIds.includes(sourceId)) group.sourceIds.push(sourceId);
+    });
+    group.nodes.push(node);
+    sourceGroups.set(groupKey, group);
+    sourceGroupKeyByExternalId.set(node.id, groupKey);
+  });
+  const sourceSummaryId = (groupKey: string) => `dependencies:external:source:${groupKey}`;
+  const sourceGroupSummaries = [...sourceGroups.entries()]
+    .sort(([firstKey, first], [secondKey, second]) => {
+      if (firstKey === 'shared') return -1;
+      if (secondKey === 'shared') return 1;
+      return first.label.localeCompare(second.label);
+    })
+    .map(([groupKey, group]) => {
+      const summary = summaryNode(
+        sourceSummaryId(groupKey),
+        group.label,
+        `${group.nodes.length} packages`,
+        'external-package',
+        'dependencies:external',
+        group.nodes,
+      );
+      return {
+        ...summary,
         metadata: {
-          presentation: 'bundle',
-          dependencyCount: sourceEdges.length,
+          ...summary.metadata,
+          displayRole: 'EXTERNAL SOURCE',
+          externalGroupId: groupKey,
+          externalGroupLabel: group.label,
+          externalGroupPresentationId: sourceSummaryId(groupKey),
+          externalSourceIds: [...group.sourceIds],
+          packageCount: group.nodes.length,
         },
-        presentation: { displayKind: 'bundle' as const, parentId: externalSummaryId },
-      }))
-    : [];
+        presentation: {
+          ...summary.presentation,
+          parentId: externalSummaryId,
+        },
+      };
+    });
+  const externalDetailNodes = externalNodes.map((node) => {
+    const groupKey = sourceGroupKeyByExternalId.get(node.id) ?? 'unlinked';
+    const group = sourceGroups.get(groupKey);
+    return {
+      ...node,
+      metadata: {
+        ...node.metadata,
+        externalGroupId: groupKey,
+        externalGroupLabel: group?.label ?? 'Other External',
+        externalGroupPresentationId: sourceSummaryId(groupKey),
+        externalSourceIds: [...(group?.sourceIds ?? [])],
+      },
+      presentation: { role: 'detail' as const, parentId: sourceSummaryId(groupKey) },
+    };
+  });
+  const externalSummaryBase = summaryNode(externalSummaryId, 'External Packages', `${externalNodes.length} packages`, 'external-package', 'dependencies:external', sourceGroupSummaries);
+  const externalSummary = {
+    ...externalSummaryBase,
+    metadata: {
+      ...externalSummaryBase.metadata,
+      childCount: externalNodes.length,
+      packageCount: externalNodes.length,
+      groupCount: sourceGroupSummaries.length,
+    },
+  };
+  const nodes = externalNodes.length > 0
+    ? [
+        ...baseNodes.filter((node) => node.type !== 'external-package'),
+        ...externalDetailNodes,
+        ...sourceGroupSummaries,
+        externalSummary,
+      ]
+    : baseNodes;
+  const childEdges = externalDependencyEdges.map((edge) => {
+    const groupKey = sourceGroupKeyByExternalId.get(edge.targetId) ?? 'unlinked';
+    return {
+      ...edge,
+      presentation: { parentId: sourceSummaryId(groupKey), initiallyHidden: true },
+    };
+  });
+  const externalEdgesBySourceAndGroup = new Map<string, AnalyzerViewEdge[]>();
+  externalDependencyEdges.forEach((edge) => {
+    const groupKey = sourceGroupKeyByExternalId.get(edge.targetId) ?? 'unlinked';
+    const key = `${edge.sourceId}\u0000${groupKey}`;
+    const sourceEdges = externalEdgesBySourceAndGroup.get(key) ?? [];
+    sourceEdges.push(edge);
+    externalEdgesBySourceAndGroup.set(key, sourceEdges);
+  });
+  const bundleEdges = [...externalEdgesBySourceAndGroup.entries()].map(([key, sourceEdges]) => {
+    const [sourceId, groupKey] = key.split('\u0000');
+    const targetSummaryId = sourceSummaryId(groupKey ?? 'unlinked');
+    return {
+      id: `view-edge:external-bundle:${sourceId}:${groupKey}`,
+      sourceId,
+      targetId: targetSummaryId,
+      kind: 'depends-on' as const,
+      label: `${sourceEdges.length} external ${sourceEdges.length === 1 ? 'dependency' : 'dependencies'}`,
+      evidenceIds: [...new Set(sourceEdges.flatMap((edge) => edge.evidenceIds))],
+      metadata: {
+        presentation: 'bundle',
+        dependencyCount: sourceEdges.length,
+        externalGroupId: groupKey,
+      },
+      presentation: { displayKind: 'bundle' as const, parentId: targetSummaryId },
+    };
+  });
   const edges = externalNodes.length > 0
     ? [...dependencyEdges.filter((edge) => !externalNodes.some((node) => node.id === edge.targetId)), ...childEdges, ...bundleEdges]
     : dependencyEdges;
