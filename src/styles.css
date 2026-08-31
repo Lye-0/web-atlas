@@ -2851,6 +2851,8 @@ summary:focus-visible {
   background-size: 28px 28px, 28px 28px, 140px 140px, 140px 140px, auto;
   cursor: grab;
   touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .analyzer-graph-stage:active {

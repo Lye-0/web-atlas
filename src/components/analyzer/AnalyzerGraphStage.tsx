@@ -171,7 +171,12 @@ export function AnalyzerGraphStage({
   };
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0 || (event.target as HTMLElement).closest('button, input, select, path, [role="button"]')) return;
+    const target = event.target;
+    if (
+      event.button !== 0 ||
+      (target instanceof Element && target.closest('button, a, input, select, textarea, [contenteditable="true"], [role="button"]'))
+    ) return;
+    event.preventDefault();
     dragRef.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, originX: transform.x, originY: transform.y };
     event.currentTarget.setPointerCapture(event.pointerId);
   };
@@ -183,7 +188,9 @@ export function AnalyzerGraphStage({
   };
 
   const handlePointerUp = (event: PointerEvent<HTMLDivElement>) => {
-    if (dragRef.current?.pointerId === event.pointerId) dragRef.current = undefined;
+    if (dragRef.current?.pointerId !== event.pointerId) return;
+    dragRef.current = undefined;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   };
 
   const zoomAtPoint = useCallback((clientX: number, clientY: number, deltaY: number) => {
