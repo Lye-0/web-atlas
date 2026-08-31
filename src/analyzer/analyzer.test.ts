@@ -367,10 +367,22 @@ describe('Analyzer scan and projectors', () => {
     expect(externalSummaryGroup).toMatchObject({ id: 'dependencies:external:summary', label: 'External Packages', countLabel: 'PACKAGES' });
     expect(externalSummaryGroup?.width).toBeGreaterThan(0);
     expect(externalSummaryGroup?.height).toBeGreaterThan(0);
+    const nestedSummaryNodes = externalGroupLayout.nodes.filter((positionedNode) => positionedNode.node.presentation?.parentId === 'dependencies:external:summary');
+    expect(nestedSummaryNodes.length).toBeGreaterThan(0);
+    expect(Math.min(...nestedSummaryNodes.map((positionedNode) => positionedNode.y)) - (externalSummaryGroup?.y ?? 0)).toBeGreaterThan(40);
     const sourceExpandedLayout = layoutAnalyzerView(sourceExpanded);
     expect(sourceExpandedLayout.bands).toEqual(expect.arrayContaining([
-      expect.objectContaining({ presentationId: sourceSummary?.id, countLabel: 'PACKAGES' }),
+      expect.objectContaining({ presentationId: sourceSummary?.id, countLabel: 'PACKAGES', depth: 2 }),
     ]));
+    expect(sourceExpandedLayout.nodes.some((positionedNode) => positionedNode.node.id === sourceSummary?.id)).toBe(false);
+    expect(sourceExpandedLayout.summaryGroups.some((group) => group.id === sourceSummary?.id)).toBe(false);
+    expect(nestedSummaryNodes.every((positionedNode) => positionedNode.height < ANALYZER_NODE_HEIGHT)).toBe(true);
+    const sourceBand = sourceExpandedLayout.bands.find((band) => band.presentationId === sourceSummary?.id);
+    const sourceParentGroup = sourceExpandedLayout.summaryGroups.find((group) => group.id === 'dependencies:external:summary');
+    expect(sourceBand).toBeDefined();
+    expect(sourceBand?.x).toBeGreaterThan(sourceParentGroup?.x ?? -1);
+    expect((sourceBand?.x ?? 0) + (sourceBand?.width ?? 0)).toBeLessThan((sourceParentGroup?.x ?? 0) + (sourceParentGroup?.width ?? 0));
+    expect((sourceBand?.y ?? 0) - (sourceParentGroup?.y ?? 0)).toBeGreaterThan(30);
     const summary = dependencies.nodes.find((node) => node.id === 'dependencies:external:summary');
     expect(summary).toBeDefined();
     expect(analyzerSummarySubtitle(summary!, false)).toContain('expand for details');
@@ -413,8 +425,20 @@ describe('Analyzer scan and projectors', () => {
     const expandedArchitectureLayout = layoutAnalyzerView(expandedArchitecture);
     const technologyGroup = expandedArchitectureLayout.summaryGroups.find((group) => group.id === technologySummary?.id);
     const technologyChildren = expandedArchitectureLayout.nodes.filter((positionedNode) => positionedNode.node.presentation?.parentId === technologySummary?.id);
+    const technologyChildIds = new Set(technologyChildren.map((positionedNode) => positionedNode.node.id));
+    const technologyClusterNodes = expandedArchitectureLayout.nodes
+      .filter((positionedNode) => positionedNode.node.clusterId === technologyChildren[0]?.node.clusterId)
+      .sort((first, second) => first.y - second.y);
+    const technologyChildIndexes = technologyClusterNodes
+      .map((positionedNode, index) => technologyChildIds.has(positionedNode.node.id) ? index : -1)
+      .filter((index) => index >= 0);
     expect(technologyGroup).toMatchObject({ id: technologySummary?.id, label: 'Technology details', countLabel: 'TECHNOLOGIES' });
     expect(technologyChildren.length).toBe(technologySummary?.presentation?.childNodeIds?.length);
+    expect(expandedArchitectureLayout.nodes.some((positionedNode) => positionedNode.node.id === technologySummary?.id)).toBe(false);
+    expect(technologyChildIndexes.length).toBe(technologyChildren.length);
+    expect(Math.max(...technologyChildIndexes) - Math.min(...technologyChildIndexes) + 1).toBe(technologyChildIndexes.length);
+    expect(technologyGroup?.depth).toBe(1);
+    expect(Math.min(...technologyChildren.map((node) => node.y)) - (technologyGroup?.y ?? 0)).toBeGreaterThan(40);
     expect(technologyGroup?.x).toBeLessThanOrEqual(Math.min(...technologyChildren.map((node) => node.x)));
     expect((technologyGroup?.x ?? 0) + (technologyGroup?.width ?? 0)).toBeGreaterThanOrEqual(Math.max(...technologyChildren.map((node) => node.x + ANALYZER_NODE_WIDTH)));
     expect(expandedArchitectureLayout.width).toBeGreaterThanOrEqual((technologyGroup?.x ?? 0) + (technologyGroup?.width ?? 0));

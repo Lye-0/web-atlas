@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
-import { ANALYZER_DEFAULT_TRANSFORM, ANALYZER_NODE_WIDTH, analyzerFocusDepths, analyzerPresentationCount, analyzerPresentationCountLabel, analyzerSummaryExpanded, displayedZoomLevelForNode, fitAnalyzerTransform, focusAnalyzerTransform, layoutAnalyzerView, nodeMatchesSearch, preserveAnalyzerTransformOnViewportResize, presentAnalyzerView, semanticZoomLevelForScale, shouldShowAnalyzerEvidencePreview, type AnalyzerGraphTransform, type AnalyzerViewCounts, type AnalyzerViewEdge, type AnalyzerViewModel, type PositionedNode } from '../../analyzer';
+import { ANALYZER_DEFAULT_TRANSFORM, ANALYZER_EXTERNAL_SUMMARY_ID, ANALYZER_NODE_WIDTH, analyzerFocusDepths, analyzerPresentationCount, analyzerPresentationCountLabel, displayedZoomLevelForNode, fitAnalyzerTransform, focusAnalyzerTransform, layoutAnalyzerView, nodeMatchesSearch, preserveAnalyzerTransformOnViewportResize, presentAnalyzerView, semanticZoomLevelForScale, shouldShowAnalyzerEvidencePreview, type AnalyzerGraphTransform, type AnalyzerViewCounts, type AnalyzerViewEdge, type AnalyzerViewModel, type PositionedNode } from '../../analyzer';
 import { nodeTypeLabels } from '../../analyzer';
 import { EvidencePreview } from './EvidenceCodeBlock';
 
@@ -65,6 +65,17 @@ function nodeCenter(positionedNode: PositionedNode): { x: number; y: number } {
 function semanticAnchorPosition(layout: GraphLayout, view: AnalyzerViewModel, nodeId: string, visited = new Set<string>()): PositionedNode | undefined {
   const direct = layout.nodes.find((positionedNode) => positionedNode.node.id === nodeId);
   if (direct) return direct;
+  const groupBounds = layout.summaryGroups.find((group) => group.id === nodeId)
+    ?? layout.bands.find((band) => band.presentationId === nodeId);
+  const summaryNode = view.nodes.find((node) => node.id === nodeId);
+  if (groupBounds && summaryNode) {
+    return {
+      node: summaryNode,
+      x: groupBounds.x + (groupBounds.width - ANALYZER_NODE_WIDTH) / 2,
+      y: groupBounds.y + 4,
+      height: 28,
+    };
+  }
   if (visited.has(nodeId)) return undefined;
   visited.add(nodeId);
   const node = view.nodes.find((candidate) => candidate.id === nodeId);
@@ -144,10 +155,15 @@ export function AnalyzerGraphStage({
   const layout = useMemo(() => layoutAnalyzerView(filteredView, expandedNodeIds), [expandedNodeIds, filteredView]);
   const positionedById = useMemo(() => new Map(layout.nodes.map((positionedNode) => [positionedNode.node.id, positionedNode])), [layout.nodes]);
   const selectedPosition = useMemo(() => {
-    if (selectedNodeId) return positionedById.get(selectedNodeId);
+    if (selectedNodeId) return positionedById.get(selectedNodeId) ?? semanticAnchorPosition(layout, filteredView, selectedNodeId);
     const selectedEdge = selectedEdgeId ? filteredView.edges.find((edge) => edge.id === selectedEdgeId) : undefined;
-    return selectedEdge ? positionedById.get(selectedEdge.sourceId) ?? positionedById.get(selectedEdge.targetId) : undefined;
-  }, [filteredView.edges, positionedById, selectedEdgeId, selectedNodeId]);
+    return selectedEdge
+      ? positionedById.get(selectedEdge.sourceId)
+        ?? semanticAnchorPosition(layout, filteredView, selectedEdge.sourceId)
+        ?? positionedById.get(selectedEdge.targetId)
+        ?? semanticAnchorPosition(layout, filteredView, selectedEdge.targetId)
+      : undefined;
+  }, [filteredView, layout, positionedById, selectedEdgeId, selectedNodeId]);
   useLayoutEffect(() => {
     const previous = presentationCameraSnapshotRef.current;
     if (previous && previous.cameraKey === cameraKey && previous.expandedKey !== expandedPresentationKey) {
@@ -272,11 +288,11 @@ export function AnalyzerGraphStage({
   useEffect(() => {
     if (!focusRequest || focusRequest.nonce === focusNonceRef.current) return;
     const element = stageRef.current;
-    const selectedPosition = positionedById.get(focusRequest.nodeId);
+    const selectedPosition = positionedById.get(focusRequest.nodeId) ?? semanticAnchorPosition(layout, filteredView, focusRequest.nodeId);
     if (!element || !selectedPosition || element.clientWidth <= 0 || element.clientHeight <= 0) return;
     focusNonceRef.current = focusRequest.nonce;
     setTransform((current) => focusAnalyzerTransform(selectedPosition, element.clientWidth, element.clientHeight, current.scale));
-  }, [focusRequest, positionedById]);
+  }, [filteredView, focusRequest, layout, positionedById]);
 
   const changeZoom = (factor: number) => setTransform((current) => ({ ...current, scale: Math.max(0.35, Math.min(1.4, current.scale * factor)) }));
   const resetTransform = () => {
@@ -363,8 +379,8 @@ export function AnalyzerGraphStage({
   }, [onClearSelection]);
 
   const renderEdge = (edge: AnalyzerViewEdge) => {
-    const source = positionedById.get(edge.sourceId);
-    const target = positionedById.get(edge.targetId);
+    const source = positionedById.get(edge.sourceId) ?? semanticAnchorPosition(layout, filteredView, edge.sourceId);
+    const target = positionedById.get(edge.targetId) ?? semanticAnchorPosition(layout, filteredView, edge.targetId);
     if (!source || !target) return null;
     const selected = edge.id === selectedEdgeId;
     const connected = selectedNodeId ? edge.sourceId === selectedNodeId || edge.targetId === selectedNodeId : false;
@@ -411,6 +427,7 @@ export function AnalyzerGraphStage({
       </g>
     );
   };
+  const hasExpandedExternalSummaryRegion = layout.summaryGroups.some((group) => group.id === ANALYZER_EXTERNAL_SUMMARY_ID);
 
   return (
     <div
@@ -450,11 +467,14 @@ export function AnalyzerGraphStage({
         <div className="analyzer-graph-viewport">
           <div className="analyzer-graph-world" style={{ width: layout.width, height: layout.height, transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})` }}>
             {layout.clusters.map((cluster) => {
+              const hideDuplicateExternalHeading = cluster.id === 'dependencies:external' && hasExpandedExternalSummaryRegion;
               return (
                 <section key={cluster.id} className={`analyzer-cluster-plane tone-${cluster.tone}`} style={{ left: cluster.x, top: cluster.y, width: cluster.width, height: cluster.height }} aria-label={cluster.label}>
-                  <div className="analyzer-cluster-heading">
-                    <span>{cluster.label}</span>
-                  </div>
+                  {!hideDuplicateExternalHeading && (
+                    <div className="analyzer-cluster-heading">
+                      <span>{cluster.label}</span>
+                    </div>
+                  )}
                 </section>
               );
             })}
@@ -463,33 +483,32 @@ export function AnalyzerGraphStage({
                 <span className="analyzer-lane-label">{lane.label}</span>
               </div>
             ))}
-            {layout.summaryGroups.map((group) => {
-              const summaryVisible = filteredView.nodes.some((node) => node.id === group.id && node.presentation?.role === 'summary');
-              return (
-                <section key={group.id} className="analyzer-summary-group" style={{ left: group.x, top: group.y, width: group.width, height: group.height }} aria-label={`${group.label} Summary Group`}>
-                  {!summaryVisible && (
-                    <div className="analyzer-summary-group-heading">
-                      <span className="analyzer-summary-group-kicker">◇ SUMMARY GROUP</span>
-                      <strong>{group.label}</strong>
-                      <span className="analyzer-summary-group-count">{group.count} {group.countLabel}</span>
-                      <button type="button" className="analyzer-summary-group-toggle" onClick={() => onTogglePresentation(group.id)} aria-expanded={true}>
-                        Collapse
-                      </button>
-                    </div>
-                  )}
-                </section>
-              );
-            })}
+            {layout.summaryGroups.map((group) => (
+              <section
+                key={group.id}
+                className={`analyzer-summary-group depth-${Math.min(3, group.depth)}${selectedNodeId === group.id ? ' is-selected' : ''}`}
+                style={{ left: group.x, top: group.y, width: group.width, height: group.height }}
+                aria-label={`${group.label} summary region`}
+              >
+                <div className="analyzer-summary-group-heading">
+                  <span className="analyzer-summary-group-kicker" aria-hidden="true">◇</span>
+                  <strong>{group.label}</strong>
+                  <span className="analyzer-summary-group-count">· {group.count} {group.countLabel}</span>
+                  <button type="button" className="analyzer-summary-group-toggle" onClick={() => onTogglePresentation(group.id)} aria-expanded={true}>
+                    Collapse
+                  </button>
+                </div>
+              </section>
+            ))}
             {layout.bands.map((band) => {
               const bandExpanded = Boolean(band.presentationId && filteredView.presentationGroups?.find((group) => group.id === band.presentationId)?.expanded);
-              const bandSummaryVisible = Boolean(band.presentationId && filteredView.nodes.some((node) => node.id === band.presentationId));
               return (
-                <div key={band.id} className={`analyzer-layout-band analyzer-layout-band-${band.kind}${bandExpanded ? ' is-expanded' : ''}`} style={{ left: band.x, top: band.y, width: band.width, height: band.height }} aria-label={band.label}>
+                <div key={band.id} className={`analyzer-layout-band analyzer-layout-band-${band.kind} depth-${Math.min(3, band.depth)}${bandExpanded ? ' is-expanded' : ''}${selectedNodeId === band.presentationId ? ' is-selected' : ''}`} style={{ left: band.x, top: band.y, width: band.width, height: band.height }} aria-label={`${band.label} summary region`}>
                   <div className="analyzer-summary-group-heading">
-                    <span className="analyzer-summary-group-kicker">◇ SUMMARY GROUP</span>
+                    <span className="analyzer-summary-group-kicker" aria-hidden="true">◇</span>
                     <strong>{band.label}</strong>
-                    <span className="analyzer-summary-group-count">{band.count} {band.countLabel}</span>
-                    {band.presentationId && (!bandSummaryVisible || bandExpanded) && (
+                    <span className="analyzer-summary-group-count">· {band.count} {band.countLabel}</span>
+                    {band.presentationId && (
                       <button type="button" className="analyzer-summary-group-toggle" onClick={() => onTogglePresentation(band.presentationId!)} aria-expanded={bandExpanded}>
                         {bandExpanded ? 'Collapse' : 'Expand'}
                       </button>
@@ -514,7 +533,9 @@ export function AnalyzerGraphStage({
               const matches = nodeMatchesSearch(node, search);
               const selected = node.id === selectedNodeId;
               const summary = node.presentation?.role === 'summary';
-              const summaryExpanded = analyzerSummaryExpanded(node.id, expandedPresentationIds);
+              const summaryExpanded = summary && Boolean(filteredView.presentationGroups?.some((group) => group.id === node.id && group.expanded));
+              if (summaryExpanded) return null;
+              const nestedSummary = summary && Boolean(node.presentation?.parentId && filteredView.presentationGroups?.some((group) => group.id === node.presentation?.parentId && group.expanded));
               const nodeZoom = displayedZoomLevelForNode(zoomLevel, selected, expandedNodeIds.has(node.id));
               const connected = selectionContext.connectedNodeIds.has(node.id) && !selected;
               const inSelectionContext = selectionContext.contextNodeIds.has(node.id);
@@ -534,7 +555,7 @@ export function AnalyzerGraphStage({
               return (
                 <div
                   key={node.id}
-                  className={`analyzer-node analyzer-node-view-${view.view} node-type-${node.type} zoom-${nodeZoom}${summary ? ' is-summary' : ''}${summary && summaryExpanded ? ' is-expanded is-presentation-anchor' : ''}${selected ? ' is-selected' : ''}${connected ? ' is-connected' : ''}${focusClass}${hasEvidencePreview ? ' has-evidence-preview' : ''}${matches && search.trim() ? ' is-match' : ''}${dimmed ? ' is-dimmed' : ''}`}
+                  className={`analyzer-node analyzer-node-view-${view.view} node-type-${node.type} zoom-${nodeZoom}${summary ? ' is-summary' : ''}${nestedSummary ? ' is-nested-summary' : ''}${selected ? ' is-selected' : ''}${connected ? ' is-connected' : ''}${focusClass}${hasEvidencePreview ? ' has-evidence-preview' : ''}${matches && search.trim() ? ' is-match' : ''}${dimmed ? ' is-dimmed' : ''}`}
                   style={nodeStyle(positionedNode)}
                   onClick={() => summary ? togglePresentation(node.id) : onSelectNode(node.id)}
                   onKeyDown={(event) => {
@@ -547,16 +568,25 @@ export function AnalyzerGraphStage({
                   role="button"
                   tabIndex={0}
                   aria-pressed={summary ? undefined : selected}
-                  aria-expanded={summary ? summaryExpanded : undefined}
-                  aria-label={`${node.label}, ${summary ? `Summary ${summaryExpanded ? 'group expanded' : 'card collapsed'}` : displayNodeType(node)}`}
+                  aria-expanded={summary ? false : undefined}
+                  aria-label={`${node.label}, ${summary ? 'Summary card collapsed' : displayNodeType(node)}`}
                 >
                   {summary ? (
-                    <>
-                      <span className="analyzer-summary-card-kicker">◇ {summaryExpanded ? 'SUMMARY GROUP' : 'SUMMARY'}</span>
-                      <strong>{node.label}</strong>
-                      <span className="analyzer-summary-card-count">{summaryCount} {summaryCountLabel}</span>
-                      <span className="analyzer-summary-card-action">{summaryExpanded ? 'Collapse' : 'Expand'} <span aria-hidden="true">→</span></span>
-                    </>
+                    nestedSummary ? (
+                      <>
+                        <span className="analyzer-summary-card-kicker" aria-hidden="true">◇</span>
+                        <strong>{node.label}</strong>
+                        <span className="analyzer-summary-card-count">· {summaryCount} {summaryCountLabel}</span>
+                        <span className="analyzer-summary-card-action">Expand <span aria-hidden="true">→</span></span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="analyzer-summary-card-kicker">◇ SUMMARY</span>
+                        <strong>{node.label}</strong>
+                        <span className="analyzer-summary-card-count">{summaryCount} {summaryCountLabel}</span>
+                        <span className="analyzer-summary-card-action">Expand <span aria-hidden="true">→</span></span>
+                      </>
+                    )
                   ) : (
                     <>
                       <span className="analyzer-node-type">{displayNodeType(node)}</span>

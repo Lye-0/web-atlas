@@ -16,16 +16,22 @@ const COMMAND_ROW_GAP = 38;
 const COMMAND_TOP = 76;
 const DEPENDENCY_MAX_ROWS = 4;
 const DEPENDENCY_EXTERNAL_GROUP_GAP = 14;
-const DEPENDENCY_EXTERNAL_GROUP_HEADER = 28;
 const DEPENDENCY_EXTERNAL_GROUP_BOTTOM = 14;
+const DEPENDENCY_EXTERNAL_GROUP_INSET = 16;
 const ARCHITECTURE_NODE_HEIGHT = 86;
 const ARCHITECTURE_NODE_GAP = 10;
 const ARCHITECTURE_TOP_PADDING = 36;
 const ARCHITECTURE_BOTTOM_PADDING = 14;
 const ARCHITECTURE_CLUSTER_ROW_GAP = 16;
-const SUMMARY_GROUP_SIDE_PADDING = 16;
-const SUMMARY_GROUP_HEADER_HEIGHT = 34;
-const SUMMARY_GROUP_BOTTOM_PADDING = 16;
+const SUMMARY_NESTED_NODE_HEIGHT = 42;
+const SUMMARY_GROUP_SIDE_PADDING = 20;
+const SUMMARY_GROUP_HEADING_TOP = 8;
+const SUMMARY_GROUP_HEADER_HEIGHT = 22;
+const SUMMARY_GROUP_MEMBER_GAP = 16;
+const SUMMARY_GROUP_MEMBER_OFFSET = SUMMARY_GROUP_HEADING_TOP + SUMMARY_GROUP_HEADER_HEIGHT + SUMMARY_GROUP_MEMBER_GAP;
+const SUMMARY_GROUP_NESTED_GAP = 16;
+const SUMMARY_GROUP_BOTTOM_PADDING = 20;
+const DEPENDENCY_EXTERNAL_GROUP_HEADER = SUMMARY_GROUP_MEMBER_OFFSET;
 
 export interface PositionedNode {
   node: AnalyzerViewNode;
@@ -58,6 +64,7 @@ export interface PositionedBand {
   label: string;
   count: number;
   countLabel: string;
+  depth: number;
   kind: 'dependency-source';
   x: number;
   y: number;
@@ -71,6 +78,7 @@ export interface PositionedSummaryGroup {
   label: string;
   count: number;
   countLabel: string;
+  depth: number;
   x: number;
   y: number;
   width: number;
@@ -115,28 +123,86 @@ function clusterEntries(view: AnalyzerViewModel): AnalyzerCluster[] {
   ];
 }
 
-function nodesForCluster(view: AnalyzerViewModel, cluster: AnalyzerCluster): AnalyzerViewNode[] {
-  const nodeIds = new Set(cluster.nodeIds);
-  return view.nodes.filter((node) => nodeIds.has(node.id));
+function isExpandedPresentationSummary(view: AnalyzerViewModel, node: AnalyzerViewNode): boolean {
+  return node.presentation?.role === 'summary'
+    && Boolean(view.presentationGroups?.some((group) => group.id === node.id && group.expanded));
 }
 
-function nodeHeight(node: AnalyzerViewNode, expandedNodeIds: ReadonlySet<string>): number {
+function isNestedSummary(view: AnalyzerViewModel, node: AnalyzerViewNode): boolean {
+  const parentId = node.presentation?.parentId;
+  return node.presentation?.role === 'summary'
+    && Boolean(parentId && view.presentationGroups?.some((group) => group.id === parentId && group.expanded));
+}
+
+function nodesForCluster(view: AnalyzerViewModel, cluster: AnalyzerCluster): AnalyzerViewNode[] {
+  const nodeIds = new Set(cluster.nodeIds);
+  return view.nodes.filter((node) => nodeIds.has(node.id) && !isExpandedPresentationSummary(view, node));
+}
+
+function nodeHeight(view: AnalyzerViewModel, node: AnalyzerViewNode, expandedNodeIds: ReadonlySet<string>): number {
+  if (isNestedSummary(view, node)) return SUMMARY_NESTED_NODE_HEIGHT;
   return expandedNodeIds.has(node.id) ? ANALYZER_NEAR_NODE_HEIGHT : ANALYZER_NODE_HEIGHT;
 }
 
-function verticalClusterHeight(nodes: AnalyzerViewNode[], expandedNodeIds: ReadonlySet<string>): number {
-  return TOP_PADDING + 20 + nodes.reduce((total, node) => total + nodeHeight(node, expandedNodeIds), 0) + Math.max(0, nodes.length - 1) * NODE_GAP;
+function verticalClusterHeight(view: AnalyzerViewModel, nodes: AnalyzerViewNode[], expandedNodeIds: ReadonlySet<string>): number {
+  return TOP_PADDING + 20 + nodes.reduce((total, node) => total + nodeHeight(view, node, expandedNodeIds), 0) + Math.max(0, nodes.length - 1) * NODE_GAP;
 }
 
-function architectureNodeHeight(node: AnalyzerViewNode, expandedNodeIds: ReadonlySet<string>): number {
+function architectureNodeHeight(view: AnalyzerViewModel, node: AnalyzerViewNode, expandedNodeIds: ReadonlySet<string>): number {
+  if (isNestedSummary(view, node)) return SUMMARY_NESTED_NODE_HEIGHT;
   return expandedNodeIds.has(node.id) ? ANALYZER_NEAR_NODE_HEIGHT : ARCHITECTURE_NODE_HEIGHT;
 }
 
-function architectureClusterHeight(nodes: AnalyzerViewNode[], expandedNodeIds: ReadonlySet<string>): number {
+function hasExpandedPresentationMember(view: AnalyzerViewModel, nodes: AnalyzerViewNode[]): boolean {
+  const groups = view.presentationGroups ?? [];
+  const expandedGroupIds = new Set(groups.filter((group) => group.expanded).map((group) => group.id));
+  if (expandedGroupIds.size === 0) return false;
+  const parentByGroupId = new Map(groups.map((group) => [group.id, group.parentId]));
+  return nodes.some((node) => {
+    const visited = new Set<string>();
+    let parentId: string | undefined = node.presentation?.parentId;
+    while (parentId && !visited.has(parentId)) {
+      if (expandedGroupIds.has(parentId)) return true;
+      visited.add(parentId);
+      parentId = parentByGroupId.get(parentId);
+    }
+    return false;
+  });
+}
+
+function architectureClusterHeight(view: AnalyzerViewModel, nodes: AnalyzerViewNode[], expandedNodeIds: ReadonlySet<string>): number {
+  const bottomPadding = hasExpandedPresentationMember(view, nodes)
+    ? Math.max(ARCHITECTURE_BOTTOM_PADDING, SUMMARY_GROUP_BOTTOM_PADDING)
+    : ARCHITECTURE_BOTTOM_PADDING;
   return ARCHITECTURE_TOP_PADDING
-    + nodes.reduce((total, node) => total + architectureNodeHeight(node, expandedNodeIds), 0)
+    + nodes.reduce((total, node) => total + architectureNodeHeight(view, node, expandedNodeIds), 0)
     + Math.max(0, nodes.length - 1) * ARCHITECTURE_NODE_GAP
-    + ARCHITECTURE_BOTTOM_PADDING;
+    + bottomPadding;
+}
+
+function orderedArchitectureNodes(view: AnalyzerViewModel, nodes: AnalyzerViewNode[]): AnalyzerViewNode[] {
+  const presentationGroupIds = new Set((view.presentationGroups ?? []).map((group) => group.id));
+  const groupedNodes = new Map<string, AnalyzerViewNode[]>();
+  const firstIndexByGroupId = new Map<string, number>();
+
+  nodes.forEach((node, index) => {
+    const parentId = node.presentation?.role === 'detail' ? node.presentation.parentId : undefined;
+    if (!parentId || !presentationGroupIds.has(parentId)) return;
+    const groupNodes = groupedNodes.get(parentId) ?? [];
+    groupNodes.push(node);
+    groupedNodes.set(parentId, groupNodes);
+    if (!firstIndexByGroupId.has(parentId)) firstIndexByGroupId.set(parentId, index);
+  });
+
+  if (groupedNodes.size === 0) return nodes;
+  const topLevelNodes = nodes.filter((node) => {
+    const parentId = node.presentation?.role === 'detail' ? node.presentation.parentId : undefined;
+    return !parentId || !presentationGroupIds.has(parentId);
+  });
+  const orderedGroups = [...groupedNodes.keys()].sort((firstId, secondId) => {
+    return (firstIndexByGroupId.get(firstId) ?? 0) - (firstIndexByGroupId.get(secondId) ?? 0);
+  });
+  return [...topLevelNodes, ...orderedGroups.flatMap((groupId) => groupedNodes.get(groupId) ?? [])];
 }
 
 function layoutColumnClusters(view: AnalyzerViewModel, expandedNodeIds: ReadonlySet<string>): AnalyzerLayout {
@@ -151,11 +217,11 @@ function layoutColumnClusters(view: AnalyzerViewModel, expandedNodeIds: Readonly
     const y = 20;
     let nodeY = y + TOP_PADDING;
     nodes.forEach((node) => {
-      const height = nodeHeight(node, expandedNodeIds);
+      const height = nodeHeight(view, node, expandedNodeIds);
       positionedNodes.push({ node, x: x + 20, y: nodeY, height });
       nodeY += height + NODE_GAP;
     });
-    const height = verticalClusterHeight(nodes, expandedNodeIds);
+    const height = verticalClusterHeight(view, nodes, expandedNodeIds);
     positionedClusters.push({ id: cluster.id, label: cluster.label, tone: cluster.tone, x, y, width: CLUSTER_WIDTH, height });
     maxHeight = Math.max(maxHeight, height + 40);
   });
@@ -167,7 +233,8 @@ function layoutColumnClusters(view: AnalyzerViewModel, expandedNodeIds: Readonly
 function layoutArchitecture(view: AnalyzerViewModel, expandedNodeIds: ReadonlySet<string>): AnalyzerLayout {
   const clusters = clusterEntries(view);
   const columnCount = Math.min(4, Math.max(1, clusters.length));
-  const heights = clusters.map((cluster) => architectureClusterHeight(nodesForCluster(view, cluster), expandedNodeIds));
+  const clusterNodes = clusters.map((cluster) => orderedArchitectureNodes(view, nodesForCluster(view, cluster)));
+  const heights = clusterNodes.map((nodes) => architectureClusterHeight(view, nodes, expandedNodeIds));
   const rowHeights = Array.from({ length: Math.ceil(clusters.length / columnCount) }, (_, row) => Math.max(...heights.slice(row * columnCount, (row + 1) * columnCount), 260));
   const rowY: number[] = [];
   rowHeights.forEach((height, index) => rowY.push(20 + rowHeights.slice(0, index).reduce((total, rowHeight) => total + rowHeight + ARCHITECTURE_CLUSTER_ROW_GAP, 0)));
@@ -175,7 +242,7 @@ function layoutArchitecture(view: AnalyzerViewModel, expandedNodeIds: ReadonlySe
   const positionedNodes: PositionedNode[] = [];
   const positionedClusters: PositionedCluster[] = [];
   clusters.forEach((cluster, clusterIndex) => {
-    const nodes = nodesForCluster(view, cluster);
+    const nodes = clusterNodes[clusterIndex] ?? [];
     if (nodes.length === 0) return;
     const column = clusterIndex % columnCount;
     const row = Math.floor(clusterIndex / columnCount);
@@ -183,7 +250,7 @@ function layoutArchitecture(view: AnalyzerViewModel, expandedNodeIds: ReadonlySe
     const y = rowY[row] ?? 20;
     let nodeY = y + ARCHITECTURE_TOP_PADDING;
     nodes.forEach((node) => {
-      const height = architectureNodeHeight(node, expandedNodeIds);
+      const height = architectureNodeHeight(view, node, expandedNodeIds);
       positionedNodes.push({ node, x: x + 20, y: nodeY, height });
       nodeY += height + ARCHITECTURE_NODE_GAP;
     });
@@ -213,11 +280,12 @@ function commandNodeOrder(node: AnalyzerViewNode): number {
 }
 
 function commandFlowLayout(view: AnalyzerViewModel, expandedNodeIds: ReadonlySet<string>): AnalyzerLayout {
-  const rankByNodeId = new Map(view.nodes.map((node) => [node.id, Math.max(0, Math.round(metadataNumber(node, 'executionRank') ?? 0))]));
+  const nodes = view.nodes.filter((node) => !isExpandedPresentationSummary(view, node));
+  const rankByNodeId = new Map(nodes.map((node) => [node.id, Math.max(0, Math.round(metadataNumber(node, 'executionRank') ?? 0))]));
   const maxRank = Math.max(0, ...rankByNodeId.values());
   const positionedNodes: PositionedNode[] = [];
   const laneGroups = new Map<string, AnalyzerViewNode[]>();
-  view.nodes.forEach((node) => {
+  nodes.forEach((node) => {
     const laneId = metadataString(node, 'laneId') || ANALYZER_COMMAND_COMMON_LANE_ID;
     const laneNodes = laneGroups.get(laneId) ?? [];
     laneNodes.push(node);
@@ -255,13 +323,13 @@ function commandFlowLayout(view: AnalyzerViewModel, expandedNodeIds: ReadonlySet
       nodesByRank.set(rank, rankNodes);
     });
     const rankStackHeight = Math.max(0, ...[...nodesByRank.values()].map((rankNodes) => {
-      const contentHeight = rankNodes.reduce((total, node) => total + nodeHeight(node, expandedNodeIds), 0);
+      const contentHeight = rankNodes.reduce((total, node) => total + nodeHeight(view, node, expandedNodeIds), 0);
       return contentHeight + Math.max(0, rankNodes.length - 1) * COMMAND_ROW_GAP;
     }));
     nodesByRank.forEach((rankNodes, rank) => {
       let y = laneCursor;
       rankNodes.forEach((node) => {
-        const height = nodeHeight(node, expandedNodeIds);
+        const height = nodeHeight(view, node, expandedNodeIds);
         positionedNodes.push({ node, x: SIDE_PADDING + rank * (ANALYZER_NODE_WIDTH + COMMAND_COLUMN_GAP), y, height });
         y += height + COMMAND_ROW_GAP;
       });
@@ -387,7 +455,7 @@ function dependencyFlowLayout(view: AnalyzerViewModel, expandedNodeIds: Readonly
       const externalGroups = dependencyExternalGroups(view, nodes);
       let cursor = y + TOP_PADDING;
       anchorNodes.forEach((node) => {
-        const height = nodeHeight(node, expandedNodeIds);
+        const height = nodeHeight(view, node, expandedNodeIds);
         positionedNodes.push({ node, x: x + 20, y: cursor, height });
         cursor += height + NODE_GAP;
       });
@@ -399,7 +467,7 @@ function dependencyFlowLayout(view: AnalyzerViewModel, expandedNodeIds: Readonly
         const groupExpanded = Boolean(presentationGroup?.expanded);
 
         if (groupSummary && !groupExpanded) {
-          const height = nodeHeight(groupSummary, expandedNodeIds);
+          const height = nodeHeight(view, groupSummary, expandedNodeIds);
           positionedNodes.push({ node: groupSummary, x: x + 20, y: cursor, height });
           cursor += height + NODE_GAP;
           return;
@@ -412,7 +480,7 @@ function dependencyFlowLayout(view: AnalyzerViewModel, expandedNodeIds: Readonly
         if (groupNodes.length === 0) return;
         const groupY = cursor - 8;
         const groupHeight = DEPENDENCY_EXTERNAL_GROUP_HEADER
-          + groupNodes.reduce((total, node) => total + nodeHeight(node, expandedNodeIds), 0)
+          + groupNodes.reduce((total, node) => total + nodeHeight(view, node, expandedNodeIds), 0)
           + Math.max(0, groupNodes.length - 1) * NODE_GAP
           + DEPENDENCY_EXTERNAL_GROUP_BOTTOM;
         const count = presentationGroup?.count ?? (groupSummary ? analyzerPresentationCount(groupSummary) : group.nodes.length);
@@ -422,16 +490,17 @@ function dependencyFlowLayout(view: AnalyzerViewModel, expandedNodeIds: Readonly
           label: group.label,
           count,
           countLabel,
+          depth: presentationDepth(view, group.presentationId),
           kind: 'dependency-source',
-          x: x + 10,
+          x: x + DEPENDENCY_EXTERNAL_GROUP_INSET,
           y: groupY,
-          width: width - 20,
+          width: width - DEPENDENCY_EXTERNAL_GROUP_INSET * 2,
           height: groupHeight,
           ...(group.presentationId ? { presentationId: group.presentationId } : {}),
         });
         let nodeY = groupY + DEPENDENCY_EXTERNAL_GROUP_HEADER;
         groupNodes.forEach((node) => {
-          const height = nodeHeight(node, expandedNodeIds);
+          const height = nodeHeight(view, node, expandedNodeIds);
           positionedNodes.push({ node, x: x + 20, y: nodeY, height });
           nodeY += height + NODE_GAP;
         });
@@ -445,14 +514,14 @@ function dependencyFlowLayout(view: AnalyzerViewModel, expandedNodeIds: Readonly
     }
     const trackCount = Math.max(1, Math.ceil(nodes.length / DEPENDENCY_MAX_ROWS));
     const rows = Math.min(DEPENDENCY_MAX_ROWS, nodes.length);
-    const rowHeight = Math.max(...nodes.map((node) => nodeHeight(node, expandedNodeIds)), ANALYZER_NODE_HEIGHT);
+    const rowHeight = Math.max(...nodes.map((node) => nodeHeight(view, node, expandedNodeIds)), ANALYZER_NODE_HEIGHT);
     const width = 40 + trackCount * ANALYZER_NODE_WIDTH + Math.max(0, trackCount - 1) * NODE_GAP;
     const height = TOP_PADDING + 20 + rows * rowHeight + Math.max(0, rows - 1) * NODE_GAP;
     const y = 20;
     nodes.forEach((node, nodeIndex) => {
       const track = Math.floor(nodeIndex / DEPENDENCY_MAX_ROWS);
       const row = nodeIndex % DEPENDENCY_MAX_ROWS;
-      positionedNodes.push({ node, x: x + 20 + track * (ANALYZER_NODE_WIDTH + NODE_GAP), y: y + TOP_PADDING + row * (rowHeight + NODE_GAP), height: nodeHeight(node, expandedNodeIds) });
+      positionedNodes.push({ node, x: x + 20 + track * (ANALYZER_NODE_WIDTH + NODE_GAP), y: y + TOP_PADDING + row * (rowHeight + NODE_GAP), height: nodeHeight(view, node, expandedNodeIds) });
     });
     positionedClusters.push({ id: cluster.id, label: cluster.label, tone: cluster.tone, x, y, width, height });
     x += width + CLUSTER_GAP;
@@ -494,9 +563,35 @@ function summaryGroupNodes(view: AnalyzerViewModel, positionedNodes: PositionedN
   });
 }
 
+function presentationDepth(view: AnalyzerViewModel, presentationId?: string): number {
+  if (!presentationId) return 1;
+  const groupsById = new Map((view.presentationGroups ?? []).map((group) => [group.id, group]));
+  const visited = new Set<string>();
+  let currentId: string | undefined = presentationId;
+  let depth = 1;
+  while (currentId && !visited.has(currentId)) {
+    visited.add(currentId);
+    const parentId: string | undefined = groupsById.get(currentId)?.parentId;
+    if (!parentId) break;
+    depth += 1;
+    currentId = parentId;
+  }
+  return depth;
+}
+
+interface SummaryRegionBounds {
+  id: string;
+  parentId?: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 function finalizeAnalyzerLayout(view: AnalyzerViewModel, layout: AnalyzerLayout): AnalyzerLayout {
+  const presentationGroupsById = new Map((view.presentationGroups ?? []).map((group) => [group.id, group]));
   const bandPresentationIds = new Set(layout.bands.flatMap((band) => band.presentationId ? [band.presentationId] : []));
-  const summaryGroups = (view.presentationGroups ?? [])
+  const rawSummaryGroups = (view.presentationGroups ?? [])
     .filter((group) => group.expanded && !bandPresentationIds.has(group.id))
     .flatMap((group): PositionedSummaryGroup[] => {
       const groupNodes = summaryGroupNodes(view, layout.nodes, group);
@@ -506,7 +601,7 @@ function finalizeAnalyzerLayout(view: AnalyzerViewModel, layout: AnalyzerLayout)
       const maxRight = Math.max(...groupNodes.map((positionedNode) => positionedNode.x + ANALYZER_NODE_WIDTH));
       const maxBottom = Math.max(...groupNodes.map((positionedNode) => positionedNode.y + positionedNode.height));
       const x = Math.max(0, minX - SUMMARY_GROUP_SIDE_PADDING);
-      const y = Math.max(0, minY - SUMMARY_GROUP_HEADER_HEIGHT);
+      const y = Math.max(0, minY - SUMMARY_GROUP_MEMBER_OFFSET);
       const right = maxRight + SUMMARY_GROUP_SIDE_PADDING;
       const bottom = maxBottom + SUMMARY_GROUP_BOTTOM_PADDING;
       return [{
@@ -514,22 +609,79 @@ function finalizeAnalyzerLayout(view: AnalyzerViewModel, layout: AnalyzerLayout)
         label: group.label,
         count: group.count,
         countLabel: group.countLabel,
+        depth: presentationDepth(view, group.id),
         x,
         y,
         width: Math.max(ANALYZER_NODE_WIDTH + SUMMARY_GROUP_SIDE_PADDING * 2, right - x),
-        height: Math.max(SUMMARY_GROUP_HEADER_HEIGHT + SUMMARY_GROUP_BOTTOM_PADDING, bottom - y),
+        height: Math.max(SUMMARY_GROUP_MEMBER_OFFSET + SUMMARY_GROUP_BOTTOM_PADDING, bottom - y),
         ...(group.parentId ? { parentId: group.parentId } : {}),
       }];
     });
+  const rawRegions: SummaryRegionBounds[] = [
+    ...rawSummaryGroups.map(({ id, parentId, x, y, width, height }) => ({ id, parentId, x, y, width, height })),
+    ...layout.bands.map((band) => ({
+      id: band.presentationId ?? band.id,
+      ...(band.presentationId && presentationGroupsById.get(band.presentationId)?.parentId
+        ? { parentId: presentationGroupsById.get(band.presentationId)?.parentId }
+        : {}),
+      x: band.x,
+      y: band.y,
+      width: band.width,
+      height: band.height,
+    })),
+  ];
+  const regionsById = new Map(rawRegions.map((region) => [region.id, region]));
+  const childrenByParent = new Map<string, SummaryRegionBounds[]>();
+  rawRegions.forEach((region) => {
+    if (!region.parentId) return;
+    const children = childrenByParent.get(region.parentId) ?? [];
+    children.push(region);
+    childrenByParent.set(region.parentId, children);
+  });
+  const regionTop = (regionId: string, visited = new Set<string>()): number => {
+    const region = regionsById.get(regionId);
+    if (!region || visited.has(regionId)) return region?.y ?? 0;
+    const nextVisited = new Set(visited);
+    nextVisited.add(regionId);
+    const childStarts = (childrenByParent.get(regionId) ?? [])
+      .map((child) => regionTop(child.id, nextVisited) - SUMMARY_GROUP_HEADER_HEIGHT - SUMMARY_GROUP_NESTED_GAP);
+    return Math.min(region.y, ...childStarts);
+  };
+  const regionTopById = new Map(rawRegions.map((region) => [region.id, regionTop(region.id)]));
+  const regionOffset = Math.max(0, ...[...regionTopById.values()].map((top) => -top));
+  const shiftY = <T extends { y: number }>(items: T[]): T[] => regionOffset === 0
+    ? items
+    : items.map((item) => ({ ...item, y: item.y + regionOffset }));
+  const summaryGroups = rawSummaryGroups.map((group) => {
+    const y = (regionTopById.get(group.id) ?? group.y) + regionOffset;
+    return {
+      ...group,
+      y,
+      height: group.y + group.height + regionOffset - y,
+    };
+  });
+  const bands = layout.bands.map((band) => {
+    const regionId = band.presentationId ?? band.id;
+    const y = (regionTopById.get(regionId) ?? band.y) + regionOffset;
+    return {
+      ...band,
+      y,
+      height: band.y + band.height + regionOffset - y,
+    };
+  });
   const allBounds = [
     ...summaryGroups.map((group) => ({ right: group.x + group.width, bottom: group.y + group.height })),
-    ...layout.bands.map((band) => ({ right: band.x + band.width, bottom: band.y + band.height })),
+    ...bands.map((band) => ({ right: band.x + band.width, bottom: band.y + band.height })),
   ];
   return {
     ...layout,
+    nodes: shiftY(layout.nodes),
+    clusters: shiftY(layout.clusters),
+    lanes: shiftY(layout.lanes),
+    bands,
     summaryGroups,
     width: Math.max(layout.width, ...allBounds.map((bounds) => bounds.right + SIDE_PADDING)),
-    height: Math.max(layout.height, ...allBounds.map((bounds) => bounds.bottom + SIDE_PADDING)),
+    height: Math.max(layout.height + regionOffset, ...allBounds.map((bounds) => bounds.bottom + SIDE_PADDING)),
   };
 }
 
