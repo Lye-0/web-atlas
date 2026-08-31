@@ -20,7 +20,7 @@ Project Folder
 
 解析対象は構造情報を持つ設定ファイルに限定しています。`.git`、依存・生成物、`.env`、秘密情報用拡張子は除外し、JSON/JSONCの設定値はサイズ上限（1 MiB）も設けています。
 
-Graphは新しい可視化ライブラリへ依存せず、[`src/analyzer/layout.ts`](../../src/analyzer/layout.ts) のView別の決定的なlayoutと、[`src/components/analyzer/AnalyzerGraphStage.tsx`](../../src/components/analyzer/AnalyzerGraphStage.tsx) のSVG/DOM rendererで構成しています。Workspaceはcolumn flow、Architectureはcompact grid、Commandはexecution rankとbranch lane、Dependencyは責務ごとのlaneで配置します。初回表示と明示的なFitだけが現在のlayout boundsに合わせてカメラを収め、Summaryの展開・折りたたみや通常のNode選択では視点を保持します。Detail Panelの開閉では選択Nodeを画面内に残すanchor補正を行います。Fitは全体表示、Resetはカメラと表示状態の初期化として役割を分けています。
+Graphは新しい可視化ライブラリへ依存せず、[`src/analyzer/layout.ts`](../../src/analyzer/layout.ts) のView別の決定的なlayoutと、[`src/components/analyzer/AnalyzerGraphStage.tsx`](../../src/components/analyzer/AnalyzerGraphStage.tsx) のSVG/DOM rendererで構成しています。Workspaceはcolumn flow、Architectureはcompact grid、Commandはexecution rankとbranch lane、Dependencyは責務ごとのlaneで配置します。Summaryの展開状態は [`src/pages/AnalyzerPage.tsx`](../../src/pages/AnalyzerPage.tsx) の単一stateをGraph / Detail / Toolbar / Cluster・Lane headerで共有し、展開・折りたたみ時はsemantic anchorを同じ画面位置へ保ちます。初回表示と明示的なFitだけが現在のlayout boundsに合わせてカメラを収め、Detail Panelの開閉では選択Nodeと1-hop contextを画面内に残す補正を行います。Fitは全体表示、Resetはカメラと表示状態の初期化として役割を分けています。
 
 ## Fact / Evidence model
 
@@ -32,7 +32,7 @@ Graphは新しい可視化ライブラリへ依存せず、[`src/analyzer/layout
 
 Evidence detailは対象行の前後を含む短いcode contextを表示し、`mark` は検出したexact rangeだけに付けます。設定値をsource storeへ保存する前に、`B2_*`、`API`、`AUTH`、`ACCESS`、`SECRET`、`PRIVATE`、`PASSWORD`、`TOKEN`、`CREDENTIAL` 系keyのvalueをoffsetを変えずにmaskします。
 
-View専用のSummary / detail表示は `AnalyzerViewNode.presentation` と `AnalyzerViewEdge.presentation` にだけ保持し、表示数は `AnalyzerViewModel.counts` でvisible / total / hiddenを分離します。External Package、低優先度Technology、workspace package、.NET detail、Command branchを初期表示から畳んでも、Fact・Evidence・Relation storeそのものは削除・変更しません。Relationのforward labelと、選択Nodeから見たinverse labelは [`src/analyzer/relations.ts`](../../src/analyzer/relations.ts) で分離します。
+View専用のSummary / detail表示は `AnalyzerViewNode.presentation` と `AnalyzerViewEdge.presentation` にだけ保持し、表示数は `AnalyzerViewModel.counts` でvisible / total / hiddenを分離します。External Package、低優先度Technology、workspace package、.NET detail、Command branchを初期表示から畳んでも、Fact・Evidence・Relation storeそのものは削除・変更しません。Summaryを展開したまま子Nodeを選んでcollapseした場合は、所有するSummary / groupへ選択をfallbackし、Detailからも同じgroupをcollapseできます。Relationのforward labelと、選択Nodeから見たinverse labelは [`src/analyzer/relations.ts`](../../src/analyzer/relations.ts) で分離します。
 
 ## Parsers and detectors
 
@@ -52,9 +52,9 @@ Analyzer shellには次の4つのprojectorがあります。
 1. **Architecture Overview** — Project、Application、Shared Workspace summary、明示的に検出したWorker/D1/B2/Firebaseなどの主要構造を10〜15 Node程度に収めます。Projectから低優先度Technologyへ直接fan-outせず、TypeScript / Vitest / pnpmなどの開発補助Technology、.NET / WPF detail、共有workspace packageはSummary Node配下へ初期collapseし、選択・Expandで元のFactを表示します。主要Framework / Runtime / Resourceは直接表示し、実際のEvidenceがないWeb→APIなどの関係は生成しません。高degreeなProject選択ではprimary / secondary / deepのedge emphasisを使います。
 2. **Workspace Flow** — pnpm config、patterns、packageの`uses-config`、`declares`、`matches`だけを主線として表示します。`contains`やdependency graphは主グラフへ混ぜず、Detailでは選択方向に応じて`config-for`などのinverse labelを表示します。
 3. **Command Flow** — rootの`dev`（なければrootの最初のscript）をentryとし、初期状態はUser Command → entry script → concurrently → branch summaryまでに抑えます。Branch summaryを展開すると、そのbranchの`pnpm --filter`、package script、CLI、nested commandを表示します。`pnpm run`、`--filter`、`pnpm exec`、CLI、`&&` / `||` / `;`、`concurrently`のEvidenceを保持し、主線は`resolves-to`、`executes`、`starts`、`expands-to`に限定します。execution rankをx座標、branch laneを薄い背景bandとして使い、Workspace Package自体はGraph Nodeにせずscript metadata / laneへ寄せます。unknown commandは警告付きで残し、cycleは警告とedgeを残します。
-4. **Package Dependency** — workspace package、直接のdependency declarationから解決されたDictionary technology、未登録のExternal Packageをdirect dependency edgeで表示します。packageManager由来だけのpnpmは含めません。Externalは閉じた状態ではSummary Nodeとsourceごとの`external dependencies` bundle edgeを表示し、展開時はSummary NodeをGraphから外してcluster countと元のdirect edgeを表示します。検索・type filter・detail選択時は該当detailを一時表示します。
+4. **Package Dependency** — workspace package、直接のdependency declarationから解決されたDictionary technology、未登録のExternal Packageをdirect dependency edgeで表示します。packageManager由来だけのpnpmは含めません。Externalは閉じた状態ではSummary Nodeとsourceごとの`external dependencies` bundle edgeを表示し、展開時はSummary NodeをGraphから外してcluster countと元のdirect edgeを表示します。展開されたExternalはsource packageごとの縦groupと`Shared External` groupへ配置し、External同士のedgeや横方向のchainに見える配置を作りません。検索・type filter・detail選択時は該当detailと1-hop contextを一時表示します。
 
-全ViewでNode search、type filter、Node/Edge選択、detail panel、Evidence previewを利用できます。
+全ViewでNode search、type filter、Node/Edge選択、detail panel、Evidence previewを利用できます。Architectureで高degree Nodeを選ぶと、1-hopをprimary、2-hopをsecondary、3-hop以降をdeepとしてemphasisします。
 
 ## Semantic zoom / 2.5D presentation
 
@@ -90,17 +90,17 @@ BrowserのFile System Access APIがない場合はdirectory file inputを使い�
 
 ## Validation
 
-合成fixtureは [`src/analyzer/analyzer.test.ts`](../../src/analyzer/analyzer.test.ts) にあり、parser range、workspace解決、Dictionary matching、D1/B2/Firebase/.NET detection、command recursion/concurrently/cycle、forward / inverse relation label、branch summary / lane、view scope、visible / total count、masking、Semantic Zoom、Architecture初期projection / high-degree emphasis、execution layout、External collapse / expandの元Fact保持を検証します。
+合成fixtureは [`src/analyzer/analyzer.test.ts`](../../src/analyzer/analyzer.test.ts) にあり、parser range、workspace解決、Dictionary matching、D1/B2/Firebase/.NET detection、command recursion/concurrently/cycle、forward / inverse relation label、branch summary / lane、view scope、visible / total count、masking、Semantic Zoom、Architecture初期projection / high-degree depth emphasis、execution layout、External collapse / expandの元Fact保持、External source grouping / shared node / no-chain、Fit paddingを検証します。
 
 実装時の検証結果:
 
-- `pnpm test`: 4 test files / 25 tests passed（Analyzer単体15 testsを含む）
+- `pnpm test`: 4 test files / 28 tests passed（Analyzer単体18 testsを含む）
 - `pnpm typecheck`: passed
 - `pnpm lint`: passed
 - `pnpm build`: passed（Vite production bundle。Three.js lazy chunkのサイズ警告あり）
 - `pnpm exec wrangler deploy --dry-run`: passed（No bindings found、dry-runで終了）
-- Analyzer fixture projection: Architectureは12 visible / 15 total / 19 edges、1000×600 viewportのFit scaleは約60.4%。Commandは5 visible / 10 total、collapsed時2 laneを確認
-- Browser smoke: `http://127.0.0.1:5173/analyzer/architecture` の未選択状態で、Analyzer Header / Footer、Folder picker、Detail panel非表示、console error / warningなしを前回確認。今回の再確認では`agent-browser` CLIが環境に存在せず、Graphデータ入りの操作確認は未実施
+- Analyzer fixture projection: Architectureは12 visible / 15 total / 19 edges、1000×600 viewportのFit scaleは約60.9%。Commandは5 visible / 10 total、collapsed時2 laneを確認
+- Browser smoke: `http://127.0.0.1:5173/analyzer/architecture` の未選択状態で、Analyzer Header / Footer、Folder picker、Detail panel非表示、console error / warningなしを前回確認。今回の再確認では`agent-browser` CLIが環境に存在せず、Summary同期・group collapse・Detail camera補正を含むGraphデータ入りの操作確認は未実施
 - Responsive viewport check: 1600 / 1440 / 1280 / 1100 / 1024 / 768 / 390pxは今回未実施
 - `vehicle-management`の実フォルダ選択、各View、全幅の視覚確認はread-only Manual QAとして今回未実施
 - `vehicle-management` はread-only QA対象であり、今回も変更していません

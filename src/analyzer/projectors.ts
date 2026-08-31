@@ -20,6 +20,8 @@ import {
   type WorkspacePackageFact,
 } from './types';
 
+export const ANALYZER_EXTERNAL_SUMMARY_ID = 'dependencies:external:summary';
+
 function nodeSubtitle(fact: AnalyzerFact): string | undefined {
   if (fact.kind === 'project') return 'Selected local project folder';
   if (fact.kind === 'workspace-package') return fact.packagePath === '.' ? 'root package · workspace root' : fact.packagePath;
@@ -644,7 +646,7 @@ export function projectDependencies(store: AnalyzerProjectStore): AnalyzerViewMo
       fact.kind === 'technology' ? 'technology' : undefined,
     ));
   const externalNodes = baseNodes.filter((node) => node.type === 'external-package');
-  const externalSummaryId = 'dependencies:external:summary';
+  const externalSummaryId = ANALYZER_EXTERNAL_SUMMARY_ID;
   const nodes = externalNodes.length > 0
     ? [
         ...markPresentationChildren(baseNodes, externalSummaryId, new Set(externalNodes.map((node) => node.id))),

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { analyzerViewCounts, presentAnalyzerView, projectAnalyzerView, viewNodeSearchText, analyzerViewLabels } from '../analyzer';
+import { ANALYZER_EXTERNAL_SUMMARY_ID, analyzerViewCounts, presentationOwnsNode, presentAnalyzerView, projectAnalyzerView, viewNodeSearchText, analyzerViewLabels } from '../analyzer';
 import type { AnalyzerProjectStore, AnalyzerViewCounts, AnalyzerViewId, AnalyzerViewModel } from '../analyzer';
 import { AnalyzerDetailPanel } from '../components/analyzer/AnalyzerDetailPanel';
 import { AnalyzerEmptyOrbit } from '../components/analyzer/AnalyzerEmptyOrbit';
@@ -23,7 +23,7 @@ export function AnalyzerPage() {
   const [selectedEdgeId, setSelectedEdgeId] = useState<string>();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<AnalyzerFilter>('all');
-  const [showExternal, setShowExternal] = useState(false);
+  const [expandedPresentationIds, setExpandedPresentationIds] = useState<ReadonlySet<string>>(new Set());
   const [entryScriptId, setEntryScriptId] = useState<string>();
   const [scanVersion, setScanVersion] = useState(0);
   const [focusRequest, setFocusRequest] = useState<{ nodeId: string; nonce: number }>();
@@ -40,9 +40,9 @@ export function AnalyzerPage() {
 
   const fallbackCounts = useMemo(() => {
     if (!model) return { visibleNodes: 0, totalNodes: 0, hiddenNodes: 0 };
-    const presented = presentAnalyzerView(model, { expandedPresentationIds: new Set(), filter, search, selectedEdgeId, selectedNodeId, showExternal });
+    const presented = presentAnalyzerView(model, { expandedPresentationIds, filter, search, selectedEdgeId, selectedNodeId });
     return presented.counts ?? analyzerViewCounts(model);
-  }, [filter, model, search, selectedEdgeId, selectedNodeId, showExternal]);
+  }, [expandedPresentationIds, filter, model, search, selectedEdgeId, selectedNodeId]);
   const nodeCounts = reportedCounts && reportedCounts.model === model ? reportedCounts.counts : fallbackCounts;
 
   useEffect(() => {
@@ -50,7 +50,7 @@ export function AnalyzerPage() {
     setSelectedEdgeId(undefined);
     setSearch('');
     setFilter('all');
-    setShowExternal(false);
+    setExpandedPresentationIds(new Set());
     setFocusRequest(undefined);
     setDetailOpen(false);
     setReportedCounts(undefined);
@@ -64,7 +64,7 @@ export function AnalyzerPage() {
     setEntryScriptId(undefined);
     setSearch('');
     setFilter('all');
-    setShowExternal(false);
+    setExpandedPresentationIds(new Set());
     setFocusRequest(undefined);
     setDetailOpen(false);
     setReportedCounts(undefined);
@@ -107,13 +107,37 @@ export function AnalyzerPage() {
     setDetailOpen(false);
   }, []);
 
+  const togglePresentation = useCallback((presentationId: string, options: { select?: boolean } = {}) => {
+    if (!model) return;
+    const currentlyExpanded = expandedPresentationIds.has(presentationId);
+    const next = new Set(expandedPresentationIds);
+    if (currentlyExpanded) next.delete(presentationId);
+    else next.add(presentationId);
+    setExpandedPresentationIds(next);
+
+    const selectedNodeIsDescendant = Boolean(selectedNodeId && presentationOwnsNode(model, presentationId, selectedNodeId));
+    const selectedEdgeTouchesDescendant = Boolean(selectedEdgeId && (() => {
+      const selectedEdge = model.edges.find((edge) => edge.id === selectedEdgeId);
+      return selectedEdge
+        ? presentationOwnsNode(model, presentationId, selectedEdge.sourceId) || presentationOwnsNode(model, presentationId, selectedEdge.targetId)
+        : false;
+    })());
+    const shouldFallbackToSummary = currentlyExpanded && (selectedNodeIsDescendant || selectedEdgeTouchesDescendant);
+    if (options.select || shouldFallbackToSummary) {
+      setSelectedNodeId(presentationId);
+      setSelectedEdgeId(undefined);
+      setDetailOpen(true);
+    }
+  }, [expandedPresentationIds, model, selectedEdgeId, selectedNodeId]);
+
   const toggleExternal = useCallback(() => {
-    setShowExternal((current) => !current);
-    clearSelection();
-  }, [clearSelection]);
+    togglePresentation(ANALYZER_EXTERNAL_SUMMARY_ID);
+  }, [togglePresentation]);
+
+  const externalExpanded = expandedPresentationIds.has(ANALYZER_EXTERNAL_SUMMARY_ID);
 
   const resetPresentation = useCallback(() => {
-    setShowExternal(false);
+    setExpandedPresentationIds(new Set());
     setSearch('');
     setFilter('all');
     clearSelection();
@@ -170,7 +194,7 @@ export function AnalyzerPage() {
             onSearchChange={setSearch}
             filter={filter}
             onFilterChange={setFilter}
-            showExternal={showExternal}
+            externalExpanded={externalExpanded}
             onToggleExternal={toggleExternal}
             scripts={scripts}
             entryScriptId={effectiveEntryScriptId}
@@ -197,8 +221,8 @@ export function AnalyzerPage() {
               selectedEdgeId={selectedEdgeId}
               filter={filter}
               search={search}
-              showExternal={showExternal}
-              onToggleExternal={toggleExternal}
+              expandedPresentationIds={expandedPresentationIds}
+              onTogglePresentation={(presentationId) => togglePresentation(presentationId, { select: true })}
               onClearSelection={clearSelection}
               onResetPresentation={resetPresentation}
               sources={store.sources}
@@ -214,7 +238,9 @@ export function AnalyzerPage() {
                 view={model}
                 selectedNodeId={selectedNodeId}
                 selectedEdgeId={selectedEdgeId}
+                expandedPresentationIds={expandedPresentationIds}
                 onSelectNode={selectNode}
+                onTogglePresentation={(presentationId) => togglePresentation(presentationId, { select: true })}
                 onClose={closeDetail}
               />
             )}

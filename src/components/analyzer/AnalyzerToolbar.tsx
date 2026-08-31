@@ -10,7 +10,7 @@ interface AnalyzerToolbarProps {
   onSearchChange: (value: string) => void;
   filter: AnalyzerFilter;
   onFilterChange: (value: AnalyzerFilter) => void;
-  showExternal: boolean;
+  externalExpanded: boolean;
   onToggleExternal: () => void;
   scripts: PackageScriptFact[];
   entryScriptId?: string;
@@ -57,7 +57,7 @@ export function AnalyzerToolbar({
   onSearchChange,
   filter,
   onFilterChange,
-  showExternal,
+  externalExpanded,
   onToggleExternal,
   scripts,
   entryScriptId,
@@ -106,8 +106,8 @@ export function AnalyzerToolbar({
           </label>
         )}
         {view === 'dependencies' && (
-          <button type="button" className={`analyzer-quiet-button${showExternal ? ' is-active' : ''}`} onClick={onToggleExternal}>
-            {showExternal ? 'Externalを折りたたむ' : 'Externalを展開'}
+          <button type="button" className={`analyzer-quiet-button${externalExpanded ? ' is-active' : ''}`} onClick={onToggleExternal} aria-expanded={externalExpanded}>
+            {externalExpanded ? 'Externalを折りたたむ' : 'Externalを展開'}
           </button>
         )}
         <span className="analyzer-node-count" aria-label={`${counts.visibleNodes} visible nodes, ${counts.totalNodes} total nodes`}>

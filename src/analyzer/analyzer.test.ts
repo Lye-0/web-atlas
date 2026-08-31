@@ -4,12 +4,13 @@ import { makeEvidence, positionAt } from './evidence';
 import { isAnalyzerSourcePath, isExcludedPath, sourceFilesFromInput } from './fileDiscovery';
 import { parseDotnetProject, parsePackageJson, parsePnpmWorkspace, parseWranglerConfig } from './parsers';
 import { projectArchitecture, projectCommand, projectDependencies, projectWorkspace } from './projectors';
-import { presentAnalyzerView } from './presentation';
+import { analyzerSummarySubtitle, presentationOwnsNode, presentAnalyzerView } from './presentation';
 import { scanProjectFiles } from './scan';
-import { packageIdForPath, scriptIdFor, type AnalyzerSourceFile } from './types';
+import { packageIdForPath, scriptIdFor, type AnalyzerSourceFile, type AnalyzerViewModel } from './types';
 import { ANALYZER_NEAR_NODE_HEIGHT, ANALYZER_NODE_HEIGHT, layoutAnalyzerView } from './layout';
-import { fitAnalyzerTransform, focusAnalyzerTransform } from './camera';
+import { ANALYZER_FIT_PADDING, fitAnalyzerTransform, focusAnalyzerTransform } from './camera';
 import { analyzerRelationInverseLabels, relationLabelForNode } from './relations';
+import { analyzerFocusedEdgeEmphasis } from './focus';
 import { ANALYZER_FAR_ZOOM_THRESHOLD, ANALYZER_NEAR_ZOOM_THRESHOLD, displayedZoomLevelForNode, semanticZoomLevelForScale } from './zoom';
 
 function fixtureFile(relativePath: string, source: string): AnalyzerSourceFile {
@@ -307,7 +308,7 @@ describe('Analyzer scan and projectors', () => {
   it('keeps External Package details in the presentation and reveals them progressively', async () => {
     const store = await scanProjectFiles(analyzerFixture());
     const dependencies = projectDependencies(store);
-    const options = { expandedPresentationIds: new Set<string>(), filter: 'all', search: '', showExternal: false };
+    const options = { expandedPresentationIds: new Set<string>(), filter: 'all', search: '' };
     const collapsed = presentAnalyzerView(dependencies, options);
     const expanded = presentAnalyzerView(dependencies, { ...options, expandedPresentationIds: new Set(['dependencies:external:summary']) });
     const collapsedAgain = presentAnalyzerView(dependencies, options);
@@ -325,6 +326,11 @@ describe('Analyzer scan and projectors', () => {
     expect(expanded.edges.some((edge) => edge.targetId === 'external-package:mystery-lib')).toBe(true);
     expect(expanded.edges.some((edge) => edge.presentation?.displayKind === 'bundle')).toBe(false);
     expect(expanded.counts?.visibleNodes).toBe(expanded.counts?.totalNodes);
+    const summary = dependencies.nodes.find((node) => node.id === 'dependencies:external:summary');
+    expect(summary).toBeDefined();
+    expect(analyzerSummarySubtitle(summary!, false)).toContain('expand for details');
+    expect(analyzerSummarySubtitle(summary!, true)).toContain('expanded · Collapse');
+    expect(presentationOwnsNode(dependencies, 'dependencies:external:summary', 'external-package:mystery-lib')).toBe(true);
   });
 
   it('keeps Architecture Overview concise while retaining expandable detail Facts', async () => {
@@ -341,7 +347,7 @@ describe('Analyzer scan and projectors', () => {
     expect(workspaceSummary?.presentation?.childNodeIds).toEqual(expect.arrayContaining(['package:.', 'package:packages/shared']));
     expect(technologySummary).toMatchObject({ label: 'Technology details', presentation: { role: 'summary' } });
     expect(architecture.edges.some((edge) => edge.presentation?.parentId === technologySummary?.id && edge.presentation?.initiallyHidden)).toBe(true);
-    const presented = presentAnalyzerView(architecture, { expandedPresentationIds: new Set(), filter: 'all', search: '', showExternal: false });
+    const presented = presentAnalyzerView(architecture, { expandedPresentationIds: new Set(), filter: 'all', search: '' });
     expect(presented.edges.some((edge) => edge.sourceId === 'project:root' && edge.targetId === 'technology:pnpm')).toBe(false);
     expect(presented.edges.some((edge) => edge.presentation?.displayKind === 'bundle' && edge.targetId === technologySummary?.id)).toBe(true);
     expect(presented.counts).toEqual({ visibleNodes: 12, totalNodes: 15, hiddenNodes: 3 });
@@ -381,7 +387,7 @@ describe('Analyzer scan and projectors', () => {
   it('collapses command branches into readable lanes and expands only the selected branch', async () => {
     const store = await scanProjectFiles(analyzerFixture());
     const command = projectCommand(store);
-    const options = { expandedPresentationIds: new Set<string>(), filter: 'all', search: '', showExternal: false };
+    const options = { expandedPresentationIds: new Set<string>(), filter: 'all', search: '' };
     const collapsed = presentAnalyzerView(command, options);
     const branchSummaries = collapsed.nodes.filter((node) => node.presentation?.role === 'summary' && node.metadata.commandType === 'branch-summary');
     const webBranch = branchSummaries.find((node) => node.label === 'WEB');
@@ -396,6 +402,7 @@ describe('Analyzer scan and projectors', () => {
     expect(expanded.nodes.some((node) => node.label === 'pnpm exec vite')).toBe(true);
     expect(expanded.nodes.some((node) => node.id === webBranch?.id)).toBe(false);
     expect(expanded.counts?.hiddenNodes).toBeLessThan(collapsed.counts?.hiddenNodes ?? 0);
+    expect(layoutAnalyzerView(collapsed).lanes.every((lane) => /· \d+ STEPS$/.test(lane.label))).toBe(true);
   });
 
   it('warns on recursive package scripts while retaining the cycle edge', async () => {
@@ -406,6 +413,94 @@ describe('Analyzer scan and projectors', () => {
     expect(command.entryScriptId).toBe(cycleId);
     expect(command.edges.some((edge) => edge.kind === 'resolves-to' && edge.targetId === cycleId)).toBe(true);
     expect(command.warnings.some((warning) => warning.message.includes('Command cycle detected'))).toBe(true);
+  });
+});
+
+describe('Analyzer presentation layout and focus emphasis', () => {
+  it('groups external packages by source without creating an external-to-external chain', () => {
+    const view: AnalyzerViewModel = {
+      view: 'dependencies',
+      nodes: [
+        { id: 'package:a', type: 'workspace-package', label: 'Package A', clusterId: 'dependencies:packages', evidenceIds: [], metadata: {} },
+        { id: 'package:b', type: 'workspace-package', label: 'Package B', clusterId: 'dependencies:packages', evidenceIds: [], metadata: {} },
+        { id: 'external:shared', type: 'external-package', label: 'shared-lib', clusterId: 'dependencies:external', evidenceIds: [], metadata: {} },
+        { id: 'external:solo', type: 'external-package', label: 'solo-lib', clusterId: 'dependencies:external', evidenceIds: [], metadata: {} },
+      ],
+      edges: [
+        { id: 'edge:a-shared', sourceId: 'package:a', targetId: 'external:shared', kind: 'depends-on', label: 'depends-on', evidenceIds: [], metadata: {} },
+        { id: 'edge:b-shared', sourceId: 'package:b', targetId: 'external:shared', kind: 'depends-on', label: 'depends-on', evidenceIds: [], metadata: {} },
+        { id: 'edge:b-solo', sourceId: 'package:b', targetId: 'external:solo', kind: 'depends-on', label: 'depends-on', evidenceIds: [], metadata: {} },
+      ],
+      clusters: [
+        { id: 'dependencies:packages', label: 'Workspace Packages', tone: 'neutral', nodeIds: ['package:a', 'package:b'] },
+        { id: 'dependencies:external', label: 'External Packages · 2', tone: 'cool', nodeIds: ['external:shared', 'external:solo'] },
+      ],
+      evidence: [],
+      warnings: [],
+    };
+    const layout = layoutAnalyzerView(view);
+    const externalPositions = layout.nodes.filter((positionedNode) => positionedNode.node.type === 'external-package');
+
+    expect(new Set(externalPositions.map((positionedNode) => positionedNode.x)).size).toBe(1);
+    expect(layout.bands.map((band) => band.label)).toEqual(expect.arrayContaining(['Shared External', 'Package B Dependencies']));
+    expect(view.edges.some((edge) => edge.sourceId.startsWith('external:') && edge.targetId.startsWith('external:'))).toBe(false);
+  });
+
+  it('keeps a selected node and its one-hop context visible through a type filter', () => {
+    const view: AnalyzerViewModel = {
+      view: 'architecture',
+      nodes: [
+        { id: 'project', type: 'project', label: 'Project', evidenceIds: [], metadata: {} },
+        { id: 'technology', type: 'technology', label: 'Technology', evidenceIds: [], metadata: {} },
+        { id: 'runtime', type: 'runtime', label: 'Runtime', evidenceIds: [], metadata: {} },
+      ],
+      edges: [
+        { id: 'edge:project-technology', sourceId: 'project', targetId: 'technology', kind: 'uses', label: 'uses', evidenceIds: [], metadata: {} },
+        { id: 'edge:project-runtime', sourceId: 'project', targetId: 'runtime', kind: 'uses', label: 'uses', evidenceIds: [], metadata: {} },
+      ],
+      clusters: [],
+      evidence: [],
+      warnings: [],
+    };
+    const presented = presentAnalyzerView(view, { expandedPresentationIds: new Set(), filter: 'technology', search: '', selectedNodeId: 'project' });
+
+    expect(presented.nodes.map((node) => node.id)).toEqual(expect.arrayContaining(['project', 'technology', 'runtime']));
+    expect(presented.edges).toHaveLength(2);
+  });
+
+  it('emphasizes architecture paths by one-hop depth for high-degree focus', () => {
+    const view: AnalyzerViewModel = {
+      view: 'architecture',
+      nodes: ['root', 'direct-a', 'direct-b', 'direct-c', 'direct-d', 'second', 'third'].map((id) => ({
+        id,
+        type: id === 'root' ? 'project' as const : 'technology' as const,
+        label: id,
+        evidenceIds: [],
+        metadata: {},
+      })),
+      edges: [
+        ['root', 'direct-a'], ['root', 'direct-b'], ['root', 'direct-c'], ['root', 'direct-d'],
+        ['direct-a', 'second'], ['second', 'third'],
+      ].map(([sourceId, targetId], index) => ({ id: `edge:${index}`, sourceId, targetId, kind: 'uses' as const, label: 'uses', evidenceIds: [], metadata: {} })),
+      clusters: [],
+      evidence: [],
+      warnings: [],
+    };
+    const edge = (index: number) => view.edges[index]!;
+
+    expect(analyzerFocusedEdgeEmphasis(view, edge(0), 'root')).toBe('primary');
+    expect(analyzerFocusedEdgeEmphasis(view, edge(4), 'root')).toBe('secondary');
+    expect(analyzerFocusedEdgeEmphasis(view, edge(5), 'root')).toBe('deep');
+  });
+
+  it('keeps Fit inside the explicit presentation padding', () => {
+    const layout = layoutAnalyzerView({ view: 'workspace', nodes: [], edges: [], clusters: [], evidence: [], warnings: [] });
+    const fitted = fitAnalyzerTransform({ ...layout, width: 1200, height: 800 }, 1000, 700);
+
+    expect(fitted.x).toBeGreaterThanOrEqual(ANALYZER_FIT_PADDING.left);
+    expect(fitted.y).toBeGreaterThanOrEqual(ANALYZER_FIT_PADDING.top);
+    expect(fitted.x + 1200 * fitted.scale).toBeLessThanOrEqual(1000 - ANALYZER_FIT_PADDING.right + 0.0001);
+    expect(fitted.y + 800 * fitted.scale).toBeLessThanOrEqual(700 - ANALYZER_FIT_PADDING.bottom + 0.0001);
   });
 });
 

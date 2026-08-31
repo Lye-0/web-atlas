@@ -13,6 +13,9 @@ const COMMAND_COLUMN_GAP = 78;
 const COMMAND_ROW_GAP = 38;
 const COMMAND_TOP = 76;
 const DEPENDENCY_MAX_ROWS = 4;
+const DEPENDENCY_EXTERNAL_GROUP_GAP = 14;
+const DEPENDENCY_EXTERNAL_GROUP_HEADER = 28;
+const DEPENDENCY_EXTERNAL_GROUP_BOTTOM = 14;
 const ARCHITECTURE_NODE_HEIGHT = 86;
 const ARCHITECTURE_NODE_GAP = 10;
 const ARCHITECTURE_TOP_PADDING = 36;
@@ -45,12 +48,23 @@ export interface PositionedLane {
   height: number;
 }
 
+export interface PositionedBand {
+  id: string;
+  label: string;
+  kind: 'dependency-source';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface AnalyzerLayout {
   width: number;
   height: number;
   nodes: PositionedNode[];
   clusters: PositionedCluster[];
   lanes: PositionedLane[];
+  bands: PositionedBand[];
 }
 
 function clusterOrder(view: AnalyzerViewModel['view']): string[] {
@@ -126,7 +140,7 @@ function layoutColumnClusters(view: AnalyzerViewModel, expandedNodeIds: Readonly
   });
 
   const width = Math.max(900, SIDE_PADDING * 2 + Math.max(1, positionedClusters.length) * CLUSTER_WIDTH + Math.max(0, positionedClusters.length - 1) * CLUSTER_GAP);
-  return { width, height: maxHeight, nodes: positionedNodes, clusters: positionedClusters, lanes: [] };
+  return { width, height: maxHeight, nodes: positionedNodes, clusters: positionedClusters, lanes: [], bands: [] };
 }
 
 function layoutArchitecture(view: AnalyzerViewModel, expandedNodeIds: ReadonlySet<string>): AnalyzerLayout {
@@ -157,7 +171,7 @@ function layoutArchitecture(view: AnalyzerViewModel, expandedNodeIds: ReadonlySe
 
   const width = Math.max(900, SIDE_PADDING * 2 + columnCount * CLUSTER_WIDTH + Math.max(0, columnCount - 1) * CLUSTER_GAP);
   const height = Math.max(420, (rowY.at(-1) ?? 20) + (rowHeights.at(-1) ?? 420) + 40);
-  return { width, height, nodes: positionedNodes, clusters: positionedClusters, lanes: [] };
+  return { width, height, nodes: positionedNodes, clusters: positionedClusters, lanes: [], bands: [] };
 }
 
 function metadataNumber(node: AnalyzerViewNode, key: string): number | undefined {
@@ -214,11 +228,13 @@ function commandFlowLayout(view: AnalyzerViewModel, expandedNodeIds: ReadonlySet
   });
   const lanes = [...laneGroups.entries()].map(([id, laneNodes]) => {
     const label = laneNodes.find((positionedNode) => typeof positionedNode.node.metadata.laneLabel === 'string')?.node.metadata.laneLabel;
+    const summaryStepCount = laneNodes.find((positionedNode) => typeof positionedNode.node.metadata.stepCount === 'number')?.node.metadata.stepCount;
+    const stepCount = typeof summaryStepCount === 'number' ? summaryStepCount : laneNodes.length;
     const top = Math.min(...laneNodes.map((positionedNode) => positionedNode.y));
     const bottom = Math.max(...laneNodes.map((positionedNode) => positionedNode.y + positionedNode.height));
     return {
       id,
-      label: typeof label === 'string' ? label : id,
+      label: `${typeof label === 'string' ? label : id} · ${stepCount} STEPS`,
       x: 20,
       y: Math.max(46, top - 18),
       width: Math.max(560, width - 40),
@@ -231,19 +247,104 @@ function commandFlowLayout(view: AnalyzerViewModel, expandedNodeIds: ReadonlySet
     nodes: positionedNodes,
     clusters: [],
     lanes,
+    bands: [],
   };
+}
+
+interface DependencyExternalGroup {
+  id: string;
+  label: string;
+  nodes: AnalyzerViewNode[];
+}
+
+function dependencyExternalGroups(view: AnalyzerViewModel, nodes: AnalyzerViewNode[]): DependencyExternalGroup[] {
+  const nodeById = new Map(view.nodes.map((node) => [node.id, node]));
+  const sourcesByExternalId = new Map<string, Set<string>>();
+  view.edges.forEach((edge) => {
+    const target = nodeById.get(edge.targetId);
+    const source = nodeById.get(edge.sourceId);
+    if (!target || target.type !== 'external-package' || !source || source.type === 'external-package') return;
+    const sourceIds = sourcesByExternalId.get(target.id) ?? new Set<string>();
+    sourceIds.add(source.id);
+    sourcesByExternalId.set(target.id, sourceIds);
+  });
+
+  const groups = new Map<string, DependencyExternalGroup>();
+  nodes.filter((node) => node.type === 'external-package' && node.presentation?.role !== 'summary').forEach((node) => {
+    const sourceIds = [...(sourcesByExternalId.get(node.id) ?? [])].sort();
+    const shared = sourceIds.length > 1;
+    const groupId = shared ? 'shared' : sourceIds[0] ?? 'unlinked';
+    const sourceLabels = sourceIds.map((sourceId) => nodeById.get(sourceId)?.label ?? sourceId);
+    const label = shared
+      ? 'Shared External'
+      : sourceLabels[0]
+        ? `${sourceLabels[0]} Dependencies`
+        : 'Other External';
+    const group = groups.get(groupId) ?? { id: groupId, label, nodes: [] };
+    group.nodes.push(node);
+    groups.set(groupId, group);
+  });
+
+  return [...groups.values()]
+    .map((group) => ({ ...group, nodes: [...group.nodes].sort((a, b) => a.label.localeCompare(b.label)) }))
+    .sort((a, b) => {
+      if (a.id === 'shared') return -1;
+      if (b.id === 'shared') return 1;
+      return a.label.localeCompare(b.label);
+    });
 }
 
 function dependencyFlowLayout(view: AnalyzerViewModel, expandedNodeIds: ReadonlySet<string>): AnalyzerLayout {
   const dependencyClusters = orderedClusters(view).filter((cluster) => cluster.nodeIds.length > 0);
   const positionedNodes: PositionedNode[] = [];
   const positionedClusters: PositionedCluster[] = [];
+  const positionedBands: PositionedBand[] = [];
   let x = SIDE_PADDING;
   let maxHeight = 420;
 
   dependencyClusters.forEach((cluster) => {
     const nodes = nodesForCluster(view, cluster);
     if (nodes.length === 0) return;
+    if (cluster.id === 'dependencies:external' && nodes.some((node) => node.type === 'external-package')) {
+      const width = 40 + ANALYZER_NODE_WIDTH;
+      const y = 20;
+      const anchorNodes = nodes.filter((node) => node.presentation?.role === 'summary');
+      const externalGroups = dependencyExternalGroups(view, nodes);
+      let cursor = y + TOP_PADDING;
+      anchorNodes.forEach((node) => {
+        const height = nodeHeight(node, expandedNodeIds);
+        positionedNodes.push({ node, x: x + 20, y: cursor, height });
+        cursor += height + NODE_GAP;
+      });
+      externalGroups.forEach((group) => {
+        const groupY = cursor - 8;
+        const groupHeight = DEPENDENCY_EXTERNAL_GROUP_HEADER
+          + group.nodes.reduce((total, node) => total + nodeHeight(node, expandedNodeIds), 0)
+          + Math.max(0, group.nodes.length - 1) * NODE_GAP
+          + DEPENDENCY_EXTERNAL_GROUP_BOTTOM;
+        positionedBands.push({
+          id: `dependency-band:${group.id}`,
+          label: group.label,
+          kind: 'dependency-source',
+          x: x + 10,
+          y: groupY,
+          width: width - 20,
+          height: groupHeight,
+        });
+        let nodeY = groupY + DEPENDENCY_EXTERNAL_GROUP_HEADER;
+        group.nodes.forEach((node) => {
+          const height = nodeHeight(node, expandedNodeIds);
+          positionedNodes.push({ node, x: x + 20, y: nodeY, height });
+          nodeY += height + NODE_GAP;
+        });
+        cursor = groupY + groupHeight + DEPENDENCY_EXTERNAL_GROUP_GAP;
+      });
+      const height = Math.max(220, cursor - y + 8);
+      positionedClusters.push({ id: cluster.id, label: cluster.label, tone: cluster.tone, x, y, width, height });
+      x += width + CLUSTER_GAP;
+      maxHeight = Math.max(maxHeight, height + 40);
+      return;
+    }
     const trackCount = Math.max(1, Math.ceil(nodes.length / DEPENDENCY_MAX_ROWS));
     const rows = Math.min(DEPENDENCY_MAX_ROWS, nodes.length);
     const rowHeight = Math.max(...nodes.map((node) => nodeHeight(node, expandedNodeIds)), ANALYZER_NODE_HEIGHT);
@@ -260,7 +361,7 @@ function dependencyFlowLayout(view: AnalyzerViewModel, expandedNodeIds: Readonly
     maxHeight = Math.max(maxHeight, height + 40);
   });
 
-  return { width: Math.max(900, x - CLUSTER_GAP + SIDE_PADDING), height: maxHeight, nodes: positionedNodes, clusters: positionedClusters, lanes: [] };
+  return { width: Math.max(900, x - CLUSTER_GAP + SIDE_PADDING), height: maxHeight, nodes: positionedNodes, clusters: positionedClusters, lanes: [], bands: positionedBands };
 }
 
 export function layoutAnalyzerView(view: AnalyzerViewModel, expandedNodeIds: ReadonlySet<string> = new Set()): AnalyzerLayout {

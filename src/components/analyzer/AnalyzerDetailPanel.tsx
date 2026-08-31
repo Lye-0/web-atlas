@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { displayDictionaryStack, factDictionaryStackId, factForNode, nodeTypeLabels, relationLabelForNode } from '../../analyzer';
+import { analyzerSummaryExpanded, analyzerSummarySubtitle, displayDictionaryStack, factDictionaryStackId, factForNode, nodeTypeLabels, relationLabelForNode } from '../../analyzer';
 import type { AnalyzerProjectStore, AnalyzerViewEdge, AnalyzerViewModel, AnalyzerViewNode } from '../../analyzer';
 import { stackPath } from '../../utils/routes';
 import { EvidenceCodeBlock } from './EvidenceCodeBlock';
@@ -9,7 +9,9 @@ interface AnalyzerDetailPanelProps {
   view: AnalyzerViewModel;
   selectedNodeId?: string;
   selectedEdgeId?: string;
+  expandedPresentationIds: ReadonlySet<string>;
   onSelectNode: (nodeId: string, focus?: boolean) => void;
+  onTogglePresentation: (presentationId: string) => void;
   onClose: () => void;
 }
 
@@ -139,10 +141,16 @@ function detectionReason(node: AnalyzerViewNode, fact: ReturnType<typeof factFor
   }
 }
 
-function NodeDetails({ node, view, store, onSelectNode }: { node: AnalyzerViewNode; view: AnalyzerViewModel; store: AnalyzerProjectStore; onSelectNode: (nodeId: string, focus?: boolean) => void }) {
+function NodeDetails({ node, view, store, expandedPresentationIds, onSelectNode, onTogglePresentation }: { node: AnalyzerViewNode; view: AnalyzerViewModel; store: AnalyzerProjectStore; expandedPresentationIds: ReadonlySet<string>; onSelectNode: (nodeId: string, focus?: boolean) => void; onTogglePresentation: (presentationId: string) => void }) {
   const fact = factForNode(store, node);
   const dictionary = displayDictionaryStack(factDictionaryStackId(fact ?? node));
   const summary = node.presentation?.role === 'summary';
+  const summaryExpanded = summary && analyzerSummaryExpanded(node.id, expandedPresentationIds);
+  const displayedSubtitle = summary ? analyzerSummarySubtitle(node, summaryExpanded) : node.subtitle;
+  const presentationParent = node.presentation?.parentId
+    ? view.nodes.find((candidate) => candidate.id === node.presentation?.parentId)
+    : undefined;
+  const parentExpanded = Boolean(presentationParent && expandedPresentationIds.has(presentationParent.id));
   return (
     <>
       <div className="analyzer-detail-heading">
@@ -151,7 +159,15 @@ function NodeDetails({ node, view, store, onSelectNode }: { node: AnalyzerViewNo
           <button type="button" className="analyzer-focus-selected" onClick={() => onSelectNode(node.id, true)}>Focus Selected</button>
         </div>
         <h2>{node.label}</h2>
-        {node.subtitle && <p>{node.subtitle}</p>}
+        {displayedSubtitle && <p>{displayedSubtitle}</p>}
+        {summary && (
+          <div className="analyzer-presentation-actions">
+            <button type="button" className="analyzer-presentation-toggle" onClick={() => onTogglePresentation(node.id)} aria-expanded={summaryExpanded}>
+              {summaryExpanded ? 'Collapse' : 'Expand'}
+            </button>
+            <span>{summaryExpanded ? 'Graphの詳細Nodeを表示中' : 'GraphではSummaryとして表示中'}</span>
+          </div>
+        )}
       </div>
       <section className="analyzer-detail-section">
         <h3>Overview</h3>
@@ -167,6 +183,15 @@ function NodeDetails({ node, view, store, onSelectNode }: { node: AnalyzerViewNo
         <section className="analyzer-detail-section">
           <h3>Evidence</h3>
           <EvidenceList evidenceIds={node.evidenceIds} view={view} store={store} />
+        </section>
+      )}
+      {presentationParent && (
+        <section className="analyzer-detail-section">
+          <h3>Presentation Group</h3>
+          <p>このDetail Nodeは {presentationParent.label} の表示グループに属しています。</p>
+          <button type="button" className="analyzer-presentation-parent-toggle" onClick={() => onTogglePresentation(presentationParent.id)} aria-expanded={parentExpanded}>
+            {parentExpanded ? `Collapse ${presentationParent.label}` : `Expand ${presentationParent.label}`}
+          </button>
         </section>
       )}
       <section className="analyzer-detail-section">
@@ -213,7 +238,7 @@ function EdgeDetails({ edge, view, store, onSelectNode }: { edge: AnalyzerViewEd
   );
 }
 
-export function AnalyzerDetailPanel({ store, view, selectedNodeId, selectedEdgeId, onSelectNode, onClose }: AnalyzerDetailPanelProps) {
+export function AnalyzerDetailPanel({ store, view, selectedNodeId, selectedEdgeId, expandedPresentationIds, onSelectNode, onTogglePresentation, onClose }: AnalyzerDetailPanelProps) {
   const node = selectedNodeId ? view.nodes.find((candidate) => candidate.id === selectedNodeId) : undefined;
   const edge = selectedEdgeId ? view.edges.find((candidate) => candidate.id === selectedEdgeId) : undefined;
   return (
@@ -232,7 +257,7 @@ export function AnalyzerDetailPanel({ store, view, selectedNodeId, selectedEdgeI
           <div className="analyzer-detail-panel-close-row">
             <button type="button" className="analyzer-detail-close" onClick={onClose} aria-label="Close detail panel">Close</button>
           </div>
-          <NodeDetails node={node} view={view} store={store} onSelectNode={onSelectNode} />
+          <NodeDetails node={node} view={view} store={store} expandedPresentationIds={expandedPresentationIds} onSelectNode={onSelectNode} onTogglePresentation={onTogglePresentation} />
         </>
       ) : edge ? (
         <>

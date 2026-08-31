@@ -10,3 +10,4 @@ export * from './layout';
 export * from './camera';
 export * from './presentation';
 export * from './relations';
+export * from './focus';

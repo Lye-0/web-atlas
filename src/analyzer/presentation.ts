@@ -6,7 +6,41 @@ export interface AnalyzerPresentationOptions {
   search: string;
   selectedEdgeId?: string;
   selectedNodeId?: string;
-  showExternal: boolean;
+}
+
+export function analyzerSummaryExpanded(summaryId: string, expandedPresentationIds: ReadonlySet<string>): boolean {
+  return expandedPresentationIds.has(summaryId);
+}
+
+export function analyzerSummarySubtitle(node: AnalyzerViewNode, expanded: boolean): string | undefined {
+  if (!node.subtitle) return undefined;
+  if (/· expand for details$/.test(node.subtitle)) {
+    return expanded ? node.subtitle.replace(/· expand for details$/, '· expanded · Collapse') : node.subtitle;
+  }
+  if (/· expanded(?: · Collapse)?$/.test(node.subtitle)) {
+    return expanded ? node.subtitle : node.subtitle.replace(/· expanded(?: · Collapse)?$/, '· expand for details');
+  }
+  return `${node.subtitle} · ${expanded ? 'expanded · Collapse' : 'expand for details'}`;
+}
+
+export function presentationParentId(view: AnalyzerViewModel, nodeId: string): string | undefined {
+  return view.nodes.find((node) => node.id === nodeId)?.presentation?.parentId;
+}
+
+export function presentationAncestorIds(view: AnalyzerViewModel, nodeId: string): string[] {
+  const ancestors: string[] = [];
+  const visited = new Set<string>();
+  let parentId = presentationParentId(view, nodeId);
+  while (parentId && !visited.has(parentId)) {
+    ancestors.push(parentId);
+    visited.add(parentId);
+    parentId = presentationParentId(view, parentId);
+  }
+  return ancestors;
+}
+
+export function presentationOwnsNode(view: AnalyzerViewModel, presentationId: string, nodeId: string): boolean {
+  return presentationAncestorIds(view, nodeId).includes(presentationId);
 }
 
 export function nodeMatchesSearch(node: AnalyzerViewNode, search: string): boolean {
@@ -39,10 +73,24 @@ export function presentAnalyzerView(view: AnalyzerViewModel, options: AnalyzerPr
     const searchExpanded = hasSearch && childIds.some((childId) => searchMatchedIds.has(childId)
       || options.selectedNodeId === childId
       || (options.filter !== 'all' && nodeById.get(childId)?.type === options.filter));
-    if (options.expandedPresentationIds.has(summary.id)
-      || (summary.id === 'dependencies:external:summary' && options.showExternal)
-      || searchExpanded) expandedGroupIds.add(summary.id);
+    if (options.expandedPresentationIds.has(summary.id) || searchExpanded) expandedGroupIds.add(summary.id);
   });
+
+  const selectedContextIds = new Set<string>();
+  if (options.selectedNodeId) {
+    selectedContextIds.add(options.selectedNodeId);
+    view.edges.forEach((edge) => {
+      if (edge.sourceId === options.selectedNodeId) selectedContextIds.add(edge.targetId);
+      if (edge.targetId === options.selectedNodeId) selectedContextIds.add(edge.sourceId);
+    });
+  }
+  if (options.selectedEdgeId) {
+    const selectedEdge = view.edges.find((edge) => edge.id === options.selectedEdgeId);
+    if (selectedEdge) {
+      selectedContextIds.add(selectedEdge.sourceId);
+      selectedContextIds.add(selectedEdge.targetId);
+    }
+  }
 
   const presentationVisibleIds = new Set<string>();
   view.nodes.forEach((node) => {
@@ -58,11 +106,12 @@ export function presentAnalyzerView(view: AnalyzerViewModel, options: AnalyzerPr
     if (expandedGroupIds.has(parentId)
       || searchMatchedIds.has(node.id)
       || options.selectedNodeId === node.id
+      || selectedContextIds.has(node.id)
       || (options.filter !== 'all' && node.type === options.filter)) presentationVisibleIds.add(node.id);
   });
 
   const visibleNodes = view.nodes.filter((node) => presentationVisibleIds.has(node.id)
-    && (options.filter === 'all' || node.type === options.filter));
+    && (options.filter === 'all' || node.type === options.filter || selectedContextIds.has(node.id)));
   const visibleIds = new Set(visibleNodes.map((node) => node.id));
   const parentByChildId = new Map(view.nodes.flatMap((node) => node.presentation?.parentId
     ? [[node.id, node.presentation.parentId] as const]
