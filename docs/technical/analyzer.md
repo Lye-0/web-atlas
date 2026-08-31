@@ -54,6 +54,21 @@ Analyzer shellには次の4つのprojectorがあります。
 
 全ViewでNode search、type filter、Node/Edge選択、detail panel、Evidence previewを利用できます。
 
+## Semantic zoom / 2.5D presentation
+
+Graphの拡大率は [`src/analyzer/zoom.ts`](../../src/analyzer/zoom.ts) で3段階に量子化しています。`scale < 0.55` はFar、`0.55 <= scale <= 0.95` はMedium、`scale > 0.95` はNearです。Nearでは現在のviewport内にあるEvidence付きNodeだけを遅延展開し、選択中のEvidence付きNodeはviewport外でもNearとして扱います。これにより、全Nodeを同時に詳細化せず、既存のView layoutとRelationモデルを変更しないまま操作対象の周辺だけを詳しく表示します。
+
+- Far: Node typeとlabelを中心に表示します。
+- Medium: subtitleとEvidence件数を表示します。
+- Near: selected/viewport内のNodeに、最初のEvidenceだけを使った3〜5行のcompact previewを表示します。exact highlight rangeはdetail panelと同じEvidenceCodeBlockで描画します。
+- Detail panel: 常に従来どおり全Evidenceとsource contextを表示し、Node内previewとは情報量を分けます。
+
+2.5Dの視覚階層は、背景grid（28px / 140px）、cluster plane、edge、Node、selected Node/connected Edge、detail/previewの順です。cluster planeのgradientとNodeの控えめなshadowで奥行きを表現し、Graph本体には新しい可視化ライブラリを追加していません。
+
+Project未選択時の装飾orbitだけは、React Three Fiber / Three.jsをlazy importした別chunkで描画します。軌道線と`SphereGeometry`を同じ3D sceneに置き、lighting・perspective・depth testで球体として表示します。device pixel ratioは最大1.5に制限し、`prefers-reduced-motion`時はdemand renderingの静止scene、WebGLを利用できない場合やsceneの読込に失敗した場合は静止したCSS軌道線へfallbackします。この装飾が利用できなくてもFolder選択と説明内容には影響しません。
+
+Canvas内のwheelはpassiveではないnative listenerで必ずpreventDefaultし、`overscroll-behavior: contain`も併用しています。wheel zoomを実行してもページ側へscroll chainingしないようにし、panやNode/Edge選択の既存操作を維持します。`prefers-reduced-motion`時は既存のreduced-motion設定に従い、transitionを抑制します。
+
 ## Privacy and unsupported scope
 
 解析はlocal browser session内で完結し、network upload、Cloudflare Worker/D1 call、AI inferenceは実装していません。選択フォルダ以外のfilesystemも読みません。
@@ -75,12 +90,14 @@ BrowserのFile System Access APIがない場合はdirectory file inputを使い�
 
 実装時の検証結果:
 
-- `pnpm exec vitest run src/analyzer/analyzer.test.ts`: 7 tests passed
-- `pnpm test`: 4 test files / 17 tests passed
+- `pnpm exec vitest run src/analyzer/analyzer.test.ts`: 9 tests passed
+- `pnpm test`: 4 test files / 19 tests passed
 - `pnpm typecheck`: passed
 - `pnpm lint`: passed
 - `pnpm build`: passed（Vite production bundle）
-- Browser smoke check: local synthetic Filesで空状態、全4 view、Node/Evidence detail、External toggle、mobile widthを確認
+- `pnpm exec wrangler deploy --dry-run`: passed（No bindings found、dry-runで終了）
+- Browser smoke check: local synthetic Filesで空状態、全4 view、Node/Evidence detail、External toggle、Semantic Zoom / Evidence Preview、Node選択時のNear override、canvas wheelのpreventDefaultとページscroll位置維持、mobile widthを確認
+- Responsive viewport check: 1600 / 1440 / 1280 / 1100 / 1024 / 768 / 390pxで横overflowなしを確認
 - Vehicle Management実フォルダをBrowserのfolder pickerで選択する手動検証: 実施前（この時点では自動fixture検証のみ）
 
 既存Dictionaryのcanonical ID・`packageNames`・Map scopeは変更せず、AnalyzerからDictionary detailへ既存stack routeを再利用しています。Repository memoryの既存Dictionary契約も実装前に再確認済みです。

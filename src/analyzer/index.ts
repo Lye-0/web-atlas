@@ -1,4 +1,5 @@
 export * from './types';
+export * from './zoom';
 export * from './evidence';
 export * from './fileDiscovery';
 export * from './parsers';

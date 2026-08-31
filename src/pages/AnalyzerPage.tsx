@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { projectAnalyzerView, viewNodeSearchText, analyzerViewLabels } from '../analyzer';
 import type { AnalyzerProjectStore, AnalyzerViewId } from '../analyzer';
 import { AnalyzerDetailPanel } from '../components/analyzer/AnalyzerDetailPanel';
+import { AnalyzerEmptyOrbit } from '../components/analyzer/AnalyzerEmptyOrbit';
 import { AnalyzerGraphStage } from '../components/analyzer/AnalyzerGraphStage';
 import { AnalyzerProjectPicker } from '../components/analyzer/AnalyzerProjectPicker';
 import { AnalyzerToolbar, type AnalyzerFilter } from '../components/analyzer/AnalyzerToolbar';
@@ -70,7 +71,7 @@ export function AnalyzerPage() {
 
       {!store || !model ? (
         <section className="analyzer-empty-state" aria-labelledby="analyzer-empty-title">
-          <div className="analyzer-empty-orbit" aria-hidden="true"><span /><span /><span /></div>
+          <AnalyzerEmptyOrbit />
           <div>
             <p className="analyzer-panel-kicker">Private by default</p>
             <h2 id="analyzer-empty-title">解析するProject Folderを選択してください</h2>
@@ -129,6 +130,7 @@ export function AnalyzerPage() {
               filter={filter}
               search={search}
               showExternal={showExternal}
+              sources={store.sources}
               onSelectNode={selectNode}
               onSelectEdge={selectEdge}
             />

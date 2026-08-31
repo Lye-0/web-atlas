@@ -6,6 +6,8 @@ import { parseDotnetProject, parsePackageJson, parsePnpmWorkspace, parseWrangler
 import { projectCommand, projectDependencies, projectWorkspace } from './projectors';
 import { scanProjectFiles } from './scan';
 import { packageIdForPath, scriptIdFor, type AnalyzerSourceFile } from './types';
+import { ANALYZER_NEAR_NODE_HEIGHT, ANALYZER_NODE_HEIGHT, layoutAnalyzerView } from './layout';
+import { ANALYZER_FAR_ZOOM_THRESHOLD, ANALYZER_NEAR_ZOOM_THRESHOLD, semanticZoomLevelForScale } from './zoom';
 
 function fixtureFile(relativePath: string, source: string): AnalyzerSourceFile {
   return {
@@ -159,6 +161,41 @@ describe('Analyzer command parsing', () => {
     expect(fragments[2].children[0].scriptName).toBe('api');
     expect(fragments[2].children[1].toolName).toBe('vite');
     expect(parseCommandExpression('pnpm exec vite')[0]).toMatchObject({ kind: 'pnpm-exec', toolName: 'vite' });
+  });
+});
+
+describe('Analyzer semantic zoom and layout', () => {
+  it('uses stable far/medium/near thresholds with inclusive medium boundaries', () => {
+    expect(semanticZoomLevelForScale(ANALYZER_FAR_ZOOM_THRESHOLD - 0.01)).toBe('far');
+    expect(semanticZoomLevelForScale(ANALYZER_FAR_ZOOM_THRESHOLD)).toBe('medium');
+    expect(semanticZoomLevelForScale(0.7)).toBe('medium');
+    expect(semanticZoomLevelForScale(ANALYZER_NEAR_ZOOM_THRESHOLD)).toBe('medium');
+    expect(semanticZoomLevelForScale(ANALYZER_NEAR_ZOOM_THRESHOLD + 0.01)).toBe('near');
+  });
+
+  it('expands only requested nodes while preserving the deterministic layout columns', () => {
+    const view = {
+      view: 'workspace' as const,
+      nodes: [
+        { id: 'node:source', type: 'project' as const, label: 'Source', clusterId: 'workspace:project', evidenceIds: ['evidence:source'], metadata: {} },
+        { id: 'node:other', type: 'workspace-package' as const, label: 'Other', clusterId: 'workspace:project', evidenceIds: [], metadata: {} },
+      ],
+      edges: [],
+      clusters: [{ id: 'workspace:project', label: 'Project', tone: 'accent' as const, nodeIds: ['node:source', 'node:other'] }],
+      evidence: [],
+      warnings: [],
+    };
+    const base = layoutAnalyzerView(view);
+    const expanded = layoutAnalyzerView(view, new Set(['node:source']));
+    const baseSource = base.nodes.find((node) => node.node.id === 'node:source');
+    const expandedSource = expanded.nodes.find((node) => node.node.id === 'node:source');
+    const expandedOther = expanded.nodes.find((node) => node.node.id === 'node:other');
+
+    expect(baseSource?.height).toBe(ANALYZER_NODE_HEIGHT);
+    expect(expandedSource?.height).toBe(ANALYZER_NEAR_NODE_HEIGHT);
+    expect(expandedOther?.height).toBe(ANALYZER_NODE_HEIGHT);
+    expect(expandedOther?.y).toBe((expandedSource?.y ?? 0) + ANALYZER_NEAR_NODE_HEIGHT + 24);
+    expect(expanded.clusters[0]?.height).toBeGreaterThan(base.clusters[0]?.height ?? 0);
   });
 });
 

@@ -3,6 +3,7 @@ import type { AnalyzerEvidence, SourceRange } from '../../analyzer';
 interface EvidenceCodeBlockProps {
   evidence: AnalyzerEvidence;
   source?: string;
+  compact?: boolean;
 }
 
 interface CodeSegment {
@@ -36,19 +37,37 @@ function splitLine(line: string, ranges: Array<{ start: number; end: number }>):
   return segments.length > 0 ? segments : [{ text: line || ' ', highlighted: false }];
 }
 
-export function EvidenceCodeBlock({ evidence, source }: EvidenceCodeBlockProps) {
+function lineWindow(evidence: AnalyzerEvidence, lineCount: number, compact: boolean): { first: number; last: number } {
+  let first = Math.max(1, Math.min(lineCount, evidence.contextStartLine));
+  let last = Math.max(first, Math.min(lineCount, evidence.contextEndLine));
+  if (!compact) return { first, last };
+
+  const evidenceStart = evidence.highlightRanges[0]?.start.line ?? first;
+  const evidenceEnd = evidence.highlightRanges.reduce((line, range) => Math.max(line, range.end.line), evidenceStart);
+  first = Math.min(first, Math.max(1, evidenceStart - 1));
+  last = Math.max(last, Math.min(lineCount, evidenceEnd + 1));
+  if (last - first + 1 > 5) {
+    first = Math.max(1, Math.min(evidenceStart, lineCount - 4));
+    last = Math.min(lineCount, first + 4);
+  }
+  while (last - first + 1 < 3 && (first > 1 || last < lineCount)) {
+    if (first > 1) first -= 1;
+    else if (last < lineCount) last += 1;
+  }
+  return { first, last };
+}
+
+export function EvidenceCodeBlock({ evidence, source, compact = false }: EvidenceCodeBlockProps) {
   if (!source) return <p className="analyzer-empty-evidence">Source context is unavailable.</p>;
   const lines = source.split(/\r?\n/);
-  const firstLine = Math.max(1, evidence.contextStartLine);
-  const lastLine = Math.min(lines.length, evidence.contextEndLine);
+  const { first: firstLine, last: lastLine } = lineWindow(evidence, lines.length, compact);
   return (
-    <div className="analyzer-evidence-block">
+    <div className={`analyzer-evidence-block${compact ? ' analyzer-evidence-block-compact' : ''}`}>
       <div className="analyzer-evidence-file">
         <code>{evidence.filePath}</code>
         <span>{evidence.description ?? evidence.detectorId}</span>
       </div>
-      <pre aria-label={`Evidence in ${evidence.filePath}`}><code>
-        {lines.slice(firstLine - 1, lastLine).map((line, index) => {
+      <pre aria-label={`Evidence in ${evidence.filePath}`}><code>{lines.slice(firstLine - 1, lastLine).map((line, index) => {
           const lineNumber = firstLine + index;
           const segments = splitLine(line, rangesForLine(evidence, lineNumber, line.length));
           return (
@@ -62,8 +81,7 @@ export function EvidenceCodeBlock({ evidence, source }: EvidenceCodeBlockProps) 
               {'\n'}
             </span>
           );
-        })}
-      </code></pre>
+        })}</code></pre>
     </div>
   );
 }
@@ -72,12 +90,13 @@ interface EvidencePreviewProps {
   evidenceIds: string[];
   evidence: AnalyzerEvidence[];
   sources: Record<string, string>;
+  compact?: boolean;
 }
 
-export function EvidencePreview({ evidenceIds, evidence, sources }: EvidencePreviewProps) {
+export function EvidencePreview({ evidenceIds, evidence, sources, compact = false }: EvidencePreviewProps) {
   const selectedEvidence = evidenceIds
     .map((id) => evidence.find((candidate) => candidate.id === id))
     .find((candidate): candidate is AnalyzerEvidence => Boolean(candidate));
   if (!selectedEvidence) return <p className="analyzer-empty-evidence">直接Evidenceはありません。</p>;
-  return <EvidenceCodeBlock evidence={selectedEvidence} source={sources[selectedEvidence.filePath]} />;
+  return <EvidenceCodeBlock evidence={selectedEvidence} source={sources[selectedEvidence.filePath]} compact={compact} />;
 }
