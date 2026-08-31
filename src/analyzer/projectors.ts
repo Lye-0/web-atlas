@@ -25,7 +25,7 @@ function nodeSubtitle(fact: AnalyzerFact): string | undefined {
   if (fact.kind === 'workspace-package') return fact.packagePath === '.' ? 'root package · workspace root' : fact.packagePath;
   if (fact.kind === 'workspace-config') return fact.filePath;
   if (fact.kind === 'workspace-pattern') return fact.configId;
-  if (fact.kind === 'package-script') return `${fact.packageName} · ${fact.command}`;
+  if (fact.kind === 'package-script') return `${fact.packageName} · ${fact.packagePath} · ${fact.command}`;
   if (fact.kind === 'technology') return fact.packageNames.length > 0 ? fact.packageNames.join(' · ') : 'explicit configuration';
   if (fact.kind === 'external-package') return fact.versionRanges.join(' · ');
   if (fact.kind === 'runtime') return typeof fact.metadata.main === 'string' ? fact.metadata.main : fact.runtimeType;
@@ -76,7 +76,7 @@ function summaryNode(
       childCount: childNodeIds.length,
       childNodeIds,
     },
-    presentation: { role: 'summary', childNodeIds },
+    presentation: { role: 'summary', childNodeIds, hideWhenExpanded: true },
   };
 }
 
@@ -135,7 +135,6 @@ function architectureCluster(fact: AnalyzerFact): { id: string; label: string; t
 }
 
 const ARCHITECTURE_PRIMARY_TECHNOLOGY_CATEGORIES = new Set([
-  'programming-language',
   'runtime',
   'fullstack-web-framework',
   'web-api-framework',
@@ -168,14 +167,22 @@ export function projectArchitecture(store: AnalyzerProjectStore): AnalyzerViewMo
     });
   const desktopDetails = baseNodes.filter((node) => node.type === 'dotnet-project');
   const technologyDetails = baseNodes.filter((node) => node.type === 'technology' && !isPrimaryArchitectureTechnology(store.facts.find((fact) => fact.id === node.factId)));
+  const sharedWorkspaceDetails = baseNodes.filter((node) => node.type === 'workspace-package');
   const desktopSummaryId = 'architecture:desktop:summary';
+  const sharedWorkspaceSummaryId = 'architecture:workspace:summary';
   const technologySummaryId = 'architecture:technology:summary';
-  const nodesWithDesktopSummary = desktopDetails.length > 0
+  const nodesWithWorkspaceSummary = sharedWorkspaceDetails.length > 1
     ? [
-        ...markPresentationChildren(baseNodes, desktopSummaryId, new Set(desktopDetails.map((node) => node.id))),
-        summaryNode(desktopSummaryId, '.NET / WPF', `${desktopDetails.length} projects · expand for details`, 'dotnet-project', 'architecture:desktop', desktopDetails),
+        ...markPresentationChildren(baseNodes, sharedWorkspaceSummaryId, new Set(sharedWorkspaceDetails.map((node) => node.id))),
+        summaryNode(sharedWorkspaceSummaryId, 'Shared Workspace', `${sharedWorkspaceDetails.length} packages · expand for details`, 'workspace-package', 'architecture:workspace', sharedWorkspaceDetails),
       ]
     : baseNodes;
+  const nodesWithDesktopSummary = desktopDetails.length > 0
+    ? [
+        ...markPresentationChildren(nodesWithWorkspaceSummary, desktopSummaryId, new Set(desktopDetails.map((node) => node.id))),
+        summaryNode(desktopSummaryId, '.NET / WPF', `${desktopDetails.length} projects · expand for details`, 'dotnet-project', 'architecture:desktop', desktopDetails),
+      ]
+    : nodesWithWorkspaceSummary;
   const nodes = technologyDetails.length > 0
     ? [
         ...markPresentationChildren(nodesWithDesktopSummary, technologySummaryId, new Set(technologyDetails.map((node) => node.id))),
@@ -188,6 +195,18 @@ export function projectArchitecture(store: AnalyzerProjectStore): AnalyzerViewMo
     (relation) => ['contains', 'uses', 'binds-to', 'depends-on'].includes(relation.kind),
     (relation) => relation.kind === 'depends-on' ? 'uses' : relation.kind,
   );
+  const nodeById = new Map(baseNodes.map((node) => [node.id, node]));
+  const architectureEdgeEmphasis = (edge: AnalyzerViewEdge): 'primary' | 'secondary' | 'deep' => {
+    const source = nodeById.get(edge.sourceId);
+    const target = nodeById.get(edge.targetId);
+    if (edge.sourceId === 'project:root') {
+      if (target?.type === 'technology') return 'deep';
+      return 'primary';
+    }
+    if (edge.kind === 'binds-to' || target?.type === 'runtime' || target?.type === 'resource') return 'primary';
+    if (target?.type === 'technology') return source?.type === 'workspace-package' || source?.type === 'application' ? 'primary' : 'secondary';
+    return 'secondary';
+  };
   const technologyDetailEdges = architectureEdges.filter((edge) => technologyDetails.some((node) => node.id === edge.targetId));
   const technologyEdgesBySource = new Map<string, AnalyzerViewEdge[]>();
   technologyDetailEdges.forEach((edge) => {
@@ -204,12 +223,18 @@ export function projectArchitecture(store: AnalyzerProjectStore): AnalyzerViewMo
         label: `${sourceEdges.length} additional ${sourceEdges.length === 1 ? 'technology' : 'technologies'}`,
         evidenceIds: [...new Set(sourceEdges.flatMap((edge) => edge.evidenceIds))],
         metadata: { presentation: 'bundle', technologyCount: sourceEdges.length },
-        presentation: { displayKind: 'bundle' as const, parentId: technologySummaryId },
+        presentation: { displayKind: 'bundle' as const, parentId: technologySummaryId, emphasis: sourceId === 'project:root' ? 'secondary' as const : 'primary' as const },
       }))
     : [];
-  const edges = architectureEdges.map((edge) => technologyDetails.some((node) => node.id === edge.targetId)
-    ? { ...edge, presentation: { parentId: technologySummaryId, initiallyHidden: true } }
-    : edge).concat(technologyBundleEdges);
+  const edges = architectureEdges.map((edge) => ({
+    ...edge,
+    presentation: {
+      emphasis: architectureEdgeEmphasis(edge),
+      ...(technologyDetails.some((node) => node.id === edge.targetId)
+        ? { parentId: technologySummaryId, initiallyHidden: true }
+        : {}),
+    },
+  })).concat(technologyBundleEdges);
   const clusterDefinitions = [
     ['architecture:project', 'Project', 'neutral'],
     ['architecture:apps', 'Applications', 'accent'],
@@ -303,6 +328,25 @@ function evidenceForCommandFragment(store: AnalyzerProjectStore, script: Package
   return [makeEvidence(script.sourcePath, source, range, 'script', 'command-fragment', `Command fragment ${fragment.text}`)].map((evidence) => evidence.id);
 }
 
+interface CommandExecutionContext {
+  executionRank: number;
+  executionDepth: number;
+  branchPath: string;
+  laneId?: string;
+  laneLabel?: string;
+}
+
+function commandLaneMetadata(context: CommandExecutionContext): AnalyzerViewNode['metadata'] {
+  return context.laneId
+    ? { laneId: context.laneId, ...(context.laneLabel ? { laneLabel: context.laneLabel } : {}) }
+    : {};
+}
+
+function commandBranchLabel(fragment: CommandFragment, index: number): string {
+  const value = fragment.packageSelector?.replace(/^@[^/]+\//, '') ?? fragment.scriptName ?? fragment.toolName ?? `Branch ${index + 1}`;
+  return value.toUpperCase();
+}
+
 function commandNode(
   id: string,
   fragment: CommandFragment,
@@ -311,6 +355,8 @@ function commandNode(
   executionRank = 0,
   executionDepth = 0,
   branchPath = 'root',
+  laneId?: string,
+  laneLabel?: string,
 ): AnalyzerViewNode {
   const fact: CommandFact = {
     id,
@@ -325,6 +371,8 @@ function commandNode(
       executionRank,
       executionDepth,
       branchPath,
+      ...(laneId ? { laneId } : {}),
+      ...(laneLabel ? { laneLabel } : {}),
     },
     commandType: fragment.kind,
     command: fragment.text,
@@ -332,12 +380,6 @@ function commandNode(
     ...(fragment.scriptName ? { scriptName: fragment.scriptName } : {}),
   };
   return nodeForFact(fact, 'command:commands');
-}
-
-interface CommandExecutionContext {
-  executionRank: number;
-  executionDepth: number;
-  branchPath: string;
 }
 
 function addViewEdge(edges: Map<string, AnalyzerViewEdge>, edge: AnalyzerViewEdge): void {
@@ -387,6 +429,7 @@ export function projectCommand(store: AnalyzerProjectStore, requestedEntryScript
         executionRank: context.executionRank,
         executionDepth: context.executionDepth,
         branchPath: context.branchPath,
+        ...commandLaneMetadata(context),
       },
     });
   };
@@ -399,7 +442,7 @@ export function projectCommand(store: AnalyzerProjectStore, requestedEntryScript
       }
     });
     const commandId = `command:${script.id}:${fragment.start}:${fragment.kind}${parentCommandId ? `:child:${parentCommandId}` : ''}`;
-    nodes.set(commandId, commandNode(commandId, fragment, evidenceIds, script.packageId, context.executionRank, context.executionDepth, context.branchPath));
+    nodes.set(commandId, commandNode(commandId, fragment, evidenceIds, script.packageId, context.executionRank, context.executionDepth, context.branchPath, context.laneId, context.laneLabel));
     addViewEdge(edges, {
       id: `view-edge:${script.id}:${commandId}`,
       sourceId: script.id,
@@ -431,6 +474,9 @@ export function projectCommand(store: AnalyzerProjectStore, requestedEntryScript
         executionRank: context.executionRank + 1,
         executionDepth: context.executionDepth + 1,
         branchPath: `${context.branchPath}.${index + 1}`,
+        ...(context.laneId
+          ? { laneId: context.laneId, ...(context.laneLabel ? { laneLabel: context.laneLabel } : {}) }
+          : { laneId: `command-lane:${commandId}:${index + 1}`, laneLabel: commandBranchLabel(child, index) }),
       }));
       return;
     }
@@ -456,6 +502,7 @@ export function projectCommand(store: AnalyzerProjectStore, requestedEntryScript
         executionRank: context.executionRank + 1,
         executionDepth: context.executionDepth + 1,
         branchPath: context.branchPath,
+        ...commandLaneMetadata(context),
       });
       return;
     }
@@ -471,6 +518,7 @@ export function projectCommand(store: AnalyzerProjectStore, requestedEntryScript
           executionRank: context.executionRank + 1,
           executionDepth: context.executionDepth + 1,
           branchPath: context.branchPath,
+          ...commandLaneMetadata(context),
         });
       }
       addViewEdge(edges, {
@@ -494,14 +542,11 @@ export function projectCommand(store: AnalyzerProjectStore, requestedEntryScript
     visited.add(script.id);
     active.add(script.id);
     addFactNode(script, 'command:scripts', undefined, context);
-    const packageFact = packages.find((fact) => fact.id === script.packageId);
-    if (packageFact) {
-      addFactNode(packageFact, 'command:packages', undefined, context);
-    }
     parseCommandExpression(script.command).forEach((fragment, index) => addFragment(script, fragment, undefined, {
       executionRank: context.executionRank + 1 + index,
       executionDepth: context.executionDepth + 1,
       branchPath: `${context.branchPath}.${index + 1}`,
+      ...commandLaneMetadata(context),
     }));
     active.delete(script.id);
   };
@@ -514,7 +559,7 @@ export function projectCommand(store: AnalyzerProjectStore, requestedEntryScript
       subtitle: entry.packageName,
       clusterId: 'command:user',
       evidenceIds: entry.evidenceIds,
-      metadata: { commandType: 'user-command', scriptId: entry.id, executionRank: 0, executionDepth: 0, branchPath: 'root' },
+      metadata: { commandType: 'user-command', scriptId: entry.id, packagePath: entry.packagePath, packageName: entry.packageName, executionRank: 0, executionDepth: 0, branchPath: 'root' },
     };
     nodes.set(entryNode.id, entryNode);
     addViewEdge(edges, {
@@ -529,12 +574,53 @@ export function projectCommand(store: AnalyzerProjectStore, requestedEntryScript
     buildScript(entry, { executionRank: 1, executionDepth: 1, branchPath: 'root' });
   }
 
-  const nodeList = [...nodes.values()];
+  const rawNodeList = [...nodes.values()];
+  const laneGroups = new Map<string, AnalyzerViewNode[]>();
+  rawNodeList.forEach((node) => {
+    const laneId = node.metadata.laneId;
+    if (typeof laneId !== 'string') return;
+    const laneNodes = laneGroups.get(laneId) ?? [];
+    laneNodes.push(node);
+    laneGroups.set(laneId, laneNodes);
+  });
+  const laneSummaries = [...laneGroups.entries()].map(([laneId, laneNodes]) => {
+    const laneLabel = laneNodes.find((node) => typeof node.metadata.laneLabel === 'string')?.metadata.laneLabel;
+    const executionRank = Math.min(...laneNodes.map((node) => typeof node.metadata.executionRank === 'number' ? node.metadata.executionRank : Number.MAX_SAFE_INTEGER));
+    const summary = summaryNode(
+      `command:lane:${laneId}`,
+      typeof laneLabel === 'string' ? laneLabel : laneId,
+      `${laneNodes.length} steps · expand for details`,
+      'command',
+      'command:commands',
+      laneNodes,
+    );
+    return {
+      ...summary,
+      metadata: {
+        ...summary.metadata,
+        commandType: 'branch-summary',
+        laneId,
+        ...(typeof laneLabel === 'string' ? { laneLabel } : {}),
+        stepCount: laneNodes.length,
+        executionRank,
+        branchPath: `lane:${laneId}`,
+      },
+    };
+  });
+  const summaryIdByLane = new Map(laneSummaries.flatMap((summary) => {
+    const laneId = summary.metadata.laneId;
+    return typeof laneId === 'string' ? [[laneId, summary.id] as const] : [];
+  }));
+  const presentedNodeList = rawNodeList.map((node) => {
+    const laneId = node.metadata.laneId;
+    const parentId = typeof laneId === 'string' ? summaryIdByLane.get(laneId) : undefined;
+    return parentId ? { ...node, presentation: { role: 'detail' as const, parentId } } : node;
+  });
+  const nodeList = [...presentedNodeList, ...laneSummaries];
   const clusterDefinitions = [
     ['command:user', 'User Command', 'warm'],
     ['command:scripts', 'Package Scripts', 'accent'],
     ['command:commands', 'Commands / CLI', 'cool'],
-    ['command:packages', 'Workspace Packages', 'neutral'],
   ] as const;
   if (!entry) warnings.set('command:no-entry', { id: 'command:no-entry', message: 'No package script is available for Command Flow', severity: 'warning', detectorId: 'command' });
   return {
@@ -562,7 +648,7 @@ export function projectDependencies(store: AnalyzerProjectStore): AnalyzerViewMo
   const nodes = externalNodes.length > 0
     ? [
         ...markPresentationChildren(baseNodes, externalSummaryId, new Set(externalNodes.map((node) => node.id))),
-        summaryNode(externalSummaryId, 'External Packages', `${externalNodes.length} packages · expand for details`, 'external-package', 'dependencies:external', externalNodes),
+        summaryNode(externalSummaryId, 'External Packages', `${externalNodes.length} packages`, 'external-package', 'dependencies:external', externalNodes),
       ]
     : baseNodes;
   const dependencyEdges = edgesForRelations(store, baseNodes, (relation) => relation.kind === 'depends-on');
@@ -599,7 +685,7 @@ export function projectDependencies(store: AnalyzerProjectStore): AnalyzerViewMo
   const clusterDefinitions = [
     ['dependencies:packages', 'Workspace Packages', 'neutral'],
     ['dependencies:technology', 'Recognized Technology', 'accent'],
-    ['dependencies:external', 'External Packages', 'cool'],
+    ['dependencies:external', `External Packages · ${externalNodes.length}`, 'cool'],
   ] as const;
   return {
     view: 'dependencies',

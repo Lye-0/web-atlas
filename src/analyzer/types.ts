@@ -252,6 +252,7 @@ export interface AnalyzerNodePresentation {
   role?: 'summary' | 'detail';
   parentId?: string;
   childNodeIds?: string[];
+  hideWhenExpanded?: boolean;
 }
 
 export interface AnalyzerViewEdge {
@@ -269,6 +270,13 @@ export interface AnalyzerEdgePresentation {
   parentId?: string;
   initiallyHidden?: boolean;
   displayKind?: 'bundle';
+  emphasis?: 'primary' | 'secondary' | 'deep';
+}
+
+export interface AnalyzerViewCounts {
+  visibleNodes: number;
+  totalNodes: number;
+  hiddenNodes: number;
 }
 
 export interface AnalyzerCluster {
@@ -283,6 +291,7 @@ export interface AnalyzerViewModel {
   nodes: AnalyzerViewNode[];
   edges: AnalyzerViewEdge[];
   clusters: AnalyzerCluster[];
+  counts?: AnalyzerViewCounts;
   evidence: AnalyzerEvidence[];
   warnings: AnalyzerWarning[];
   entryScriptId?: string;

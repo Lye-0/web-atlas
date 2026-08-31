@@ -1,4 +1,4 @@
-import type { AnalyzerViewEdge, AnalyzerViewModel, AnalyzerViewNode } from './types';
+import type { AnalyzerViewEdge, AnalyzerViewCounts, AnalyzerViewModel, AnalyzerViewNode } from './types';
 
 export interface AnalyzerPresentationOptions {
   expandedPresentationIds: ReadonlySet<string>;
@@ -15,6 +15,16 @@ export function nodeMatchesSearch(node: AnalyzerViewNode, search: string): boole
     .join(' ')
     .toLowerCase();
   return haystack.includes(search.trim().toLowerCase());
+}
+
+export function analyzerViewCounts(view: AnalyzerViewModel, visibleNodes: AnalyzerViewNode[] = view.nodes): AnalyzerViewCounts {
+  const totalNodes = view.nodes.filter((node) => node.presentation?.role !== 'summary').length;
+  const visibleNodeCount = Math.min(totalNodes, visibleNodes.length);
+  return {
+    visibleNodes: visibleNodeCount,
+    totalNodes,
+    hiddenNodes: Math.max(0, totalNodes - visibleNodeCount),
+  };
 }
 
 export function presentAnalyzerView(view: AnalyzerViewModel, options: AnalyzerPresentationOptions): AnalyzerViewModel {
@@ -36,6 +46,10 @@ export function presentAnalyzerView(view: AnalyzerViewModel, options: AnalyzerPr
 
   const presentationVisibleIds = new Set<string>();
   view.nodes.forEach((node) => {
+    if (node.presentation?.role === 'summary'
+      && node.presentation.hideWhenExpanded
+      && expandedGroupIds.has(node.id)
+      && options.selectedNodeId !== node.id) return;
     const parentId = node.presentation?.parentId;
     if (!parentId) {
       presentationVisibleIds.add(node.id);
@@ -87,6 +101,7 @@ export function presentAnalyzerView(view: AnalyzerViewModel, options: AnalyzerPr
     ...view,
     nodes: visibleNodes,
     edges: [...resolvedEdges.values()],
+    counts: analyzerViewCounts(view, visibleNodes),
     clusters: view.clusters
       .map((cluster) => ({ ...cluster, nodeIds: cluster.nodeIds.filter((nodeId) => visibleIds.has(nodeId)) }))
       .filter((cluster) => cluster.nodeIds.length > 0),

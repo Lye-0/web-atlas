@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { displayDictionaryStack, factDictionaryStackId, factForNode, nodeTypeLabels } from '../../analyzer';
+import { displayDictionaryStack, factDictionaryStackId, factForNode, nodeTypeLabels, relationLabelForNode } from '../../analyzer';
 import type { AnalyzerProjectStore, AnalyzerViewEdge, AnalyzerViewModel, AnalyzerViewNode } from '../../analyzer';
 import { stackPath } from '../../utils/routes';
 import { EvidenceCodeBlock } from './EvidenceCodeBlock';
@@ -39,7 +39,7 @@ function RelationList({ nodeId, view, onSelectNode }: { nodeId: string; view: An
         return (
           <li key={relation.id}>
             <button type="button" onClick={() => onSelectNode(target.id, true)}>
-              <span>{relation.label}</span>
+              <span>{relationLabelForNode(relation, nodeId)}</span>
               <strong>{target.label}</strong>
             </button>
           </li>

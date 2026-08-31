@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { projectAnalyzerView, viewNodeSearchText, analyzerViewLabels } from '../analyzer';
-import type { AnalyzerProjectStore, AnalyzerViewId } from '../analyzer';
+import { analyzerViewCounts, presentAnalyzerView, projectAnalyzerView, viewNodeSearchText, analyzerViewLabels } from '../analyzer';
+import type { AnalyzerProjectStore, AnalyzerViewCounts, AnalyzerViewId, AnalyzerViewModel } from '../analyzer';
 import { AnalyzerDetailPanel } from '../components/analyzer/AnalyzerDetailPanel';
 import { AnalyzerEmptyOrbit } from '../components/analyzer/AnalyzerEmptyOrbit';
 import { AnalyzerGraphStage } from '../components/analyzer/AnalyzerGraphStage';
@@ -28,6 +28,7 @@ export function AnalyzerPage() {
   const [scanVersion, setScanVersion] = useState(0);
   const [focusRequest, setFocusRequest] = useState<{ nodeId: string; nonce: number }>();
   const [detailOpen, setDetailOpen] = useState(false);
+  const [reportedCounts, setReportedCounts] = useState<{ model: AnalyzerViewModel; counts: AnalyzerViewCounts }>();
 
   const model = useMemo(() => store ? projectAnalyzerView(store, view, entryScriptId) : undefined, [entryScriptId, store, view]);
   const scripts = useMemo(() => store?.facts.filter((fact) => fact.kind === 'package-script') ?? [], [store]);
@@ -37,6 +38,13 @@ export function AnalyzerPage() {
     return model.nodes.filter((node) => viewNodeSearchText(node).includes(search.trim().toLowerCase())).slice(0, 8);
   }, [model, search]);
 
+  const fallbackCounts = useMemo(() => {
+    if (!model) return { visibleNodes: 0, totalNodes: 0, hiddenNodes: 0 };
+    const presented = presentAnalyzerView(model, { expandedPresentationIds: new Set(), filter, search, selectedEdgeId, selectedNodeId, showExternal });
+    return presented.counts ?? analyzerViewCounts(model);
+  }, [filter, model, search, selectedEdgeId, selectedNodeId, showExternal]);
+  const nodeCounts = reportedCounts && reportedCounts.model === model ? reportedCounts.counts : fallbackCounts;
+
   useEffect(() => {
     setSelectedNodeId(undefined);
     setSelectedEdgeId(undefined);
@@ -45,6 +53,7 @@ export function AnalyzerPage() {
     setShowExternal(false);
     setFocusRequest(undefined);
     setDetailOpen(false);
+    setReportedCounts(undefined);
   }, [view]);
 
   const handleScanned = (nextStore: AnalyzerProjectStore) => {
@@ -58,11 +67,22 @@ export function AnalyzerPage() {
     setShowExternal(false);
     setFocusRequest(undefined);
     setDetailOpen(false);
+    setReportedCounts(undefined);
   };
 
   const requestFocus = useCallback((nodeId: string) => {
     setFocusRequest((current) => ({ nodeId, nonce: (current?.nonce ?? 0) + 1 }));
   }, []);
+
+  const reportCounts = useCallback((counts: AnalyzerViewCounts) => {
+    if (!model) return;
+    setReportedCounts((current) => current?.model === model
+      && current.counts.visibleNodes === counts.visibleNodes
+      && current.counts.totalNodes === counts.totalNodes
+      && current.counts.hiddenNodes === counts.hiddenNodes
+      ? current
+      : { model, counts });
+  }, [model]);
 
   const selectNode = useCallback((nodeId: string, focus = false) => {
     setSelectedNodeId(nodeId);
@@ -155,7 +175,7 @@ export function AnalyzerPage() {
             scripts={scripts}
             entryScriptId={effectiveEntryScriptId}
             onEntryChange={setEntryScriptId}
-            nodes={model.nodes}
+            counts={nodeCounts}
           />
 
           {searchResults.length > 0 && (
@@ -186,6 +206,7 @@ export function AnalyzerPage() {
               onSelectEdge={selectEdge}
               focusRequest={focusRequest}
               cameraResetKey={scanVersion}
+              onCountsChange={reportCounts}
             />
             {detailOpen && (
               <AnalyzerDetailPanel

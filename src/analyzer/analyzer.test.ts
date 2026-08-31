@@ -9,6 +9,7 @@ import { scanProjectFiles } from './scan';
 import { packageIdForPath, scriptIdFor, type AnalyzerSourceFile } from './types';
 import { ANALYZER_NEAR_NODE_HEIGHT, ANALYZER_NODE_HEIGHT, layoutAnalyzerView } from './layout';
 import { fitAnalyzerTransform, focusAnalyzerTransform } from './camera';
+import { analyzerRelationInverseLabels, relationLabelForNode } from './relations';
 import { ANALYZER_FAR_ZOOM_THRESHOLD, ANALYZER_NEAR_ZOOM_THRESHOLD, displayedZoomLevelForNode, semanticZoomLevelForScale } from './zoom';
 
 function fixtureFile(relativePath: string, source: string): AnalyzerSourceFile {
@@ -223,6 +224,35 @@ describe('Analyzer semantic zoom and layout', () => {
   });
 });
 
+describe('Analyzer relation presentation', () => {
+  it('keeps forward labels and presents inverse labels from the selected target perspective', () => {
+    const edge = {
+      id: 'edge:depends-on',
+      sourceId: 'package:api',
+      targetId: 'external-package:aws4fetch',
+      kind: 'depends-on' as const,
+      label: 'depends-on',
+      evidenceIds: [],
+      metadata: {},
+    };
+
+    expect(relationLabelForNode(edge, 'package:api')).toBe('depends-on');
+    expect(relationLabelForNode(edge, 'external-package:aws4fetch')).toBe('used-by');
+    expect(analyzerRelationInverseLabels).toMatchObject({
+      contains: 'contained-by',
+      uses: 'used-by',
+      'binds-to': 'bound-from',
+      'uses-config': 'config-for',
+      declares: 'declared-by',
+      matches: 'matched-by',
+      'depends-on': 'used-by',
+      starts: 'started-by',
+      executes: 'executed-by',
+      'resolves-to': 'resolved-from',
+    });
+  });
+});
+
 describe('Analyzer scan and projectors', () => {
   it('builds local facts, direct dependency relations, Dictionary matches, and masked sources', async () => {
     const store = await scanProjectFiles(analyzerFixture());
@@ -270,6 +300,7 @@ describe('Analyzer scan and projectors', () => {
     expect(command.nodes.some((node) => node.label === 'pnpm exec vite')).toBe(true);
     expect(command.edges.some((edge) => edge.kind === 'starts' && edge.targetId === 'technology:vite')).toBe(true);
     expect(command.edges.some((edge) => edge.kind === 'runs-in')).toBe(false);
+    expect(command.nodes.some((node) => node.id === 'package:apps/web')).toBe(false);
     expect(command.evidence.length).toBeGreaterThan(store.evidence.length);
   });
 
@@ -286,28 +317,37 @@ describe('Analyzer scan and projectors', () => {
     expect(collapsed.nodes.map((node) => node.id)).toContain('dependencies:external:summary');
     expect(collapsed.nodes.map((node) => node.id)).not.toContain('external-package:mystery-lib');
     expect(expanded.nodes.map((node) => node.id)).toContain('external-package:mystery-lib');
+    expect(expanded.nodes.map((node) => node.id)).not.toContain('dependencies:external:summary');
     expect(collapsedAgain.nodes.map((node) => node.id)).not.toContain('external-package:mystery-lib');
     expect(searchRevealed.nodes.map((node) => node.id)).toContain('external-package:mystery-lib');
     expect(collapsed.edges.some((edge) => edge.targetId === 'dependencies:external:summary')).toBe(true);
     expect(collapsed.edges.some((edge) => edge.presentation?.displayKind === 'bundle')).toBe(true);
     expect(expanded.edges.some((edge) => edge.targetId === 'external-package:mystery-lib')).toBe(true);
     expect(expanded.edges.some((edge) => edge.presentation?.displayKind === 'bundle')).toBe(false);
+    expect(expanded.counts?.visibleNodes).toBe(expanded.counts?.totalNodes);
   });
 
   it('keeps Architecture Overview concise while retaining expandable detail Facts', async () => {
     const store = await scanProjectFiles(analyzerFixture());
     const architecture = projectArchitecture(store);
     const desktopSummary = architecture.nodes.find((node) => node.id === 'architecture:desktop:summary');
+    const workspaceSummary = architecture.nodes.find((node) => node.id === 'architecture:workspace:summary');
     const technologySummary = architecture.nodes.find((node) => node.id === 'architecture:technology:summary');
 
     expect(desktopSummary).toMatchObject({ label: '.NET / WPF', presentation: { role: 'summary' } });
     expect(desktopSummary?.presentation?.childNodeIds).toHaveLength(2);
     expect(architecture.nodes.filter((node) => node.presentation?.parentId === desktopSummary?.id)).toHaveLength(2);
+    expect(workspaceSummary).toMatchObject({ label: 'Shared Workspace', presentation: { role: 'summary' } });
+    expect(workspaceSummary?.presentation?.childNodeIds).toEqual(expect.arrayContaining(['package:.', 'package:packages/shared']));
     expect(technologySummary).toMatchObject({ label: 'Technology details', presentation: { role: 'summary' } });
     expect(architecture.edges.some((edge) => edge.presentation?.parentId === technologySummary?.id && edge.presentation?.initiallyHidden)).toBe(true);
     const presented = presentAnalyzerView(architecture, { expandedPresentationIds: new Set(), filter: 'all', search: '', showExternal: false });
     expect(presented.edges.some((edge) => edge.sourceId === 'project:root' && edge.targetId === 'technology:pnpm')).toBe(false);
     expect(presented.edges.some((edge) => edge.presentation?.displayKind === 'bundle' && edge.targetId === technologySummary?.id)).toBe(true);
+    expect(presented.counts).toEqual({ visibleNodes: 12, totalNodes: 15, hiddenNodes: 3 });
+    expect(presented.edges).toHaveLength(19);
+    expect(fitAnalyzerTransform(layoutAnalyzerView(presented), 1000, 600).scale).toBeGreaterThan(0.6);
+    expect(architecture.edges.some((edge) => edge.sourceId === 'project:root' && edge.targetId.startsWith('technology:') && edge.presentation?.emphasis === 'deep')).toBe(true);
   });
 
   it('places Command Flow by execution rank and keeps concurrently branches on one stage', async () => {
@@ -336,6 +376,26 @@ describe('Analyzer scan and projectors', () => {
         const target = layout.nodes.find((candidate) => candidate.node.id === edge.targetId);
         if (source && target) expect(source.x).toBeLessThan(target.x);
       });
+  });
+
+  it('collapses command branches into readable lanes and expands only the selected branch', async () => {
+    const store = await scanProjectFiles(analyzerFixture());
+    const command = projectCommand(store);
+    const options = { expandedPresentationIds: new Set<string>(), filter: 'all', search: '', showExternal: false };
+    const collapsed = presentAnalyzerView(command, options);
+    const branchSummaries = collapsed.nodes.filter((node) => node.presentation?.role === 'summary' && node.metadata.commandType === 'branch-summary');
+    const webBranch = branchSummaries.find((node) => node.label === 'WEB');
+    const expanded = webBranch
+      ? presentAnalyzerView(command, { ...options, expandedPresentationIds: new Set([webBranch.id]) })
+      : collapsed;
+    expect(branchSummaries).toHaveLength(2);
+    expect(webBranch).toBeDefined();
+    expect(collapsed.nodes.some((node) => node.label === 'pnpm exec vite')).toBe(false);
+    expect(collapsed.counts).toEqual({ visibleNodes: 5, totalNodes: 10, hiddenNodes: 5 });
+    expect(layoutAnalyzerView(collapsed).lanes).toHaveLength(2);
+    expect(expanded.nodes.some((node) => node.label === 'pnpm exec vite')).toBe(true);
+    expect(expanded.nodes.some((node) => node.id === webBranch?.id)).toBe(false);
+    expect(expanded.counts?.hiddenNodes).toBeLessThan(collapsed.counts?.hiddenNodes ?? 0);
   });
 
   it('warns on recursive package scripts while retaining the cycle edge', async () => {

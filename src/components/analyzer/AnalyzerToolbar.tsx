@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { analyzerRoutes } from '../../utils/routes';
-import { analyzerViewLabels, type AnalyzerViewId, type AnalyzerViewNode, type PackageScriptFact } from '../../analyzer';
+import { analyzerViewLabels, type AnalyzerViewCounts, type AnalyzerViewId, type PackageScriptFact } from '../../analyzer';
 
 export type AnalyzerFilter = 'all' | 'application' | 'workspace-package' | 'workspace-config' | 'workspace-pattern' | 'package-script' | 'command' | 'technology' | 'runtime' | 'resource' | 'dotnet-project' | 'external-package';
 
@@ -15,7 +15,7 @@ interface AnalyzerToolbarProps {
   scripts: PackageScriptFact[];
   entryScriptId?: string;
   onEntryChange: (value: string) => void;
-  nodes: AnalyzerViewNode[];
+  counts: AnalyzerViewCounts;
 }
 
 const viewPaths: Record<AnalyzerViewId, string> = analyzerRoutes;
@@ -40,7 +40,6 @@ function filterOptions(view: AnalyzerViewId): Array<{ value: AnalyzerFilter; lab
     { value: 'all', label: 'すべてのNode' },
     { value: 'package-script', label: 'Scripts' },
     { value: 'command', label: 'Commands / CLI' },
-    { value: 'workspace-package', label: 'Packages' },
     { value: 'technology', label: 'Technology' },
     { value: 'runtime', label: 'Runtime / Platform' },
   ];
@@ -63,7 +62,7 @@ export function AnalyzerToolbar({
   scripts,
   entryScriptId,
   onEntryChange,
-  nodes,
+  counts,
 }: AnalyzerToolbarProps) {
   const options = filterOptions(view);
   return (
@@ -108,10 +107,12 @@ export function AnalyzerToolbar({
         )}
         {view === 'dependencies' && (
           <button type="button" className={`analyzer-quiet-button${showExternal ? ' is-active' : ''}`} onClick={onToggleExternal}>
-            {showExternal ? 'Externalを折りたたむ' : 'Externalを表示'}
+            {showExternal ? 'Externalを折りたたむ' : 'Externalを展開'}
           </button>
         )}
-        <span className="analyzer-node-count">{nodes.length} nodes</span>
+        <span className="analyzer-node-count" aria-label={`${counts.visibleNodes} visible nodes, ${counts.totalNodes} total nodes`}>
+          {counts.visibleNodes} visible · {counts.totalNodes} total
+        </span>
       </div>
     </div>
   );

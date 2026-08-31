@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
-import { ANALYZER_DEFAULT_TRANSFORM, ANALYZER_NODE_WIDTH, displayedZoomLevelForNode, fitAnalyzerTransform, focusAnalyzerTransform, layoutAnalyzerView, nodeMatchesSearch, presentAnalyzerView, semanticZoomLevelForScale, type AnalyzerGraphTransform, type AnalyzerViewEdge, type AnalyzerViewModel, type PositionedNode } from '../../analyzer';
+import { ANALYZER_DEFAULT_TRANSFORM, ANALYZER_NODE_WIDTH, displayedZoomLevelForNode, fitAnalyzerTransform, focusAnalyzerTransform, layoutAnalyzerView, nodeMatchesSearch, presentAnalyzerView, semanticZoomLevelForScale, type AnalyzerGraphTransform, type AnalyzerViewCounts, type AnalyzerViewEdge, type AnalyzerViewModel, type PositionedNode } from '../../analyzer';
 import { nodeTypeLabels } from '../../analyzer';
 import { EvidencePreview } from './EvidenceCodeBlock';
 
@@ -18,6 +18,7 @@ interface AnalyzerGraphStageProps {
   onSelectEdge: (edgeId: string) => void;
   focusRequest?: { nodeId: string; nonce: number };
   cameraResetKey: string | number;
+  onCountsChange: (counts: AnalyzerViewCounts) => void;
 }
 
 type GraphTransform = AnalyzerGraphTransform;
@@ -52,6 +53,13 @@ function evidenceHint(node: AnalyzerViewModel['nodes'][number], view: AnalyzerVi
   return evidence ? `${evidence.filePath}:${evidence.contextStartLine}` : undefined;
 }
 
+function summarySubtitle(node: AnalyzerViewModel['nodes'][number], expanded: boolean): string | undefined {
+  if (!node.subtitle) return undefined;
+  if (/· expand for details$/.test(node.subtitle)) return expanded ? node.subtitle.replace(/· expand for details$/, '· expanded · Collapse') : node.subtitle;
+  if (/· expanded(?: · Collapse)?$/.test(node.subtitle)) return expanded ? node.subtitle : node.subtitle.replace(/· expanded(?: · Collapse)?$/, '· expand for details');
+  return `${node.subtitle} · ${expanded ? 'expanded · Collapse' : 'expand for details'}`;
+}
+
 export function AnalyzerGraphStage({
   view,
   selectedNodeId,
@@ -67,6 +75,7 @@ export function AnalyzerGraphStage({
   sources,
   focusRequest,
   cameraResetKey,
+  onCountsChange,
 }: AnalyzerGraphStageProps) {
   const stageRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ pointerId: number; startX: number; startY: number; originX: number; originY: number; moved: boolean; background: boolean } | undefined>(undefined);
@@ -105,6 +114,9 @@ export function AnalyzerGraphStage({
   const filteredView = useMemo<AnalyzerViewModel>(() => {
     return presentAnalyzerView(view, { expandedPresentationIds, filter, search, selectedEdgeId, selectedNodeId, showExternal });
   }, [expandedPresentationIds, filter, search, selectedEdgeId, selectedNodeId, showExternal, view]);
+  useEffect(() => {
+    if (filteredView.counts) onCountsChange(filteredView.counts);
+  }, [filteredView.counts, onCountsChange]);
   const baseLayout = useMemo(() => layoutAnalyzerView(filteredView), [filteredView]);
   const zoomLevel = semanticZoomLevelForScale(transform.scale);
   const expandedNodeKey = useMemo(() => {
@@ -171,11 +183,26 @@ export function AnalyzerGraphStage({
     const previous = previousViewportRef.current;
     previousViewportRef.current = viewportSize;
     if (!cameraRef.current.initialized || previous.width <= 0 || previous.height <= 0) return;
-    const deltaX = (viewportSize.width - previous.width) / 2;
     const deltaY = (viewportSize.height - previous.height) / 2;
-    if (deltaX === 0 && deltaY === 0) return;
-    setTransform((current) => ({ ...current, x: current.x + deltaX, y: current.y + deltaY }));
-  }, [viewportSize]);
+    if (viewportSize.width === previous.width && deltaY === 0) return;
+    const selectedPosition = selectedNodeId ? positionedById.get(selectedNodeId) : undefined;
+    setTransform((current) => {
+      let deltaX = (viewportSize.width - previous.width) / 2;
+      if (selectedPosition) {
+        const selectedScreenX = current.x + (selectedPosition.x + ANALYZER_NODE_WIDTH / 2) * current.scale;
+        const safeInset = 36;
+        const minimum = safeInset;
+        const maximum = Math.max(minimum, viewportSize.width - safeInset);
+        deltaX = selectedScreenX > maximum
+          ? maximum - selectedScreenX
+          : selectedScreenX < minimum
+            ? minimum - selectedScreenX
+            : 0;
+      }
+      if (deltaX === 0 && deltaY === 0) return current;
+      return { ...current, x: current.x + deltaX, y: current.y + deltaY };
+    });
+  }, [positionedById, selectedNodeId, viewportSize]);
 
   useLayoutEffect(() => {
     const element = stageRef.current;
@@ -297,8 +324,10 @@ export function AnalyzerGraphStage({
       || (target.node.clusterId && selectionContext.contextClusterIds.has(target.node.clusterId)),
     );
     const dimmed = Boolean((selectedNodeId || selectedEdgeId) && !selected && !connected && !inContext);
+    const contextual = Boolean((selectedNodeId || selectedEdgeId) && !selected && !connected && inContext);
+    const emphasis = edge.presentation?.emphasis;
     return (
-      <g key={edge.id} className={`analyzer-edge-group${selected ? ' is-selected' : ''}${connected ? ' is-connected' : ''}${edge.presentation?.displayKind === 'bundle' ? ' is-bundle' : ''}${dimmed ? ' is-dimmed' : ''}`}>
+      <g key={edge.id} className={`analyzer-edge-group${selected ? ' is-selected' : ''}${connected ? ' is-connected' : ''}${emphasis === 'secondary' ? ' is-secondary' : ''}${emphasis === 'deep' ? ' is-deep' : ''}${edge.presentation?.displayKind === 'bundle' ? ' is-bundle' : ''}${contextual ? ' is-context' : ''}${dimmed ? ' is-dimmed' : ''}`}>
         <path
           className="analyzer-edge-hit"
           d={edgePath(source, target)}
@@ -367,6 +396,11 @@ export function AnalyzerGraphStage({
                 <span>{cluster.label}</span>
               </section>
             ))}
+            {layout.lanes.map((lane) => (
+              <div key={lane.id} className="analyzer-command-lane" style={{ left: lane.x, top: lane.y, width: lane.width, height: lane.height }} aria-label={`${lane.label} execution lane`}>
+                <span>{lane.label}</span>
+              </div>
+            ))}
             <svg className="analyzer-edge-layer analyzer-edge-layer-base" width={layout.width} height={layout.height} viewBox={`0 0 ${layout.width} ${layout.height}`} aria-label="Graph relations">
               <defs>
                 <marker id="analyzer-edge-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth">
@@ -389,6 +423,7 @@ export function AnalyzerGraphStage({
               const inSelectionContext = selectionContext.contextNodeIds.has(node.id);
               const hasEvidencePreview = nodeZoom === 'near' && node.evidenceIds.length > 0 && (selected || hoveredNodeId === node.id);
               const compactEvidenceHint = zoomLevel === 'near' && node.evidenceIds.length > 0 && !hasEvidencePreview ? evidenceHint(node, view) : undefined;
+              const displayedSubtitle = summary ? summarySubtitle(node, summaryExpanded) : node.subtitle;
               const dimmed = Boolean(search.trim() && !matches && !selected) || Boolean((selectedNodeId || selectedEdgeId) && !selected && !inSelectionContext);
               return (
                 <div
@@ -413,7 +448,7 @@ export function AnalyzerGraphStage({
                 >
                   <span className="analyzer-node-type">{displayNodeType(node)}</span>
                   <strong>{node.label}</strong>
-                  {nodeZoom !== 'far' && node.subtitle && <span className="analyzer-node-subtitle">{node.subtitle}</span>}
+                  {nodeZoom !== 'far' && displayedSubtitle && <span className="analyzer-node-subtitle">{displayedSubtitle}</span>}
                   {compactEvidenceHint && <span className="analyzer-node-evidence-hint">Evidence · {compactEvidenceHint}</span>}
                   {nodeZoom === 'near' && node.evidenceIds.length > 0 && (
                     <div className="analyzer-node-evidence-preview">

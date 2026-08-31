@@ -6,7 +6,6 @@ export const ANALYZER_NEAR_NODE_HEIGHT = 236;
 
 const CLUSTER_WIDTH = 284;
 const CLUSTER_GAP = 36;
-const CLUSTER_ROW_GAP = 34;
 const NODE_GAP = 24;
 const TOP_PADDING = 62;
 const SIDE_PADDING = 28;
@@ -14,6 +13,11 @@ const COMMAND_COLUMN_GAP = 78;
 const COMMAND_ROW_GAP = 38;
 const COMMAND_TOP = 76;
 const DEPENDENCY_MAX_ROWS = 4;
+const ARCHITECTURE_NODE_HEIGHT = 86;
+const ARCHITECTURE_NODE_GAP = 10;
+const ARCHITECTURE_TOP_PADDING = 36;
+const ARCHITECTURE_BOTTOM_PADDING = 14;
+const ARCHITECTURE_CLUSTER_ROW_GAP = 16;
 
 export interface PositionedNode {
   node: AnalyzerViewNode;
@@ -32,11 +36,21 @@ export interface PositionedCluster {
   height: number;
 }
 
+export interface PositionedLane {
+  id: string;
+  label: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface AnalyzerLayout {
   width: number;
   height: number;
   nodes: PositionedNode[];
   clusters: PositionedCluster[];
+  lanes: PositionedLane[];
 }
 
 function clusterOrder(view: AnalyzerViewModel['view']): string[] {
@@ -79,6 +93,17 @@ function verticalClusterHeight(nodes: AnalyzerViewNode[], expandedNodeIds: Reado
   return TOP_PADDING + 20 + nodes.reduce((total, node) => total + nodeHeight(node, expandedNodeIds), 0) + Math.max(0, nodes.length - 1) * NODE_GAP;
 }
 
+function architectureNodeHeight(node: AnalyzerViewNode, expandedNodeIds: ReadonlySet<string>): number {
+  return expandedNodeIds.has(node.id) ? ANALYZER_NEAR_NODE_HEIGHT : ARCHITECTURE_NODE_HEIGHT;
+}
+
+function architectureClusterHeight(nodes: AnalyzerViewNode[], expandedNodeIds: ReadonlySet<string>): number {
+  return ARCHITECTURE_TOP_PADDING
+    + nodes.reduce((total, node) => total + architectureNodeHeight(node, expandedNodeIds), 0)
+    + Math.max(0, nodes.length - 1) * ARCHITECTURE_NODE_GAP
+    + ARCHITECTURE_BOTTOM_PADDING;
+}
+
 function layoutColumnClusters(view: AnalyzerViewModel, expandedNodeIds: ReadonlySet<string>): AnalyzerLayout {
   const positionedNodes: PositionedNode[] = [];
   const positionedClusters: PositionedCluster[] = [];
@@ -101,16 +126,16 @@ function layoutColumnClusters(view: AnalyzerViewModel, expandedNodeIds: Readonly
   });
 
   const width = Math.max(900, SIDE_PADDING * 2 + Math.max(1, positionedClusters.length) * CLUSTER_WIDTH + Math.max(0, positionedClusters.length - 1) * CLUSTER_GAP);
-  return { width, height: maxHeight, nodes: positionedNodes, clusters: positionedClusters };
+  return { width, height: maxHeight, nodes: positionedNodes, clusters: positionedClusters, lanes: [] };
 }
 
 function layoutArchitecture(view: AnalyzerViewModel, expandedNodeIds: ReadonlySet<string>): AnalyzerLayout {
   const clusters = clusterEntries(view);
-  const columnCount = Math.min(3, Math.max(1, clusters.length));
-  const heights = clusters.map((cluster) => verticalClusterHeight(nodesForCluster(view, cluster), expandedNodeIds));
-  const rowHeights = Array.from({ length: Math.ceil(clusters.length / columnCount) }, (_, row) => Math.max(...heights.slice(row * columnCount, (row + 1) * columnCount), 420));
+  const columnCount = Math.min(4, Math.max(1, clusters.length));
+  const heights = clusters.map((cluster) => architectureClusterHeight(nodesForCluster(view, cluster), expandedNodeIds));
+  const rowHeights = Array.from({ length: Math.ceil(clusters.length / columnCount) }, (_, row) => Math.max(...heights.slice(row * columnCount, (row + 1) * columnCount), 260));
   const rowY: number[] = [];
-  rowHeights.forEach((height, index) => rowY.push(20 + rowHeights.slice(0, index).reduce((total, rowHeight) => total + rowHeight + CLUSTER_ROW_GAP, 0)));
+  rowHeights.forEach((height, index) => rowY.push(20 + rowHeights.slice(0, index).reduce((total, rowHeight) => total + rowHeight + ARCHITECTURE_CLUSTER_ROW_GAP, 0)));
 
   const positionedNodes: PositionedNode[] = [];
   const positionedClusters: PositionedCluster[] = [];
@@ -121,18 +146,18 @@ function layoutArchitecture(view: AnalyzerViewModel, expandedNodeIds: ReadonlySe
     const row = Math.floor(clusterIndex / columnCount);
     const x = SIDE_PADDING + column * (CLUSTER_WIDTH + CLUSTER_GAP);
     const y = rowY[row] ?? 20;
-    let nodeY = y + TOP_PADDING;
+    let nodeY = y + ARCHITECTURE_TOP_PADDING;
     nodes.forEach((node) => {
-      const height = nodeHeight(node, expandedNodeIds);
+      const height = architectureNodeHeight(node, expandedNodeIds);
       positionedNodes.push({ node, x: x + 20, y: nodeY, height });
-      nodeY += height + NODE_GAP;
+      nodeY += height + ARCHITECTURE_NODE_GAP;
     });
     positionedClusters.push({ id: cluster.id, label: cluster.label, tone: cluster.tone, x, y, width: CLUSTER_WIDTH, height: heights[clusterIndex] ?? 420 });
   });
 
   const width = Math.max(900, SIDE_PADDING * 2 + columnCount * CLUSTER_WIDTH + Math.max(0, columnCount - 1) * CLUSTER_GAP);
   const height = Math.max(420, (rowY.at(-1) ?? 20) + (rowHeights.at(-1) ?? 420) + 40);
-  return { width, height, nodes: positionedNodes, clusters: positionedClusters };
+  return { width, height, nodes: positionedNodes, clusters: positionedClusters, lanes: [] };
 }
 
 function metadataNumber(node: AnalyzerViewNode, key: string): number | undefined {
@@ -179,11 +204,33 @@ function commandFlowLayout(view: AnalyzerViewModel, expandedNodeIds: ReadonlySet
 
   const width = Math.max(900, SIDE_PADDING * 2 + (maxRank + 1) * ANALYZER_NODE_WIDTH + maxRank * COMMAND_COLUMN_GAP);
   const height = Math.max(420, maxBottom + 38);
+  const laneGroups = new Map<string, PositionedNode[]>();
+  positionedNodes.forEach((positionedNode) => {
+    const laneId = positionedNode.node.metadata.laneId;
+    if (typeof laneId !== 'string') return;
+    const laneNodes = laneGroups.get(laneId) ?? [];
+    laneNodes.push(positionedNode);
+    laneGroups.set(laneId, laneNodes);
+  });
+  const lanes = [...laneGroups.entries()].map(([id, laneNodes]) => {
+    const label = laneNodes.find((positionedNode) => typeof positionedNode.node.metadata.laneLabel === 'string')?.node.metadata.laneLabel;
+    const top = Math.min(...laneNodes.map((positionedNode) => positionedNode.y));
+    const bottom = Math.max(...laneNodes.map((positionedNode) => positionedNode.y + positionedNode.height));
+    return {
+      id,
+      label: typeof label === 'string' ? label : id,
+      x: 20,
+      y: Math.max(46, top - 18),
+      width: Math.max(560, width - 40),
+      height: Math.max(52, bottom - Math.max(46, top - 18) + 36),
+    };
+  });
   return {
     width,
     height,
     nodes: positionedNodes,
-    clusters: [{ id: 'command:execution', label: 'Execution order', tone: 'neutral', x: 20, y: 20, width: Math.max(560, width - 40), height: height - 40 }],
+    clusters: [],
+    lanes,
   };
 }
 
@@ -213,7 +260,7 @@ function dependencyFlowLayout(view: AnalyzerViewModel, expandedNodeIds: Readonly
     maxHeight = Math.max(maxHeight, height + 40);
   });
 
-  return { width: Math.max(900, x - CLUSTER_GAP + SIDE_PADDING), height: maxHeight, nodes: positionedNodes, clusters: positionedClusters };
+  return { width: Math.max(900, x - CLUSTER_GAP + SIDE_PADDING), height: maxHeight, nodes: positionedNodes, clusters: positionedClusters, lanes: [] };
 }
 
 export function layoutAnalyzerView(view: AnalyzerViewModel, expandedNodeIds: ReadonlySet<string> = new Set()): AnalyzerLayout {
