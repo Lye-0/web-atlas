@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
-import { layoutAnalyzerView, ANALYZER_NODE_WIDTH, type AnalyzerLayout, type PositionedNode, semanticZoomLevelForScale, type AnalyzerZoomLevel, type AnalyzerViewModel } from '../../analyzer';
+import { layoutAnalyzerView, ANALYZER_NODE_WIDTH, type AnalyzerLayout, type PositionedNode, displayedZoomLevelForNode, nodeMatchesSearch, presentAnalyzerView, semanticZoomLevelForScale, type AnalyzerViewEdge, type AnalyzerViewModel } from '../../analyzer';
 import { nodeTypeLabels } from '../../analyzer';
 import { EvidencePreview } from './EvidenceCodeBlock';
 
@@ -10,6 +10,7 @@ interface AnalyzerGraphStageProps {
   filter: string;
   search: string;
   showExternal: boolean;
+  onToggleExternal: () => void;
   sources: Record<string, string>;
   onSelectNode: (nodeId: string) => void;
   onSelectEdge: (edgeId: string) => void;
@@ -21,12 +22,9 @@ interface GraphTransform {
   scale: number;
 }
 
-function nodeMatchesSearch(node: AnalyzerViewModel['nodes'][number], search: string): boolean {
-  if (!search.trim()) return true;
-  const haystack = [node.label, node.subtitle, ...Object.values(node.metadata).flatMap((value) => Array.isArray(value) ? value : value === undefined ? [] : [String(value)])]
-    .join(' ')
-    .toLowerCase();
-  return haystack.includes(search.trim().toLowerCase());
+function displayNodeType(node: AnalyzerViewModel['nodes'][number]): string {
+  const displayRole = node.metadata.displayRole;
+  return typeof displayRole === 'string' ? displayRole : nodeTypeLabels[node.type] ?? node.type;
 }
 
 function edgePath(source: PositionedNode, target: PositionedNode): string {
@@ -59,15 +57,10 @@ function nodeIsInViewport(positionedNode: PositionedNode, transform: GraphTransf
     && positionedNode.y + positionedNode.height > viewportTop;
 }
 
-function displayedZoomLevel(zoomLevel: AnalyzerZoomLevel, selected: boolean, expanded: boolean): AnalyzerZoomLevel {
-  if (selected || expanded) return 'near';
-  return zoomLevel === 'near' ? 'medium' : zoomLevel;
-}
-
 function fitTransform(layout: AnalyzerLayout, width: number, height: number): GraphTransform {
   const availableWidth = Math.max(240, width - 60);
   const availableHeight = Math.max(220, height - 100);
-  const scale = Math.max(0.38, Math.min(1, availableWidth / layout.width, availableHeight / layout.height));
+  const scale = Math.max(0.44, Math.min(1, availableWidth / layout.width, availableHeight / layout.height));
   return {
     scale,
     x: (width - layout.width * scale) / 2,
@@ -82,6 +75,7 @@ export function AnalyzerGraphStage({
   filter,
   search,
   showExternal,
+  onToggleExternal,
   onSelectNode,
   onSelectEdge,
   sources,
@@ -91,17 +85,30 @@ export function AnalyzerGraphStage({
   const [transform, setTransform] = useState<GraphTransform>({ x: 24, y: 24, scale: 0.7 });
   const [hoveredEdgeId, setHoveredEdgeId] = useState<string | undefined>();
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
+  const [expandedPresentationIds, setExpandedPresentationIds] = useState<ReadonlySet<string>>(new Set());
+
+  useEffect(() => {
+    setExpandedPresentationIds(new Set());
+  }, [view.view]);
+
+  const togglePresentation = useCallback((nodeId: string) => {
+    if (nodeId === 'dependencies:external:summary') {
+      onToggleExternal();
+      onSelectNode(nodeId);
+      return;
+    }
+    setExpandedPresentationIds((current) => {
+      const next = new Set(current);
+      if (next.has(nodeId)) next.delete(nodeId);
+      else next.add(nodeId);
+      return next;
+    });
+    onSelectNode(nodeId);
+  }, [onSelectNode, onToggleExternal]);
 
   const filteredView = useMemo<AnalyzerViewModel>(() => {
-    const visibleNodes = view.nodes.filter((node) => (filter === 'all' || node.type === filter) && (showExternal || node.type !== 'external-package'));
-    const visibleIds = new Set(visibleNodes.map((node) => node.id));
-    return {
-      ...view,
-      nodes: visibleNodes,
-      edges: view.edges.filter((edge) => visibleIds.has(edge.sourceId) && visibleIds.has(edge.targetId)),
-      clusters: view.clusters.map((cluster) => ({ ...cluster, nodeIds: cluster.nodeIds.filter((nodeId) => visibleIds.has(nodeId)) })).filter((cluster) => cluster.nodeIds.length > 0),
-    };
-  }, [filter, showExternal, view]);
+    return presentAnalyzerView(view, { expandedPresentationIds, filter, search, selectedEdgeId, selectedNodeId, showExternal });
+  }, [expandedPresentationIds, filter, search, selectedEdgeId, selectedNodeId, showExternal, view]);
   const baseLayout = useMemo(() => layoutAnalyzerView(filteredView), [filteredView]);
   const zoomLevel = semanticZoomLevelForScale(transform.scale);
   const expandedNodeKey = useMemo(() => {
@@ -120,14 +127,8 @@ export function AnalyzerGraphStage({
   const expandedNodeIds = useMemo(() => new Set(expandedNodeKey ? expandedNodeKey.split('\u0000') : []), [expandedNodeKey]);
   const layout = useMemo(() => layoutAnalyzerView(filteredView, expandedNodeIds), [expandedNodeIds, filteredView]);
   const positionedById = useMemo(() => new Map(layout.nodes.map((positionedNode) => [positionedNode.node.id, positionedNode])), [layout.nodes]);
-  const orderedEdges = useMemo(() => [...filteredView.edges].sort((first, second) => {
-    const edgeLayer = (edge: AnalyzerViewModel['edges'][number]) => {
-      if (edge.id === selectedEdgeId) return 2;
-      if (selectedNodeId && (edge.sourceId === selectedNodeId || edge.targetId === selectedNodeId)) return 1;
-      return 0;
-    };
-    return edgeLayer(first) - edgeLayer(second);
-  }), [filteredView.edges, selectedEdgeId, selectedNodeId]);
+  const foregroundEdges = useMemo(() => filteredView.edges.filter((edge) => edge.id === selectedEdgeId || Boolean(selectedNodeId && (edge.sourceId === selectedNodeId || edge.targetId === selectedNodeId))), [filteredView.edges, selectedEdgeId, selectedNodeId]);
+  const backgroundEdges = useMemo(() => filteredView.edges.filter((edge) => !foregroundEdges.includes(edge)), [filteredView.edges, foregroundEdges]);
 
   useEffect(() => {
     const element = stageRef.current;
@@ -220,6 +221,41 @@ export function AnalyzerGraphStage({
     return () => element.removeEventListener('wheel', handleNativeWheel);
   }, [zoomAtPoint]);
 
+  const renderEdge = (edge: AnalyzerViewEdge) => {
+    const source = positionedById.get(edge.sourceId);
+    const target = positionedById.get(edge.targetId);
+    if (!source || !target) return null;
+    const selected = edge.id === selectedEdgeId;
+    const connected = selectedNodeId ? edge.sourceId === selectedNodeId || edge.targetId === selectedNodeId : false;
+    const dimmed = Boolean((selectedNodeId || selectedEdgeId) && !selected && !connected);
+    return (
+      <g key={edge.id} className={`analyzer-edge-group${selected ? ' is-selected' : ''}${connected ? ' is-connected' : ''}${dimmed ? ' is-dimmed' : ''}`}>
+        <path
+          className="analyzer-edge-hit"
+          d={edgePath(source, target)}
+          markerEnd="url(#analyzer-edge-arrow)"
+          role="button"
+          tabIndex={0}
+          aria-label={`${edge.label}: ${source.node.label} to ${target.node.label}`}
+          onClick={() => onSelectEdge(edge.id)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              onSelectEdge(edge.id);
+            }
+          }}
+          onMouseEnter={() => setHoveredEdgeId(edge.id)}
+          onMouseLeave={() => setHoveredEdgeId(undefined)}
+        />
+        {(selected || hoveredEdgeId === edge.id) && (
+          <text className="analyzer-edge-label" x={(source.x + target.x) / 2 + ANALYZER_NODE_WIDTH / 2} y={(source.y + source.height / 2 + target.y + target.height / 2) / 2 - 8}>
+            {edge.label}
+          </text>
+        )}
+      </g>
+    );
+  };
+
   return (
     <div
       ref={stageRef}
@@ -248,71 +284,46 @@ export function AnalyzerGraphStage({
                 <span>{cluster.label}</span>
               </section>
             ))}
-            <svg className="analyzer-edge-layer" width={layout.width} height={layout.height} viewBox={`0 0 ${layout.width} ${layout.height}`} aria-label="Graph relations">
+            <svg className="analyzer-edge-layer analyzer-edge-layer-base" width={layout.width} height={layout.height} viewBox={`0 0 ${layout.width} ${layout.height}`} aria-label="Graph relations">
               <defs>
                 <marker id="analyzer-edge-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth">
                   <path d="M 0 0 L 8 4 L 0 8 z" fill="currentColor" />
                 </marker>
               </defs>
-              {orderedEdges.map((edge) => {
-                const source = positionedById.get(edge.sourceId);
-                const target = positionedById.get(edge.targetId);
-                if (!source || !target) return null;
-                const selected = edge.id === selectedEdgeId;
-                const connected = selectedNodeId ? edge.sourceId === selectedNodeId || edge.targetId === selectedNodeId : false;
-                const dimmed = Boolean((selectedNodeId || selectedEdgeId) && !selected && !connected);
-                return (
-                  <g key={edge.id} className={`analyzer-edge-group${selected ? ' is-selected' : ''}${connected ? ' is-connected' : ''}${dimmed ? ' is-dimmed' : ''}`}>
-                    <path
-                      className="analyzer-edge-hit"
-                      d={edgePath(source, target)}
-                      markerEnd="url(#analyzer-edge-arrow)"
-                      role="button"
-                      tabIndex={0}
-                      aria-label={`${edge.label}: ${source.node.label} to ${target.node.label}`}
-                      onClick={() => onSelectEdge(edge.id)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter' || event.key === ' ') {
-                          event.preventDefault();
-                          onSelectEdge(edge.id);
-                        }
-                      }}
-                      onMouseEnter={() => setHoveredEdgeId(edge.id)}
-                      onMouseLeave={() => setHoveredEdgeId(undefined)}
-                    />
-                    {(selected || hoveredEdgeId === edge.id) && (
-                      <text className="analyzer-edge-label" x={(source.x + target.x) / 2 + ANALYZER_NODE_WIDTH / 2} y={(source.y + source.height / 2 + target.y + target.height / 2) / 2 - 8}>
-                        {edge.label}
-                      </text>
-                    )}
-                  </g>
-                );
-              })}
+              {backgroundEdges.map(renderEdge)}
+            </svg>
+            <svg className="analyzer-edge-layer analyzer-edge-layer-foreground" width={layout.width} height={layout.height} viewBox={`0 0 ${layout.width} ${layout.height}`}>
+              {foregroundEdges.map(renderEdge)}
             </svg>
             {layout.nodes.map((positionedNode) => {
               const node = positionedNode.node;
               const matches = nodeMatchesSearch(node, search);
               const selected = node.id === selectedNodeId;
-              const nodeZoom = displayedZoomLevel(zoomLevel, selected, expandedNodeIds.has(node.id));
-              const dimmed = Boolean(search.trim() && !matches) || Boolean((selectedNodeId || selectedEdgeId) && !selected && !view.edges.some((edge) => (edge.id === selectedEdgeId || (selectedNodeId && (edge.sourceId === selectedNodeId || edge.targetId === selectedNodeId))) && (edge.sourceId === node.id || edge.targetId === node.id)));
+              const summary = node.presentation?.role === 'summary';
+              const summaryExpanded = expandedPresentationIds.has(node.id) || (node.id === 'dependencies:external:summary' && showExternal);
+              const nodeZoom = displayedZoomLevelForNode(zoomLevel, selected, expandedNodeIds.has(node.id));
+              const hasEvidencePreview = nodeZoom === 'near' && node.evidenceIds.length > 0;
+              const dimmed = Boolean(search.trim() && !matches) || Boolean((selectedNodeId || selectedEdgeId) && !selected && !filteredView.edges.some((edge) => (edge.id === selectedEdgeId || (selectedNodeId && (edge.sourceId === selectedNodeId || edge.targetId === selectedNodeId))) && (edge.sourceId === node.id || edge.targetId === node.id)));
               return (
                 <div
                   key={node.id}
-                  className={`analyzer-node node-type-${node.type} zoom-${nodeZoom}${selected ? ' is-selected' : ''}${matches && search.trim() ? ' is-match' : ''}${dimmed ? ' is-dimmed' : ''}`}
+                  className={`analyzer-node node-type-${node.type} zoom-${nodeZoom}${summary ? ' is-summary' : ''}${selected ? ' is-selected' : ''}${hasEvidencePreview ? ' has-evidence-preview' : ''}${matches && search.trim() ? ' is-match' : ''}${dimmed ? ' is-dimmed' : ''}`}
                   style={nodeStyle(positionedNode)}
-                  onClick={() => onSelectNode(node.id)}
+                  onClick={() => summary ? togglePresentation(node.id) : onSelectNode(node.id)}
                   onKeyDown={(event) => {
                     if (event.key === 'Enter' || event.key === ' ') {
                       event.preventDefault();
-                      onSelectNode(node.id);
+                      if (summary) togglePresentation(node.id);
+                      else onSelectNode(node.id);
                     }
                   }}
                   role="button"
                   tabIndex={0}
-                  aria-pressed={selected}
-                  aria-label={`${node.label}, ${nodeTypeLabels[node.type] ?? node.type}`}
+                  aria-pressed={summary ? undefined : selected}
+                  aria-expanded={summary ? summaryExpanded : undefined}
+                  aria-label={`${node.label}, ${displayNodeType(node)}${summary ? (summaryExpanded ? ', expanded' : ', collapsed') : ''}`}
                 >
-                  <span className="analyzer-node-type">{nodeTypeLabels[node.type] ?? node.type}</span>
+                  <span className="analyzer-node-type">{displayNodeType(node)}</span>
                   <strong>{node.label}</strong>
                   {nodeZoom !== 'far' && node.subtitle && <span className="analyzer-node-subtitle">{node.subtitle}</span>}
                   {nodeZoom === 'near' && node.evidenceIds.length > 0 && (

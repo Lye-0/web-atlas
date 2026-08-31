@@ -8,3 +8,8 @@ export function semanticZoomLevelForScale(scale: number): AnalyzerZoomLevel {
   if (scale > ANALYZER_NEAR_ZOOM_THRESHOLD) return 'near';
   return 'medium';
 }
+
+export function displayedZoomLevelForNode(zoomLevel: AnalyzerZoomLevel, selected: boolean, expanded: boolean): AnalyzerZoomLevel {
+  if (selected || expanded) return 'near';
+  return zoomLevel === 'near' ? 'medium' : zoomLevel;
+}

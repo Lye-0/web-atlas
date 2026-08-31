@@ -41,6 +41,8 @@ function filterOptions(view: AnalyzerViewId): Array<{ value: AnalyzerFilter; lab
     { value: 'package-script', label: 'Scripts' },
     { value: 'command', label: 'Commands / CLI' },
     { value: 'workspace-package', label: 'Packages' },
+    { value: 'technology', label: 'Technology' },
+    { value: 'runtime', label: 'Runtime / Platform' },
   ];
   return [
     { value: 'all', label: 'すべてのNode' },

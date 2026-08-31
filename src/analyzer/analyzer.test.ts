@@ -3,11 +3,12 @@ import { parseCommandExpression } from './commandParser';
 import { makeEvidence, positionAt } from './evidence';
 import { isAnalyzerSourcePath, isExcludedPath, sourceFilesFromInput } from './fileDiscovery';
 import { parseDotnetProject, parsePackageJson, parsePnpmWorkspace, parseWranglerConfig } from './parsers';
-import { projectCommand, projectDependencies, projectWorkspace } from './projectors';
+import { projectArchitecture, projectCommand, projectDependencies, projectWorkspace } from './projectors';
+import { presentAnalyzerView } from './presentation';
 import { scanProjectFiles } from './scan';
 import { packageIdForPath, scriptIdFor, type AnalyzerSourceFile } from './types';
 import { ANALYZER_NEAR_NODE_HEIGHT, ANALYZER_NODE_HEIGHT, layoutAnalyzerView } from './layout';
-import { ANALYZER_FAR_ZOOM_THRESHOLD, ANALYZER_NEAR_ZOOM_THRESHOLD, semanticZoomLevelForScale } from './zoom';
+import { ANALYZER_FAR_ZOOM_THRESHOLD, ANALYZER_NEAR_ZOOM_THRESHOLD, displayedZoomLevelForNode, semanticZoomLevelForScale } from './zoom';
 
 function fixtureFile(relativePath: string, source: string): AnalyzerSourceFile {
   return {
@@ -30,6 +31,7 @@ function analyzerFixture(): AnalyzerSourceFile[] {
     },
     dependencies: {
       react: '^19.1.0',
+      firebase: '^12.0.0',
       '@atlas/shared': 'workspace:*',
       'mystery-lib': '^1.0.0',
     },
@@ -171,6 +173,9 @@ describe('Analyzer semantic zoom and layout', () => {
     expect(semanticZoomLevelForScale(0.7)).toBe('medium');
     expect(semanticZoomLevelForScale(ANALYZER_NEAR_ZOOM_THRESHOLD)).toBe('medium');
     expect(semanticZoomLevelForScale(ANALYZER_NEAR_ZOOM_THRESHOLD + 0.01)).toBe('near');
+    expect(displayedZoomLevelForNode('near', false, true)).toBe('near');
+    expect(displayedZoomLevelForNode('near', false, false)).toBe('medium');
+    expect(displayedZoomLevelForNode('far', true, false)).toBe('near');
   });
 
   it('expands only requested nodes while preserving the deterministic layout columns', () => {
@@ -209,6 +214,8 @@ describe('Analyzer scan and projectors', () => {
     expect(fact('package:apps/web')).toMatchObject({ kind: 'workspace-package', packageName: '@atlas/web' });
     expect(fact('technology:react')).toMatchObject({ kind: 'technology', dictionaryStackId: 'react' });
     expect(fact('technology:vite')).toMatchObject({ kind: 'technology', dictionaryStackId: 'vite' });
+    expect(fact('technology:firebase')).toMatchObject({ kind: 'technology', label: 'Firebase' });
+    expect(fact('technology:firebase-authentication')).toBeUndefined();
     expect(fact('runtime:cloudflare-workers:wrangler.jsonc')).toMatchObject({ kind: 'runtime', runtimeType: 'cloudflare-workers' });
     expect(fact('resource:wrangler.jsonc:d1:DB')).toMatchObject({ kind: 'resource', resourceType: 'database', binding: 'DB' });
     expect(fact('resource:wrangler.jsonc:b2')).toMatchObject({ kind: 'resource', resourceType: 'storage', dictionaryStackId: 'backblaze-b2' });
@@ -233,12 +240,75 @@ describe('Analyzer scan and projectors', () => {
     expect(workspace.nodes.map((node) => node.type)).not.toContain('external-package');
     expect(workspace.edges.every((edge) => ['contains', 'uses-config', 'declares', 'matches'].includes(edge.kind))).toBe(true);
     expect(dependencies.nodes.map((node) => node.id)).toEqual(expect.arrayContaining(['package:.', 'package:apps/web', 'technology:react', 'external-package:mystery-lib']));
+    expect(dependencies.nodes.map((node) => node.id)).toContain('dependencies:external:summary');
+    expect(dependencies.nodes.map((node) => node.id)).not.toContain('technology:pnpm');
+    expect(dependencies.nodes.find((node) => node.id === 'external-package:mystery-lib')?.presentation?.parentId).toBe('dependencies:external:summary');
     expect(dependencies.edges.some((edge) => edge.metadata.dependencyType === 'workspaceDependency')).toBe(true);
     expect(command.entryScriptId).toBe(scriptIdFor(packageIdForPath('.'), 'dev'));
     expect(command.nodes.some((node) => node.id.startsWith('user-command:'))).toBe(true);
     expect(command.nodes.some((node) => node.label === 'pnpm exec vite')).toBe(true);
     expect(command.edges.some((edge) => edge.kind === 'starts' && edge.targetId === 'technology:vite')).toBe(true);
     expect(command.evidence.length).toBeGreaterThan(store.evidence.length);
+  });
+
+  it('keeps External Package details in the presentation and reveals them progressively', async () => {
+    const store = await scanProjectFiles(analyzerFixture());
+    const dependencies = projectDependencies(store);
+    const options = { expandedPresentationIds: new Set<string>(), filter: 'all', search: '', showExternal: false };
+    const collapsed = presentAnalyzerView(dependencies, options);
+    const expanded = presentAnalyzerView(dependencies, { ...options, expandedPresentationIds: new Set(['dependencies:external:summary']) });
+    const collapsedAgain = presentAnalyzerView(dependencies, options);
+    const searchRevealed = presentAnalyzerView(dependencies, { ...options, search: 'mystery-lib' });
+
+    expect(dependencies.nodes.map((node) => node.id)).toContain('external-package:mystery-lib');
+    expect(collapsed.nodes.map((node) => node.id)).toContain('dependencies:external:summary');
+    expect(collapsed.nodes.map((node) => node.id)).not.toContain('external-package:mystery-lib');
+    expect(expanded.nodes.map((node) => node.id)).toContain('external-package:mystery-lib');
+    expect(collapsedAgain.nodes.map((node) => node.id)).not.toContain('external-package:mystery-lib');
+    expect(searchRevealed.nodes.map((node) => node.id)).toContain('external-package:mystery-lib');
+    expect(collapsed.edges.some((edge) => edge.targetId === 'dependencies:external:summary')).toBe(true);
+    expect(expanded.edges.some((edge) => edge.targetId === 'external-package:mystery-lib')).toBe(true);
+  });
+
+  it('keeps Architecture Overview concise while retaining expandable detail Facts', async () => {
+    const store = await scanProjectFiles(analyzerFixture());
+    const architecture = projectArchitecture(store);
+    const desktopSummary = architecture.nodes.find((node) => node.id === 'architecture:desktop:summary');
+    const technologySummary = architecture.nodes.find((node) => node.id === 'architecture:technology:summary');
+
+    expect(desktopSummary).toMatchObject({ label: '.NET / WPF', presentation: { role: 'summary' } });
+    expect(desktopSummary?.presentation?.childNodeIds).toHaveLength(2);
+    expect(architecture.nodes.filter((node) => node.presentation?.parentId === desktopSummary?.id)).toHaveLength(2);
+    expect(technologySummary).toMatchObject({ label: 'Technology details', presentation: { role: 'summary' } });
+    expect(architecture.edges.some((edge) => edge.presentation?.parentId === technologySummary?.id && edge.presentation?.initiallyHidden)).toBe(true);
+  });
+
+  it('places Command Flow by execution rank and keeps concurrently branches on one stage', async () => {
+    const store = await scanProjectFiles(analyzerFixture());
+    const command = projectCommand(store);
+    const layout = layoutAnalyzerView(command);
+    const position = (predicate: (node: typeof layout.nodes[number]['node']) => boolean) => {
+      const positioned = layout.nodes.find((candidate) => predicate(candidate.node));
+      expect(positioned).toBeDefined();
+      return positioned!;
+    };
+    const entry = position((node) => node.id.startsWith('user-command:'));
+    const rootScript = position((node) => node.id === scriptIdFor(packageIdForPath('.'), 'dev'));
+    const concurrently = position((node) => node.metadata.commandType === 'concurrently');
+    const branches = layout.nodes.filter((candidate) => candidate.node.type === 'command' && /^root\.1\.[12]$/.test(String(candidate.node.metadata.branchPath)));
+
+    expect(entry.x).toBeLessThan(rootScript.x);
+    expect(rootScript.x).toBeLessThan(concurrently.x);
+    expect(branches).toHaveLength(2);
+    expect(branches[0]?.x).toBe(branches[1]?.x);
+    expect(branches[0]?.y).not.toBe(branches[1]?.y);
+    command.edges
+      .filter((edge) => ['expands-to', 'resolves-to', 'starts'].includes(edge.kind))
+      .forEach((edge) => {
+        const source = layout.nodes.find((candidate) => candidate.node.id === edge.sourceId);
+        const target = layout.nodes.find((candidate) => candidate.node.id === edge.targetId);
+        if (source && target) expect(source.x).toBeLessThan(target.x);
+      });
   });
 
   it('warns on recursive package scripts while retaining the cycle edge', async () => {

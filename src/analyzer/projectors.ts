@@ -22,7 +22,7 @@ import {
 
 function nodeSubtitle(fact: AnalyzerFact): string | undefined {
   if (fact.kind === 'project') return 'Selected local project folder';
-  if (fact.kind === 'workspace-package') return fact.packagePath === '.' ? 'root package' : fact.packagePath;
+  if (fact.kind === 'workspace-package') return fact.packagePath === '.' ? 'root package · workspace root' : fact.packagePath;
   if (fact.kind === 'workspace-config') return fact.filePath;
   if (fact.kind === 'workspace-pattern') return fact.configId;
   if (fact.kind === 'package-script') return `${fact.packageName} · ${fact.command}`;
@@ -44,8 +44,46 @@ function nodeForFact(fact: AnalyzerFact, clusterId: string | undefined, typeOver
     subtitle: nodeSubtitle(fact),
     ...(clusterId ? { clusterId } : {}),
     evidenceIds: fact.evidenceIds,
-    metadata: { ...fact.metadata, factKind: fact.kind, nodeType: nodeTypeLabels[type] },
+    metadata: {
+      ...fact.metadata,
+      factKind: fact.kind,
+      nodeType: nodeTypeLabels[type],
+      ...(fact.kind === 'project' ? { displayRole: 'PROJECT' } : {}),
+      ...(fact.kind === 'workspace-package' && fact.isRoot ? { displayRole: 'ROOT PACKAGE' } : {}),
+    },
   };
+}
+
+function summaryNode(
+  id: string,
+  label: string,
+  subtitle: string,
+  type: AnalyzerNodeType,
+  clusterId: string,
+  childNodes: AnalyzerViewNode[],
+): AnalyzerViewNode {
+  const childNodeIds = childNodes.map((node) => node.id);
+  return {
+    id,
+    type,
+    label,
+    subtitle,
+    clusterId,
+    evidenceIds: [],
+    metadata: {
+      displayRole: 'SUMMARY',
+      presentation: 'summary',
+      childCount: childNodeIds.length,
+      childNodeIds,
+    },
+    presentation: { role: 'summary', childNodeIds },
+  };
+}
+
+function markPresentationChildren(nodes: AnalyzerViewNode[], parentId: string, childIds: ReadonlySet<string>): AnalyzerViewNode[] {
+  return nodes.map((node) => childIds.has(node.id)
+    ? { ...node, presentation: { role: 'detail', parentId } }
+    : node);
 }
 
 function cluster(id: string, label: string, tone: AnalyzerCluster['tone'], nodes: AnalyzerViewNode[]): AnalyzerCluster {
@@ -96,19 +134,62 @@ function architectureCluster(fact: AnalyzerFact): { id: string; label: string; t
   return { id: 'architecture:desktop', label: 'Desktop', tone: 'violet' };
 }
 
+const ARCHITECTURE_PRIMARY_TECHNOLOGY_CATEGORIES = new Set([
+  'programming-language',
+  'runtime',
+  'fullstack-web-framework',
+  'web-api-framework',
+  'ui-library',
+  'auth-framework',
+  'auth-library',
+  'auth-service',
+  'build-tool',
+  'relational-database',
+  'document-database',
+  'object-database',
+  'object-storage',
+  'serverless-runtime',
+  'application-platform',
+  'web-hosting',
+]);
+
+function isPrimaryArchitectureTechnology(fact: AnalyzerFact | undefined): boolean {
+  if (!fact || fact.kind !== 'technology') return false;
+  if (!fact.dictionaryStackId) return fact.explicit;
+  return ARCHITECTURE_PRIMARY_TECHNOLOGY_CATEGORIES.has(getStack(fact.dictionaryStackId)?.categoryId ?? '');
+}
+
 export function projectArchitecture(store: AnalyzerProjectStore): AnalyzerViewModel {
-  const nodes = store.facts
+  const baseNodes = store.facts
     .filter((fact) => ['project', 'workspace-package', 'technology', 'runtime', 'resource', 'dotnet-project'].includes(fact.kind))
     .map((fact) => {
       const placement = architectureCluster(fact);
       return nodeForFact(fact, placement.id, placement.type);
     });
+  const desktopDetails = baseNodes.filter((node) => node.type === 'dotnet-project');
+  const technologyDetails = baseNodes.filter((node) => node.type === 'technology' && !isPrimaryArchitectureTechnology(store.facts.find((fact) => fact.id === node.factId)));
+  const desktopSummaryId = 'architecture:desktop:summary';
+  const technologySummaryId = 'architecture:technology:summary';
+  const nodesWithDesktopSummary = desktopDetails.length > 0
+    ? [
+        ...markPresentationChildren(baseNodes, desktopSummaryId, new Set(desktopDetails.map((node) => node.id))),
+        summaryNode(desktopSummaryId, '.NET / WPF', `${desktopDetails.length} projects · expand for details`, 'dotnet-project', 'architecture:desktop', desktopDetails),
+      ]
+    : baseNodes;
+  const nodes = technologyDetails.length > 0
+    ? [
+        ...markPresentationChildren(nodesWithDesktopSummary, technologySummaryId, new Set(technologyDetails.map((node) => node.id))),
+        summaryNode(technologySummaryId, 'Technology details', `${technologyDetails.length} additional technologies`, 'technology', 'architecture:technology', technologyDetails),
+      ]
+    : nodesWithDesktopSummary;
   const edges = edgesForRelations(
     store,
-    nodes,
+    baseNodes,
     (relation) => ['contains', 'uses', 'binds-to', 'depends-on'].includes(relation.kind),
     (relation) => relation.kind === 'depends-on' ? 'uses' : relation.kind,
-  );
+  ).map((edge) => technologyDetails.some((node) => node.id === edge.targetId)
+    ? { ...edge, presentation: { parentId: technologySummaryId, initiallyHidden: true } }
+    : edge);
   const clusterDefinitions = [
     ['architecture:project', 'Project', 'neutral'],
     ['architecture:apps', 'Applications', 'accent'],
@@ -207,6 +288,9 @@ function commandNode(
   fragment: CommandFragment,
   evidenceIds: string[],
   packageId?: string,
+  executionRank = 0,
+  executionDepth = 0,
+  branchPath = 'root',
 ): AnalyzerViewNode {
   const fact: CommandFact = {
     id,
@@ -218,6 +302,9 @@ function commandNode(
       ...(fragment.operator ? { operator: fragment.operator } : {}),
       ...(fragment.packageSelector ? { packageSelector: fragment.packageSelector } : {}),
       ...(fragment.scriptName ? { scriptName: fragment.scriptName } : {}),
+      executionRank,
+      executionDepth,
+      branchPath,
     },
     commandType: fragment.kind,
     command: fragment.text,
@@ -225,6 +312,12 @@ function commandNode(
     ...(fragment.scriptName ? { scriptName: fragment.scriptName } : {}),
   };
   return nodeForFact(fact, 'command:commands');
+}
+
+interface CommandExecutionContext {
+  executionRank: number;
+  executionDepth: number;
+  branchPath: string;
 }
 
 function addViewEdge(edges: Map<string, AnalyzerViewEdge>, edge: AnalyzerViewEdge): void {
@@ -258,8 +351,26 @@ export function projectCommand(store: AnalyzerProjectStore, requestedEntryScript
   const visited = new Set<string>();
   const active = new Set<string>();
 
-  const addFactNode = (fact: AnalyzerFact, clusterId: string, typeOverride?: AnalyzerNodeType) => nodes.set(fact.id, nodeForFact(fact, clusterId, typeOverride));
-  const addFragment = (script: PackageScriptFact, fragment: CommandFragment, parentCommandId?: string): void => {
+  const addFactNode = (fact: AnalyzerFact, clusterId: string, typeOverride?: AnalyzerNodeType, context?: CommandExecutionContext) => {
+    const nextNode = nodeForFact(fact, clusterId, typeOverride);
+    if (!context) {
+      nodes.set(fact.id, nextNode);
+      return;
+    }
+    const currentNode = nodes.get(fact.id);
+    const currentRank = currentNode?.metadata.executionRank;
+    if (typeof currentRank === 'number' && currentRank <= context.executionRank) return;
+    nodes.set(fact.id, {
+      ...(currentNode ?? nextNode),
+      metadata: {
+        ...(currentNode?.metadata ?? nextNode.metadata),
+        executionRank: context.executionRank,
+        executionDepth: context.executionDepth,
+        branchPath: context.branchPath,
+      },
+    });
+  };
+  const addFragment = (script: PackageScriptFact, fragment: CommandFragment, parentCommandId: string | undefined, context: CommandExecutionContext): void => {
     const evidenceIds = evidenceForCommandFragment(store, script, fragment);
     evidenceIds.forEach((evidenceId) => {
       if (!generatedEvidence.has(evidenceId) && store.sources[script.sourcePath]) {
@@ -268,7 +379,7 @@ export function projectCommand(store: AnalyzerProjectStore, requestedEntryScript
       }
     });
     const commandId = `command:${script.id}:${fragment.start}:${fragment.kind}${parentCommandId ? `:child:${parentCommandId}` : ''}`;
-    nodes.set(commandId, commandNode(commandId, fragment, evidenceIds, script.packageId));
+    nodes.set(commandId, commandNode(commandId, fragment, evidenceIds, script.packageId, context.executionRank, context.executionDepth, context.branchPath));
     addViewEdge(edges, {
       id: `view-edge:${script.id}:${commandId}`,
       sourceId: script.id,
@@ -276,7 +387,11 @@ export function projectCommand(store: AnalyzerProjectStore, requestedEntryScript
       kind: 'expands-to',
       label: relationLabels['expands-to'],
       evidenceIds,
-      metadata: { ...(fragment.operator ? { operator: fragment.operator } : {}) },
+      metadata: {
+        ...(fragment.operator ? { operator: fragment.operator } : {}),
+        executionRank: context.executionRank,
+        branchPath: context.branchPath,
+      },
     });
     if (parentCommandId) {
       addViewEdge(edges, {
@@ -286,13 +401,17 @@ export function projectCommand(store: AnalyzerProjectStore, requestedEntryScript
         kind: 'starts',
         label: relationLabels.starts,
         evidenceIds,
-        metadata: { parallel: true },
+        metadata: { parallel: true, executionRank: context.executionRank, branchPath: context.branchPath },
       });
     }
 
     if (fragment.kind === 'concurrently') {
       if (fragment.children.length === 0) addCommandWarning(warnings, 'concurrently has no quoted command branches', script);
-      fragment.children.forEach((child) => addFragment(script, child, commandId));
+      fragment.children.forEach((child, index) => addFragment(script, child, commandId, {
+        executionRank: context.executionRank + 1,
+        executionDepth: context.executionDepth + 1,
+        branchPath: `${context.branchPath}.${index + 1}`,
+      }));
       return;
     }
     if (fragment.kind === 'pnpm-script') {
@@ -313,7 +432,11 @@ export function projectCommand(store: AnalyzerProjectStore, requestedEntryScript
           scriptName: targetScript.scriptName,
         },
       });
-      buildScript(targetScript);
+      buildScript(targetScript, {
+        executionRank: context.executionRank + 1,
+        executionDepth: context.executionDepth + 1,
+        branchPath: context.branchPath,
+      });
       return;
     }
     if (fragment.kind === 'unknown') {
@@ -322,6 +445,14 @@ export function projectCommand(store: AnalyzerProjectStore, requestedEntryScript
     }
     const terminalId = terminalTechnologyId(fragment, store, script);
     if (terminalId) {
+      const terminalFact = store.facts.find((fact) => fact.id === terminalId);
+      if (terminalFact) {
+        addFactNode(terminalFact, 'command:commands', undefined, {
+          executionRank: context.executionRank + 1,
+          executionDepth: context.executionDepth + 1,
+          branchPath: context.branchPath,
+        });
+      }
       addViewEdge(edges, {
         id: `view-edge:${commandId}:${terminalId}:starts`,
         sourceId: commandId,
@@ -329,12 +460,12 @@ export function projectCommand(store: AnalyzerProjectStore, requestedEntryScript
         kind: 'starts',
         label: relationLabels.starts,
         evidenceIds,
-        metadata: { terminal: true },
+        metadata: { terminal: true, executionRank: context.executionRank + 1, branchPath: context.branchPath },
       });
     }
   };
 
-  const buildScript = (script: PackageScriptFact): void => {
+  const buildScript = (script: PackageScriptFact, context: CommandExecutionContext): void => {
     if (active.has(script.id)) {
       addCommandWarning(warnings, `Command cycle detected at ${script.packageName}:${script.scriptName}`, script);
       return;
@@ -342,10 +473,10 @@ export function projectCommand(store: AnalyzerProjectStore, requestedEntryScript
     if (visited.has(script.id)) return;
     visited.add(script.id);
     active.add(script.id);
-    addFactNode(script, 'command:scripts');
+    addFactNode(script, 'command:scripts', undefined, context);
     const packageFact = packages.find((fact) => fact.id === script.packageId);
     if (packageFact) {
-      addFactNode(packageFact, 'command:packages');
+      addFactNode(packageFact, 'command:packages', undefined, context);
       addViewEdge(edges, {
         id: `view-edge:${script.id}:${packageFact.id}:runs-in`,
         sourceId: script.id,
@@ -356,7 +487,11 @@ export function projectCommand(store: AnalyzerProjectStore, requestedEntryScript
         metadata: { packagePath: packageFact.packagePath },
       });
     }
-    parseCommandExpression(script.command).forEach((fragment) => addFragment(script, fragment));
+    parseCommandExpression(script.command).forEach((fragment, index) => addFragment(script, fragment, undefined, {
+      executionRank: context.executionRank + 1 + index,
+      executionDepth: context.executionDepth + 1,
+      branchPath: `${context.branchPath}.${index + 1}`,
+    }));
     active.delete(script.id);
   };
 
@@ -368,7 +503,7 @@ export function projectCommand(store: AnalyzerProjectStore, requestedEntryScript
       subtitle: entry.packageName,
       clusterId: 'command:user',
       evidenceIds: entry.evidenceIds,
-      metadata: { commandType: 'user-command', scriptId: entry.id },
+      metadata: { commandType: 'user-command', scriptId: entry.id, executionRank: 0, executionDepth: 0, branchPath: 'root' },
     };
     nodes.set(entryNode.id, entryNode);
     addViewEdge(edges, {
@@ -380,7 +515,7 @@ export function projectCommand(store: AnalyzerProjectStore, requestedEntryScript
       evidenceIds: entry.evidenceIds,
       metadata: { entry: true },
     });
-    buildScript(entry);
+    buildScript(entry, { executionRank: 1, executionDepth: 1, branchPath: 'root' });
   }
 
   const nodeList = [...nodes.values()];
@@ -403,14 +538,23 @@ export function projectCommand(store: AnalyzerProjectStore, requestedEntryScript
 }
 
 export function projectDependencies(store: AnalyzerProjectStore): AnalyzerViewModel {
-  const nodes = store.facts
-    .filter((fact) => fact.kind === 'workspace-package' || fact.kind === 'technology' || fact.kind === 'external-package')
+  const dependencyTargetIds = new Set(store.relations.filter((relation) => relation.kind === 'depends-on').map((relation) => relation.targetId));
+  const baseNodes = store.facts
+    .filter((fact) => fact.kind === 'workspace-package' || (['technology', 'external-package'].includes(fact.kind) && dependencyTargetIds.has(fact.id)))
     .map((fact) => nodeForFact(
       fact,
       fact.kind === 'workspace-package' ? 'dependencies:packages' : fact.kind === 'technology' ? 'dependencies:technology' : 'dependencies:external',
       fact.kind === 'technology' ? 'technology' : undefined,
     ));
-  const edges = edgesForRelations(store, nodes, (relation) => relation.kind === 'depends-on');
+  const externalNodes = baseNodes.filter((node) => node.type === 'external-package');
+  const externalSummaryId = 'dependencies:external:summary';
+  const nodes = externalNodes.length > 0
+    ? [
+        ...markPresentationChildren(baseNodes, externalSummaryId, new Set(externalNodes.map((node) => node.id))),
+        summaryNode(externalSummaryId, 'External Packages', `${externalNodes.length} packages · expand for details`, 'external-package', 'dependencies:external', externalNodes),
+      ]
+    : baseNodes;
+  const edges = edgesForRelations(store, baseNodes, (relation) => relation.kind === 'depends-on');
   const warnings = baseWarnings(store, 'dependencies');
   const clusterDefinitions = [
     ['dependencies:packages', 'Workspace Packages', 'neutral'],

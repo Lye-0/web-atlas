@@ -382,8 +382,16 @@ function makeWorkspacePackageFact(parsed: ParsedPackageJson, source: string, bui
   return fact;
 }
 
-function technologyForPackageName(packageName: string): typeof stacks[number] | undefined {
+const PRIMARY_PACKAGE_TECHNOLOGY: Record<string, string> = {
+  // `firebase` is the product package; Firebase Authentication remains the
+  // capability/resource dictionary match for firebase.json Auth evidence.
+  firebase: 'firebase',
+};
+
+function technologyForPackageName(packageName: string): { id: string } | undefined {
   const normalized = packageName.toLowerCase();
+  const primaryTechnologyId = PRIMARY_PACKAGE_TECHNOLOGY[normalized];
+  if (primaryTechnologyId) return { id: primaryTechnologyId };
   return stacks.find((stack) => stack.packageNames?.some((candidate) => candidate.toLowerCase() === normalized));
 }
 
@@ -478,7 +486,7 @@ function addPackageDependencies(
     else {
       const stack = technologyForPackageName(dependency.packageName);
       targetId = stack
-        ? addTechnologyFact(builder, stack.id, dependency.packageName, evidenceId, false)
+        ? addTechnologyFact(builder, stack.id, dependency.packageName, evidenceId, false, stack.id === 'firebase' ? 'Firebase' : undefined)
         : addExternalPackageFact(builder, dependency, evidenceId);
     }
     addRelation(builder, ownerId, targetId, 'depends-on', evidenceId ? [evidenceId] : [], {

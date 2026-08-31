@@ -58,25 +58,57 @@ function MetadataList({ metadata }: { metadata: AnalyzerViewNode['metadata'] }) 
   );
 }
 
+function displayNodeType(node: AnalyzerViewNode): string {
+  const displayRole = node.metadata.displayRole;
+  return typeof displayRole === 'string' ? displayRole : nodeTypeLabels[node.type] ?? node.type;
+}
+
+function PresentationChildren({ node, view, onSelectNode }: { node: AnalyzerViewNode; view: AnalyzerViewModel; onSelectNode: (nodeId: string) => void }) {
+  const childNodes = (node.presentation?.childNodeIds ?? [])
+    .map((childId) => view.nodes.find((candidate) => candidate.id === childId))
+    .filter((candidate): candidate is AnalyzerViewNode => Boolean(candidate));
+  if (childNodes.length === 0) return <p className="analyzer-muted-copy">展開対象の詳細Nodeはありません。</p>;
+  return (
+    <ul className="analyzer-presentation-list">
+      {childNodes.map((child) => (
+        <li key={child.id}>
+          <button type="button" onClick={() => onSelectNode(child.id)}>
+            <span>{displayNodeType(child)}</span>
+            <strong>{child.label}</strong>
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function NodeDetails({ node, view, store, onSelectNode }: { node: AnalyzerViewNode; view: AnalyzerViewModel; store: AnalyzerProjectStore; onSelectNode: (nodeId: string) => void }) {
   const fact = factForNode(store, node);
   const dictionary = displayDictionaryStack(factDictionaryStackId(fact ?? node));
+  const summary = node.presentation?.role === 'summary';
   return (
     <>
       <div className="analyzer-detail-heading">
-        <span className="analyzer-node-type">{nodeTypeLabels[node.type] ?? node.type}</span>
+        <span className="analyzer-node-type">{displayNodeType(node)}</span>
         <h2>{node.label}</h2>
         {node.subtitle && <p>{node.subtitle}</p>}
       </div>
       <section className="analyzer-detail-section">
         <h3>Overview</h3>
-        <p>{fact?.metadata.role ? String(fact.metadata.role) : 'このNodeは選択中のAnalyzer Viewで検出・表示されています。'}</p>
+        <p>{summary ? 'これは表示上のSummary Nodeです。元のFact / Evidenceを保持したまま、Graph上の初期情報量を抑えています。' : fact?.metadata.role ? String(fact.metadata.role) : 'このNodeは選択中のAnalyzer Viewで検出・表示されています。'}</p>
         {dictionary && <Link className="analyzer-dictionary-link" to={stackPath(dictionary.id)}>Dictionaryで見る <span aria-hidden="true">→</span></Link>}
       </section>
-      <section className="analyzer-detail-section">
-        <h3>Evidence</h3>
-        <EvidenceList evidenceIds={node.evidenceIds} view={view} store={store} />
-      </section>
+      {summary ? (
+        <section className="analyzer-detail-section">
+          <h3>Contained Nodes</h3>
+          <PresentationChildren node={node} view={view} onSelectNode={onSelectNode} />
+        </section>
+      ) : (
+        <section className="analyzer-detail-section">
+          <h3>Evidence</h3>
+          <EvidenceList evidenceIds={node.evidenceIds} view={view} store={store} />
+        </section>
+      )}
       <section className="analyzer-detail-section">
         <h3>Relations</h3>
         <RelationList nodeId={node.id} view={view} onSelectNode={onSelectNode} />

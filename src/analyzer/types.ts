@@ -245,6 +245,13 @@ export interface AnalyzerViewNode {
   clusterId?: string;
   evidenceIds: string[];
   metadata: AnalyzerMetadata;
+  presentation?: AnalyzerNodePresentation;
+}
+
+export interface AnalyzerNodePresentation {
+  role?: 'summary' | 'detail';
+  parentId?: string;
+  childNodeIds?: string[];
 }
 
 export interface AnalyzerViewEdge {
@@ -255,6 +262,12 @@ export interface AnalyzerViewEdge {
   label: string;
   evidenceIds: string[];
   metadata: AnalyzerMetadata;
+  presentation?: AnalyzerEdgePresentation;
+}
+
+export interface AnalyzerEdgePresentation {
+  parentId?: string;
+  initiallyHidden?: boolean;
 }
 
 export interface AnalyzerCluster {

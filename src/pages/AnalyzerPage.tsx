@@ -23,7 +23,7 @@ export function AnalyzerPage() {
   const [selectedEdgeId, setSelectedEdgeId] = useState<string>();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<AnalyzerFilter>('all');
-  const [showExternal, setShowExternal] = useState(true);
+  const [showExternal, setShowExternal] = useState(false);
   const [entryScriptId, setEntryScriptId] = useState<string>();
 
   const model = useMemo(() => store ? projectAnalyzerView(store, view, entryScriptId) : undefined, [entryScriptId, store, view]);
@@ -56,6 +56,12 @@ export function AnalyzerPage() {
   const selectEdge = (edgeId: string) => {
     setSelectedEdgeId(edgeId);
     setSelectedNodeId(undefined);
+  };
+
+  const toggleExternal = () => {
+    setShowExternal((current) => !current);
+    setSelectedNodeId(undefined);
+    setSelectedEdgeId(undefined);
   };
 
   return (
@@ -103,7 +109,7 @@ export function AnalyzerPage() {
             filter={filter}
             onFilterChange={setFilter}
             showExternal={showExternal}
-            onToggleExternal={() => setShowExternal((current) => !current)}
+            onToggleExternal={toggleExternal}
             scripts={scripts}
             entryScriptId={effectiveEntryScriptId}
             onEntryChange={setEntryScriptId}
@@ -130,6 +136,7 @@ export function AnalyzerPage() {
               filter={filter}
               search={search}
               showExternal={showExternal}
+              onToggleExternal={toggleExternal}
               sources={store.sources}
               onSelectNode={selectNode}
               onSelectEdge={selectEdge}
