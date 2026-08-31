@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
-import { ANALYZER_DEFAULT_TRANSFORM, ANALYZER_NODE_WIDTH, analyzerFocusedEdgeEmphasis, analyzerFocusDepths, analyzerSummaryExpanded, analyzerSummarySubtitle, displayedZoomLevelForNode, fitAnalyzerTransform, focusAnalyzerTransform, layoutAnalyzerView, nodeMatchesSearch, presentAnalyzerView, semanticZoomLevelForScale, type AnalyzerGraphTransform, type AnalyzerViewCounts, type AnalyzerViewEdge, type AnalyzerViewModel, type PositionedNode } from '../../analyzer';
+import { ANALYZER_DEFAULT_TRANSFORM, ANALYZER_NODE_WIDTH, analyzerFocusDepths, analyzerSummaryExpanded, analyzerSummarySubtitle, displayedZoomLevelForNode, fitAnalyzerTransform, focusAnalyzerTransform, layoutAnalyzerView, nodeMatchesSearch, preserveAnalyzerTransformOnViewportResize, presentAnalyzerView, semanticZoomLevelForScale, shouldShowAnalyzerEvidencePreview, type AnalyzerGraphTransform, type AnalyzerViewCounts, type AnalyzerViewEdge, type AnalyzerViewModel, type PositionedNode } from '../../analyzer';
 import { nodeTypeLabels } from '../../analyzer';
 import { EvidencePreview } from './EvidenceCodeBlock';
 
@@ -114,7 +114,6 @@ export function AnalyzerGraphStage({
   const previousViewportRef = useRef({ width: 0, height: 0 });
   const [transform, setTransform] = useState<GraphTransform>(ANALYZER_DEFAULT_TRANSFORM);
   const [hoveredEdgeId, setHoveredEdgeId] = useState<string | undefined>();
-  const [hoveredNodeId, setHoveredNodeId] = useState<string | undefined>();
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const [showHelp, setShowHelp] = useState(false);
   const cameraKey = `${cameraResetKey}:${view.view}`;
@@ -138,16 +137,17 @@ export function AnalyzerGraphStage({
   const baseLayout = useMemo(() => layoutAnalyzerView(filteredView), [filteredView]);
   const zoomLevel = semanticZoomLevelForScale(transform.scale);
   const expandedNodeKey = useMemo(() => {
-    const expanded = new Set<string>();
     const selected = baseLayout.nodes.find((positionedNode) => positionedNode.node.id === selectedNodeId);
-    if (selected?.node.evidenceIds.length) expanded.add(selected.node.id);
-    const hovered = baseLayout.nodes.find((positionedNode) => positionedNode.node.id === hoveredNodeId);
-    if (zoomLevel === 'near' && hovered?.node.evidenceIds.length) expanded.add(hovered.node.id);
-    return [...expanded].sort().join('\u0000');
-  }, [baseLayout, hoveredNodeId, selectedNodeId, zoomLevel]);
+    return selected?.node.evidenceIds.length ? selected.node.id : '';
+  }, [baseLayout, selectedNodeId]);
   const expandedNodeIds = useMemo(() => new Set(expandedNodeKey ? expandedNodeKey.split('\u0000') : []), [expandedNodeKey]);
   const layout = useMemo(() => layoutAnalyzerView(filteredView, expandedNodeIds), [expandedNodeIds, filteredView]);
   const positionedById = useMemo(() => new Map(layout.nodes.map((positionedNode) => [positionedNode.node.id, positionedNode])), [layout.nodes]);
+  const selectedPosition = useMemo(() => {
+    if (selectedNodeId) return positionedById.get(selectedNodeId);
+    const selectedEdge = selectedEdgeId ? filteredView.edges.find((edge) => edge.id === selectedEdgeId) : undefined;
+    return selectedEdge ? positionedById.get(selectedEdge.sourceId) ?? positionedById.get(selectedEdge.targetId) : undefined;
+  }, [filteredView.edges, positionedById, selectedEdgeId, selectedNodeId]);
   useLayoutEffect(() => {
     const previous = presentationCameraSnapshotRef.current;
     if (previous && previous.cameraKey === cameraKey && previous.expandedKey !== expandedPresentationKey) {
@@ -249,52 +249,10 @@ export function AnalyzerGraphStage({
     const previous = previousViewportRef.current;
     previousViewportRef.current = viewportSize;
     if (!cameraRef.current.initialized || previous.width <= 0 || previous.height <= 0) return;
-    const deltaY = (viewportSize.height - previous.height) / 2;
-    if (viewportSize.width === previous.width && deltaY === 0) return;
-    const contextPositions = selectedNodeId
-      ? [...new Set([
-          selectedNodeId,
-          ...(() => {
-            const candidates = filteredView.edges.filter((edge) => edge.sourceId === selectedNodeId || edge.targetId === selectedNodeId);
-            const emphasisRank = (edge: AnalyzerViewEdge): number => {
-              const emphasis = filteredView.view === 'architecture'
-                ? analyzerFocusedEdgeEmphasis(filteredView, edge, selectedNodeId)
-                : edge.presentation?.emphasis;
-              return emphasis === 'primary' ? 0 : emphasis === 'secondary' ? 1 : emphasis === 'deep' ? 2 : 3;
-            };
-            const ordered = [...candidates].sort((first, second) => {
-              const emphasisOrder = emphasisRank(first) - emphasisRank(second);
-              if (emphasisOrder !== 0) return emphasisOrder;
-              const firstDirection = first.sourceId === selectedNodeId ? 0 : 1;
-              const secondDirection = second.sourceId === selectedNodeId ? 0 : 1;
-              return firstDirection - secondDirection;
-            });
-            const outgoing = ordered.find((edge) => edge.sourceId === selectedNodeId);
-            const incoming = ordered.find((edge) => edge.targetId === selectedNodeId);
-            return [outgoing, incoming, ...ordered].flatMap((edge) => edge ? [edge.sourceId === selectedNodeId ? edge.targetId : edge.sourceId] : []).slice(0, 4);
-          })(),
-        ])]
-        .map((nodeId) => positionedById.get(nodeId))
-        .filter((positionedNode): positionedNode is PositionedNode => Boolean(positionedNode))
-      : [];
     setTransform((current) => {
-      const safeInset = 36;
-      let nextX = current.x + (viewportSize.width - previous.width) / 2;
-      if (contextPositions.length > 0) {
-        const left = Math.min(...contextPositions.map((positionedNode) => positionedNode.x));
-        const right = Math.max(...contextPositions.map((positionedNode) => positionedNode.x + ANALYZER_NODE_WIDTH));
-        const minimum = safeInset;
-        const maximum = Math.max(minimum, viewportSize.width - safeInset);
-        const screenLeft = nextX + left * current.scale;
-        const screenRight = nextX + right * current.scale;
-        if (screenRight > maximum) nextX -= screenRight - maximum;
-        if (screenLeft < minimum) nextX += minimum - screenLeft;
-      }
-      const deltaX = nextX - current.x;
-      if (deltaX === 0 && deltaY === 0) return current;
-      return { ...current, x: nextX, y: current.y + deltaY };
+      return preserveAnalyzerTransformOnViewportResize(current, previous, viewportSize, selectedPosition);
     });
-  }, [filteredView, positionedById, selectedNodeId, viewportSize]);
+  }, [selectedPosition, viewportSize]);
 
   useLayoutEffect(() => {
     const element = stageRef.current;
@@ -562,7 +520,7 @@ export function AnalyzerGraphStage({
                   : focusDepth === 2
                     ? ' is-focus-secondary'
                     : ' is-focus-deep';
-              const hasEvidencePreview = nodeZoom === 'near' && node.evidenceIds.length > 0 && (selected || hoveredNodeId === node.id);
+              const hasEvidencePreview = shouldShowAnalyzerEvidencePreview(nodeZoom, selected, node.evidenceIds.length > 0);
               const compactEvidenceHint = zoomLevel === 'near' && node.evidenceIds.length > 0 && !hasEvidencePreview ? evidenceHint(node, view) : undefined;
               const displayedSubtitle = summary ? analyzerSummarySubtitle(node, summaryExpanded) : node.subtitle;
               const dimmed = Boolean(search.trim() && !matches && !selected) || Boolean((selectedNodeId || selectedEdgeId) && !selected && !inSelectionContext && focusDepth === undefined);
@@ -572,8 +530,6 @@ export function AnalyzerGraphStage({
                   className={`analyzer-node node-type-${node.type} zoom-${nodeZoom}${summary ? ' is-summary' : ''}${summary && summaryExpanded ? ' is-expanded is-presentation-anchor' : ''}${selected ? ' is-selected' : ''}${connected ? ' is-connected' : ''}${focusClass}${hasEvidencePreview ? ' has-evidence-preview' : ''}${matches && search.trim() ? ' is-match' : ''}${dimmed ? ' is-dimmed' : ''}`}
                   style={nodeStyle(positionedNode)}
                   onClick={() => summary ? togglePresentation(node.id) : onSelectNode(node.id)}
-                  onMouseEnter={() => setHoveredNodeId(node.id)}
-                  onMouseLeave={() => setHoveredNodeId(undefined)}
                   onKeyDown={(event) => {
                     if (event.key === 'Enter' || event.key === ' ') {
                       event.preventDefault();
@@ -591,7 +547,7 @@ export function AnalyzerGraphStage({
                   <strong>{node.label}</strong>
                   {nodeZoom !== 'far' && displayedSubtitle && <span className="analyzer-node-subtitle">{displayedSubtitle}</span>}
                   {compactEvidenceHint && <span className="analyzer-node-evidence-hint">Evidence · {compactEvidenceHint}</span>}
-                  {nodeZoom === 'near' && node.evidenceIds.length > 0 && (
+                  {hasEvidencePreview && (
                     <div className="analyzer-node-evidence-preview">
                       <EvidencePreview evidenceIds={node.evidenceIds} evidence={view.evidence} sources={sources} compact />
                     </div>

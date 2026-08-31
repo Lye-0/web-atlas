@@ -8,10 +8,10 @@ import { analyzerSummarySubtitle, presentationOwnsNode, presentAnalyzerView } fr
 import { scanProjectFiles } from './scan';
 import { packageIdForPath, scriptIdFor, type AnalyzerSourceFile, type AnalyzerViewModel } from './types';
 import { ANALYZER_NEAR_NODE_HEIGHT, ANALYZER_NODE_HEIGHT, layoutAnalyzerView } from './layout';
-import { ANALYZER_FIT_PADDING, fitAnalyzerTransform, focusAnalyzerTransform } from './camera';
+import { ANALYZER_FIT_PADDING, fitAnalyzerTransform, focusAnalyzerTransform, preserveAnalyzerTransformOnViewportResize } from './camera';
 import { analyzerRelationInverseLabels, relationLabelForNode } from './relations';
 import { analyzerFocusedEdgeEmphasis } from './focus';
-import { ANALYZER_FAR_ZOOM_THRESHOLD, ANALYZER_NEAR_ZOOM_THRESHOLD, displayedZoomLevelForNode, semanticZoomLevelForScale } from './zoom';
+import { ANALYZER_FAR_ZOOM_THRESHOLD, ANALYZER_NEAR_ZOOM_THRESHOLD, displayedZoomLevelForNode, semanticZoomLevelForScale, shouldShowAnalyzerEvidencePreview } from './zoom';
 
 function fixtureFile(relativePath: string, source: string): AnalyzerSourceFile {
   return {
@@ -181,6 +181,15 @@ describe('Analyzer semantic zoom and layout', () => {
     expect(displayedZoomLevelForNode('far', true, false)).toBe('near');
   });
 
+  it('allows the code preview only for a selected node with evidence', () => {
+    const selectedZoom = displayedZoomLevelForNode('far', true, false);
+    const hoveredZoom = displayedZoomLevelForNode('near', false, false);
+
+    expect(shouldShowAnalyzerEvidencePreview(selectedZoom, true, true)).toBe(true);
+    expect(shouldShowAnalyzerEvidencePreview(hoveredZoom, false, true)).toBe(false);
+    expect(shouldShowAnalyzerEvidencePreview('near', false, false)).toBe(false);
+  });
+
   it('expands only requested nodes while preserving the deterministic layout columns', () => {
     const view = {
       view: 'workspace' as const,
@@ -222,6 +231,19 @@ describe('Analyzer semantic zoom and layout', () => {
     expect(fitted.y + layout.height * fitted.scale).toBeLessThanOrEqual(500);
     expect(focused.scale).toBe(0.82);
     expect(focused.x).toBe(800 / 2 - (200 + 122) * 0.82);
+  });
+
+  it('keeps the selected block in place when the detail panel narrows the viewport', () => {
+    const current = { x: 120, y: 40, scale: 1 };
+    const selected = {
+      node: { id: 'selected', type: 'project' as const, label: 'Selected', evidenceIds: [], metadata: {} },
+      x: 240,
+      y: 80,
+      height: 106,
+    };
+
+    expect(preserveAnalyzerTransformOnViewportResize(current, { width: 1000, height: 600 }, { width: 700, height: 600 }, selected)).toEqual(current);
+    expect(preserveAnalyzerTransformOnViewportResize(current, { width: 1000, height: 600 }, { width: 700, height: 600 }, { ...selected, x: 600 })).toEqual({ x: -180, y: 40, scale: 1 });
   });
 });
 

@@ -18,6 +18,13 @@ export interface AnalyzerFitPadding {
 
 export const ANALYZER_FIT_PADDING: AnalyzerFitPadding = { top: 48, right: 64, bottom: 48, left: 64 };
 
+export interface AnalyzerViewportSize {
+  width: number;
+  height: number;
+}
+
+const ANALYZER_VIEWPORT_SAFE_INSET = 36;
+
 export function fitAnalyzerTransform(layout: AnalyzerLayout, width: number, height: number, padding: AnalyzerFitPadding = ANALYZER_FIT_PADDING): AnalyzerGraphTransform {
   if (width <= 0 || height <= 0 || layout.width <= 0 || layout.height <= 0) return ANALYZER_DEFAULT_TRANSFORM;
 
@@ -43,4 +50,30 @@ export function focusAnalyzerTransform(
     x: width / 2 - (positionedNode.x + ANALYZER_NODE_WIDTH / 2) * scale,
     y: height / 2 - (positionedNode.y + positionedNode.height / 2) * scale,
   };
+}
+
+export function preserveAnalyzerTransformOnViewportResize(
+  current: AnalyzerGraphTransform,
+  previousViewport: AnalyzerViewportSize,
+  nextViewport: AnalyzerViewportSize,
+  selectedPosition?: PositionedNode,
+): AnalyzerGraphTransform {
+  const deltaY = (nextViewport.height - previousViewport.height) / 2;
+  if (nextViewport.width === previousViewport.width && deltaY === 0) return current;
+
+  let deltaX = (nextViewport.width - previousViewport.width) / 2;
+  if (selectedPosition) {
+    const selectedLeft = current.x + selectedPosition.x * current.scale;
+    const selectedRight = current.x + (selectedPosition.x + ANALYZER_NODE_WIDTH) * current.scale;
+    const minimum = ANALYZER_VIEWPORT_SAFE_INSET;
+    const maximum = Math.max(minimum, nextViewport.width - ANALYZER_VIEWPORT_SAFE_INSET);
+    deltaX = selectedRight > maximum
+      ? maximum - selectedRight
+      : selectedLeft < minimum
+        ? minimum - selectedLeft
+        : 0;
+  }
+
+  if (deltaX === 0 && deltaY === 0) return current;
+  return { ...current, x: current.x + deltaX, y: current.y + deltaY };
 }

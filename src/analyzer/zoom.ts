@@ -13,3 +13,7 @@ export function displayedZoomLevelForNode(zoomLevel: AnalyzerZoomLevel, selected
   if (selected || expanded) return 'near';
   return zoomLevel === 'near' ? 'medium' : zoomLevel;
 }
+
+export function shouldShowAnalyzerEvidencePreview(zoomLevel: AnalyzerZoomLevel, selected: boolean, hasEvidence: boolean): boolean {
+  return zoomLevel === 'near' && selected && hasEvidence;
+}

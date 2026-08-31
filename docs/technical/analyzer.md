@@ -20,7 +20,7 @@ Project Folder
 
 解析対象は構造情報を持つ設定ファイルに限定しています。`.git`、依存・生成物、`.env`、秘密情報用拡張子は除外し、JSON/JSONCの設定値はサイズ上限（1 MiB）も設けています。
 
-Graphは新しい可視化ライブラリへ依存せず、[`src/analyzer/layout.ts`](../../src/analyzer/layout.ts) のView別の決定的なlayoutと、[`src/components/analyzer/AnalyzerGraphStage.tsx`](../../src/components/analyzer/AnalyzerGraphStage.tsx) のSVG/DOM rendererで構成しています。Workspaceはcolumn flow、Architectureはcompact grid、Commandはexecution rankとbranch lane、Dependencyは責務ごとのlaneで配置します。Summaryの展開状態は [`src/pages/AnalyzerPage.tsx`](../../src/pages/AnalyzerPage.tsx) の単一stateをGraph / Detail / Toolbar / Cluster・Lane headerで共有し、展開・折りたたみ時はsemantic anchorを同じ画面位置へ保ちます。初回表示と明示的なFitだけが現在のlayout boundsに合わせてカメラを収め、Detail Panelの開閉では選択Nodeと1-hop contextを画面内に残す補正を行います。Fitは全体表示、Resetはカメラと表示状態の初期化として役割を分けています。
+Graphは新しい可視化ライブラリへ依存せず、[`src/analyzer/layout.ts`](../../src/analyzer/layout.ts) のView別の決定的なlayoutと、[`src/components/analyzer/AnalyzerGraphStage.tsx`](../../src/components/analyzer/AnalyzerGraphStage.tsx) のSVG/DOM rendererで構成しています。Workspaceはcolumn flow、Architectureはcompact grid、Commandはexecution rankとbranch lane、Dependencyは責務ごとのlaneで配置します。Summaryの展開状態は [`src/pages/AnalyzerPage.tsx`](../../src/pages/AnalyzerPage.tsx) の単一stateをGraph / Detail / Toolbar / Cluster・Lane headerで共有し、展開・折りたたみ時はsemantic anchorを同じ画面位置へ保ちます。初回表示と明示的なFitだけが現在のlayout boundsに合わせてカメラを収め、Detail Panelの開閉などでGraphの表示幅が変わる場合は、選択Node（Edge選択時は端点）が表示領域外へ出るときだけ最小限の補正を行い、表示中ならカメラ位置を維持します。Fitは全体表示、Resetはカメラと表示状態の初期化として役割を分けています。
 
 ## Fact / Evidence model
 
@@ -58,11 +58,11 @@ Analyzer shellには次の4つのprojectorがあります。
 
 ## Semantic zoom / 2.5D presentation
 
-Graphの拡大率は [`src/analyzer/zoom.ts`](../../src/analyzer/zoom.ts) で3段階に量子化しています。`scale < 0.55` はFar、`0.55 <= scale <= 0.95` はMedium、`scale > 0.95` はNearです。Nearでも全Nodeを詳細化せず、Evidence付きNodeはNear時のHoverまたはSelectedのときだけcompact previewへ遅延展開します。SelectedのEvidence previewはFar / Mediumでも保持します。これにより、全Nodeを同時に詳細化せず、既存のView layoutとRelationモデルを変更しないまま操作対象の周辺だけを詳しく表示します。
+Graphの拡大率は [`src/analyzer/zoom.ts`](../../src/analyzer/zoom.ts) で3段階に量子化しています。`scale < 0.55` はFar、`0.55 <= scale <= 0.95` はMedium、`scale > 0.95` はNearです。Nearでも全Nodeを詳細化せず、Evidence付きNodeはcompact hintまでに留め、3〜5行のcompact previewはSelected時だけ遅延展開します。SelectedのEvidence previewはFar / Mediumでも保持します。Hoverはborder / surface / shadowのvisual feedbackだけを与え、Nodeの高さやlayoutを変更しません。これにより、全Nodeを同時に詳細化せず、既存のView layoutとRelationモデルを変更しないまま操作対象の周辺だけを詳しく表示します。
 
 - Far: Node typeとlabelを中心に表示します。
 - Medium: subtitleとEvidence件数を表示します。
-- Near: 通常のEvidence付きNodeには`filePath:line`のcompact evidence hintを表示し、selectedまたはHover中のNodeに、最初のEvidenceだけを使った3〜5行のcompact previewを表示します。通常のNodeはsource / metadataを抑制表示し、Evidenceが1件だけの場合は反復的な`Evidence 1`を表示しません。exact highlight rangeはdetail panelと同じEvidenceCodeBlockで描画します。
+- Near: 通常のEvidence付きNodeには`filePath:line`のcompact evidence hintを表示します。3〜5行のcompact previewはSelected Nodeだけに表示し、HoverではNodeのsurface / border / shadowのみを強調します。通常のNodeはsource / metadataを抑制表示し、Evidenceが1件だけの場合は反復的な`Evidence 1`を表示しません。exact highlight rangeはdetail panelと同じEvidenceCodeBlockで描画します。
 - Detail panel: 未選択時は閉じ、選択時だけ開きます。選択中は全Evidenceとsource contextを表示し、Focus Selected、関係先への移動、Closeを提供します。Closeは選択Node / Edgeを保持したままPanelだけを閉じ、背景クリックまたはEscで選択・detailを解除します。
 
 2.5Dの視覚階層は、z0のFine / Large grid、z1のcluster plane / command lane、z2のdefault・focused edge、z3のnormal Node、z5のSelected NodeとEvidence / interaction layerです。Cluster tintは弱め、bottom/right shadow・top highlight・inner shadingで奥の板として表現します。Normal Nodeにはtight contact shadow、Selected Nodeにはsmall liftと少し広いshadowを使います。EdgeはNodeより背面に置き、選択EdgeもNodeの前へ出しすぎません。Neonや強いglassmorphismは使わず、Graph本体には新しい可視化ライブラリを追加していません。
@@ -94,7 +94,7 @@ BrowserのFile System Access APIがない場合はdirectory file inputを使い�
 
 実装時の検証結果:
 
-- `pnpm test`: 4 test files / 29 tests passed（Analyzer単体19 testsを含む）
+- `pnpm test`: 4 test files / 31 tests passed（Analyzer単体21 testsを含む）
 - `pnpm typecheck`: passed
 - `pnpm lint`: passed
 - `pnpm build`: passed（Vite production bundle。Three.js lazy chunkのサイズ警告あり）
