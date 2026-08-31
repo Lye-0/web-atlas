@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
-import { layoutAnalyzerView, ANALYZER_NODE_WIDTH, type AnalyzerLayout, type PositionedNode, displayedZoomLevelForNode, nodeMatchesSearch, presentAnalyzerView, semanticZoomLevelForScale, type AnalyzerViewEdge, type AnalyzerViewModel } from '../../analyzer';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
+import { ANALYZER_DEFAULT_TRANSFORM, ANALYZER_NODE_WIDTH, displayedZoomLevelForNode, fitAnalyzerTransform, focusAnalyzerTransform, layoutAnalyzerView, nodeMatchesSearch, presentAnalyzerView, semanticZoomLevelForScale, type AnalyzerGraphTransform, type AnalyzerViewEdge, type AnalyzerViewModel, type PositionedNode } from '../../analyzer';
 import { nodeTypeLabels } from '../../analyzer';
 import { EvidencePreview } from './EvidenceCodeBlock';
 
@@ -11,16 +11,16 @@ interface AnalyzerGraphStageProps {
   search: string;
   showExternal: boolean;
   onToggleExternal: () => void;
+  onClearSelection: () => void;
+  onResetPresentation: () => void;
   sources: Record<string, string>;
-  onSelectNode: (nodeId: string) => void;
+  onSelectNode: (nodeId: string, focus?: boolean) => void;
   onSelectEdge: (edgeId: string) => void;
+  focusRequest?: { nodeId: string; nonce: number };
+  cameraResetKey: string | number;
 }
 
-interface GraphTransform {
-  x: number;
-  y: number;
-  scale: number;
-}
+type GraphTransform = AnalyzerGraphTransform;
 
 function displayNodeType(node: AnalyzerViewModel['nodes'][number]): string {
   const displayRole = node.metadata.displayRole;
@@ -45,27 +45,11 @@ function nodeStyle(positionedNode: PositionedNode): CSSProperties {
   return { left: positionedNode.x, top: positionedNode.y, width: ANALYZER_NODE_WIDTH, height: positionedNode.height };
 }
 
-function nodeIsInViewport(positionedNode: PositionedNode, transform: GraphTransform, width: number, height: number): boolean {
-  if (width <= 0 || height <= 0) return false;
-  const viewportLeft = -transform.x / transform.scale;
-  const viewportTop = -transform.y / transform.scale;
-  const viewportRight = (width - transform.x) / transform.scale;
-  const viewportBottom = (height - transform.y) / transform.scale;
-  return positionedNode.x < viewportRight
-    && positionedNode.x + ANALYZER_NODE_WIDTH > viewportLeft
-    && positionedNode.y < viewportBottom
-    && positionedNode.y + positionedNode.height > viewportTop;
-}
-
-function fitTransform(layout: AnalyzerLayout, width: number, height: number): GraphTransform {
-  const availableWidth = Math.max(240, width - 60);
-  const availableHeight = Math.max(220, height - 100);
-  const scale = Math.max(0.44, Math.min(1, availableWidth / layout.width, availableHeight / layout.height));
-  return {
-    scale,
-    x: (width - layout.width * scale) / 2,
-    y: (height - layout.height * scale) / 2 + 28,
-  };
+function evidenceHint(node: AnalyzerViewModel['nodes'][number], view: AnalyzerViewModel): string | undefined {
+  const evidence = node.evidenceIds
+    .map((evidenceId) => view.evidence.find((candidate) => candidate.id === evidenceId))
+    .find((candidate): candidate is NonNullable<typeof candidate> => Boolean(candidate));
+  return evidence ? `${evidence.filePath}:${evidence.contextStartLine}` : undefined;
 }
 
 export function AnalyzerGraphStage({
@@ -76,20 +60,32 @@ export function AnalyzerGraphStage({
   search,
   showExternal,
   onToggleExternal,
+  onClearSelection,
+  onResetPresentation,
   onSelectNode,
   onSelectEdge,
   sources,
+  focusRequest,
+  cameraResetKey,
 }: AnalyzerGraphStageProps) {
   const stageRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef<{ pointerId: number; startX: number; startY: number; originX: number; originY: number } | undefined>(undefined);
-  const [transform, setTransform] = useState<GraphTransform>({ x: 24, y: 24, scale: 0.7 });
+  const dragRef = useRef<{ pointerId: number; startX: number; startY: number; originX: number; originY: number; moved: boolean; background: boolean } | undefined>(undefined);
+  const cameraRef = useRef<{ key: string; initialized: boolean }>({ key: '', initialized: false });
+  const focusNonceRef = useRef<number>(-1);
+  const previousViewportRef = useRef({ width: 0, height: 0 });
+  const [transform, setTransform] = useState<GraphTransform>(ANALYZER_DEFAULT_TRANSFORM);
   const [hoveredEdgeId, setHoveredEdgeId] = useState<string | undefined>();
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | undefined>();
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const [expandedPresentationIds, setExpandedPresentationIds] = useState<ReadonlySet<string>>(new Set());
+  const [showHelp, setShowHelp] = useState(false);
+  const cameraKey = `${cameraResetKey}:${view.view}`;
 
   useEffect(() => {
     setExpandedPresentationIds(new Set());
-  }, [view.view]);
+    cameraRef.current = { key: cameraKey, initialized: false };
+    focusNonceRef.current = -1;
+  }, [cameraKey]);
 
   const togglePresentation = useCallback((nodeId: string) => {
     if (nodeId === 'dependencies:external:summary') {
@@ -115,25 +111,54 @@ export function AnalyzerGraphStage({
     const expanded = new Set<string>();
     const selected = baseLayout.nodes.find((positionedNode) => positionedNode.node.id === selectedNodeId);
     if (selected?.node.evidenceIds.length) expanded.add(selected.node.id);
-    if (zoomLevel === 'near') {
-      baseLayout.nodes.forEach((positionedNode) => {
-        if (positionedNode.node.evidenceIds.length > 0 && nodeIsInViewport(positionedNode, transform, viewportSize.width, viewportSize.height)) {
-          expanded.add(positionedNode.node.id);
-        }
-      });
-    }
+    const hovered = baseLayout.nodes.find((positionedNode) => positionedNode.node.id === hoveredNodeId);
+    if (zoomLevel === 'near' && hovered?.node.evidenceIds.length) expanded.add(hovered.node.id);
     return [...expanded].sort().join('\u0000');
-  }, [baseLayout, selectedNodeId, transform, viewportSize.height, viewportSize.width, zoomLevel]);
+  }, [baseLayout, hoveredNodeId, selectedNodeId, zoomLevel]);
   const expandedNodeIds = useMemo(() => new Set(expandedNodeKey ? expandedNodeKey.split('\u0000') : []), [expandedNodeKey]);
   const layout = useMemo(() => layoutAnalyzerView(filteredView, expandedNodeIds), [expandedNodeIds, filteredView]);
   const positionedById = useMemo(() => new Map(layout.nodes.map((positionedNode) => [positionedNode.node.id, positionedNode])), [layout.nodes]);
   const foregroundEdges = useMemo(() => filteredView.edges.filter((edge) => edge.id === selectedEdgeId || Boolean(selectedNodeId && (edge.sourceId === selectedNodeId || edge.targetId === selectedNodeId))), [filteredView.edges, selectedEdgeId, selectedNodeId]);
   const backgroundEdges = useMemo(() => filteredView.edges.filter((edge) => !foregroundEdges.includes(edge)), [filteredView.edges, foregroundEdges]);
+  const selectionContext = useMemo(() => {
+    const connectedNodeIds = new Set<string>();
+    const contextClusterIds = new Set<string>();
+    if (selectedNodeId) {
+      connectedNodeIds.add(selectedNodeId);
+      const selectedNode = filteredView.nodes.find((node) => node.id === selectedNodeId);
+      if (selectedNode?.clusterId) contextClusterIds.add(selectedNode.clusterId);
+      filteredView.edges.forEach((edge) => {
+        if (edge.sourceId !== selectedNodeId && edge.targetId !== selectedNodeId) return;
+        const otherId = edge.sourceId === selectedNodeId ? edge.targetId : edge.sourceId;
+        connectedNodeIds.add(otherId);
+        const other = filteredView.nodes.find((node) => node.id === otherId);
+        if (other?.clusterId) contextClusterIds.add(other.clusterId);
+      });
+    }
+    if (selectedEdgeId) {
+      const selectedEdge = filteredView.edges.find((edge) => edge.id === selectedEdgeId);
+      if (selectedEdge) {
+        [selectedEdge.sourceId, selectedEdge.targetId].forEach((nodeId) => {
+          connectedNodeIds.add(nodeId);
+          const node = filteredView.nodes.find((candidate) => candidate.id === nodeId);
+          if (node?.clusterId) contextClusterIds.add(node.clusterId);
+        });
+      }
+    }
+    const contextNodeIds = new Set(connectedNodeIds);
+    filteredView.nodes.forEach((node) => {
+      if (node.clusterId && contextClusterIds.has(node.clusterId)) contextNodeIds.add(node.id);
+    });
+    return { connectedNodeIds, contextClusterIds, contextNodeIds };
+  }, [filteredView.edges, filteredView.nodes, selectedEdgeId, selectedNodeId]);
 
   useEffect(() => {
     const element = stageRef.current;
     if (!element) return;
-    const updateSize = () => setViewportSize({ width: element.clientWidth, height: element.clientHeight });
+    const updateSize = () => setViewportSize((current) => {
+      const next = { width: element.clientWidth, height: element.clientHeight };
+      return current.width === next.width && current.height === next.height ? current : next;
+    });
     updateSize();
     if (typeof ResizeObserver === 'undefined') return;
     const observer = new ResizeObserver(updateSize);
@@ -142,33 +167,52 @@ export function AnalyzerGraphStage({
   }, []);
 
   useEffect(() => {
-    const element = stageRef.current;
-    if (!element) return;
-    setTransform(fitTransform(baseLayout, element.clientWidth, element.clientHeight));
-  }, [baseLayout, view.view]);
+    if (viewportSize.width <= 0 || viewportSize.height <= 0) return;
+    const previous = previousViewportRef.current;
+    previousViewportRef.current = viewportSize;
+    if (!cameraRef.current.initialized || previous.width <= 0 || previous.height <= 0) return;
+    const deltaX = (viewportSize.width - previous.width) / 2;
+    const deltaY = (viewportSize.height - previous.height) / 2;
+    if (deltaX === 0 && deltaY === 0) return;
+    setTransform((current) => ({ ...current, x: current.x + deltaX, y: current.y + deltaY }));
+  }, [viewportSize]);
 
-  const selectedPosition = selectedNodeId ? positionedById.get(selectedNodeId) : undefined;
-  const selectedX = selectedPosition?.x;
-  const selectedY = selectedPosition?.y;
-  const selectedHeight = selectedPosition?.height;
+  useLayoutEffect(() => {
+    const element = stageRef.current;
+    if (!element || layout.nodes.length === 0 || viewportSize.width <= 0 || viewportSize.height <= 0) return;
+    if (cameraRef.current.key !== cameraKey) cameraRef.current = { key: cameraKey, initialized: false };
+    if (cameraRef.current.initialized) return;
+    const applyFit = () => {
+      const width = element.clientWidth;
+      const height = element.clientHeight;
+      if (width <= 0 || height <= 0) return;
+      cameraRef.current = { key: cameraKey, initialized: true };
+      setTransform(fitAnalyzerTransform(layout, width, height));
+    };
+    applyFit();
+  }, [cameraKey, layout, viewportSize.height, viewportSize.width]);
 
   useEffect(() => {
-    if (!selectedNodeId) return;
+    if (!focusRequest || focusRequest.nonce === focusNonceRef.current) return;
     const element = stageRef.current;
-    if (selectedX === undefined || selectedY === undefined || selectedHeight === undefined || !element) return;
-    setTransform((current) => {
-      const x = element.clientWidth / 2 - (selectedX + ANALYZER_NODE_WIDTH / 2) * current.scale;
-      const y = element.clientHeight / 2 - (selectedY + selectedHeight / 2) * current.scale;
-      if (current.x === x && current.y === y) return current;
-      return { ...current, x, y };
-    });
-  }, [selectedHeight, selectedNodeId, selectedX, selectedY]);
+    const selectedPosition = positionedById.get(focusRequest.nodeId);
+    if (!element || !selectedPosition || element.clientWidth <= 0 || element.clientHeight <= 0) return;
+    focusNonceRef.current = focusRequest.nonce;
+    setTransform((current) => focusAnalyzerTransform(selectedPosition, element.clientWidth, element.clientHeight, current.scale));
+  }, [focusRequest, positionedById]);
 
   const changeZoom = (factor: number) => setTransform((current) => ({ ...current, scale: Math.max(0.35, Math.min(1.4, current.scale * factor)) }));
-  const resetTransform = () => setTransform({ x: 24, y: 24, scale: 0.7 });
+  const resetTransform = () => {
+    setExpandedPresentationIds(new Set());
+    cameraRef.current = { key: cameraKey, initialized: true };
+    onResetPresentation();
+    setTransform(ANALYZER_DEFAULT_TRANSFORM);
+  };
   const fit = () => {
     const element = stageRef.current;
-    if (element) setTransform(fitTransform(baseLayout, element.clientWidth, element.clientHeight));
+    if (!element) return;
+    cameraRef.current = { key: cameraKey, initialized: true };
+    setTransform(fitAnalyzerTransform(layout, element.clientWidth, element.clientHeight));
   };
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
@@ -178,20 +222,31 @@ export function AnalyzerGraphStage({
       (target instanceof Element && target.closest('button, a, input, select, textarea, [contenteditable="true"], [role="button"]'))
     ) return;
     event.preventDefault();
-    dragRef.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, originX: transform.x, originY: transform.y };
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: transform.x,
+      originY: transform.y,
+      moved: false,
+      background: true,
+    };
     event.currentTarget.setPointerCapture(event.pointerId);
   };
 
   const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
+    if (Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) > 3) drag.moved = true;
     setTransform((current) => ({ ...current, x: drag.originX + event.clientX - drag.startX, y: drag.originY + event.clientY - drag.startY }));
   };
 
-  const handlePointerUp = (event: PointerEvent<HTMLDivElement>) => {
-    if (dragRef.current?.pointerId !== event.pointerId) return;
+  const handlePointerUp = (event: PointerEvent<HTMLDivElement>, clear = true) => {
+    const drag = dragRef.current;
+    if (drag?.pointerId !== event.pointerId) return;
     dragRef.current = undefined;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    if (clear && drag.background && !drag.moved) onClearSelection();
   };
 
   const zoomAtPoint = useCallback((clientX: number, clientY: number, deltaY: number) => {
@@ -221,15 +276,29 @@ export function AnalyzerGraphStage({
     return () => element.removeEventListener('wheel', handleNativeWheel);
   }, [zoomAtPoint]);
 
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      onClearSelection();
+      setShowHelp(false);
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [onClearSelection]);
+
   const renderEdge = (edge: AnalyzerViewEdge) => {
     const source = positionedById.get(edge.sourceId);
     const target = positionedById.get(edge.targetId);
     if (!source || !target) return null;
     const selected = edge.id === selectedEdgeId;
     const connected = selectedNodeId ? edge.sourceId === selectedNodeId || edge.targetId === selectedNodeId : false;
-    const dimmed = Boolean((selectedNodeId || selectedEdgeId) && !selected && !connected);
+    const inContext = Boolean(
+      (source.node.clusterId && selectionContext.contextClusterIds.has(source.node.clusterId))
+      || (target.node.clusterId && selectionContext.contextClusterIds.has(target.node.clusterId)),
+    );
+    const dimmed = Boolean((selectedNodeId || selectedEdgeId) && !selected && !connected && !inContext);
     return (
-      <g key={edge.id} className={`analyzer-edge-group${selected ? ' is-selected' : ''}${connected ? ' is-connected' : ''}${dimmed ? ' is-dimmed' : ''}`}>
+      <g key={edge.id} className={`analyzer-edge-group${selected ? ' is-selected' : ''}${connected ? ' is-connected' : ''}${edge.presentation?.displayKind === 'bundle' ? ' is-bundle' : ''}${dimmed ? ' is-dimmed' : ''}`}>
         <path
           className="analyzer-edge-hit"
           d={edgePath(source, target)}
@@ -263,17 +332,31 @@ export function AnalyzerGraphStage({
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerUp}
+      onPointerCancel={(event) => handlePointerUp(event, false)}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          onClearSelection();
+        }
+      }}
       role="application"
+      tabIndex={0}
       aria-label={`${view.view} graph stage. Drag to pan and use the wheel to zoom. Semantic zoom: ${zoomLevel}.`}
     >
       <div className="analyzer-stage-controls" aria-label="Graph controls">
-        <button type="button" onClick={fit}>Fit</button>
-        <button type="button" onClick={resetTransform}>Reset</button>
+        <button type="button" onClick={fit} title="現在のGraph全体を表示">Fit</button>
+        <button type="button" onClick={resetTransform} title="カメラと表示状態を初期化">Reset</button>
         <button type="button" onClick={() => changeZoom(1.14)} aria-label="Zoom in">+</button>
         <button type="button" onClick={() => changeZoom(0.88)} aria-label="Zoom out">−</button>
         <span>{Math.round(transform.scale * 100)}%</span>
+        <button type="button" className="analyzer-help-button" onClick={() => setShowHelp((current) => !current)} aria-expanded={showHelp} aria-controls="analyzer-graph-help" aria-label="Graph操作ヘルプ">?</button>
       </div>
+      {showHelp && (
+        <div id="analyzer-graph-help" className="analyzer-stage-help" role="dialog" aria-label="Graph操作ヘルプ">
+          <strong>Graph操作</strong>
+          <p>背景をドラッグして移動、Wheelで拡大縮小。Node / Edgeを選ぶと詳細が開き、背景クリックまたはEscで選択を解除します。</p>
+        </div>
+      )}
       {filteredView.nodes.length === 0 ? (
         <div className="analyzer-graph-empty">現在のFilterに一致するNodeはありません。</div>
       ) : (
@@ -302,14 +385,19 @@ export function AnalyzerGraphStage({
               const summary = node.presentation?.role === 'summary';
               const summaryExpanded = expandedPresentationIds.has(node.id) || (node.id === 'dependencies:external:summary' && showExternal);
               const nodeZoom = displayedZoomLevelForNode(zoomLevel, selected, expandedNodeIds.has(node.id));
-              const hasEvidencePreview = nodeZoom === 'near' && node.evidenceIds.length > 0;
-              const dimmed = Boolean(search.trim() && !matches) || Boolean((selectedNodeId || selectedEdgeId) && !selected && !filteredView.edges.some((edge) => (edge.id === selectedEdgeId || (selectedNodeId && (edge.sourceId === selectedNodeId || edge.targetId === selectedNodeId))) && (edge.sourceId === node.id || edge.targetId === node.id)));
+              const connected = selectionContext.connectedNodeIds.has(node.id) && !selected;
+              const inSelectionContext = selectionContext.contextNodeIds.has(node.id);
+              const hasEvidencePreview = nodeZoom === 'near' && node.evidenceIds.length > 0 && (selected || hoveredNodeId === node.id);
+              const compactEvidenceHint = zoomLevel === 'near' && node.evidenceIds.length > 0 && !hasEvidencePreview ? evidenceHint(node, view) : undefined;
+              const dimmed = Boolean(search.trim() && !matches && !selected) || Boolean((selectedNodeId || selectedEdgeId) && !selected && !inSelectionContext);
               return (
                 <div
                   key={node.id}
-                  className={`analyzer-node node-type-${node.type} zoom-${nodeZoom}${summary ? ' is-summary' : ''}${selected ? ' is-selected' : ''}${hasEvidencePreview ? ' has-evidence-preview' : ''}${matches && search.trim() ? ' is-match' : ''}${dimmed ? ' is-dimmed' : ''}`}
+                  className={`analyzer-node node-type-${node.type} zoom-${nodeZoom}${summary ? ' is-summary' : ''}${selected ? ' is-selected' : ''}${connected ? ' is-connected' : ''}${hasEvidencePreview ? ' has-evidence-preview' : ''}${matches && search.trim() ? ' is-match' : ''}${dimmed ? ' is-dimmed' : ''}`}
                   style={nodeStyle(positionedNode)}
                   onClick={() => summary ? togglePresentation(node.id) : onSelectNode(node.id)}
+                  onMouseEnter={() => setHoveredNodeId(node.id)}
+                  onMouseLeave={() => setHoveredNodeId(undefined)}
                   onKeyDown={(event) => {
                     if (event.key === 'Enter' || event.key === ' ') {
                       event.preventDefault();
@@ -326,13 +414,14 @@ export function AnalyzerGraphStage({
                   <span className="analyzer-node-type">{displayNodeType(node)}</span>
                   <strong>{node.label}</strong>
                   {nodeZoom !== 'far' && node.subtitle && <span className="analyzer-node-subtitle">{node.subtitle}</span>}
+                  {compactEvidenceHint && <span className="analyzer-node-evidence-hint">Evidence · {compactEvidenceHint}</span>}
                   {nodeZoom === 'near' && node.evidenceIds.length > 0 && (
                     <div className="analyzer-node-evidence-preview">
                       <EvidencePreview evidenceIds={node.evidenceIds} evidence={view.evidence} sources={sources} compact />
                     </div>
                   )}
-                  {nodeZoom !== 'far' && (
-                    <span className="analyzer-node-evidence">{node.evidenceIds.length > 0 ? `Evidence ${node.evidenceIds.length}` : 'No direct evidence'}</span>
+                  {nodeZoom !== 'far' && node.evidenceIds.length > 1 && (
+                    <span className="analyzer-node-evidence">Evidence {node.evidenceIds.length}</span>
                   )}
                 </div>
               );
@@ -340,7 +429,6 @@ export function AnalyzerGraphStage({
           </div>
         </div>
       )}
-      <p className="analyzer-stage-hint">Drag to pan · Wheel to zoom · Select a Node or Edge for Evidence</p>
     </div>
   );
 }

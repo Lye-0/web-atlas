@@ -7,4 +7,5 @@ export * from './commandParser';
 export * from './scan';
 export * from './projectors';
 export * from './layout';
+export * from './camera';
 export * from './presentation';

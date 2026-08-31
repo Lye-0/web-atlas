@@ -268,6 +268,7 @@ export interface AnalyzerViewEdge {
 export interface AnalyzerEdgePresentation {
   parentId?: string;
   initiallyHidden?: boolean;
+  displayKind?: 'bundle';
 }
 
 export interface AnalyzerCluster {

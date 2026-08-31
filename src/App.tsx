@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AppHeader } from './components/layout/AppHeader';
 import { PageContainer } from './components/layout/PageContainer';
 import { AnalyzerPage } from './pages/AnalyzerPage';
@@ -11,6 +11,8 @@ import { StacksPage } from './pages/StacksPage';
 import { analyzerRoutes } from './utils/routes';
 
 export default function App() {
+  const { pathname } = useLocation();
+  const isAnalyzer = pathname.startsWith('/analyzer');
   return (
     <div className="app-shell">
       <AppHeader />
@@ -29,8 +31,8 @@ export default function App() {
         </Routes>
       </PageContainer>
       <footer className="app-footer">
-        <span>Web Atlas / Dictionary</span>
-        <span>Phase 1 · Technical Dictionary</span>
+        <span>Web Atlas / {isAnalyzer ? 'Analyzer' : 'Dictionary'}</span>
+        <span>{isAnalyzer ? 'Local Evidence Graph' : 'Phase 1 · Technical Dictionary'}</span>
       </footer>
     </div>
   );

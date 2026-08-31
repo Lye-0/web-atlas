@@ -182,14 +182,34 @@ export function projectArchitecture(store: AnalyzerProjectStore): AnalyzerViewMo
         summaryNode(technologySummaryId, 'Technology details', `${technologyDetails.length} additional technologies`, 'technology', 'architecture:technology', technologyDetails),
       ]
     : nodesWithDesktopSummary;
-  const edges = edgesForRelations(
+  const architectureEdges = edgesForRelations(
     store,
     baseNodes,
     (relation) => ['contains', 'uses', 'binds-to', 'depends-on'].includes(relation.kind),
     (relation) => relation.kind === 'depends-on' ? 'uses' : relation.kind,
-  ).map((edge) => technologyDetails.some((node) => node.id === edge.targetId)
+  );
+  const technologyDetailEdges = architectureEdges.filter((edge) => technologyDetails.some((node) => node.id === edge.targetId));
+  const technologyEdgesBySource = new Map<string, AnalyzerViewEdge[]>();
+  technologyDetailEdges.forEach((edge) => {
+    const sourceEdges = technologyEdgesBySource.get(edge.sourceId) ?? [];
+    sourceEdges.push(edge);
+    technologyEdgesBySource.set(edge.sourceId, sourceEdges);
+  });
+  const technologyBundleEdges = technologyEdgesBySource.size > 0
+    ? [...technologyEdgesBySource.entries()].map(([sourceId, sourceEdges]) => ({
+        id: `view-edge:architecture-technology-bundle:${sourceId}`,
+        sourceId,
+        targetId: technologySummaryId,
+        kind: 'uses' as const,
+        label: `${sourceEdges.length} additional ${sourceEdges.length === 1 ? 'technology' : 'technologies'}`,
+        evidenceIds: [...new Set(sourceEdges.flatMap((edge) => edge.evidenceIds))],
+        metadata: { presentation: 'bundle', technologyCount: sourceEdges.length },
+        presentation: { displayKind: 'bundle' as const, parentId: technologySummaryId },
+      }))
+    : [];
+  const edges = architectureEdges.map((edge) => technologyDetails.some((node) => node.id === edge.targetId)
     ? { ...edge, presentation: { parentId: technologySummaryId, initiallyHidden: true } }
-    : edge);
+    : edge).concat(technologyBundleEdges);
   const clusterDefinitions = [
     ['architecture:project', 'Project', 'neutral'],
     ['architecture:apps', 'Applications', 'accent'],
@@ -223,7 +243,7 @@ export function projectWorkspace(store: AnalyzerProjectStore): AnalyzerViewModel
             : 'workspace:packages';
       return nodeForFact(fact, clusterId);
     });
-  const edges = edgesForRelations(store, nodes, (relation) => ['contains', 'uses-config', 'declares', 'matches'].includes(relation.kind));
+  const edges = edgesForRelations(store, nodes, (relation) => ['uses-config', 'declares', 'matches'].includes(relation.kind));
   const warnings = baseWarnings(store, 'workspace');
   if (!store.facts.some((fact) => fact.kind === 'workspace-config')) {
     warnings.push({ id: 'workspace:no-config', message: 'No pnpm-workspace.yaml was detected', severity: 'warning', detectorId: 'workspace' });
@@ -477,15 +497,6 @@ export function projectCommand(store: AnalyzerProjectStore, requestedEntryScript
     const packageFact = packages.find((fact) => fact.id === script.packageId);
     if (packageFact) {
       addFactNode(packageFact, 'command:packages', undefined, context);
-      addViewEdge(edges, {
-        id: `view-edge:${script.id}:${packageFact.id}:runs-in`,
-        sourceId: script.id,
-        targetId: packageFact.id,
-        kind: 'runs-in',
-        label: relationLabels['runs-in'],
-        evidenceIds: script.evidenceIds,
-        metadata: { packagePath: packageFact.packagePath },
-      });
     }
     parseCommandExpression(script.command).forEach((fragment, index) => addFragment(script, fragment, undefined, {
       executionRank: context.executionRank + 1 + index,
@@ -554,7 +565,36 @@ export function projectDependencies(store: AnalyzerProjectStore): AnalyzerViewMo
         summaryNode(externalSummaryId, 'External Packages', `${externalNodes.length} packages · expand for details`, 'external-package', 'dependencies:external', externalNodes),
       ]
     : baseNodes;
-  const edges = edgesForRelations(store, baseNodes, (relation) => relation.kind === 'depends-on');
+  const dependencyEdges = edgesForRelations(store, baseNodes, (relation) => relation.kind === 'depends-on');
+  const externalDependencyEdges = dependencyEdges.filter((edge) => externalNodes.some((node) => node.id === edge.targetId));
+  const externalEdgesBySource = new Map<string, AnalyzerViewEdge[]>();
+  externalDependencyEdges.forEach((edge) => {
+    const sourceEdges = externalEdgesBySource.get(edge.sourceId) ?? [];
+    sourceEdges.push(edge);
+    externalEdgesBySource.set(edge.sourceId, sourceEdges);
+  });
+  const childEdges = externalDependencyEdges.map((edge) => ({
+    ...edge,
+    presentation: { parentId: externalSummaryId, initiallyHidden: true },
+  }));
+  const bundleEdges = externalEdgesBySource.size > 0
+    ? [...externalEdgesBySource.entries()].map(([sourceId, sourceEdges]) => ({
+        id: `view-edge:external-bundle:${sourceId}`,
+        sourceId,
+        targetId: externalSummaryId,
+        kind: 'depends-on' as const,
+        label: `${sourceEdges.length} external ${sourceEdges.length === 1 ? 'dependency' : 'dependencies'}`,
+        evidenceIds: [...new Set(sourceEdges.flatMap((edge) => edge.evidenceIds))],
+        metadata: {
+          presentation: 'bundle',
+          dependencyCount: sourceEdges.length,
+        },
+        presentation: { displayKind: 'bundle' as const, parentId: externalSummaryId },
+      }))
+    : [];
+  const edges = externalNodes.length > 0
+    ? [...dependencyEdges.filter((edge) => !externalNodes.some((node) => node.id === edge.targetId)), ...childEdges, ...bundleEdges]
+    : dependencyEdges;
   const warnings = baseWarnings(store, 'dependencies');
   const clusterDefinitions = [
     ['dependencies:packages', 'Workspace Packages', 'neutral'],

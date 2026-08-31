@@ -9,7 +9,8 @@ interface AnalyzerDetailPanelProps {
   view: AnalyzerViewModel;
   selectedNodeId?: string;
   selectedEdgeId?: string;
-  onSelectNode: (nodeId: string) => void;
+  onSelectNode: (nodeId: string, focus?: boolean) => void;
+  onClose: () => void;
 }
 
 function metadataValue(value: AnalyzerViewNode['metadata'][string]): string {
@@ -26,7 +27,7 @@ function EvidenceList({ evidenceIds, view, store }: { evidenceIds: string[]; vie
   return <div className="analyzer-evidence-list">{evidence.map((item) => <EvidenceCodeBlock key={item.id} evidence={item} source={store.sources[item.filePath]} />)}</div>;
 }
 
-function RelationList({ nodeId, view, onSelectNode }: { nodeId: string; view: AnalyzerViewModel; onSelectNode: (nodeId: string) => void }) {
+function RelationList({ nodeId, view, onSelectNode }: { nodeId: string; view: AnalyzerViewModel; onSelectNode: (nodeId: string, focus?: boolean) => void }) {
   const relations = view.edges.filter((edge) => edge.sourceId === nodeId || edge.targetId === nodeId);
   if (relations.length === 0) return <p className="analyzer-muted-copy">このViewで表示している直接関係はありません。</p>;
   return (
@@ -37,7 +38,7 @@ function RelationList({ nodeId, view, onSelectNode }: { nodeId: string; view: An
         if (!target) return null;
         return (
           <li key={relation.id}>
-            <button type="button" onClick={() => onSelectNode(target.id)}>
+            <button type="button" onClick={() => onSelectNode(target.id, true)}>
               <span>{relation.label}</span>
               <strong>{target.label}</strong>
             </button>
@@ -63,7 +64,7 @@ function displayNodeType(node: AnalyzerViewNode): string {
   return typeof displayRole === 'string' ? displayRole : nodeTypeLabels[node.type] ?? node.type;
 }
 
-function PresentationChildren({ node, view, onSelectNode }: { node: AnalyzerViewNode; view: AnalyzerViewModel; onSelectNode: (nodeId: string) => void }) {
+function PresentationChildren({ node, view, onSelectNode }: { node: AnalyzerViewNode; view: AnalyzerViewModel; onSelectNode: (nodeId: string, focus?: boolean) => void }) {
   const childNodes = (node.presentation?.childNodeIds ?? [])
     .map((childId) => view.nodes.find((candidate) => candidate.id === childId))
     .filter((candidate): candidate is AnalyzerViewNode => Boolean(candidate));
@@ -72,7 +73,7 @@ function PresentationChildren({ node, view, onSelectNode }: { node: AnalyzerView
     <ul className="analyzer-presentation-list">
       {childNodes.map((child) => (
         <li key={child.id}>
-          <button type="button" onClick={() => onSelectNode(child.id)}>
+          <button type="button" onClick={() => onSelectNode(child.id, true)}>
             <span>{displayNodeType(child)}</span>
             <strong>{child.label}</strong>
           </button>
@@ -82,20 +83,79 @@ function PresentationChildren({ node, view, onSelectNode }: { node: AnalyzerView
   );
 }
 
-function NodeDetails({ node, view, store, onSelectNode }: { node: AnalyzerViewNode; view: AnalyzerViewModel; store: AnalyzerProjectStore; onSelectNode: (nodeId: string) => void }) {
+function evidenceFiles(node: AnalyzerViewNode, view: AnalyzerViewModel): string[] {
+  return [...new Set(node.evidenceIds
+    .map((evidenceId) => view.evidence.find((evidence) => evidence.id === evidenceId)?.filePath)
+    .filter((filePath): filePath is string => Boolean(filePath)))];
+}
+
+function detectionReason(node: AnalyzerViewNode, fact: ReturnType<typeof factForNode>, view: AnalyzerViewModel): string {
+  if (node.presentation?.role === 'summary') {
+    const childCount = typeof node.metadata.childCount === 'number' ? node.metadata.childCount : node.presentation.childNodeIds?.length ?? 0;
+    return `${childCount}件の詳細Factをまとめた表示上のSummary Nodeです。展開して元のNodeとEvidenceを確認できます。`;
+  }
+
+  if (!fact) {
+    if (node.type === 'command') {
+      const commandType = typeof node.metadata.commandType === 'string' ? node.metadata.commandType : 'command';
+      return commandType === 'user-command'
+        ? `選択したEntry scriptを起点に、${node.label}を実行入口として展開しました。`
+        : `package scriptのcommand fragment「${node.label}」として展開しました。`;
+    }
+    return `${nodeTypeLabels[node.type] ?? node.type}として、このViewの検出結果に追加しました。`;
+  }
+
+  const files = evidenceFiles(node, view);
+  const source = files[0] ?? fact.filePath;
+  switch (fact.kind) {
+    case 'project':
+      return source ? `${source}のproject metadataからProjectを検出しました。` : '選択したローカルFolderをProjectとして検出しました。';
+    case 'workspace-config':
+      return `${source ?? fact.filePath ?? 'workspace設定'}のpackages設定からpnpm workspaceを検出しました。`;
+    case 'workspace-pattern':
+      return `${source ?? fact.filePath ?? 'workspace設定'}のpackages pattern「${fact.pattern}」を検出しました。`;
+    case 'workspace-package':
+      return `${fact.manifestPath}のpackage manifestを${fact.isRoot ? 'root package' : 'workspace package'}として検出しました。`;
+    case 'package-manifest':
+      return `${fact.filePath ?? fact.packagePath}のpackage.json manifestとして検出しました。`;
+    case 'package-script':
+      return `${fact.sourcePath}のscripts.${fact.scriptName}からpackage scriptを検出しました。`;
+    case 'external-package':
+      return `${fact.packageName}が直接dependency declarationに含まれているためExternal Packageとして検出しました。`;
+    case 'technology':
+      return fact.explicit
+        ? `${source ?? '設定ファイル'}の明示的な設定から${fact.label}を検出しました。`
+        : `package.jsonのdependency declaration（${fact.packageNames.join('、') || fact.label}）から${fact.label}を検出しました。`;
+    case 'runtime':
+      return `${fact.configPath ?? source ?? 'runtime設定'}のname / mainから${fact.label} runtimeを検出しました。`;
+    case 'resource':
+      return `${source ?? fact.filePath ?? '設定ファイル'}の${fact.binding ? `binding「${fact.binding}」` : fact.resourceType}からResourceを検出しました。`;
+    case 'dotnet-project':
+      return `${fact.projectPath}の.csproj propertyから${fact.useWpf ? '.NET / WPF Application' : '.NET Application'}を検出しました。`;
+    case 'command':
+      return `package scriptのcommand fragment「${fact.command}」として展開しました。`;
+    default:
+      return `${nodeTypeLabels[node.type] ?? node.type}として検出しました。`;
+  }
+}
+
+function NodeDetails({ node, view, store, onSelectNode }: { node: AnalyzerViewNode; view: AnalyzerViewModel; store: AnalyzerProjectStore; onSelectNode: (nodeId: string, focus?: boolean) => void }) {
   const fact = factForNode(store, node);
   const dictionary = displayDictionaryStack(factDictionaryStackId(fact ?? node));
   const summary = node.presentation?.role === 'summary';
   return (
     <>
       <div className="analyzer-detail-heading">
-        <span className="analyzer-node-type">{displayNodeType(node)}</span>
+        <div className="analyzer-detail-heading-top">
+          <span className="analyzer-node-type">{displayNodeType(node)}</span>
+          <button type="button" className="analyzer-focus-selected" onClick={() => onSelectNode(node.id, true)}>Focus Selected</button>
+        </div>
         <h2>{node.label}</h2>
         {node.subtitle && <p>{node.subtitle}</p>}
       </div>
       <section className="analyzer-detail-section">
         <h3>Overview</h3>
-        <p>{summary ? 'これは表示上のSummary Nodeです。元のFact / Evidenceを保持したまま、Graph上の初期情報量を抑えています。' : fact?.metadata.role ? String(fact.metadata.role) : 'このNodeは選択中のAnalyzer Viewで検出・表示されています。'}</p>
+        <p>{detectionReason(node, fact, view)}</p>
         {dictionary && <Link className="analyzer-dictionary-link" to={stackPath(dictionary.id)}>Dictionaryで見る <span aria-hidden="true">→</span></Link>}
       </section>
       {summary ? (
@@ -121,13 +181,15 @@ function NodeDetails({ node, view, store, onSelectNode }: { node: AnalyzerViewNo
   );
 }
 
-function EdgeDetails({ edge, view, store, onSelectNode }: { edge: AnalyzerViewEdge; view: AnalyzerViewModel; store: AnalyzerProjectStore; onSelectNode: (nodeId: string) => void }) {
+function EdgeDetails({ edge, view, store, onSelectNode }: { edge: AnalyzerViewEdge; view: AnalyzerViewModel; store: AnalyzerProjectStore; onSelectNode: (nodeId: string, focus?: boolean) => void }) {
   const source = view.nodes.find((node) => node.id === edge.sourceId);
   const target = view.nodes.find((node) => node.id === edge.targetId);
   return (
     <>
       <div className="analyzer-detail-heading">
-        <span className="analyzer-node-type">Relation</span>
+        <div className="analyzer-detail-heading-top">
+          <span className="analyzer-node-type">Relation</span>
+        </div>
         <h2>{edge.label}</h2>
         <p>{source?.label ?? edge.sourceId} → {target?.label ?? edge.targetId}</p>
       </div>
@@ -135,8 +197,8 @@ function EdgeDetails({ edge, view, store, onSelectNode }: { edge: AnalyzerViewEd
         <h3>Relation</h3>
         <p className="analyzer-edge-summary">{source?.label ?? edge.sourceId} <span aria-hidden="true">→</span> {target?.label ?? edge.targetId}</p>
         <div className="analyzer-edge-actions">
-          {source && <button type="button" onClick={() => onSelectNode(source.id)}>Sourceを見る</button>}
-          {target && <button type="button" onClick={() => onSelectNode(target.id)}>Targetを見る</button>}
+          {source && <button type="button" onClick={() => onSelectNode(source.id, true)}>Sourceを見る</button>}
+          {target && <button type="button" onClick={() => onSelectNode(target.id, true)}>Targetを見る</button>}
         </div>
       </section>
       <section className="analyzer-detail-section">
@@ -151,21 +213,34 @@ function EdgeDetails({ edge, view, store, onSelectNode }: { edge: AnalyzerViewEd
   );
 }
 
-export function AnalyzerDetailPanel({ store, view, selectedNodeId, selectedEdgeId, onSelectNode }: AnalyzerDetailPanelProps) {
+export function AnalyzerDetailPanel({ store, view, selectedNodeId, selectedEdgeId, onSelectNode, onClose }: AnalyzerDetailPanelProps) {
   const node = selectedNodeId ? view.nodes.find((candidate) => candidate.id === selectedNodeId) : undefined;
   const edge = selectedEdgeId ? view.edges.find((candidate) => candidate.id === selectedEdgeId) : undefined;
   return (
     <aside className="analyzer-detail-panel" aria-label="Analyzer detail panel">
       {!node && !edge ? (
         <div className="analyzer-detail-empty">
-          <span className="analyzer-panel-kicker">Selection</span>
+          <div className="analyzer-detail-heading-top">
+            <span className="analyzer-panel-kicker">Selection</span>
+            <button type="button" className="analyzer-detail-close" onClick={onClose} aria-label="Close detail panel">Close</button>
+          </div>
           <h2>NodeまたはEdgeを選択</h2>
           <p>Graph上の要素を選ぶと、検出理由・直接Evidence・関係・metadataを表示します。</p>
         </div>
       ) : node ? (
-        <NodeDetails node={node} view={view} store={store} onSelectNode={onSelectNode} />
+        <>
+          <div className="analyzer-detail-panel-close-row">
+            <button type="button" className="analyzer-detail-close" onClick={onClose} aria-label="Close detail panel">Close</button>
+          </div>
+          <NodeDetails node={node} view={view} store={store} onSelectNode={onSelectNode} />
+        </>
       ) : edge ? (
-        <EdgeDetails edge={edge} view={view} store={store} onSelectNode={onSelectNode} />
+        <>
+          <div className="analyzer-detail-panel-close-row">
+            <button type="button" className="analyzer-detail-close" onClick={onClose} aria-label="Close detail panel">Close</button>
+          </div>
+          <EdgeDetails edge={edge} view={view} store={store} onSelectNode={onSelectNode} />
+        </>
       ) : null}
     </aside>
   );

@@ -20,7 +20,7 @@ Project Folder
 
 解析対象は構造情報を持つ設定ファイルに限定しています。`.git`、依存・生成物、`.env`、秘密情報用拡張子は除外し、JSON/JSONCの設定値はサイズ上限（1 MiB）も設けています。
 
-Graphは新しい可視化ライブラリへ依存せず、[`src/analyzer/layout.ts`](../../src/analyzer/layout.ts) のView別の決定的なlayoutと、[`src/components/analyzer/AnalyzerGraphStage.tsx`](../../src/components/analyzer/AnalyzerGraphStage.tsx) のSVG/DOM rendererで構成しています。Workspaceは既存のcolumn flowを維持し、Architectureはcompact grid、Commandはexecution rank、Dependencyは責務ごとのlaneで配置します。これによりBundleを増やさず、Node・Edge選択、pan、wheel zoom、Fit、Reset、semantic zoomを同じモデル上で制御できます。
+Graphは新しい可視化ライブラリへ依存せず、[`src/analyzer/layout.ts`](../../src/analyzer/layout.ts) のView別の決定的なlayoutと、[`src/components/analyzer/AnalyzerGraphStage.tsx`](../../src/components/analyzer/AnalyzerGraphStage.tsx) のSVG/DOM rendererで構成しています。Workspaceはcolumn flow、Architectureはcompact grid、Commandはexecution rank、Dependencyは責務ごとのlaneで配置します。初回表示と明示的なFitだけが現在のlayout boundsに合わせてカメラを収め、Summaryの展開・折りたたみや通常のNode選択では視点を保持します。Fitは全体表示、Resetはカメラと表示状態の初期化として役割を分けています。
 
 ## Fact / Evidence model
 
@@ -49,27 +49,29 @@ Parserは値とsource rangeを返し、detectorがFact・Evidence・Relationを�
 
 Analyzer shellには次の4つのprojectorがあります。
 
-1. **Architecture Overview** — Project、workspace package、明示的に検出したWorker/D1/B2/Firebaseなどの主要構造を配置します。.NET / WPF detailと低優先度TechnologyはSummary Node配下へ初期collapseし、選択・Expandで元のFactを表示します。実際のEvidenceがないWeb→APIなどの関係は生成しません。
-2. **Workspace Flow** — pnpm config、patterns、packageの関係を表示します。dependency graphは混ぜません。
-3. **Command Flow** — rootの`dev`（なければrootの最初のscript）をentryとし、`pnpm run`、`--filter`、`pnpm exec`、CLI、`&&` / `||` / `;`、`concurrently`を再帰的に展開します。Node typeではなくexecution rankをx座標に使い、同時実行branchはbranch pathでy方向に分離します。unknown commandは警告付きで残し、cycleは警告とedgeを残します。
-4. **Package Dependency** — workspace package、直接のdependency declarationから解決されたDictionary technology、未登録のExternal Packageをdirect dependency edgeで表示します。packageManager由来だけのpnpmは含めません。ExternalはSummary Nodeへ初期collapseし、表示/折りたたみを切り替えられます。検索・type filter・detail選択時は該当detailを一時表示します。
+1. **Architecture Overview** — Project、workspace package、明示的に検出したWorker/D1/B2/Firebaseなどの主要構造を配置します。Projectから低優先度Technologyへ直接fan-outせず、.NET / WPF detailと低優先度TechnologyはSummary Node配下へ初期collapseし、選択・Expandで元のFactを表示します。実際のEvidenceがないWeb→APIなどの関係は生成しません。
+2. **Workspace Flow** — pnpm config、patterns、packageの`uses-config`、`declares`、`matches`だけを主線として表示します。`contains`やdependency graphは主グラフへ混ぜません。
+3. **Command Flow** — rootの`dev`（なければrootの最初のscript）をentryとし、`pnpm run`、`--filter`、`pnpm exec`、CLI、`&&` / `||` / `;`、`concurrently`を再帰的に展開します。主線は`resolves-to`、`executes`、`starts`、`expands-to`に限定し、Node typeではなくexecution rankをx座標に使い、同時実行branchはbranch pathでy方向に分離します。scriptの所属packageはNode metadata / subtitle / detailで確認できます。unknown commandは警告付きで残し、cycleは警告とedgeを残します。
+4. **Package Dependency** — workspace package、直接のdependency declarationから解決されたDictionary technology、未登録のExternal Packageをdirect dependency edgeで表示します。packageManager由来だけのpnpmは含めません。ExternalはSummary Nodeへ初期collapseし、閉じた状態ではsourceごとの`external dependencies` bundle edge、展開時は元のdirect edgeを表示します。検索・type filter・detail選択時は該当detailを一時表示します。
 
 全ViewでNode search、type filter、Node/Edge選択、detail panel、Evidence previewを利用できます。
 
 ## Semantic zoom / 2.5D presentation
 
-Graphの拡大率は [`src/analyzer/zoom.ts`](../../src/analyzer/zoom.ts) で3段階に量子化しています。`scale < 0.55` はFar、`0.55 <= scale <= 0.95` はMedium、`scale > 0.95` はNearです。Nearでは現在のviewport内にあるEvidence付きNodeだけを遅延展開し、非選択NodeでもZoomだけでcompact previewへ入ります。選択中のEvidence付きNodeはviewport外・FarでもNearとして扱います。これにより、全Nodeを同時に詳細化せず、既存のView layoutとRelationモデルを変更しないまま操作対象の周辺だけを詳しく表示します。
+Graphの拡大率は [`src/analyzer/zoom.ts`](../../src/analyzer/zoom.ts) で3段階に量子化しています。`scale < 0.55` はFar、`0.55 <= scale <= 0.95` はMedium、`scale > 0.95` はNearです。Nearでも全Nodeを詳細化せず、Evidence付きNodeはHoverまたはSelectedのときだけcompact previewへ遅延展開します。選択中のEvidence付きNodeはviewport外・FarでもNearとして扱います。これにより、全Nodeを同時に詳細化せず、既存のView layoutとRelationモデルを変更しないまま操作対象の周辺だけを詳しく表示します。
 
 - Far: Node typeとlabelを中心に表示します。
 - Medium: subtitleとEvidence件数を表示します。
-- Near: selected/viewport内のNodeに、最初のEvidenceだけを使った3〜5行のcompact previewを表示します。exact highlight rangeはdetail panelと同じEvidenceCodeBlockで描画します。
-- Detail panel: 常に従来どおり全Evidenceとsource contextを表示し、Node内previewとは情報量を分けます。
+- Near: selectedまたはHover中のNodeに、最初のEvidenceだけを使った3〜5行のcompact previewを表示します。通常のNodeはsource / metadataを抑制表示し、Evidenceが1件だけの場合は反復的な`Evidence 1`を表示しません。exact highlight rangeはdetail panelと同じEvidenceCodeBlockで描画します。
+- Detail panel: 未選択時は閉じ、選択時だけ開きます。選択中は全Evidenceとsource contextを表示し、Focus Selected、関係先への移動、Closeを提供します。Closeは選択Node / Edgeを保持したままPanelだけを閉じ、背景クリックまたはEscで選択・detailを解除します。
 
 2.5Dの視覚階層は、z0のFine / Large grid、z1のcluster plane、z2のdefault edge、z3のnormal Node、z4のconnected / selected edgeとselected Node、z5のEvidence / interaction layerです。ClusterはNodeより暗く弱いsurface・上端のinner highlight・右下方向のsoft shadow、Nodeは控えめなelevationとsurface contrastで表現します。Edgeは通常Nodeの背面に見えるbase SVG、選択・接続Edgeは前面のforeground SVGへ分離し、Node textの上へ強い発光を重ねません。Neonや強いglassmorphismは使わず、Graph本体には新しい可視化ライブラリを追加していません。
 
 Project未選択時の装飾orbitだけは、React Three Fiber / Three.jsをlazy importした別chunkで描画します。軌道線と`SphereGeometry`を同じ3D sceneに置き、lighting・perspective・depth testで球体として表示します。device pixel ratioは最大1.5に制限し、`prefers-reduced-motion`時はdemand renderingの静止scene、WebGLを利用できない場合やsceneの読込に失敗した場合は静止したCSS軌道線へfallbackします。この装飾が利用できなくてもFolder選択と説明内容には影響しません。
 
-Canvas内のwheelはpassiveではないnative listenerで必ずpreventDefaultし、`overscroll-behavior: contain`も併用しています。wheel zoomを実行してもページ側へscroll chainingしないようにし、panやNode/Edge選択の既存操作を維持します。キャンバス背景のdrag開始ではselectionを抑制し、文字選択を起こさないようにしています。`prefers-reduced-motion`時は既存のreduced-motion設定に従い、transitionを抑制します。
+Canvas内のwheelはpassiveではないnative listenerで必ずpreventDefaultし、`overscroll-behavior: contain`も併用しています。wheel zoomを実行してもページ側へscroll chainingしないようにし、panやNode/Edge選択の既存操作を維持します。キャンバス背景のdrag開始ではselectionを抑制し、文字選択を起こさないようにしています。Node typeはmarker形状とaccentで差別化し、Summaryはdashed / soft surface、bundle edgeは破線と集約labelで区別します。常時表示の操作ヒントは置かず、`?` Helpから操作方法を開けます。`prefers-reduced-motion`時は既存のreduced-motion設定に従い、transitionを抑制します。
+
+Analyzer routeではHeader / Footerも`Analyzer` / `Local Evidence Graph`へ切り替え、Dictionary用の`Phase 1 · Technical Dictionary`表記を表示しません。
 
 ## Privacy and unsupported scope
 
@@ -92,14 +94,14 @@ BrowserのFile System Access APIがない場合はdirectory file inputを使い�
 
 実装時の検証結果:
 
-- `pnpm exec vitest run src/analyzer/analyzer.test.ts`: 12 tests passed
-- `pnpm test`: 4 test files / 22 tests passed
+- `pnpm test`: 4 test files / 23 tests passed（Analyzer単体13 testsを含む）
 - `pnpm typecheck`: passed
 - `pnpm lint`: passed
-- `pnpm build`: passed（Vite production bundle）
+- `pnpm build`: passed（Vite production bundle。Three.js lazy chunkのサイズ警告あり）
 - `pnpm exec wrangler deploy --dry-run`: passed（No bindings found、dry-runで終了）
-- Browser smoke / responsive viewport check: 前回Phase 2Aで実施済み。今回差分の実ブラウザ視覚確認は未実施
-- Manual QA対象width: 1600 / 1440 / 1280 / 1100 / 1024 / 768 / 390px。今回のvehicle-management実フォルダ選択と各Viewの視覚確認は未実施
+- Browser smoke: `http://127.0.0.1:5173/analyzer/architecture` の未選択状態で、Analyzer Header / Footer、Folder picker、Detail panel非表示、console error / warningなしを確認。Graphデータ入りの操作確認は未実施
+- Responsive viewport check: 1600 / 1440 / 1280 / 1100 / 1024 / 768 / 390pxは今回未実施
+- `vehicle-management`の実フォルダ選択、各View、全幅の視覚確認はread-only Manual QAとして今回未実施
 - `vehicle-management` はread-only QA対象であり、今回も変更していません
 
 既存Dictionaryのcanonical ID・`packageNames`・Map scopeは変更せず、AnalyzerからDictionary detailへ既存stack routeを再利用しています。Repository memoryの既存Dictionary契約も実装前に再確認済みです。

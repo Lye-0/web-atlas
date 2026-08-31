@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { projectAnalyzerView, viewNodeSearchText, analyzerViewLabels } from '../analyzer';
 import type { AnalyzerProjectStore, AnalyzerViewId } from '../analyzer';
@@ -25,6 +25,9 @@ export function AnalyzerPage() {
   const [filter, setFilter] = useState<AnalyzerFilter>('all');
   const [showExternal, setShowExternal] = useState(false);
   const [entryScriptId, setEntryScriptId] = useState<string>();
+  const [scanVersion, setScanVersion] = useState(0);
+  const [focusRequest, setFocusRequest] = useState<{ nodeId: string; nonce: number }>();
+  const [detailOpen, setDetailOpen] = useState(false);
 
   const model = useMemo(() => store ? projectAnalyzerView(store, view, entryScriptId) : undefined, [entryScriptId, store, view]);
   const scripts = useMemo(() => store?.facts.filter((fact) => fact.kind === 'package-script') ?? [], [store]);
@@ -39,30 +42,69 @@ export function AnalyzerPage() {
     setSelectedEdgeId(undefined);
     setSearch('');
     setFilter('all');
+    setShowExternal(false);
+    setFocusRequest(undefined);
+    setDetailOpen(false);
   }, [view]);
 
   const handleScanned = (nextStore: AnalyzerProjectStore) => {
     setStore(nextStore);
+    setScanVersion((current) => current + 1);
     setSelectedNodeId(undefined);
     setSelectedEdgeId(undefined);
     setEntryScriptId(undefined);
+    setSearch('');
+    setFilter('all');
+    setShowExternal(false);
+    setFocusRequest(undefined);
+    setDetailOpen(false);
   };
 
-  const selectNode = (nodeId: string) => {
+  const requestFocus = useCallback((nodeId: string) => {
+    setFocusRequest((current) => ({ nodeId, nonce: (current?.nonce ?? 0) + 1 }));
+  }, []);
+
+  const selectNode = useCallback((nodeId: string, focus = false) => {
     setSelectedNodeId(nodeId);
     setSelectedEdgeId(undefined);
-  };
+    setDetailOpen(true);
+    if (focus) requestFocus(nodeId);
+  }, [requestFocus]);
 
-  const selectEdge = (edgeId: string) => {
+  const selectEdge = useCallback((edgeId: string) => {
     setSelectedEdgeId(edgeId);
     setSelectedNodeId(undefined);
-  };
+    setDetailOpen(true);
+  }, []);
 
-  const toggleExternal = () => {
-    setShowExternal((current) => !current);
+  const clearSelection = useCallback(() => {
     setSelectedNodeId(undefined);
     setSelectedEdgeId(undefined);
-  };
+    setDetailOpen(false);
+  }, []);
+
+  const closeDetail = useCallback(() => {
+    setDetailOpen(false);
+  }, []);
+
+  const toggleExternal = useCallback(() => {
+    setShowExternal((current) => !current);
+    clearSelection();
+  }, [clearSelection]);
+
+  const resetPresentation = useCallback(() => {
+    setShowExternal(false);
+    setSearch('');
+    setFilter('all');
+    clearSelection();
+    setFocusRequest(undefined);
+  }, [clearSelection]);
+
+  useEffect(() => {
+    if (!search.trim() || searchResults.length !== 1) return;
+    const [result] = searchResults;
+    if (result) selectNode(result.id, true);
+  }, [search, searchResults, selectNode]);
 
   return (
     <div className="page-stack analyzer-page">
@@ -119,7 +161,7 @@ export function AnalyzerPage() {
           {searchResults.length > 0 && (
             <div className="analyzer-search-results" role="listbox" aria-label="Analyzer search results">
               {searchResults.map((node) => (
-                <button key={node.id} type="button" onClick={() => selectNode(node.id)}>
+                <button key={node.id} type="button" onClick={() => selectNode(node.id, true)}>
                   <span>{node.type}</span>
                   <strong>{node.label}</strong>
                   {node.subtitle && <small>{node.subtitle}</small>}
@@ -128,7 +170,7 @@ export function AnalyzerPage() {
             </div>
           )}
 
-          <div className="analyzer-workspace">
+          <div className={`analyzer-workspace${detailOpen ? ' has-detail' : ''}`}>
             <AnalyzerGraphStage
               view={model}
               selectedNodeId={selectedNodeId}
@@ -137,17 +179,24 @@ export function AnalyzerPage() {
               search={search}
               showExternal={showExternal}
               onToggleExternal={toggleExternal}
+              onClearSelection={clearSelection}
+              onResetPresentation={resetPresentation}
               sources={store.sources}
               onSelectNode={selectNode}
               onSelectEdge={selectEdge}
+              focusRequest={focusRequest}
+              cameraResetKey={scanVersion}
             />
-            <AnalyzerDetailPanel
-              store={store}
-              view={model}
-              selectedNodeId={selectedNodeId}
-              selectedEdgeId={selectedEdgeId}
-              onSelectNode={selectNode}
-            />
+            {detailOpen && (
+              <AnalyzerDetailPanel
+                store={store}
+                view={model}
+                selectedNodeId={selectedNodeId}
+                selectedEdgeId={selectedEdgeId}
+                onSelectNode={selectNode}
+                onClose={closeDetail}
+              />
+            )}
           </div>
 
           {model.warnings.length > 0 && (

@@ -57,6 +57,10 @@ export function presentAnalyzerView(view: AnalyzerViewModel, options: AnalyzerPr
 
   view.edges.forEach((edge) => {
     const parentId = edge.presentation?.parentId;
+    if (edge.presentation?.displayKind === 'bundle'
+      && parentId
+      && expandedGroupIds.has(parentId)
+      && edge.id !== options.selectedEdgeId) return;
     if (edge.presentation?.initiallyHidden
       && (!parentId || !expandedGroupIds.has(parentId))
       && edge.id !== options.selectedEdgeId) return;
