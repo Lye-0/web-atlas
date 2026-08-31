@@ -255,6 +255,16 @@ export interface AnalyzerNodePresentation {
   hideWhenExpanded?: boolean;
 }
 
+export interface AnalyzerPresentationGroup {
+  id: string;
+  label: string;
+  count: number;
+  countLabel: string;
+  childNodeIds: string[];
+  parentId?: string;
+  expanded: boolean;
+}
+
 export interface AnalyzerViewEdge {
   id: string;
   sourceId: string;
@@ -291,6 +301,7 @@ export interface AnalyzerViewModel {
   nodes: AnalyzerViewNode[];
   edges: AnalyzerViewEdge[];
   clusters: AnalyzerCluster[];
+  presentationGroups?: AnalyzerPresentationGroup[];
   counts?: AnalyzerViewCounts;
   evidence: AnalyzerEvidence[];
   warnings: AnalyzerWarning[];

@@ -7,7 +7,7 @@ import { ANALYZER_COMMAND_COMMON_LANE_ID, projectArchitecture, projectCommand, p
 import { analyzerSummarySubtitle, presentationOwnsNode, presentAnalyzerView } from './presentation';
 import { scanProjectFiles } from './scan';
 import { packageIdForPath, scriptIdFor, type AnalyzerSourceFile, type AnalyzerViewModel } from './types';
-import { ANALYZER_NEAR_NODE_HEIGHT, ANALYZER_NODE_HEIGHT, layoutAnalyzerView } from './layout';
+import { ANALYZER_NEAR_NODE_HEIGHT, ANALYZER_NODE_HEIGHT, ANALYZER_NODE_WIDTH, layoutAnalyzerView } from './layout';
 import { ANALYZER_FIT_PADDING, fitAnalyzerTransform, focusAnalyzerTransform, preserveAnalyzerTransformOnViewportResize } from './camera';
 import { analyzerRelationInverseLabels, relationLabelForNode } from './relations';
 import { analyzerFocusedEdgeEmphasis } from './focus';
@@ -358,6 +358,19 @@ describe('Analyzer scan and projectors', () => {
     expect(sourceExpanded.edges.some((edge) => edge.targetId === 'external-package:mystery-lib')).toBe(true);
     expect(sourceExpanded.edges.some((edge) => edge.presentation?.displayKind === 'bundle')).toBe(false);
     expect(sourceExpanded.counts?.visibleNodes).toBe(sourceExpanded.counts?.totalNodes);
+    expect(expanded.presentationGroups).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'dependencies:external:summary', label: 'External Packages', count: expect.any(Number), countLabel: 'PACKAGES', expanded: true }),
+    ]));
+    expect(layoutAnalyzerView(collapsed).summaryGroups).toHaveLength(0);
+    const externalGroupLayout = layoutAnalyzerView(expanded);
+    const externalSummaryGroup = externalGroupLayout.summaryGroups.find((group) => group.id === 'dependencies:external:summary');
+    expect(externalSummaryGroup).toMatchObject({ id: 'dependencies:external:summary', label: 'External Packages', countLabel: 'PACKAGES' });
+    expect(externalSummaryGroup?.width).toBeGreaterThan(0);
+    expect(externalSummaryGroup?.height).toBeGreaterThan(0);
+    const sourceExpandedLayout = layoutAnalyzerView(sourceExpanded);
+    expect(sourceExpandedLayout.bands).toEqual(expect.arrayContaining([
+      expect.objectContaining({ presentationId: sourceSummary?.id, countLabel: 'PACKAGES' }),
+    ]));
     const summary = dependencies.nodes.find((node) => node.id === 'dependencies:external:summary');
     expect(summary).toBeDefined();
     expect(analyzerSummarySubtitle(summary!, false)).toContain('expand for details');
@@ -386,6 +399,24 @@ describe('Analyzer scan and projectors', () => {
     expect(presented.counts).toEqual({ visibleNodes: 12, totalNodes: 15, hiddenNodes: 3 });
     expect(presented.edges).toHaveLength(19);
     expect(fitAnalyzerTransform(layoutAnalyzerView(presented), 1000, 600).scale).toBeGreaterThan(0.6);
+    expect(presented.presentationGroups).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: technologySummary?.id, label: 'Technology details', countLabel: 'TECHNOLOGIES', expanded: false }),
+    ]));
+    expect(layoutAnalyzerView(presented).summaryGroups).toHaveLength(0);
+    const expandedArchitecture = presentAnalyzerView(architecture, {
+      expandedPresentationIds: new Set([technologySummary?.id].filter((id): id is string => Boolean(id))),
+      filter: 'all',
+      search: '',
+    });
+    const expandedArchitectureLayout = layoutAnalyzerView(expandedArchitecture);
+    const technologyGroup = expandedArchitectureLayout.summaryGroups.find((group) => group.id === technologySummary?.id);
+    const technologyChildren = expandedArchitectureLayout.nodes.filter((positionedNode) => positionedNode.node.presentation?.parentId === technologySummary?.id);
+    expect(technologyGroup).toMatchObject({ id: technologySummary?.id, label: 'Technology details', countLabel: 'TECHNOLOGIES' });
+    expect(technologyChildren.length).toBe(technologySummary?.presentation?.childNodeIds?.length);
+    expect(technologyGroup?.x).toBeLessThanOrEqual(Math.min(...technologyChildren.map((node) => node.x)));
+    expect((technologyGroup?.x ?? 0) + (technologyGroup?.width ?? 0)).toBeGreaterThanOrEqual(Math.max(...technologyChildren.map((node) => node.x + ANALYZER_NODE_WIDTH)));
+    expect(expandedArchitectureLayout.width).toBeGreaterThanOrEqual((technologyGroup?.x ?? 0) + (technologyGroup?.width ?? 0));
+    expect(expandedArchitectureLayout.height).toBeGreaterThanOrEqual((technologyGroup?.y ?? 0) + (technologyGroup?.height ?? 0));
     expect(architecture.edges.some((edge) => edge.sourceId === 'project:root' && edge.targetId.startsWith('technology:') && edge.presentation?.emphasis === 'deep')).toBe(true);
   });
 
@@ -442,6 +473,11 @@ describe('Analyzer scan and projectors', () => {
     expect(expanded.nodes.some((node) => node.id === webBranch?.id)).toBe(false);
     expect(expanded.counts?.hiddenNodes).toBeLessThan(collapsed.counts?.hiddenNodes ?? 0);
     expect(layoutAnalyzerView(collapsed).lanes.every((lane) => /· \d+ STEPS$/.test(lane.label))).toBe(true);
+    const expandedCommandLayout = layoutAnalyzerView(expanded);
+    expect(expandedCommandLayout.summaryGroups).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: webBranch?.id, label: 'WEB', countLabel: 'STEPS' }),
+    ]));
+    expect(layoutAnalyzerView(collapsed).summaryGroups).toHaveLength(0);
   });
 
   it('warns on recursive package scripts while retaining the cycle edge', async () => {

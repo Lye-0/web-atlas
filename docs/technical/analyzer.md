@@ -32,7 +32,7 @@ Graphは新しい可視化ライブラリへ依存せず、[`src/analyzer/layout
 
 Evidence detailは対象行の前後を含む短いcode contextを表示し、`mark` は検出したexact rangeだけに付けます。設定値をsource storeへ保存する前に、`B2_*`、`API`、`AUTH`、`ACCESS`、`SECRET`、`PRIVATE`、`PASSWORD`、`TOKEN`、`CREDENTIAL` 系keyのvalueをoffsetを変えずにmaskします。
 
-View専用のSummary / detail表示は `AnalyzerViewNode.presentation` と `AnalyzerViewEdge.presentation` にだけ保持し、表示数は `AnalyzerViewModel.counts` でvisible / total / hiddenを分離します。External Package、低優先度Technology、workspace package、.NET detail、Command branchを初期表示から畳んでも、Fact・Evidence・Relation storeそのものは削除・変更しません。Summaryを展開したまま子Nodeを選んでcollapseした場合は、所有するSummary / groupへ選択をfallbackし、Detailからも同じgroupをcollapseできます。Collapsed SummaryはCard、Expanded SummaryはPresentation-onlyのCluster / Lane Headerまたはsource band anchorとして描画します。Relationのforward labelと、選択Nodeから見たinverse labelは [`src/analyzer/relations.ts`](../../src/analyzer/relations.ts) で分離します。
+View専用のSummary / detail表示は `AnalyzerViewNode.presentation`、`AnalyzerViewModel.presentationGroups`、`AnalyzerViewEdge.presentation` にだけ保持し、表示数は `AnalyzerViewModel.counts` でvisible / total / hiddenを分離します。External Package、低優先度Technology、workspace package、.NET detail、Command branchを初期表示から畳んでも、Fact・Evidence・Relation storeそのものは削除・変更しません。Summaryを展開したまま子Nodeを選んでcollapseした場合は、所有するSummary / groupへ選択をfallbackし、Detailからも同じgroupをcollapseできます。Collapsed SummaryはSUMMARY marker・count・Expand affordanceを持つ破線のSummary Cardとして描画し、Expanded Summaryは子Node全体を囲む破線・透明面のSummary Group Regionと、必要に応じて選択されたSummary anchorとして描画します。Structural Cluster / Command laneはSummaryの展開操作を兼ねず、solidな構造背景として維持します。Summary GroupのboundsはGraphのlayout boundsにも加え、Fit時に見出しや輪郭が切れないようにします。Relationのforward labelと、選択Nodeから見たinverse labelは [`src/analyzer/relations.ts`](../../src/analyzer/relations.ts) で分離します。
 
 ## Parsers and detectors
 
@@ -65,7 +65,7 @@ Graphの拡大率は [`src/analyzer/zoom.ts`](../../src/analyzer/zoom.ts) で3�
 - Near: 通常のEvidence付きNodeには`filePath:line`のcompact evidence hintを表示します。3〜5行のcompact previewはSelected Nodeだけに表示し、HoverではNodeのsurface / border / shadowのみを強調します。通常のNodeはsource / metadataを抑制表示し、Evidenceが1件だけの場合は反復的な`Evidence 1`を表示しません。exact highlight rangeはdetail panelと同じEvidenceCodeBlockで描画します。
 - Detail panel: 未選択時は閉じ、選択時だけ開きます。選択中は全Evidenceとsource contextを表示し、Focus Selected、関係先への移動、Closeを提供します。Closeは選択Node / Edgeを保持したままPanelだけを閉じ、背景クリックまたはEscで選択・detailを解除します。
 
-2.5Dの視覚階層は、z0のFine / Large grid、z1のcluster plane / command lane、z2のdefault・focused edge、z3のnormal Node、z5のSelected NodeとEvidence / interaction layerです。Cluster tintは弱め、bottom/right shadow・top highlight・inner shadingで奥の板として表現します。Normal Nodeにはtight contact shadow、Selected Nodeにはsmall liftと少し広いshadowを使います。EdgeはNodeより背面に置き、選択EdgeもNodeの前へ出しすぎません。Neonや強いglassmorphismは使わず、Graph本体には新しい可視化ライブラリを追加していません。
+2.5Dの視覚階層は、z0のFine / Large grid、z1のCluster Plane、z1上のSummary Group Region、z2のdefault・focused edge、z3のnormal Fact Node、z5のSelected NodeとEvidence / interaction layerです。Summary GroupはClusterより前、Edgeより後ろに置き、transparent surface・dashed outline・headingで所属範囲を示します。Cluster tintは弱め、bottom/right shadow・top highlight・inner shadingで奥の板として表現します。Normal Nodeにはtight contact shadow、Selected Nodeにはsmall liftと少し広いshadowを使います。EdgeはNodeより背面に置き、選択EdgeもNodeの前へ出しすぎません。Neonや強いglassmorphismは使わず、Graph本体には新しい可視化ライブラリを追加していません。
 
 Project未選択時の装飾orbitだけは、React Three Fiber / Three.jsをlazy importした別chunkで描画します。軌道線と`SphereGeometry`を同じ3D sceneに置き、lighting・perspective・depth testで球体として表示します。device pixel ratioは最大1.5に制限し、`prefers-reduced-motion`時はdemand renderingの静止scene、WebGLを利用できない場合やsceneの読込に失敗した場合は静止したCSS軌道線へfallbackします。この装飾が利用できなくてもFolder選択と説明内容には影響しません。
 
@@ -90,7 +90,7 @@ BrowserのFile System Access APIがない場合はdirectory file inputを使い�
 
 ## Validation
 
-合成fixtureは [`src/analyzer/analyzer.test.ts`](../../src/analyzer/analyzer.test.ts) にあり、parser range、workspace解決、Dictionary matching、D1/B2/Firebase/.NET detection、command recursion/concurrently/cycle、forward / inverse relation label、COMMON / branch summary / lane、view scope、visible / total count、masking、Semantic Zoom、Architecture初期projection / high-degree depth emphasis、execution layout、External collapse / source別expand / global expandの元Fact保持、External source grouping / shared node / no-chain、collapsed search、Fit paddingを検証します。
+合成fixtureは [`src/analyzer/analyzer.test.ts`](../../src/analyzer/analyzer.test.ts) にあり、parser range、workspace解決、Dictionary matching、D1/B2/Firebase/.NET detection、command recursion/concurrently/cycle、forward / inverse relation label、COMMON / branch summary / lane、view scope、visible / total count、masking、Semantic Zoom、Summary Card / Summary GroupのPresentation metadata・count・共通bounds、Architecture初期projection / high-degree depth emphasis、execution layout、External collapse / source別expand / global expandの元Fact保持、External source grouping / shared node / no-chain、collapsed search、Fit paddingを検証します。
 
 実装時の検証結果:
 

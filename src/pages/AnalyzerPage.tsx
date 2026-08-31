@@ -111,9 +111,6 @@ export function AnalyzerPage() {
     if (!model) return;
     const currentlyExpanded = expandedPresentationIds.has(presentationId);
     const next = new Set(expandedPresentationIds);
-    if (currentlyExpanded) next.delete(presentationId);
-    else next.add(presentationId);
-    setExpandedPresentationIds(next);
 
     const selectedNodeIsDescendant = Boolean(selectedNodeId && presentationOwnsNode(model, presentationId, selectedNodeId));
     const selectedEdgeTouchesDescendant = Boolean(selectedEdgeId && (() => {
@@ -122,7 +119,11 @@ export function AnalyzerPage() {
         ? presentationOwnsNode(model, presentationId, selectedEdge.sourceId) || presentationOwnsNode(model, presentationId, selectedEdge.targetId)
         : false;
     })());
-    const shouldFallbackToSummary = currentlyExpanded && (selectedNodeIsDescendant || selectedEdgeTouchesDescendant);
+    const effectivelyExpanded = currentlyExpanded || selectedNodeIsDescendant || selectedEdgeTouchesDescendant;
+    if (effectivelyExpanded) next.delete(presentationId);
+    else next.add(presentationId);
+    setExpandedPresentationIds(next);
+    const shouldFallbackToSummary = effectivelyExpanded && (selectedNodeIsDescendant || selectedEdgeTouchesDescendant);
     if (options.select || shouldFallbackToSummary) {
       setSelectedNodeId(presentationId);
       setSelectedEdgeId(undefined);

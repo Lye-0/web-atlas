@@ -1,4 +1,4 @@
-import type { AnalyzerViewEdge, AnalyzerViewCounts, AnalyzerViewModel, AnalyzerViewNode } from './types';
+import type { AnalyzerViewEdge, AnalyzerViewCounts, AnalyzerViewModel, AnalyzerViewNode, AnalyzerPresentationGroup } from './types';
 
 export interface AnalyzerPresentationOptions {
   expandedPresentationIds: ReadonlySet<string>;
@@ -21,6 +21,20 @@ export function analyzerSummarySubtitle(node: AnalyzerViewNode, expanded: boolea
     return expanded ? node.subtitle : node.subtitle.replace(/· expanded(?: · Collapse)?$/, '· expand for details');
   }
   return `${node.subtitle} · ${expanded ? 'expanded · Collapse' : 'expand for details'}`;
+}
+
+export function analyzerPresentationCount(node: AnalyzerViewNode): number {
+  const metadataCount = node.metadata.childCount;
+  if (typeof metadataCount === 'number' && Number.isFinite(metadataCount)) return Math.max(0, Math.round(metadataCount));
+  return node.presentation?.childNodeIds?.length ?? 0;
+}
+
+export function analyzerPresentationCountLabel(node: AnalyzerViewNode): string {
+  if (typeof node.metadata.stepCount === 'number' || node.metadata.commandType === 'branch-summary') return 'STEPS';
+  if (typeof node.metadata.packageCount === 'number' || node.type === 'external-package' || node.type === 'workspace-package') return 'PACKAGES';
+  if (node.type === 'dotnet-project') return 'PROJECTS';
+  if (node.type === 'technology') return 'TECHNOLOGIES';
+  return 'ITEMS';
 }
 
 export function presentationParentId(view: AnalyzerViewModel, nodeId: string): string | undefined {
@@ -109,6 +123,18 @@ export function presentAnalyzerView(view: AnalyzerViewModel, options: AnalyzerPr
     if (options.expandedPresentationIds.has(summary.id) || hasRelevantDescendant) expandedGroupIds.add(summary.id);
   });
 
+  const presentationGroups: AnalyzerPresentationGroup[] = view.nodes
+    .filter((node) => node.presentation?.role === 'summary')
+    .map((summary) => ({
+      id: summary.id,
+      label: summary.label,
+      count: analyzerPresentationCount(summary),
+      countLabel: analyzerPresentationCountLabel(summary),
+      childNodeIds: [...(summary.presentation?.childNodeIds ?? [])],
+      ...(summary.presentation?.parentId ? { parentId: summary.presentation.parentId } : {}),
+      expanded: expandedGroupIds.has(summary.id),
+    }));
+
   const presentationVisibleIds = new Set<string>();
   view.nodes.forEach((node) => {
     if (node.presentation?.role === 'summary'
@@ -181,5 +207,6 @@ export function presentAnalyzerView(view: AnalyzerViewModel, options: AnalyzerPr
     clusters: view.clusters
       .map((cluster) => ({ ...cluster, nodeIds: cluster.nodeIds.filter((nodeId) => visibleIds.has(nodeId)) }))
       .filter((cluster) => cluster.nodeIds.length > 0),
+    presentationGroups,
   };
 }

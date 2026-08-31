@@ -1,4 +1,5 @@
-import type { AnalyzerCluster, AnalyzerViewModel, AnalyzerViewNode } from './types';
+import { analyzerPresentationCount, analyzerPresentationCountLabel } from './presentation';
+import type { AnalyzerCluster, AnalyzerPresentationGroup, AnalyzerViewModel, AnalyzerViewNode } from './types';
 import { ANALYZER_COMMAND_COMMON_LANE_ID } from './projectors';
 
 export const ANALYZER_NODE_WIDTH = 244;
@@ -22,6 +23,9 @@ const ARCHITECTURE_NODE_GAP = 10;
 const ARCHITECTURE_TOP_PADDING = 36;
 const ARCHITECTURE_BOTTOM_PADDING = 14;
 const ARCHITECTURE_CLUSTER_ROW_GAP = 16;
+const SUMMARY_GROUP_SIDE_PADDING = 16;
+const SUMMARY_GROUP_HEADER_HEIGHT = 34;
+const SUMMARY_GROUP_BOTTOM_PADDING = 16;
 
 export interface PositionedNode {
   node: AnalyzerViewNode;
@@ -52,12 +56,26 @@ export interface PositionedLane {
 export interface PositionedBand {
   id: string;
   label: string;
+  count: number;
+  countLabel: string;
   kind: 'dependency-source';
   x: number;
   y: number;
   width: number;
   height: number;
   presentationId?: string;
+}
+
+export interface PositionedSummaryGroup {
+  id: string;
+  label: string;
+  count: number;
+  countLabel: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  parentId?: string;
 }
 
 export interface AnalyzerLayout {
@@ -67,6 +85,7 @@ export interface AnalyzerLayout {
   clusters: PositionedCluster[];
   lanes: PositionedLane[];
   bands: PositionedBand[];
+  summaryGroups: PositionedSummaryGroup[];
 }
 
 function clusterOrder(view: AnalyzerViewModel['view']): string[] {
@@ -142,7 +161,7 @@ function layoutColumnClusters(view: AnalyzerViewModel, expandedNodeIds: Readonly
   });
 
   const width = Math.max(900, SIDE_PADDING * 2 + Math.max(1, positionedClusters.length) * CLUSTER_WIDTH + Math.max(0, positionedClusters.length - 1) * CLUSTER_GAP);
-  return { width, height: maxHeight, nodes: positionedNodes, clusters: positionedClusters, lanes: [], bands: [] };
+  return { width, height: maxHeight, nodes: positionedNodes, clusters: positionedClusters, lanes: [], bands: [], summaryGroups: [] };
 }
 
 function layoutArchitecture(view: AnalyzerViewModel, expandedNodeIds: ReadonlySet<string>): AnalyzerLayout {
@@ -173,7 +192,7 @@ function layoutArchitecture(view: AnalyzerViewModel, expandedNodeIds: ReadonlySe
 
   const width = Math.max(900, SIDE_PADDING * 2 + columnCount * CLUSTER_WIDTH + Math.max(0, columnCount - 1) * CLUSTER_GAP);
   const height = Math.max(420, (rowY.at(-1) ?? 20) + (rowHeights.at(-1) ?? 420) + 40);
-  return { width, height, nodes: positionedNodes, clusters: positionedClusters, lanes: [], bands: [] };
+  return { width, height, nodes: positionedNodes, clusters: positionedClusters, lanes: [], bands: [], summaryGroups: [] };
 }
 
 function metadataNumber(node: AnalyzerViewNode, key: string): number | undefined {
@@ -276,6 +295,7 @@ function commandFlowLayout(view: AnalyzerViewModel, expandedNodeIds: ReadonlySet
     clusters: [],
     lanes: normalizedLanes,
     bands: [],
+    summaryGroups: [],
   };
 }
 
@@ -373,18 +393,35 @@ function dependencyFlowLayout(view: AnalyzerViewModel, expandedNodeIds: Readonly
       });
       externalGroups.forEach((group) => {
         const groupSummary = group.summary && nodes.some((node) => node.id === group.summary?.id) ? group.summary : undefined;
+        const presentationGroup = group.presentationId
+          ? view.presentationGroups?.find((candidate) => candidate.id === group.presentationId)
+          : undefined;
+        const groupExpanded = Boolean(presentationGroup?.expanded);
+
+        if (groupSummary && !groupExpanded) {
+          const height = nodeHeight(groupSummary, expandedNodeIds);
+          positionedNodes.push({ node: groupSummary, x: x + 20, y: cursor, height });
+          cursor += height + NODE_GAP;
+          return;
+        }
+
         const groupNodes = [
           ...(groupSummary ? [groupSummary] : []),
           ...group.nodes,
         ];
+        if (groupNodes.length === 0) return;
         const groupY = cursor - 8;
         const groupHeight = DEPENDENCY_EXTERNAL_GROUP_HEADER
           + groupNodes.reduce((total, node) => total + nodeHeight(node, expandedNodeIds), 0)
           + Math.max(0, groupNodes.length - 1) * NODE_GAP
           + DEPENDENCY_EXTERNAL_GROUP_BOTTOM;
+        const count = presentationGroup?.count ?? (groupSummary ? analyzerPresentationCount(groupSummary) : group.nodes.length);
+        const countLabel = presentationGroup?.countLabel ?? (groupSummary ? analyzerPresentationCountLabel(groupSummary) : 'PACKAGES');
         positionedBands.push({
           id: `dependency-band:${group.id}`,
           label: group.label,
+          count,
+          countLabel,
           kind: 'dependency-source',
           x: x + 10,
           y: groupY,
@@ -422,12 +459,87 @@ function dependencyFlowLayout(view: AnalyzerViewModel, expandedNodeIds: Readonly
     maxHeight = Math.max(maxHeight, height + 40);
   });
 
-  return { width: Math.max(900, x - CLUSTER_GAP + SIDE_PADDING), height: maxHeight, nodes: positionedNodes, clusters: positionedClusters, lanes: [], bands: positionedBands };
+  return { width: Math.max(900, x - CLUSTER_GAP + SIDE_PADDING), height: maxHeight, nodes: positionedNodes, clusters: positionedClusters, lanes: [], bands: positionedBands, summaryGroups: [] };
+}
+
+function presentationParentMap(view: AnalyzerViewModel): Map<string, string> {
+  const parentByNodeId = new Map<string, string>();
+  view.nodes.forEach((node) => {
+    if (node.presentation?.parentId) parentByNodeId.set(node.id, node.presentation.parentId);
+  });
+  view.presentationGroups?.forEach((group) => {
+    group.childNodeIds.forEach((childNodeId) => {
+      if (!parentByNodeId.has(childNodeId)) parentByNodeId.set(childNodeId, group.id);
+    });
+  });
+  return parentByNodeId;
+}
+
+function summaryGroupNodes(view: AnalyzerViewModel, positionedNodes: PositionedNode[], group: AnalyzerPresentationGroup): PositionedNode[] {
+  const parentByNodeId = presentationParentMap(view);
+  const parentByGroupId = new Map(
+    (view.presentationGroups ?? []).flatMap((candidate) => candidate.parentId ? [[candidate.id, candidate.parentId] as const] : []),
+  );
+  const parentOf = (nodeId: string): string | undefined => parentByNodeId.get(nodeId) ?? parentByGroupId.get(nodeId);
+  return positionedNodes.filter((positionedNode) => {
+    if (positionedNode.node.id === group.id) return true;
+    const visited = new Set<string>();
+    let parentId = parentOf(positionedNode.node.id);
+    while (parentId && !visited.has(parentId)) {
+      if (parentId === group.id) return true;
+      visited.add(parentId);
+      parentId = parentOf(parentId);
+    }
+    return false;
+  });
+}
+
+function finalizeAnalyzerLayout(view: AnalyzerViewModel, layout: AnalyzerLayout): AnalyzerLayout {
+  const bandPresentationIds = new Set(layout.bands.flatMap((band) => band.presentationId ? [band.presentationId] : []));
+  const summaryGroups = (view.presentationGroups ?? [])
+    .filter((group) => group.expanded && !bandPresentationIds.has(group.id))
+    .flatMap((group): PositionedSummaryGroup[] => {
+      const groupNodes = summaryGroupNodes(view, layout.nodes, group);
+      if (groupNodes.length === 0) return [];
+      const minX = Math.min(...groupNodes.map((positionedNode) => positionedNode.x));
+      const minY = Math.min(...groupNodes.map((positionedNode) => positionedNode.y));
+      const maxRight = Math.max(...groupNodes.map((positionedNode) => positionedNode.x + ANALYZER_NODE_WIDTH));
+      const maxBottom = Math.max(...groupNodes.map((positionedNode) => positionedNode.y + positionedNode.height));
+      const x = Math.max(0, minX - SUMMARY_GROUP_SIDE_PADDING);
+      const y = Math.max(0, minY - SUMMARY_GROUP_HEADER_HEIGHT);
+      const right = maxRight + SUMMARY_GROUP_SIDE_PADDING;
+      const bottom = maxBottom + SUMMARY_GROUP_BOTTOM_PADDING;
+      return [{
+        id: group.id,
+        label: group.label,
+        count: group.count,
+        countLabel: group.countLabel,
+        x,
+        y,
+        width: Math.max(ANALYZER_NODE_WIDTH + SUMMARY_GROUP_SIDE_PADDING * 2, right - x),
+        height: Math.max(SUMMARY_GROUP_HEADER_HEIGHT + SUMMARY_GROUP_BOTTOM_PADDING, bottom - y),
+        ...(group.parentId ? { parentId: group.parentId } : {}),
+      }];
+    });
+  const allBounds = [
+    ...summaryGroups.map((group) => ({ right: group.x + group.width, bottom: group.y + group.height })),
+    ...layout.bands.map((band) => ({ right: band.x + band.width, bottom: band.y + band.height })),
+  ];
+  return {
+    ...layout,
+    summaryGroups,
+    width: Math.max(layout.width, ...allBounds.map((bounds) => bounds.right + SIDE_PADDING)),
+    height: Math.max(layout.height, ...allBounds.map((bounds) => bounds.bottom + SIDE_PADDING)),
+  };
 }
 
 export function layoutAnalyzerView(view: AnalyzerViewModel, expandedNodeIds: ReadonlySet<string> = new Set()): AnalyzerLayout {
-  if (view.view === 'architecture') return layoutArchitecture(view, expandedNodeIds);
-  if (view.view === 'command') return commandFlowLayout(view, expandedNodeIds);
-  if (view.view === 'dependencies') return dependencyFlowLayout(view, expandedNodeIds);
-  return layoutColumnClusters(view, expandedNodeIds);
+  const layout = view.view === 'architecture'
+    ? layoutArchitecture(view, expandedNodeIds)
+    : view.view === 'command'
+      ? commandFlowLayout(view, expandedNodeIds)
+      : view.view === 'dependencies'
+        ? dependencyFlowLayout(view, expandedNodeIds)
+        : layoutColumnClusters(view, expandedNodeIds);
+  return finalizeAnalyzerLayout(view, layout);
 }

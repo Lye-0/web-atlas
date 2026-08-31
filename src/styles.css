@@ -3097,6 +3097,83 @@ summary:focus-visible {
   border-bottom-color: rgba(172, 220, 202, 0.22);
 }
 
+.analyzer-summary-group {
+  position: absolute;
+  z-index: 1;
+  box-sizing: border-box;
+  padding: 34px 13px 15px;
+  overflow: visible;
+  border: 1px dashed rgba(172, 220, 202, 0.42);
+  border-radius: 9px;
+  background: linear-gradient(145deg, rgba(91, 143, 126, 0.09), rgba(15, 25, 23, 0.2) 70%, rgba(15, 25, 23, 0.08));
+  color: rgba(203, 224, 215, 0.76);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.07em;
+  pointer-events: none;
+  box-shadow: inset 0 1px 0 rgba(203, 224, 215, 0.07), 10px 14px 26px rgba(0, 0, 0, 0.16);
+  text-transform: uppercase;
+}
+
+.analyzer-summary-group-heading {
+  position: absolute;
+  top: 8px;
+  right: 11px;
+  left: 12px;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.analyzer-summary-group-heading strong {
+  min-width: 0;
+  overflow: hidden;
+  color: rgba(203, 224, 215, 0.9);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-overflow: ellipsis;
+}
+
+.analyzer-summary-group-kicker {
+  flex: 0 0 auto;
+  color: var(--warm);
+  font-size: 0.56rem;
+  letter-spacing: 0.09em;
+}
+
+.analyzer-summary-group-count {
+  flex: 0 0 auto;
+  color: rgba(203, 224, 215, 0.58);
+  font-size: 0.54rem;
+  letter-spacing: 0.06em;
+}
+
+.analyzer-summary-group-toggle {
+  flex: 0 0 auto;
+  pointer-events: auto;
+  padding: 1px 5px;
+  border: 1px solid rgba(172, 220, 202, 0.22);
+  border-radius: 3px;
+  background: rgba(12, 17, 17, 0.68);
+  color: var(--accent-strong);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.54rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.analyzer-summary-group-toggle:hover,
+.analyzer-summary-group-toggle:focus-visible {
+  border-color: rgba(172, 220, 202, 0.5);
+  color: var(--text);
+  outline: none;
+}
+
 .analyzer-layout-band {
   position: absolute;
   z-index: 1;
@@ -3105,25 +3182,14 @@ summary:focus-visible {
 }
 
 .analyzer-layout-band-dependency-source {
-  padding: 7px 9px;
-  border: 1px solid rgba(132, 177, 197, 0.18);
-  border-radius: 5px;
-  background: linear-gradient(150deg, rgba(80, 126, 144, 0.11), rgba(17, 27, 30, 0.28));
+  border: 1px dashed rgba(132, 177, 197, 0.34);
+  border-radius: 7px;
+  background: linear-gradient(150deg, rgba(80, 126, 144, 0.08), rgba(17, 27, 30, 0.18));
   color: rgba(167, 201, 211, 0.68);
   font-family: var(--font-mono);
   font-size: 0.59rem;
   letter-spacing: 0.07em;
   text-transform: uppercase;
-}
-
-.analyzer-layout-band-dependency-source span {
-  display: inline-block;
-  max-width: 100%;
-  overflow: hidden;
-  padding: 1px 4px;
-  background: rgba(12, 17, 17, 0.72);
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .analyzer-band-toggle {
@@ -3151,8 +3217,8 @@ summary:focus-visible {
 }
 
 .analyzer-layout-band-dependency-source.is-expanded {
-  border-color: rgba(172, 220, 202, 0.3);
-  background: linear-gradient(150deg, rgba(80, 126, 144, 0.14), rgba(17, 27, 30, 0.32));
+  border-color: rgba(172, 220, 202, 0.48);
+  background: linear-gradient(150deg, rgba(80, 126, 144, 0.12), rgba(17, 27, 30, 0.24));
 }
 
 .analyzer-node {
@@ -3233,43 +3299,57 @@ summary:focus-visible {
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(203, 224, 215, 0.045);
 }
 
+.analyzer-node.is-summary:hover,
+.analyzer-node.is-summary:focus-visible {
+  border-color: rgba(203, 224, 215, 0.66);
+  background: linear-gradient(155deg, rgba(39, 57, 51, 0.94), rgba(16, 25, 24, 0.96));
+}
+
+.analyzer-summary-card-kicker {
+  color: var(--warm);
+  font-family: var(--font-mono);
+  font-size: 0.57rem;
+  letter-spacing: 0.1em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.analyzer-summary-card-count {
+  color: rgba(203, 224, 215, 0.62);
+  font-family: var(--font-mono);
+  font-size: 0.59rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.analyzer-summary-card-action {
+  color: var(--accent-strong);
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .analyzer-node.is-summary.is-expanded {
   border-style: solid;
-  border-color: rgba(172, 220, 202, 0.24);
-  border-left-color: transparent;
-  border-right-color: transparent;
-  border-radius: 3px;
-  background: linear-gradient(90deg, rgba(172, 220, 202, 0.09), rgba(172, 220, 202, 0.02) 72%, transparent);
-  box-shadow: inset 0 1px 0 rgba(203, 224, 215, 0.08), inset 0 -1px 0 rgba(203, 224, 215, 0.045);
+  border-color: rgba(172, 220, 202, 0.28);
+  background: linear-gradient(155deg, rgba(172, 220, 202, 0.1), rgba(20, 34, 31, 0.58));
 }
 
 .analyzer-node.is-summary.is-presentation-anchor {
-  display: flex;
-  align-items: center;
-  gap: 9px;
+  display: grid;
+  align-content: center;
+  gap: 3px;
   padding: 8px 12px;
-  border-top-width: 1px;
-  border-bottom-width: 1px;
-  border-left-width: 0;
-  border-right-width: 0;
-  border-radius: 2px;
-  background: linear-gradient(90deg, rgba(172, 220, 202, 0.09), rgba(172, 220, 202, 0.018) 72%, transparent);
+  border-width: 1px;
+  border-radius: 5px;
+  background: linear-gradient(155deg, rgba(172, 220, 202, 0.12), rgba(20, 34, 31, 0.62));
   box-shadow: inset 0 1px 0 rgba(203, 224, 215, 0.08), inset 0 -1px 0 rgba(203, 224, 215, 0.045);
-}
-
-.analyzer-node.is-summary.is-presentation-anchor .analyzer-node-type {
-  flex: 0 0 auto;
-  color: var(--warm);
 }
 
 .analyzer-node.is-summary.is-presentation-anchor strong {
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.analyzer-node.is-summary.is-presentation-anchor .analyzer-node-subtitle {
-  overflow: hidden;
+  font-size: 0.8rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -3278,10 +3358,6 @@ summary:focus-visible {
   border-color: rgba(172, 220, 202, 0.52);
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(203, 224, 215, 0.1), inset 0 -1px 0 rgba(203, 224, 215, 0.05);
   transform: translateY(-1px);
-}
-
-.analyzer-node.is-summary.is-expanded .analyzer-node-type {
-  color: var(--warm);
 }
 
 .analyzer-node.zoom-far {

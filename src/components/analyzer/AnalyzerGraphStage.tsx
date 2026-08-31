@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
-import { ANALYZER_DEFAULT_TRANSFORM, ANALYZER_NODE_WIDTH, analyzerFocusDepths, analyzerSummaryExpanded, analyzerSummarySubtitle, displayedZoomLevelForNode, fitAnalyzerTransform, focusAnalyzerTransform, layoutAnalyzerView, nodeMatchesSearch, preserveAnalyzerTransformOnViewportResize, presentAnalyzerView, semanticZoomLevelForScale, shouldShowAnalyzerEvidencePreview, type AnalyzerGraphTransform, type AnalyzerViewCounts, type AnalyzerViewEdge, type AnalyzerViewModel, type PositionedNode } from '../../analyzer';
+import { ANALYZER_DEFAULT_TRANSFORM, ANALYZER_NODE_WIDTH, analyzerFocusDepths, analyzerPresentationCount, analyzerPresentationCountLabel, analyzerSummaryExpanded, displayedZoomLevelForNode, fitAnalyzerTransform, focusAnalyzerTransform, layoutAnalyzerView, nodeMatchesSearch, preserveAnalyzerTransformOnViewportResize, presentAnalyzerView, semanticZoomLevelForScale, shouldShowAnalyzerEvidencePreview, type AnalyzerGraphTransform, type AnalyzerViewCounts, type AnalyzerViewEdge, type AnalyzerViewModel, type PositionedNode } from '../../analyzer';
 import { nodeTypeLabels } from '../../analyzer';
 import { EvidencePreview } from './EvidenceCodeBlock';
 
@@ -450,45 +450,51 @@ export function AnalyzerGraphStage({
         <div className="analyzer-graph-viewport">
           <div className="analyzer-graph-world" style={{ width: layout.width, height: layout.height, transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})` }}>
             {layout.clusters.map((cluster) => {
-              const summaryNode = view.nodes.find((node) => node.clusterId === cluster.id && node.presentation?.role === 'summary');
-              const summaryExpanded = Boolean(summaryNode && expandedPresentationIds.has(summaryNode.id));
               return (
-                <section key={cluster.id} className={`analyzer-cluster-plane tone-${cluster.tone}${summaryExpanded ? ' is-expanded' : ''}`} style={{ left: cluster.x, top: cluster.y, width: cluster.width, height: cluster.height }} aria-label={cluster.label}>
+                <section key={cluster.id} className={`analyzer-cluster-plane tone-${cluster.tone}`} style={{ left: cluster.x, top: cluster.y, width: cluster.width, height: cluster.height }} aria-label={cluster.label}>
                   <div className="analyzer-cluster-heading">
                     <span>{cluster.label}</span>
-                    {summaryNode && (
-                      <button type="button" className="analyzer-cluster-toggle" onClick={() => onTogglePresentation(summaryNode.id)} aria-expanded={summaryExpanded}>
-                        {summaryExpanded ? 'Collapse' : 'Expand'}
-                      </button>
-                    )}
                   </div>
                 </section>
               );
             })}
+            {layout.lanes.map((lane) => (
+              <div key={lane.id} className="analyzer-command-lane" style={{ left: lane.x, top: lane.y, width: lane.width, height: lane.height }} aria-label={`${lane.label} execution lane`}>
+                <span className="analyzer-lane-label">{lane.label}</span>
+              </div>
+            ))}
+            {layout.summaryGroups.map((group) => {
+              const summaryVisible = filteredView.nodes.some((node) => node.id === group.id && node.presentation?.role === 'summary');
+              return (
+                <section key={group.id} className="analyzer-summary-group" style={{ left: group.x, top: group.y, width: group.width, height: group.height }} aria-label={`${group.label} Summary Group`}>
+                  {!summaryVisible && (
+                    <div className="analyzer-summary-group-heading">
+                      <span className="analyzer-summary-group-kicker">◇ SUMMARY GROUP</span>
+                      <strong>{group.label}</strong>
+                      <span className="analyzer-summary-group-count">{group.count} {group.countLabel}</span>
+                      <button type="button" className="analyzer-summary-group-toggle" onClick={() => onTogglePresentation(group.id)} aria-expanded={true}>
+                        Collapse
+                      </button>
+                    </div>
+                  )}
+                </section>
+              );
+            })}
             {layout.bands.map((band) => {
-              const bandExpanded = Boolean(band.presentationId && expandedPresentationIds.has(band.presentationId));
+              const bandExpanded = Boolean(band.presentationId && filteredView.presentationGroups?.find((group) => group.id === band.presentationId)?.expanded);
               const bandSummaryVisible = Boolean(band.presentationId && filteredView.nodes.some((node) => node.id === band.presentationId));
               return (
                 <div key={band.id} className={`analyzer-layout-band analyzer-layout-band-${band.kind}${bandExpanded ? ' is-expanded' : ''}`} style={{ left: band.x, top: band.y, width: band.width, height: band.height }} aria-label={band.label}>
-                  {band.presentationId && (!bandSummaryVisible || bandExpanded) ? (
-                    <button type="button" className="analyzer-band-toggle" onClick={() => onTogglePresentation(band.presentationId!)} aria-expanded={bandExpanded}>
-                      {band.label} · {bandExpanded ? 'Collapse' : 'Expand'}
-                    </button>
-                  ) : <span>{band.label}</span>}
-                </div>
-              );
-            })}
-            {layout.lanes.map((lane) => {
-              const presentationId = `command:lane:${lane.id}`;
-              const laneExpanded = expandedPresentationIds.has(presentationId);
-              const laneSummary = view.nodes.some((node) => node.id === presentationId && node.presentation?.role === 'summary');
-              return (
-                <div key={lane.id} className={`analyzer-command-lane${laneExpanded ? ' is-expanded' : ''}`} style={{ left: lane.x, top: lane.y, width: lane.width, height: lane.height }} aria-label={`${lane.label} execution lane`}>
-                  {laneSummary ? (
-                    <button type="button" className="analyzer-lane-toggle" onClick={() => onTogglePresentation(presentationId)} aria-expanded={laneExpanded}>
-                      {lane.label}
-                    </button>
-                  ) : <span className="analyzer-lane-label">{lane.label}</span>}
+                  <div className="analyzer-summary-group-heading">
+                    <span className="analyzer-summary-group-kicker">◇ SUMMARY GROUP</span>
+                    <strong>{band.label}</strong>
+                    <span className="analyzer-summary-group-count">{band.count} {band.countLabel}</span>
+                    {band.presentationId && (!bandSummaryVisible || bandExpanded) && (
+                      <button type="button" className="analyzer-summary-group-toggle" onClick={() => onTogglePresentation(band.presentationId!)} aria-expanded={bandExpanded}>
+                        {bandExpanded ? 'Collapse' : 'Expand'}
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -521,8 +527,9 @@ export function AnalyzerGraphStage({
                     ? ' is-focus-secondary'
                     : ' is-focus-deep';
               const hasEvidencePreview = shouldShowAnalyzerEvidencePreview(nodeZoom, selected, node.evidenceIds.length > 0);
-              const compactEvidenceHint = zoomLevel === 'near' && node.evidenceIds.length > 0 && !hasEvidencePreview ? evidenceHint(node, view) : undefined;
-              const displayedSubtitle = summary ? analyzerSummarySubtitle(node, summaryExpanded) : node.subtitle;
+              const compactEvidenceHint = !summary && zoomLevel === 'near' && node.evidenceIds.length > 0 && !hasEvidencePreview ? evidenceHint(node, view) : undefined;
+              const summaryCount = summary ? analyzerPresentationCount(node) : 0;
+              const summaryCountLabel = summary ? analyzerPresentationCountLabel(node) : '';
               const dimmed = Boolean(search.trim() && !matches && !selected) || Boolean((selectedNodeId || selectedEdgeId) && !selected && !inSelectionContext && focusDepth === undefined);
               return (
                 <div
@@ -541,11 +548,22 @@ export function AnalyzerGraphStage({
                   tabIndex={0}
                   aria-pressed={summary ? undefined : selected}
                   aria-expanded={summary ? summaryExpanded : undefined}
-                  aria-label={`${node.label}, ${displayNodeType(node)}${summary ? (summaryExpanded ? ', expanded' : ', collapsed') : ''}`}
+                  aria-label={`${node.label}, ${summary ? `Summary ${summaryExpanded ? 'group expanded' : 'card collapsed'}` : displayNodeType(node)}`}
                 >
-                  <span className="analyzer-node-type">{displayNodeType(node)}</span>
-                  <strong>{node.label}</strong>
-                  {nodeZoom !== 'far' && displayedSubtitle && <span className="analyzer-node-subtitle">{displayedSubtitle}</span>}
+                  {summary ? (
+                    <>
+                      <span className="analyzer-summary-card-kicker">◇ {summaryExpanded ? 'SUMMARY GROUP' : 'SUMMARY'}</span>
+                      <strong>{node.label}</strong>
+                      <span className="analyzer-summary-card-count">{summaryCount} {summaryCountLabel}</span>
+                      <span className="analyzer-summary-card-action">{summaryExpanded ? 'Collapse' : 'Expand'} <span aria-hidden="true">→</span></span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="analyzer-node-type">{displayNodeType(node)}</span>
+                      <strong>{node.label}</strong>
+                      {nodeZoom !== 'far' && node.subtitle && <span className="analyzer-node-subtitle">{node.subtitle}</span>}
+                    </>
+                  )}
                   {compactEvidenceHint && <span className="analyzer-node-evidence-hint">Evidence · {compactEvidenceHint}</span>}
                   {hasEvidencePreview && (
                     <div className="analyzer-node-evidence-preview">
