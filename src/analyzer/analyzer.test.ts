@@ -398,7 +398,9 @@ describe('Analyzer scan and projectors', () => {
     expect(presented.edges.some((edge) => edge.presentation?.displayKind === 'bundle' && edge.targetId === technologySummary?.id)).toBe(true);
     expect(presented.counts).toEqual({ visibleNodes: 12, totalNodes: 15, hiddenNodes: 3 });
     expect(presented.edges).toHaveLength(19);
-    expect(fitAnalyzerTransform(layoutAnalyzerView(presented), 1000, 600).scale).toBeGreaterThan(0.6);
+    const presentedLayout = layoutAnalyzerView(presented);
+    expect(presentedLayout.nodes.find((positionedNode) => positionedNode.node.id === 'technology:firebase')?.height).toBeGreaterThanOrEqual(80);
+    expect(fitAnalyzerTransform(presentedLayout, 1000, 600).scale).toBeGreaterThan(0.6);
     expect(presented.presentationGroups).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: technologySummary?.id, label: 'Technology details', countLabel: 'TECHNOLOGIES', expanded: false }),
     ]));

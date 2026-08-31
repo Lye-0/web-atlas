@@ -3360,6 +3360,11 @@ summary:focus-visible {
   transform: translateY(-1px);
 }
 
+.analyzer-node-view-architecture:not(.zoom-far) {
+  gap: 1px;
+  padding: 8px 12px 7px;
+}
+
 .analyzer-node.zoom-far {
   gap: 1px;
   padding: 9px 11px 8px;

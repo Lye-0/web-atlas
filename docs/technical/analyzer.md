@@ -62,7 +62,7 @@ Graphの拡大率は [`src/analyzer/zoom.ts`](../../src/analyzer/zoom.ts) で3�
 
 - Far: Node typeとlabelを中心に表示します。
 - Medium: subtitleとEvidence件数を表示します。
-- Near: 通常のEvidence付きNodeには`filePath:line`のcompact evidence hintを表示します。3〜5行のcompact previewはSelected Nodeだけに表示し、HoverではNodeのsurface / border / shadowのみを強調します。通常のNodeはsource / metadataを抑制表示し、Evidenceが1件だけの場合は反復的な`Evidence 1`を表示しません。exact highlight rangeはdetail panelと同じEvidenceCodeBlockで描画します。
+- Near: 通常のEvidence付きNodeには`filePath:line`のcompact evidence hintを表示します。hintを表示する場合は重複するEvidence件数を省き、Architectureのcompact Nodeでもtitle・subtitle・hintが固定高さ内で欠けないようにします。3〜5行のcompact previewはSelected Nodeだけに表示し、HoverではNodeのsurface / border / shadowのみを強調します。通常のNodeはsource / metadataを抑制表示し、Evidenceが1件だけの場合は反復的な`Evidence 1`を表示しません。exact highlight rangeはdetail panelと同じEvidenceCodeBlockで描画します。
 - Detail panel: 未選択時は閉じ、選択時だけ開きます。選択中は全Evidenceとsource contextを表示し、Focus Selected、関係先への移動、Closeを提供します。Closeは選択Node / Edgeを保持したままPanelだけを閉じ、背景クリックまたはEscで選択・detailを解除します。
 
 2.5Dの視覚階層は、z0のFine / Large grid、z1のCluster Plane、z1上のSummary Group Region、z2のdefault・focused edge、z3のnormal Fact Node、z5のSelected NodeとEvidence / interaction layerです。Summary GroupはClusterより前、Edgeより後ろに置き、transparent surface・dashed outline・headingで所属範囲を示します。Cluster tintは弱め、bottom/right shadow・top highlight・inner shadingで奥の板として表現します。Normal Nodeにはtight contact shadow、Selected Nodeにはsmall liftと少し広いshadowを使います。EdgeはNodeより背面に置き、選択EdgeもNodeの前へ出しすぎません。Neonや強いglassmorphismは使わず、Graph本体には新しい可視化ライブラリを追加していません。

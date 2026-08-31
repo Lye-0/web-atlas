@@ -534,7 +534,7 @@ export function AnalyzerGraphStage({
               return (
                 <div
                   key={node.id}
-                  className={`analyzer-node node-type-${node.type} zoom-${nodeZoom}${summary ? ' is-summary' : ''}${summary && summaryExpanded ? ' is-expanded is-presentation-anchor' : ''}${selected ? ' is-selected' : ''}${connected ? ' is-connected' : ''}${focusClass}${hasEvidencePreview ? ' has-evidence-preview' : ''}${matches && search.trim() ? ' is-match' : ''}${dimmed ? ' is-dimmed' : ''}`}
+                  className={`analyzer-node analyzer-node-view-${view.view} node-type-${node.type} zoom-${nodeZoom}${summary ? ' is-summary' : ''}${summary && summaryExpanded ? ' is-expanded is-presentation-anchor' : ''}${selected ? ' is-selected' : ''}${connected ? ' is-connected' : ''}${focusClass}${hasEvidencePreview ? ' has-evidence-preview' : ''}${matches && search.trim() ? ' is-match' : ''}${dimmed ? ' is-dimmed' : ''}`}
                   style={nodeStyle(positionedNode)}
                   onClick={() => summary ? togglePresentation(node.id) : onSelectNode(node.id)}
                   onKeyDown={(event) => {
@@ -570,7 +570,7 @@ export function AnalyzerGraphStage({
                       <EvidencePreview evidenceIds={node.evidenceIds} evidence={view.evidence} sources={sources} compact />
                     </div>
                   )}
-                  {nodeZoom !== 'far' && node.evidenceIds.length > 1 && (
+                  {nodeZoom !== 'far' && node.evidenceIds.length > 1 && !compactEvidenceHint && (
                     <span className="analyzer-node-evidence">Evidence {node.evidenceIds.length}</span>
                   )}
                 </div>
