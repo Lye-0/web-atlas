@@ -383,6 +383,10 @@ describe('Analyzer scan and projectors', () => {
     expect(sourceBand?.x).toBeGreaterThan(sourceParentGroup?.x ?? -1);
     expect((sourceBand?.x ?? 0) + (sourceBand?.width ?? 0)).toBeLessThan((sourceParentGroup?.x ?? 0) + (sourceParentGroup?.width ?? 0));
     expect((sourceBand?.y ?? 0) - (sourceParentGroup?.y ?? 0)).toBeGreaterThan(30);
+    expect((sourceParentGroup?.y ?? 0) + 8 + 22 + 16).toBeLessThanOrEqual((sourceBand?.y ?? 0) + 8);
+    const sourceBandMembers = sourceExpandedLayout.nodes.filter((positionedNode) => positionedNode.node.presentation?.parentId === sourceSummary?.id);
+    expect(sourceBandMembers.length).toBeGreaterThan(0);
+    expect(Math.min(...sourceBandMembers.map((positionedNode) => positionedNode.y))).toBeGreaterThanOrEqual((sourceBand?.y ?? 0) + 8 + 22 + 16);
     const summary = dependencies.nodes.find((node) => node.id === 'dependencies:external:summary');
     expect(summary).toBeDefined();
     expect(analyzerSummarySubtitle(summary!, false)).toContain('expand for details');
@@ -439,6 +443,9 @@ describe('Analyzer scan and projectors', () => {
     expect(Math.max(...technologyChildIndexes) - Math.min(...technologyChildIndexes) + 1).toBe(technologyChildIndexes.length);
     expect(technologyGroup?.depth).toBe(1);
     expect(Math.min(...technologyChildren.map((node) => node.y)) - (technologyGroup?.y ?? 0)).toBeGreaterThan(40);
+    const previousTechnologyNode = technologyClusterNodes.filter((positionedNode) => !technologyChildIds.has(positionedNode.node.id)).at(-1);
+    expect(previousTechnologyNode).toBeDefined();
+    expect((technologyGroup?.y ?? 0) + 8).toBeGreaterThanOrEqual((previousTechnologyNode?.y ?? 0) + (previousTechnologyNode?.height ?? 0) + 16);
     expect(technologyGroup?.x).toBeLessThanOrEqual(Math.min(...technologyChildren.map((node) => node.x)));
     expect((technologyGroup?.x ?? 0) + (technologyGroup?.width ?? 0)).toBeGreaterThanOrEqual(Math.max(...technologyChildren.map((node) => node.x + ANALYZER_NODE_WIDTH)));
     expect(expandedArchitectureLayout.width).toBeGreaterThanOrEqual((technologyGroup?.x ?? 0) + (technologyGroup?.width ?? 0));
@@ -503,6 +510,16 @@ describe('Analyzer scan and projectors', () => {
     expect(expandedCommandLayout.summaryGroups).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: webBranch?.id, label: 'WEB', countLabel: 'STEPS' }),
     ]));
+    const webGroup = expandedCommandLayout.summaryGroups.find((group) => group.id === webBranch?.id);
+    const webGroupMembers = expandedCommandLayout.nodes.filter((positionedNode) => positionedNode.node.presentation?.parentId === webBranch?.id);
+    const webLaneId = webGroupMembers[0]?.node.metadata.laneId;
+    const webLane = expandedCommandLayout.lanes.find((lane) => lane.id === webLaneId);
+    expect(webGroupMembers.length).toBeGreaterThan(0);
+    expect(webLane).toBeDefined();
+    expect((webGroup?.y ?? 0) + 8).toBeGreaterThanOrEqual((webLane?.y ?? 0) + 28 + 16);
+    const fittedExpandedCommand = fitAnalyzerTransform(expandedCommandLayout, 1000, 600);
+    expect(fittedExpandedCommand.y + ((webGroup?.y ?? 0) + (webGroup?.height ?? 0)) * fittedExpandedCommand.scale)
+      .toBeLessThanOrEqual(600 - ANALYZER_FIT_PADDING.bottom + 0.0001);
     expect(layoutAnalyzerView(collapsed).summaryGroups).toHaveLength(0);
   });
 
