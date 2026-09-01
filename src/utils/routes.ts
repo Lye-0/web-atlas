@@ -4,6 +4,8 @@ export const dictionaryRoutes = {
   stacks: '/dictionary/stacks',
 } as const;
 
+export const analyzerRoot = '/analyzer';
+
 export const analyzerRoutes = {
   architecture: '/analyzer/architecture',
   workspace: '/analyzer/workspace',

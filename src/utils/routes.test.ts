@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { getCategory, getStack } from '../data';
-import { analyzerRoutes, categoryPath, stackPath } from './routes';
+import { analyzerRoot, analyzerRoutes, categoryPath, stackPath } from './routes';
 
 describe('dictionary routes', () => {
   it('resolves stable IDs to the expected entries and URLs', () => {
@@ -16,6 +16,7 @@ describe('dictionary routes', () => {
   });
 
   it('keeps Analyzer views on explicit stable routes', () => {
+    expect(analyzerRoot).toBe('/analyzer');
     expect(analyzerRoutes).toEqual({
       architecture: '/analyzer/architecture',
       workspace: '/analyzer/workspace',

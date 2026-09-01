@@ -6,6 +6,7 @@ import type { AnalyzerSessionState, AnalyzerViewSessionUpdate } from './session'
 export interface AnalyzerSessionContextValue {
   state: AnalyzerSessionState;
   replaceProject: (store: AnalyzerProjectStore, folderHandle?: DirectoryHandleLike) => void;
+  setActiveView: (view: AnalyzerViewId) => void;
   updateView: (view: AnalyzerViewId, update: AnalyzerViewSessionUpdate) => void;
 }
 

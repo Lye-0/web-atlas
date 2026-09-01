@@ -8,8 +8,8 @@ import { MapPage } from './pages/MapPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { StackDetailPage } from './pages/StackDetailPage';
 import { StacksPage } from './pages/StacksPage';
-import { AnalyzerSessionProvider } from './analyzer';
-import { analyzerRoutes } from './utils/routes';
+import { AnalyzerSessionProvider, useAnalyzerSession } from './analyzer';
+import { analyzerRoot, analyzerRoutes } from './utils/routes';
 
 export default function App() {
   return (
@@ -28,7 +28,7 @@ function AppRoutes() {
       <PageContainer>
         <Routes>
           <Route path="/" element={<Navigate to="/dictionary/map" replace />} />
-          <Route path="/analyzer" element={<Navigate to={analyzerRoutes.architecture} replace />} />
+          <Route path={analyzerRoot} element={<AnalyzerIndexRedirect />} />
           <Route path="/analyzer/:view" element={<AnalyzerPage />} />
           <Route path="/dictionary" element={<Navigate to="/dictionary/map" replace />} />
           <Route path="/dictionary/map" element={<MapPage />} />
@@ -45,4 +45,9 @@ function AppRoutes() {
       </footer>
     </div>
   );
+}
+
+function AnalyzerIndexRedirect() {
+  const { state } = useAnalyzerSession();
+  return <Navigate to={analyzerRoutes[state.activeView]} replace />;
 }

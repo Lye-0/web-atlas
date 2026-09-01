@@ -10,9 +10,12 @@ export function AnalyzerSessionProvider({ children }: { children: ReactNode }) {
   const replaceProject = useCallback((store: AnalyzerProjectStore, folderHandle?: DirectoryHandleLike) => {
     dispatch({ type: 'replaceProject', store, folderHandle });
   }, []);
+  const setActiveView = useCallback((view: AnalyzerViewId) => {
+    dispatch({ type: 'setActiveView', view });
+  }, []);
   const updateView = useCallback((view: AnalyzerViewId, update: AnalyzerViewSessionUpdate) => {
     dispatch({ type: 'updateView', view, update });
   }, []);
 
-  return <analyzerSessionContext.Provider value={{ state, replaceProject, updateView }}>{children}</analyzerSessionContext.Provider>;
+  return <analyzerSessionContext.Provider value={{ state, replaceProject, setActiveView, updateView }}>{children}</analyzerSessionContext.Provider>;
 }

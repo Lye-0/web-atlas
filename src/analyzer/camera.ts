@@ -18,6 +18,10 @@ export interface AnalyzerFitPadding {
 
 export const ANALYZER_FIT_PADDING: AnalyzerFitPadding = { top: 48, right: 64, bottom: 48, left: 64 };
 
+export function shouldRunAnalyzerInitialFit(hasStoredCamera: boolean): boolean {
+  return !hasStoredCamera;
+}
+
 export interface AnalyzerViewportSize {
   width: number;
   height: number;

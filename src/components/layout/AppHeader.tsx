@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { DictionaryNav } from './DictionaryNav';
 import { DictionarySearch } from '../search/DictionarySearch';
-import { analyzerRoutes, dictionaryRoutes } from '../../utils/routes';
+import { analyzerRoot, dictionaryRoutes } from '../../utils/routes';
 
 export function AppHeader() {
   const { pathname } = useLocation();
@@ -9,7 +9,7 @@ export function AppHeader() {
   return (
     <header className="app-header">
       <div className="header-inner">
-        <Link to={isAnalyzer ? analyzerRoutes.architecture : dictionaryRoutes.map} className="brand" aria-label={`Web Atlas ${isAnalyzer ? 'Analyzer' : 'Dictionary'}のホーム`}>
+        <Link to={isAnalyzer ? analyzerRoot : dictionaryRoutes.map} className="brand" aria-label={`Web Atlas ${isAnalyzer ? 'Analyzer' : 'Dictionary'}のホーム`}>
           <span className="brand-mark" aria-hidden="true">
             <span />
             <span />

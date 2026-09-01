@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { ANALYZER_DEFAULT_TRANSFORM, ANALYZER_EXTERNAL_SUMMARY_ID, analyzerViewCounts, analyzerViewLabels, presentationOwnsNode, presentAnalyzerView, projectAnalyzerView, useAnalyzerSession, viewNodeSearchText } from '../analyzer';
+import { ANALYZER_DEFAULT_TRANSFORM, ANALYZER_EXTERNAL_SUMMARY_ID, analyzerViewCounts, analyzerViewLabels, presentationOwnsNode, presentAnalyzerView, projectAnalyzerView, restoreAnalyzerViewSession, useAnalyzerSession, viewNodeSearchText } from '../analyzer';
 import type { AnalyzerGraphTransform, AnalyzerProjectStore, AnalyzerViewCounts, AnalyzerViewId, AnalyzerViewModel, AnalyzerViewSession, DirectoryHandleLike } from '../analyzer';
 import { AnalyzerDetailPanel } from '../components/analyzer/AnalyzerDetailPanel';
 import { AnalyzerEmptyOrbit } from '../components/analyzer/AnalyzerEmptyOrbit';
@@ -18,14 +18,15 @@ function viewFromPath(pathname: string): AnalyzerViewId {
 export function AnalyzerPage() {
   const location = useLocation();
   const view = viewFromPath(location.pathname);
-  const { state: session, replaceProject, updateView } = useAnalyzerSession();
+  const { state: session, replaceProject, setActiveView, updateView } = useAnalyzerSession();
   const store = session.store;
-  const viewState = session.views[view];
-  const { selectedNodeId, selectedEdgeId, search, filter, expandedPresentationIds, entryScriptId, detailOpen } = viewState;
+  const storedViewState = session.views[view];
   const [focusRequest, setFocusRequest] = useState<{ view: AnalyzerViewId; nodeId: string; nonce: number }>();
   const [reportedCounts, setReportedCounts] = useState<{ model: AnalyzerViewModel; counts: AnalyzerViewCounts }>();
 
-  const model = useMemo(() => store ? projectAnalyzerView(store, view, entryScriptId) : undefined, [entryScriptId, store, view]);
+  const model = useMemo(() => store ? projectAnalyzerView(store, view, storedViewState.entryScriptId) : undefined, [store, storedViewState.entryScriptId, view]);
+  const viewState = useMemo(() => model ? restoreAnalyzerViewSession(storedViewState, model) : storedViewState, [model, storedViewState]);
+  const { selectedNodeId, selectedEdgeId, search, filter, expandedPresentationIds, entryScriptId, detailOpen } = viewState;
   const scripts = useMemo(() => store?.facts.filter((fact) => fact.kind === 'package-script') ?? [], [store]);
   const effectiveEntryScriptId = entryScriptId ?? model?.entryScriptId;
   const searchResults = useMemo(() => {
@@ -39,6 +40,11 @@ export function AnalyzerPage() {
     return presented.counts ?? analyzerViewCounts(model);
   }, [expandedPresentationIds, filter, model, search, selectedEdgeId, selectedNodeId]);
   const nodeCounts = reportedCounts && reportedCounts.model === model ? reportedCounts.counts : fallbackCounts;
+
+  useEffect(() => {
+    setActiveView(view);
+    if (viewState !== storedViewState) updateView(view, viewState);
+  }, [setActiveView, storedViewState, updateView, view, viewState]);
 
   useEffect(() => {
     setFocusRequest(undefined);

@@ -8,7 +8,7 @@ import { analyzerSummarySubtitle, presentationOwnsNode, presentAnalyzerView } fr
 import { scanProjectFiles } from './scan';
 import { packageIdForPath, scriptIdFor, type AnalyzerProjectStore, type AnalyzerSourceFile, type AnalyzerViewModel } from './types';
 import { ANALYZER_NEAR_NODE_HEIGHT, ANALYZER_NODE_HEIGHT, ANALYZER_NODE_WIDTH, layoutAnalyzerView } from './layout';
-import { ANALYZER_FIT_PADDING, fitAnalyzerTransform, focusAnalyzerTransform, preserveAnalyzerTransformOnViewportResize } from './camera';
+import { ANALYZER_FIT_PADDING, fitAnalyzerTransform, focusAnalyzerTransform, preserveAnalyzerTransformOnViewportResize, shouldRunAnalyzerInitialFit } from './camera';
 import { analyzerRelationInverseLabels, relationLabelForNode } from './relations';
 import { analyzerFocusedEdgeEmphasis } from './focus';
 import { ANALYZER_FAR_ZOOM_THRESHOLD, ANALYZER_NEAR_ZOOM_THRESHOLD, displayedZoomLevelForNode, semanticZoomLevelForScale, shouldShowAnalyzerEvidencePreview } from './zoom';
@@ -177,6 +177,11 @@ describe('Analyzer command parsing', () => {
 });
 
 describe('Analyzer semantic zoom and layout', () => {
+  it('fits only a view that has no stored camera', () => {
+    expect(shouldRunAnalyzerInitialFit(false)).toBe(true);
+    expect(shouldRunAnalyzerInitialFit(true)).toBe(false);
+  });
+
   it('uses stable far/medium/near thresholds with inclusive medium boundaries', () => {
     expect(semanticZoomLevelForScale(ANALYZER_FAR_ZOOM_THRESHOLD - 0.01)).toBe('far');
     expect(semanticZoomLevelForScale(ANALYZER_FAR_ZOOM_THRESHOLD)).toBe('medium');
