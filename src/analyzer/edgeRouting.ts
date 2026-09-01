@@ -43,6 +43,16 @@ export interface AnalyzerEdgeRoutingOptions {
   bendPenalty?: number;
   obstaclePenalty?: number;
   crossingPenalty?: number;
+  /** Distance outside a Node body that remains traversable but less desirable. */
+  softKeepOut?: number;
+  /** Cost per pixel spent inside a Node's soft keep-out zone. */
+  softProximityPenalty?: number;
+  /** Non-linear base cost for consecutive soft-zone visits. */
+  occlusionPenalty?: number;
+  /** Additional cost per pixel for soft-zone overlap near a source/target port. */
+  terminalLegPenalty?: number;
+  /** Length of the source/target terminal leg that receives the readability cost. */
+  terminalLegLength?: number;
   existingRoutes?: readonly (readonly AnalyzerEdgePoint[])[];
   enableFanout?: boolean;
   /** Prefer a view's primary flow axis when choosing source/target ports. */
@@ -58,10 +68,17 @@ const DEFAULT_CORNER_RADIUS = 10;
 const DEFAULT_BEND_PENALTY = 150;
 const DEFAULT_OBSTACLE_PENALTY = 18;
 const DEFAULT_CROSSING_PENALTY = 900;
+const DEFAULT_SOFT_KEEP_OUT = 18;
+const DEFAULT_SOFT_PROXIMITY_PENALTY = 2.5;
+const DEFAULT_OCCLUSION_PENALTY = 90;
+const DEFAULT_TERMINAL_LEG_PENALTY = 3.5;
+const DEFAULT_TERMINAL_LEG_LENGTH = 64;
 const SHORT_ZIGZAG_LENGTH = 12;
 const FANOUT_TRUNK_GAP = 28;
 const FANOUT_MAX_SPREAD = 360;
 const VISIBILITY_ESCAPE_MARGIN = 32;
+const FANOUT_CORRIDOR_MARGIN = 4;
+const SOFT_ZONE_VISIT_THRESHOLD = 4;
 const MAX_GRID_POINTS = 20_000;
 const EPSILON = 0.0001;
 
@@ -108,6 +125,12 @@ interface ResolvedRoutingOptions {
   bendPenalty: number;
   obstaclePenalty: number;
   crossingPenalty: number;
+  softKeepOut: number;
+  softProximityPenalty: number;
+  occlusionPenalty: number;
+  terminalLegPenalty: number;
+  terminalLegLength: number;
+  softObstacles: readonly InflatedObstacle[];
   existingRoutes: readonly (readonly AnalyzerEdgePoint[])[];
   enableFanout: boolean;
   flowDirection: 'auto' | 'horizontal' | 'vertical';
@@ -179,6 +202,12 @@ function resolveRoutingOptions(options: AnalyzerEdgeRoutingOptions): ResolvedRou
     bendPenalty: Math.max(0, options.bendPenalty ?? DEFAULT_BEND_PENALTY),
     obstaclePenalty: Math.max(0, options.obstaclePenalty ?? DEFAULT_OBSTACLE_PENALTY),
     crossingPenalty: Math.max(0, options.crossingPenalty ?? DEFAULT_CROSSING_PENALTY),
+    softKeepOut: Math.max(0, options.softKeepOut ?? DEFAULT_SOFT_KEEP_OUT),
+    softProximityPenalty: Math.max(0, options.softProximityPenalty ?? DEFAULT_SOFT_PROXIMITY_PENALTY),
+    occlusionPenalty: Math.max(0, options.occlusionPenalty ?? DEFAULT_OCCLUSION_PENALTY),
+    terminalLegPenalty: Math.max(0, options.terminalLegPenalty ?? DEFAULT_TERMINAL_LEG_PENALTY),
+    terminalLegLength: Math.max(0, options.terminalLegLength ?? DEFAULT_TERMINAL_LEG_LENGTH),
+    softObstacles: [],
     existingRoutes: options.existingRoutes ?? [],
     enableFanout: options.enableFanout !== false,
     flowDirection: options.flowDirection ?? 'auto',
@@ -301,6 +330,198 @@ function segmentIntersectsRect(first: AnalyzerEdgePoint, second: AnalyzerEdgePoi
     && clip(first.y, dy, obstacle.y, obstacle.bottom);
 }
 
+function segmentOverlapLength(first: AnalyzerEdgePoint, second: AnalyzerEdgePoint, obstacle: InflatedObstacle): number {
+  const direction = segmentDirection(first, second);
+  if (!direction) return 0;
+  if (direction === 'horizontal') {
+    if (first.y <= obstacle.y + EPSILON || first.y >= obstacle.bottom - EPSILON) return 0;
+    const overlap = Math.min(Math.max(first.x, second.x), obstacle.right) - Math.max(Math.min(first.x, second.x), obstacle.x);
+    return overlap > EPSILON ? overlap : 0;
+  }
+  if (first.x <= obstacle.x + EPSILON || first.x >= obstacle.right - EPSILON) return 0;
+  const overlap = Math.min(Math.max(first.y, second.y), obstacle.bottom) - Math.max(Math.min(first.y, second.y), obstacle.y);
+  return overlap > EPSILON ? overlap : 0;
+}
+
+interface SoftZoneVisit {
+  id: string;
+  position: number;
+  overlap: number;
+}
+
+function softZoneVisitsForSegment(
+  first: AnalyzerEdgePoint,
+  second: AnalyzerEdgePoint,
+  softObstacles: readonly InflatedObstacle[],
+): SoftZoneVisit[] {
+  const direction = segmentDirection(first, second);
+  if (!direction) return [];
+  const horizontal = direction === 'horizontal';
+  const startValue = horizontal ? first.x : first.y;
+  const endValue = horizontal ? second.x : second.y;
+  const sign = endValue >= startValue ? 1 : -1;
+  return softObstacles
+    .map((obstacle) => {
+      const overlap = segmentOverlapLength(first, second, obstacle);
+      const segmentMinimum = Math.min(startValue, endValue);
+      const segmentMaximum = Math.max(startValue, endValue);
+      const obstacleMinimum = horizontal ? obstacle.x : obstacle.y;
+      const obstacleMaximum = horizontal ? obstacle.right : obstacle.bottom;
+      const overlapStart = Math.max(segmentMinimum, obstacleMinimum);
+      const overlapEnd = Math.min(segmentMaximum, obstacleMaximum);
+      const entry = sign === 1 ? overlapStart : overlapEnd;
+      return {
+        id: obstacle.id,
+        position: Math.abs(entry - startValue),
+        overlap,
+      };
+    })
+    .filter((visit) => visit.overlap >= SOFT_ZONE_VISIT_THRESHOLD)
+    .sort((firstVisit, secondVisit) => firstVisit.position - secondVisit.position);
+}
+
+function routeSoftProximityCost(
+  points: readonly AnalyzerEdgePoint[],
+  options: ResolvedRoutingOptions,
+): number {
+  return points.slice(1).reduce((cost, point, index) => {
+    const previous = points[index]!;
+    return cost + options.softObstacles.reduce(
+      (segmentCost, obstacle) => segmentCost + segmentOverlapLength(previous, point, obstacle) * options.softProximityPenalty,
+      0,
+    );
+  }, 0);
+}
+
+interface RouteSoftZoneVisit {
+  id: string;
+  pathDistance: number;
+  overlap: number;
+}
+
+function routeSoftZoneVisits(
+  points: readonly AnalyzerEdgePoint[],
+  softObstacles: readonly InflatedObstacle[],
+): RouteSoftZoneVisit[] {
+  const visits: RouteSoftZoneVisit[] = [];
+  let travelled = 0;
+  points.slice(1).forEach((point, index) => {
+    const first = points[index]!;
+    const segmentLength = Math.abs(point.x - first.x) + Math.abs(point.y - first.y);
+    softZoneVisitsForSegment(points[index]!, point, softObstacles).forEach((visit) => {
+      if (visits.at(-1)?.id !== visit.id) {
+        visits.push({ id: visit.id, pathDistance: travelled + visit.position, overlap: visit.overlap });
+      }
+    });
+    travelled += segmentLength;
+  });
+  return visits;
+}
+
+function consecutiveOcclusionCost(
+  points: readonly AnalyzerEdgePoint[],
+  options: ResolvedRoutingOptions,
+): number {
+  const visits = routeSoftZoneVisits(points, options.softObstacles);
+  if (visits.length === 0 || options.occlusionPenalty <= 0) return 0;
+  const continuationGap = Math.max(32, options.softKeepOut * 2);
+  let currentRun: string[] = [];
+  let previousVisit: RouteSoftZoneVisit | undefined;
+  let cost = 0;
+  const flush = (): void => {
+    if (currentRun.length > 0) cost += options.occlusionPenalty * currentRun.length ** 2;
+    currentRun = [];
+  };
+  visits.forEach((visit) => {
+    const gap = previousVisit
+      ? visit.pathDistance - (previousVisit.pathDistance + previousVisit.overlap)
+      : 0;
+    if (gap > continuationGap || currentRun.includes(visit.id)) flush();
+    if (currentRun.at(-1) !== visit.id) currentRun.push(visit.id);
+    previousVisit = visit;
+  });
+  flush();
+  return cost;
+}
+
+function terminalSoftOverlapLength(
+  points: readonly AnalyzerEdgePoint[],
+  softObstacles: readonly InflatedObstacle[],
+  length: number,
+  fromStart: boolean,
+): number {
+  if (points.length < 2 || length <= 0) return 0;
+  let remaining = length;
+  let total = 0;
+  const firstIndex = fromStart ? 0 : points.length - 2;
+  const lastIndex = fromStart ? points.length - 1 : -1;
+  const step = fromStart ? 1 : -1;
+  for (let index = firstIndex; index !== lastIndex && remaining > EPSILON; index += step) {
+    const first = fromStart ? points[index]! : points[index + 1]!;
+    const second = fromStart ? points[index + 1]! : points[index]!;
+    const segmentLength = Math.abs(second.x - first.x) + Math.abs(second.y - first.y);
+    if (segmentLength <= EPSILON) continue;
+    const visibleLength = Math.min(segmentLength, remaining);
+    const ratio = visibleLength / segmentLength;
+    const visibleEnd = {
+      x: first.x + (second.x - first.x) * ratio,
+      y: first.y + (second.y - first.y) * ratio,
+    };
+    total += softObstacles.reduce((overlap, obstacle) => overlap + segmentOverlapLength(first, visibleEnd, obstacle), 0);
+    remaining -= visibleLength;
+  }
+  return total;
+}
+
+function terminalReadabilityCost(
+  points: readonly AnalyzerEdgePoint[],
+  options: ResolvedRoutingOptions,
+): number {
+  if (options.terminalLegPenalty <= 0 || options.terminalLegLength <= 0) return 0;
+  const overlap = terminalSoftOverlapLength(points, options.softObstacles, options.terminalLegLength, true)
+    + terminalSoftOverlapLength(points, options.softObstacles, options.terminalLegLength, false);
+  return overlap * options.terminalLegPenalty;
+}
+
+function visibilitySegmentReadabilityCost(
+  first: AnalyzerEdgePoint,
+  second: AnalyzerEdgePoint,
+  options: ResolvedRoutingOptions,
+  isFirstSegment: boolean,
+  isLastSegment: boolean,
+): number {
+  const visits = softZoneVisitsForSegment(first, second, options.softObstacles);
+  const occlusionCost = visits.length * options.occlusionPenalty;
+  const terminalCost = (isFirstSegment ? terminalSoftOverlapLength([first, second], options.softObstacles, options.terminalLegLength, true) : 0)
+    + (isLastSegment ? terminalSoftOverlapLength([first, second], options.softObstacles, options.terminalLegLength, false) : 0);
+  return occlusionCost + terminalCost * options.terminalLegPenalty;
+}
+
+function routeReadabilityPenalty(
+  points: readonly AnalyzerEdgePoint[],
+  options: ResolvedRoutingOptions,
+): number {
+  return consecutiveOcclusionCost(points, options) + terminalReadabilityCost(points, options);
+}
+
+/**
+ * Exposes the soft readability portion of routing for deterministic tests and
+ * layout diagnostics. The supplied rectangles are Node bodies; the same
+ * keep-out expansion used by the router is applied before scoring them.
+ */
+export function analyzerEdgeReadabilityCost(
+  points: readonly AnalyzerEdgePoint[],
+  softObstacles: readonly AnalyzerEdgeObstacle[],
+  options: AnalyzerEdgeRoutingOptions = {},
+): number {
+  const resolved = resolveRoutingOptions(options);
+  const inflatedSoftObstacles = softObstacles
+    .filter(validObstacle)
+    .map((obstacle) => inflateObstacle(obstacle, resolved.softKeepOut));
+  const scopedOptions = { ...resolved, softObstacles: inflatedSoftObstacles };
+  return routeSoftProximityCost(points, scopedOptions) + routeReadabilityPenalty(points, scopedOptions);
+}
+
 function segmentClear(first: AnalyzerEdgePoint, second: AnalyzerEdgePoint, obstacles: readonly InflatedObstacle[]): boolean {
   if (!approximatelyEqual(first.x, second.x) && !approximatelyEqual(first.y, second.y)) return false;
   return !obstacles.some((obstacle) => {
@@ -344,6 +565,24 @@ function relevantObstacles(
     .filter(validObstacle)
     .filter((obstacle) => !isEndpointObstacle(obstacle, source) && !isEndpointObstacle(obstacle, target))
     .map((obstacle) => inflateObstacle(obstacle, clearance));
+}
+
+function isSoftKeepOutObstacle(obstacle: AnalyzerEdgeObstacle): boolean {
+  return obstacle.kind === 'node' || obstacle.kind === 'fact-node' || obstacle.kind === 'summary-card';
+}
+
+function relevantSoftObstacles(
+  source: PositionedNode,
+  target: PositionedNode,
+  obstacles: readonly AnalyzerEdgeObstacle[],
+  softKeepOut: number,
+): InflatedObstacle[] {
+  if (softKeepOut <= 0) return [];
+  return obstacles
+    .filter(isSoftKeepOutObstacle)
+    .filter(validObstacle)
+    .filter((obstacle) => !isEndpointObstacle(obstacle, source) && !isEndpointObstacle(obstacle, target))
+    .map((obstacle) => inflateObstacle(obstacle, softKeepOut));
 }
 
 function segmentDirection(first: AnalyzerEdgePoint, second: AnalyzerEdgePoint): Direction | undefined {
@@ -390,7 +629,11 @@ function routeSegmentPenalty(
   const crossingPenalty = routeCrossesExisting(first, second, options.existingRoutes)
     ? options.crossingPenalty
     : 0;
-  return obstaclePenalty + crossingPenalty;
+  const softProximityPenalty = options.softObstacles.reduce(
+    (penalty, obstacle) => penalty + segmentOverlapLength(first, second, obstacle) * options.softProximityPenalty,
+    0,
+  );
+  return obstaclePenalty + crossingPenalty + softProximityPenalty;
 }
 
 function routeCost(
@@ -398,7 +641,7 @@ function routeCost(
   obstacles: readonly InflatedObstacle[],
   options: ResolvedRoutingOptions,
 ): number {
-  return points.slice(1).reduce((cost, point, index) => {
+  const geometricCost = points.slice(1).reduce((cost, point, index) => {
     const previous = points[index]!;
     const distance = Math.abs(point.x - previous.x) + Math.abs(point.y - previous.y);
     return cost
@@ -406,6 +649,7 @@ function routeCost(
       + routeSegmentPenalty(previous, point, obstacles, options)
       + (index > 0 ? options.bendPenalty : 0);
   }, 0);
+  return geometricCost + routeReadabilityPenalty(points, options);
 }
 
 function routeIsClear(points: readonly AnalyzerEdgePoint[], obstacles: readonly InflatedObstacle[]): boolean {
@@ -431,6 +675,7 @@ function buildVisibilityGraph(
   obstacles: readonly InflatedObstacle[],
   bounds?: AnalyzerEdgeBounds,
   monotonicity?: MonotonicConstraint,
+  visibilityObstacles: readonly InflatedObstacle[] = obstacles,
 ): Map<string, Neighbor[]> | undefined {
   const xCoordinates = new Set<number>();
   const yCoordinates = new Set<number>();
@@ -438,18 +683,22 @@ function buildVisibilityGraph(
   addCoordinate(xCoordinates, end.x);
   addCoordinate(yCoordinates, start.y);
   addCoordinate(yCoordinates, end.y);
-  obstacles.forEach((obstacle) => {
+  visibilityObstacles.forEach((obstacle) => {
     addCoordinate(xCoordinates, obstacle.x);
     addCoordinate(xCoordinates, obstacle.right);
+    addCoordinate(xCoordinates, obstacle.x - FANOUT_CORRIDOR_MARGIN);
+    addCoordinate(xCoordinates, obstacle.right + FANOUT_CORRIDOR_MARGIN);
     addCoordinate(yCoordinates, obstacle.y);
     addCoordinate(yCoordinates, obstacle.bottom);
+    addCoordinate(yCoordinates, obstacle.y - FANOUT_CORRIDOR_MARGIN);
+    addCoordinate(yCoordinates, obstacle.bottom + FANOUT_CORRIDOR_MARGIN);
   });
 
-  if (obstacles.length > 0) {
-    const minimumX = bounds ? bounds.x : Math.min(start.x, end.x, ...obstacles.map((obstacle) => obstacle.x));
-    const maximumX = bounds ? bounds.x + bounds.width : Math.max(start.x, end.x, ...obstacles.map((obstacle) => obstacle.right));
-    const minimumY = bounds ? bounds.y : Math.min(start.y, end.y, ...obstacles.map((obstacle) => obstacle.y));
-    const maximumY = bounds ? bounds.y + bounds.height : Math.max(start.y, end.y, ...obstacles.map((obstacle) => obstacle.bottom));
+  if (visibilityObstacles.length > 0) {
+    const minimumX = bounds ? bounds.x : Math.min(start.x, end.x, ...visibilityObstacles.map((obstacle) => obstacle.x));
+    const maximumX = bounds ? bounds.x + bounds.width : Math.max(start.x, end.x, ...visibilityObstacles.map((obstacle) => obstacle.right));
+    const minimumY = bounds ? bounds.y : Math.min(start.y, end.y, ...visibilityObstacles.map((obstacle) => obstacle.y));
+    const maximumY = bounds ? bounds.y + bounds.height : Math.max(start.y, end.y, ...visibilityObstacles.map((obstacle) => obstacle.bottom));
     addCoordinate(xCoordinates, bounds ? minimumX : minimumX - VISIBILITY_ESCAPE_MARGIN);
     addCoordinate(xCoordinates, bounds ? maximumX : maximumX + VISIBILITY_ESCAPE_MARGIN);
     addCoordinate(yCoordinates, bounds ? minimumY : minimumY - VISIBILITY_ESCAPE_MARGIN);
@@ -516,7 +765,8 @@ function shortestVisibilityRoute(
   options: ResolvedRoutingOptions,
   monotonicity?: MonotonicConstraint,
 ): AnalyzerEdgePoint[] | undefined {
-  const graph = buildVisibilityGraph(start, end, obstacles, options.bounds, monotonicity);
+  const visibilityObstacles = [...obstacles, ...options.softObstacles];
+  const graph = buildVisibilityGraph(start, end, obstacles, options.bounds, monotonicity, visibilityObstacles);
   if (!graph) return undefined;
   const startKey = pointKey(start);
   const endKey = pointKey(end);
@@ -547,6 +797,13 @@ function shortestVisibilityRoute(
       const nextCost = current.cost
         + neighbor.distance
         + routeSegmentPenalty(segmentStart, neighbor.point, obstacles, options)
+        + visibilitySegmentReadabilityCost(
+          segmentStart,
+          neighbor.point,
+          options,
+          current.state.pointKey === startKey,
+          pointKey(neighbor.point) === endKey,
+        )
         + (current.state.direction && current.state.direction !== nextDirection ? options.bendPenalty : 0);
       if (nextCost >= (distances.get(nextKey) ?? Number.POSITIVE_INFINITY)) return;
       distances.set(nextKey, nextCost);
@@ -575,6 +832,7 @@ function orthogonalCandidateRoutes(
   end: AnalyzerEdgePoint,
   obstacles: readonly InflatedObstacle[],
   monotonicity?: MonotonicConstraint,
+  visibilityObstacles: readonly InflatedObstacle[] = obstacles,
 ): AnalyzerEdgePoint[][] {
   const candidates: AnalyzerEdgePoint[][] = [];
   const add = (points: AnalyzerEdgePoint[]): void => {
@@ -589,11 +847,15 @@ function orthogonalCandidateRoutes(
 
   const xCoordinates = new Set<number>([start.x, end.x]);
   const yCoordinates = new Set<number>([start.y, end.y]);
-  obstacles.forEach((obstacle) => {
+  visibilityObstacles.forEach((obstacle) => {
     xCoordinates.add(obstacle.x);
     xCoordinates.add(obstacle.right);
+    xCoordinates.add(obstacle.x - FANOUT_CORRIDOR_MARGIN);
+    xCoordinates.add(obstacle.right + FANOUT_CORRIDOR_MARGIN);
     yCoordinates.add(obstacle.y);
     yCoordinates.add(obstacle.bottom);
+    yCoordinates.add(obstacle.y - FANOUT_CORRIDOR_MARGIN);
+    yCoordinates.add(obstacle.bottom + FANOUT_CORRIDOR_MARGIN);
   });
   [...xCoordinates].forEach((x) => {
     if (approximatelyEqual(x, start.x) || approximatelyEqual(x, end.x)) return;
@@ -610,15 +872,16 @@ function fallbackRoute(
   start: AnalyzerEdgePoint,
   end: AnalyzerEdgePoint,
   obstacles: readonly InflatedObstacle[],
-  bounds?: AnalyzerEdgeBounds,
+  options: ResolvedRoutingOptions,
   monotonicity?: MonotonicConstraint,
 ): AnalyzerEdgePoint[] {
-  const monotonicCandidates = orthogonalCandidateRoutes(start, end, obstacles, monotonicity);
-  const relaxedCandidates = monotonicity ? orthogonalCandidateRoutes(start, end, obstacles) : [];
-  const minimumX = bounds ? bounds.x : Math.min(start.x, end.x, ...obstacles.map((obstacle) => obstacle.x)) - VISIBILITY_ESCAPE_MARGIN;
-  const maximumX = bounds ? bounds.x + bounds.width : Math.max(start.x, end.x, ...obstacles.map((obstacle) => obstacle.right)) + VISIBILITY_ESCAPE_MARGIN;
-  const minimumY = bounds ? bounds.y : Math.min(start.y, end.y, ...obstacles.map((obstacle) => obstacle.y)) - VISIBILITY_ESCAPE_MARGIN;
-  const maximumY = bounds ? bounds.y + bounds.height : Math.max(start.y, end.y, ...obstacles.map((obstacle) => obstacle.bottom)) + VISIBILITY_ESCAPE_MARGIN;
+  const visibilityObstacles = [...obstacles, ...options.softObstacles];
+  const monotonicCandidates = orthogonalCandidateRoutes(start, end, obstacles, monotonicity, visibilityObstacles);
+  const relaxedCandidates = monotonicity ? orthogonalCandidateRoutes(start, end, obstacles, undefined, visibilityObstacles) : [];
+  const minimumX = options.bounds ? options.bounds.x : Math.min(start.x, end.x, ...visibilityObstacles.map((obstacle) => obstacle.x)) - VISIBILITY_ESCAPE_MARGIN;
+  const maximumX = options.bounds ? options.bounds.x + options.bounds.width : Math.max(start.x, end.x, ...visibilityObstacles.map((obstacle) => obstacle.right)) + VISIBILITY_ESCAPE_MARGIN;
+  const minimumY = options.bounds ? options.bounds.y : Math.min(start.y, end.y, ...visibilityObstacles.map((obstacle) => obstacle.y)) - VISIBILITY_ESCAPE_MARGIN;
+  const maximumY = options.bounds ? options.bounds.y + options.bounds.height : Math.max(start.y, end.y, ...visibilityObstacles.map((obstacle) => obstacle.bottom)) + VISIBILITY_ESCAPE_MARGIN;
   const escapeCandidates = [
     [start, { x: minimumX, y: start.y }, { x: minimumX, y: end.y }, end],
     [start, { x: maximumX, y: start.y }, { x: maximumX, y: end.y }, end],
@@ -626,9 +889,13 @@ function fallbackRoute(
     [start, { x: start.x, y: maximumY }, { x: end.x, y: maximumY }, end],
   ];
   const allCandidates = [...monotonicCandidates, ...relaxedCandidates, ...escapeCandidates];
-  return monotonicCandidates.find((candidate) => routeWithinBounds(candidate, bounds) && routeIsClear(candidate, obstacles))
-    ?? allCandidates.find((candidate) => routeWithinBounds(candidate, bounds) && routeIsClear(candidate, obstacles))
-    ?? allCandidates.find((candidate) => routeWithinBounds(candidate, bounds))
+  const best = (candidates: readonly AnalyzerEdgePoint[][]): AnalyzerEdgePoint[] | undefined => candidates
+    .filter((candidate) => routeWithinBounds(candidate, options.bounds) && routeIsClear(candidate, obstacles))
+    .sort((first, second) => routeCost(first, obstacles, options) - routeCost(second, obstacles, options))[0];
+  return best(monotonicCandidates)
+    ?? best(relaxedCandidates)
+    ?? best(escapeCandidates)
+    ?? allCandidates.find((candidate) => routeWithinBounds(candidate, options.bounds))
     ?? allCandidates[0]
     ?? [start, end];
 }
@@ -641,24 +908,26 @@ function candidateRoute(
 ): AnalyzerEdgePoint[] {
   const ports = edgePortGeometry(source, target, options.clearance, options.flowDirection);
   const monotonicity = monotonicConstraint(ports.direction);
+  const visibilityObstacles = [...obstacles, ...options.softObstacles];
   const usable = (candidate: AnalyzerEdgePoint[]): boolean => routeWithinBounds(candidate, options.bounds) && routeIsClear(candidate, obstacles);
   const best = (candidates: AnalyzerEdgePoint[][]): AnalyzerEdgePoint[] | undefined => candidates
     .filter(usable)
     .sort((first, second) => routeCost(first, obstacles, options) - routeCost(second, obstacles, options))[0];
-  const monotonicCandidates = orthogonalCandidateRoutes(ports.start, ports.end, obstacles, monotonicity);
+  const monotonicCandidates = orthogonalCandidateRoutes(ports.start, ports.end, obstacles, monotonicity, visibilityObstacles);
   const monotonicVisibility = shortestVisibilityRoute(ports.start, ports.end, obstacles, options, monotonicity);
   if (monotonicVisibility) monotonicCandidates.push(monotonicVisibility);
-  const relaxedCandidates = orthogonalCandidateRoutes(ports.start, ports.end, obstacles);
+  const relaxedCandidates = orthogonalCandidateRoutes(ports.start, ports.end, obstacles, undefined, visibilityObstacles);
   const relaxedVisibility = shortestVisibilityRoute(ports.start, ports.end, obstacles, options);
   if (relaxedVisibility) relaxedCandidates.push(relaxedVisibility);
   const internalRoute = best(monotonicCandidates)
     ?? best(relaxedCandidates)
-    ?? fallbackRoute(ports.start, ports.end, obstacles, options.bounds, monotonicity);
+    ?? fallbackRoute(ports.start, ports.end, obstacles, options, monotonicity);
+  const simplificationObstacles = [...obstacles, ...options.softObstacles];
   return simplifyAnalyzerOrthogonalRoute([
     ports.sourceBoundary,
     ...internalRoute,
     ports.targetBoundary,
-  ], { obstacles, shortZigzagLength: SHORT_ZIGZAG_LENGTH });
+  ], { obstacles: simplificationObstacles, shortZigzagLength: SHORT_ZIGZAG_LENGTH });
 }
 
 function replaceSlice(points: AnalyzerEdgePoint[], index: number, replacement: AnalyzerEdgePoint[]): AnalyzerEdgePoint[] {
@@ -781,6 +1050,7 @@ function fanoutDirection(
 
 function fanoutTrunkCandidates(
   ports: readonly EdgePortGeometry[],
+  corridorObstacles: readonly InflatedObstacle[] = [],
 ): Array<{ x?: number; y?: number }> {
   const first = ports[0];
   if (!first) return [];
@@ -792,11 +1062,31 @@ function fanoutTrunkCandidates(
     if (first.direction === 'right') {
       const nearest = minimumEnd - FANOUT_TRUNK_GAP;
       const midpoint = first.start.x + (minimumEnd - first.start.x) / 2;
-      return [{ x: midpoint }, { x: nearest }].filter((candidate) => candidate.x !== undefined && candidate.x > first.start.x + 4 && candidate.x < minimumEnd - 4);
+      const candidates = [
+        midpoint,
+        nearest,
+        ...corridorObstacles.flatMap((obstacle) => [
+          obstacle.x - FANOUT_CORRIDOR_MARGIN,
+          obstacle.right + FANOUT_CORRIDOR_MARGIN,
+        ]),
+      ];
+      return [...new Set(candidates)]
+        .filter((x) => x > first.start.x + 4 && x < minimumEnd - 4)
+        .map((x) => ({ x }));
     }
     const nearest = maximumEnd + FANOUT_TRUNK_GAP;
     const midpoint = first.start.x - (first.start.x - maximumEnd) / 2;
-    return [{ x: midpoint }, { x: nearest }].filter((candidate) => candidate.x !== undefined && candidate.x < first.start.x - 4 && candidate.x > maximumEnd + 4);
+    const candidates = [
+      midpoint,
+      nearest,
+      ...corridorObstacles.flatMap((obstacle) => [
+        obstacle.x - FANOUT_CORRIDOR_MARGIN,
+        obstacle.right + FANOUT_CORRIDOR_MARGIN,
+      ]),
+    ];
+    return [...new Set(candidates)]
+      .filter((x) => x < first.start.x - 4 && x > maximumEnd + 4)
+      .map((x) => ({ x }));
   }
   const endYs = ports.map((port) => port.end.y);
   const minimumEnd = Math.min(...endYs);
@@ -804,11 +1094,31 @@ function fanoutTrunkCandidates(
   if (first.direction === 'down') {
     const nearest = minimumEnd - FANOUT_TRUNK_GAP;
     const midpoint = first.start.y + (minimumEnd - first.start.y) / 2;
-    return [{ y: midpoint }, { y: nearest }].filter((candidate) => candidate.y !== undefined && candidate.y > first.start.y + 4 && candidate.y < minimumEnd - 4);
+    const candidates = [
+      midpoint,
+      nearest,
+      ...corridorObstacles.flatMap((obstacle) => [
+        obstacle.y - FANOUT_CORRIDOR_MARGIN,
+        obstacle.bottom + FANOUT_CORRIDOR_MARGIN,
+      ]),
+    ];
+    return [...new Set(candidates)]
+      .filter((y) => y > first.start.y + 4 && y < minimumEnd - 4)
+      .map((y) => ({ y }));
   }
   const nearest = maximumEnd + FANOUT_TRUNK_GAP;
   const midpoint = first.start.y - (first.start.y - maximumEnd) / 2;
-  return [{ y: midpoint }, { y: nearest }].filter((candidate) => candidate.y !== undefined && candidate.y < first.start.y - 4 && candidate.y > maximumEnd + 4);
+  const candidates = [
+    midpoint,
+    nearest,
+    ...corridorObstacles.flatMap((obstacle) => [
+      obstacle.y - FANOUT_CORRIDOR_MARGIN,
+      obstacle.bottom + FANOUT_CORRIDOR_MARGIN,
+    ]),
+  ];
+  return [...new Set(candidates)]
+    .filter((y) => y < first.start.y - 4 && y > maximumEnd + 4)
+    .map((y) => ({ y }));
 }
 
 function fanoutRoute(
@@ -824,15 +1134,24 @@ function fanoutRoute(
   const horizontal = direction === 'left' || direction === 'right';
   const spreadValues = members.map(({ target }) => horizontal ? nodeCenter(target).y : nodeCenter(target).x);
   if (Math.max(...spreadValues) - Math.min(...spreadValues) > FANOUT_MAX_SPREAD) return undefined;
-  const candidates = fanoutTrunkCandidates(ports);
   const hardObstacles = obstacles
     .filter(isAnalyzerEdgeObstacleHard)
     .filter(validObstacle)
     .filter((obstacle) => !isEndpointObstacle(obstacle, source))
     .map((obstacle) => inflateObstacle(obstacle, options.clearance));
+  const softObstacles = obstacles
+    .filter(isSoftKeepOutObstacle)
+    .filter(validObstacle)
+    .filter((obstacle) => !isEndpointObstacle(obstacle, source))
+    .map((obstacle) => inflateObstacle(obstacle, options.softKeepOut));
+  const candidates = fanoutTrunkCandidates(ports, [...hardObstacles, ...softObstacles]);
   const relevantByEdgeId = new Map(members.map(({ edge, target }) => [
     edge.id,
     hardObstacles.filter((obstacle) => !isEndpointObstacle(obstacle, target)),
+  ]));
+  const relevantSoftByEdgeId = new Map(members.map(({ edge, target }) => [
+    edge.id,
+    softObstacles.filter((obstacle) => !isEndpointObstacle(obstacle, target)),
   ]));
   const monotonicity = monotonicConstraint(direction);
   const candidateRoutes: Array<{ routes: Map<string, AnalyzerEdgePoint[]>; cost: number }> = [];
@@ -858,17 +1177,24 @@ function fanoutRoute(
           { x: trunkSpreadEnd, y: trunk.y! },
         ];
     if (!routeIsClear(sharedTrunk, hardObstacles)) valid = false;
+    const trunkOptions = { ...options, softObstacles };
+    cost += routeSoftProximityCost(sharedTrunk, trunkOptions) + routeReadabilityPenalty(sharedTrunk, trunkOptions);
     ports.forEach((port, index) => {
       const member = members[index]!;
       const route = horizontal
         ? [port.sourceBoundary, port.start, { x: trunk.x!, y: port.start.y }, { x: trunk.x!, y: port.end.y }, port.end, port.targetBoundary]
         : [port.sourceBoundary, port.start, { x: port.start.x, y: trunk.y! }, { x: port.end.x, y: trunk.y! }, port.end, port.targetBoundary];
       const relevant = relevantByEdgeId.get(member.edge.id) ?? [];
+      const relevantSoft = relevantSoftByEdgeId.get(member.edge.id) ?? [];
+      const memberOptions = { ...options, softObstacles: relevantSoft };
       if (!routeWithinBounds(route, options.bounds) || !routeRespectsMonotonicity(route, monotonicity) || !routeIsClear(route, relevant)) valid = false;
-      const compacted = simplifyAnalyzerOrthogonalRoute(route, { obstacles: relevant, shortZigzagLength: SHORT_ZIGZAG_LENGTH });
+      const compacted = simplifyAnalyzerOrthogonalRoute(route, {
+        obstacles: [...relevant, ...relevantSoft],
+        shortZigzagLength: SHORT_ZIGZAG_LENGTH,
+      });
       if (!routeRespectsMonotonicity(compacted, monotonicity)) valid = false;
       routes.set(member.edge.id, compacted);
-      cost += routeCost(compacted, relevant, options);
+      cost += routeCost(compacted, relevant, memberOptions);
     });
     if (valid) candidateRoutes.push({ routes, cost });
   });
@@ -896,7 +1222,8 @@ export function analyzerEdgeRoute(
 ): AnalyzerEdgePoint[] | undefined {
   const resolved = resolveRoutingOptions(options);
   const relevant = relevantObstacles(source, target, obstacles, resolved.clearance);
-  return candidateRoute(source, target, relevant, resolved);
+  const softObstacles = relevantSoftObstacles(source, target, obstacles, resolved.softKeepOut);
+  return candidateRoute(source, target, relevant, { ...resolved, softObstacles });
 }
 
 export function analyzerEdgeRoutes(

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
-import { ANALYZER_DEFAULT_TRANSFORM, ANALYZER_EXTERNAL_SUMMARY_ID, ANALYZER_NODE_WIDTH, analyzerEdgeObstacles, analyzerEdgePaths, analyzerFocusDepths, analyzerPresentationCount, analyzerPresentationCountLabel, displayedZoomLevelForNode, evidenceRangeLabel, fitAnalyzerTransform, focusAnalyzerTransform, layoutAnalyzerView, nodeMatchesSearch, preserveAnalyzerTransformOnViewportResize, presentAnalyzerView, semanticZoomLevelForScale, shouldRunAnalyzerInitialFit, shouldShowAnalyzerEvidencePreview, type AnalyzerGraphTransform, type AnalyzerViewCounts, type AnalyzerViewEdge, type AnalyzerViewModel, type PositionedNode } from '../../analyzer';
+import { ANALYZER_DEFAULT_TRANSFORM, ANALYZER_EXTERNAL_SUMMARY_ID, ANALYZER_NODE_WIDTH, analyzerEdgeArrowMarkerId, analyzerEdgeObstacles, analyzerEdgePaths, analyzerFocusDepths, analyzerForegroundEdges, analyzerPresentationCount, analyzerPresentationCountLabel, displayedZoomLevelForNode, evidenceRangeLabel, fitAnalyzerTransform, focusAnalyzerTransform, layoutAnalyzerView, nodeMatchesSearch, preserveAnalyzerTransformOnViewportResize, presentAnalyzerView, semanticZoomLevelForScale, shouldRunAnalyzerInitialFit, shouldShowAnalyzerEvidencePreview, type AnalyzerGraphTransform, type AnalyzerViewCounts, type AnalyzerViewEdge, type AnalyzerViewModel, type PositionedNode } from '../../analyzer';
 import { nodeTypeLabels } from '../../analyzer';
 import { EvidencePreview } from './EvidenceCodeBlock';
 
@@ -205,8 +205,9 @@ export function AnalyzerGraphStage({
       selectedNodeId,
     };
   }, [cameraKey, expandedPresentationKey, layout, onTransformChange, selectedNodeId, transform.scale, transform.x, transform.y, view]);
-  const foregroundEdges = useMemo(() => filteredView.edges.filter((edge) => edge.id === selectedEdgeId || Boolean(selectedNodeId && (edge.sourceId === selectedNodeId || edge.targetId === selectedNodeId))), [filteredView.edges, selectedEdgeId, selectedNodeId]);
+  const foregroundEdges = useMemo(() => analyzerForegroundEdges(filteredView.edges, selectedEdgeId, selectedNodeId), [filteredView.edges, selectedEdgeId, selectedNodeId]);
   const backgroundEdges = useMemo(() => filteredView.edges.filter((edge) => !foregroundEdges.includes(edge)), [filteredView.edges, foregroundEdges]);
+  const hasSelectedEdge = Boolean(selectedEdgeId && filteredView.edges.some((edge) => edge.id === selectedEdgeId));
   const edgeObstacles = useMemo(() => analyzerEdgeObstacles(layout), [layout]);
   const edgeFlowDirection = view.view === 'command' || view.view === 'dependencies' ? 'horizontal' as const : 'auto' as const;
   const edgePaths = useMemo(() => analyzerEdgePaths(filteredView.edges, edgePositions, edgeObstacles, {
@@ -407,12 +408,18 @@ export function AnalyzerGraphStage({
         : focusDepth === 2
           ? 'secondary'
           : 'deep';
+    const arrowMarkerId = analyzerEdgeArrowMarkerId({
+      selected,
+      connected,
+      bundle: edge.presentation?.displayKind === 'bundle',
+      focusDepth,
+    });
     return (
       <g key={edge.id} className={`analyzer-edge-group${selected ? ' is-selected' : ''}${connected ? ' is-connected' : ''}${focusDepth !== undefined ? ' is-focus-depth' : ''}${emphasis === 'secondary' ? ' is-secondary' : ''}${emphasis === 'deep' ? ' is-deep' : ''}${edge.presentation?.displayKind === 'bundle' ? ' is-bundle' : ''}${contextual ? ' is-context' : ''}${dimmed ? ' is-dimmed' : ''}`}>
         <path
           className="analyzer-edge-hit"
           d={path}
-          markerEnd="url(#analyzer-edge-arrow)"
+          markerEnd={`url(#${arrowMarkerId})`}
           role="button"
           tabIndex={0}
           aria-label={`${edge.label}: ${source.node.label} to ${target.node.label}`}
@@ -472,7 +479,7 @@ export function AnalyzerGraphStage({
         <div className="analyzer-graph-empty">現在のFilterに一致するNodeはありません。</div>
       ) : (
         <div className="analyzer-graph-viewport">
-          <div className="analyzer-graph-world" style={{ width: layout.width, height: layout.height, transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})` }}>
+          <div className={`analyzer-graph-world${hasSelectedEdge ? ' has-selected-edge' : ''}`} style={{ width: layout.width, height: layout.height, transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})` }}>
             {layout.clusters.map((cluster) => {
               const hideDuplicateExternalHeading = cluster.id === 'dependencies:external' && hasExpandedExternalSummaryRegion;
               return (
@@ -526,8 +533,20 @@ export function AnalyzerGraphStage({
             })}
             <svg className="analyzer-edge-layer analyzer-edge-layer-base" width={layout.width} height={layout.height} viewBox={`0 0 ${layout.width} ${layout.height}`} aria-label="Graph relations">
               <defs>
-                <marker id="analyzer-edge-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth">
-                  <path d="M 0 0 L 8 4 L 0 8 z" fill="currentColor" />
+                <marker id="analyzer-edge-arrow-normal" markerWidth="9" markerHeight="9" refX="7.5" refY="4.5" orient="auto" markerUnits="userSpaceOnUse" viewBox="0 0 9 9">
+                  <path d="M 0 0 L 9 4.5 L 0 9 z" fill="var(--connector)" />
+                </marker>
+                <marker id="analyzer-edge-arrow-related" markerWidth="9" markerHeight="9" refX="7.5" refY="4.5" orient="auto" markerUnits="userSpaceOnUse" viewBox="0 0 9 9">
+                  <path d="M 0 0 L 9 4.5 L 0 9 z" fill="var(--analyzer-edge-related)" />
+                </marker>
+                <marker id="analyzer-edge-arrow-selected" markerWidth="9" markerHeight="9" refX="7.5" refY="4.5" orient="auto" markerUnits="userSpaceOnUse" viewBox="0 0 9 9">
+                  <path d="M 0 0 L 9 4.5 L 0 9 z" fill="var(--analyzer-edge-selected)" />
+                </marker>
+                <marker id="analyzer-edge-arrow-bundle" markerWidth="9" markerHeight="9" refX="7.5" refY="4.5" orient="auto" markerUnits="userSpaceOnUse" viewBox="0 0 9 9">
+                  <path d="M 0 0 L 9 4.5 L 0 9 z" fill="var(--warm)" />
+                </marker>
+                <marker id="analyzer-edge-arrow-deep" markerWidth="9" markerHeight="9" refX="7.5" refY="4.5" orient="auto" markerUnits="userSpaceOnUse" viewBox="0 0 9 9">
+                  <path d="M 0 0 L 9 4.5 L 0 9 z" fill="var(--subtle)" />
                 </marker>
               </defs>
               {backgroundEdges.map(renderEdge)}

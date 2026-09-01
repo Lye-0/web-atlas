@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  analyzerEdgeReadabilityCost,
   analyzerEdgeObstacles,
   analyzerEdgePath,
   analyzerEdgePathIntersectsObstacle,
@@ -43,6 +44,10 @@ function nodeObstacle(positionedNode: PositionedNode): AnalyzerEdgeObstacle {
     height: positionedNode.height,
     kind: 'node',
   };
+}
+
+function softNodeObstacle(id: string, x: number, y: number, width = 244, height = 60): AnalyzerEdgeObstacle {
+  return { id, x, y, width, height, kind: 'node', hard: false };
 }
 
 function emptyLayout(nodes: PositionedNode[]): AnalyzerLayout {
@@ -164,6 +169,68 @@ describe('Analyzer orthogonal edge routing', () => {
     expect(route).toBeDefined();
     expect(analyzerEdgeRouteIntersectsObstacle(route ?? [], sibling)).toBe(false);
     expect(analyzerEdgeRouteIntersectsObstacle(route ?? [], summary)).toBe(false);
+  });
+});
+
+describe('Analyzer readability-aware edge routing', () => {
+  it('keeps a soft keep-out zone traversable while choosing a clear corridor', () => {
+    const source = positionedNode('source', 0, 77);
+    const target = positionedNode('target', 700, 77);
+    const softZone = softNodeObstacle('soft-zone', 350, 100);
+    const directRoute = analyzerEdgeRoute(source, target, [softZone], { softKeepOut: 0 });
+    const readableRoute = analyzerEdgeRoute(source, target, [softZone]);
+
+    expect(directRoute).toBeDefined();
+    expect(readableRoute).toBeDefined();
+    expect(analyzerEdgeRouteIntersectsObstacle(directRoute ?? [], softZone)).toBe(true);
+    expect(analyzerEdgeRouteIntersectsObstacle(readableRoute ?? [], softZone)).toBe(false);
+    expect(readableRoute).not.toEqual(directRoute);
+    expect(readableRoute?.some((point) => point.y < softZone.y || point.y > softZone.y + softZone.height)).toBe(true);
+  });
+
+  it('increases the occlusion cost non-linearly for consecutive hidden Nodes', () => {
+    const route = [{ x: 0, y: 0 }, { x: 1000, y: 0 }];
+    const makeZones = (count: number): AnalyzerEdgeObstacle[] => Array.from({ length: count }, (_, index) => softNodeObstacle(`zone-${index}`, 120 + index * 110, -20, 100, 40));
+    const options = { terminalLegLength: 0 };
+    const oneZone = analyzerEdgeReadabilityCost(route, makeZones(1), options);
+    const twoZones = analyzerEdgeReadabilityCost(route, makeZones(2), options);
+    const threeZones = analyzerEdgeReadabilityCost(route, makeZones(3), options);
+
+    expect(twoZones).toBeGreaterThan(oneZone);
+    expect(threeZones).toBeGreaterThan(twoZones);
+    expect(threeZones - twoZones).toBeGreaterThan(twoZones - oneZone);
+  });
+
+  it('adds an extra readability cost to an occluded terminal leg', () => {
+    const route = [{ x: 0, y: 0 }, { x: 1000, y: 0 }];
+    const middleZone = [softNodeObstacle('middle-zone', 400, -20, 100, 40)];
+    const terminalZone = [softNodeObstacle('terminal-zone', 930, -20, 100, 40)];
+    const options = { terminalLegLength: 80 };
+
+    expect(analyzerEdgeReadabilityCost(route, terminalZone, options)).toBeGreaterThan(analyzerEdgeReadabilityCost(route, middleZone, options));
+  });
+
+  it('moves a shared fan-out trunk out of a continuous soft Node column', () => {
+    const source = positionedNode('source', 0, 200);
+    const targets = [
+      positionedNode('target-a', 700, 40),
+      positionedNode('target-b', 700, 200),
+      positionedNode('target-c', 700, 360),
+    ];
+    const nodes = [source, ...targets];
+    const positionedById = new Map(nodes.map((node) => [node.node.id, node]));
+    const edges = targets.map((target) => edge(`edge:${target.node.id}`, 'source', target.node.id));
+    const softColumn = [
+      softNodeObstacle('soft-column-a', 350, 20),
+      softNodeObstacle('soft-column-b', 350, 160),
+      softNodeObstacle('soft-column-c', 350, 300),
+    ];
+    const routes = analyzerEdgeRoutes(edges, positionedById, [...nodes.map(nodeObstacle), ...softColumn], { flowDirection: 'horizontal' });
+    const sharedRoute = routes.get('edge:target-a') ?? [];
+    const trunkX = sharedRoute.slice(1).map((point) => point.x).find((x) => x > source.x + ANALYZER_NODE_WIDTH && x < Math.min(...targets.map((target) => target.x)));
+
+    expect(trunkX).toBeDefined();
+    expect(trunkX! < 350 - 18 || trunkX! > 350 + 244 + 18).toBe(true);
   });
 });
 
