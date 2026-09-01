@@ -677,8 +677,10 @@ export function projectDependencies(store: AnalyzerProjectStore): AnalyzerViewMo
     sourceGroups.set(groupKey, group);
     sourceGroupKeyByExternalId.set(node.id, groupKey);
   });
+  const externalSourceIds = new Set([...sourceIdsByExternalId.values()].flat());
+  const hasSingleExternalSource = externalSourceIds.size <= 1;
   const sourceSummaryId = (groupKey: string) => `dependencies:external:source:${groupKey}`;
-  const sourceGroupSummaries = [...sourceGroups.entries()]
+  const groupedSourceSummaries = [...sourceGroups.entries()]
     .sort(([firstKey, first], [secondKey, second]) => {
       if (firstKey === 'shared') return -1;
       if (secondKey === 'shared') return 1;
@@ -710,29 +712,33 @@ export function projectDependencies(store: AnalyzerProjectStore): AnalyzerViewMo
         },
       };
     });
+  const sourceGroupSummaries = hasSingleExternalSource ? [] : groupedSourceSummaries;
   const externalDetailNodes = externalNodes.map((node) => {
     const groupKey = sourceGroupKeyByExternalId.get(node.id) ?? 'unlinked';
     const group = sourceGroups.get(groupKey);
+    const parentId = hasSingleExternalSource ? externalSummaryId : sourceSummaryId(groupKey);
     return {
       ...node,
       metadata: {
         ...node.metadata,
         externalGroupId: groupKey,
         externalGroupLabel: group?.label ?? 'Other External',
-        externalGroupPresentationId: sourceSummaryId(groupKey),
+        externalGroupPresentationId: parentId,
         externalSourceIds: [...(group?.sourceIds ?? [])],
       },
-      presentation: { role: 'detail' as const, parentId: sourceSummaryId(groupKey) },
+      presentation: { role: 'detail' as const, parentId },
     };
   });
-  const externalSummaryBase = summaryNode(externalSummaryId, 'External Packages', `${externalNodes.length} packages`, 'external-package', 'dependencies:external', sourceGroupSummaries);
+  const externalSummaryChildren = hasSingleExternalSource ? externalDetailNodes : sourceGroupSummaries;
+  const externalSummaryBase = summaryNode(externalSummaryId, 'External Packages', `${externalNodes.length} packages`, 'external-package', 'dependencies:external', externalSummaryChildren);
   const externalSummary = {
     ...externalSummaryBase,
     metadata: {
       ...externalSummaryBase.metadata,
       childCount: externalNodes.length,
       packageCount: externalNodes.length,
-      groupCount: sourceGroupSummaries.length,
+      groupCount: groupedSourceSummaries.length,
+      ...(hasSingleExternalSource ? { externalLayoutMode: 'flat' } : {}),
     },
   };
   const nodes = externalNodes.length > 0
@@ -747,7 +753,7 @@ export function projectDependencies(store: AnalyzerProjectStore): AnalyzerViewMo
     const groupKey = sourceGroupKeyByExternalId.get(edge.targetId) ?? 'unlinked';
     return {
       ...edge,
-      presentation: { parentId: sourceSummaryId(groupKey), initiallyHidden: true },
+      presentation: { parentId: hasSingleExternalSource ? externalSummaryId : sourceSummaryId(groupKey), initiallyHidden: true },
     };
   });
   const externalEdgesBySourceAndGroup = new Map<string, AnalyzerViewEdge[]>();
@@ -760,7 +766,7 @@ export function projectDependencies(store: AnalyzerProjectStore): AnalyzerViewMo
   });
   const bundleEdges = [...externalEdgesBySourceAndGroup.entries()].map(([key, sourceEdges]) => {
     const [sourceId, groupKey] = key.split('\u0000');
-    const targetSummaryId = sourceSummaryId(groupKey ?? 'unlinked');
+    const targetSummaryId = hasSingleExternalSource ? externalSummaryId : sourceSummaryId(groupKey ?? 'unlinked');
     return {
       id: `view-edge:external-bundle:${sourceId}:${groupKey}`,
       sourceId,

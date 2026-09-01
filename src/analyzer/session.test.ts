@@ -5,6 +5,7 @@ import {
   type AnalyzerSessionState,
 } from './session';
 import type { AnalyzerProjectStore } from './types';
+import type { DirectoryHandleLike } from './fileDiscovery';
 
 function projectStore(scannedAt: string): AnalyzerProjectStore {
   return {
@@ -26,6 +27,24 @@ function withProject(): AnalyzerSessionState {
 }
 
 describe('Analyzer session store', () => {
+  it('keeps the selected folder handle alongside the analysis result', () => {
+    const folderHandle: DirectoryHandleLike = {
+      kind: 'directory',
+      name: 'git-lines',
+      values: async function* values() {
+        // The session only retains the handle; scanning has already completed.
+      },
+    };
+    const state = analyzerSessionReducer(createInitialAnalyzerSessionState(), {
+      type: 'replaceProject',
+      store: projectStore('first'),
+      folderHandle,
+    });
+
+    expect(state.store?.scannedAt).toBe('first');
+    expect(state.folderHandle).toBe(folderHandle);
+  });
+
   it('keeps each view state and camera independent across route changes', () => {
     let state = withProject();
     state = analyzerSessionReducer(state, {
@@ -74,6 +93,7 @@ describe('Analyzer session store', () => {
 
     state = analyzerSessionReducer(state, { type: 'replaceProject', store: projectStore('second') });
     expect(state.store?.scannedAt).toBe('second');
+    expect(state.folderHandle).toBeUndefined();
     expect(state.views.architecture).toMatchObject({ search: '', filter: 'all', detailOpen: false });
     expect(state.views.architecture.selectedNodeId).toBeUndefined();
     expect(state.views.architecture.camera).toBeUndefined();

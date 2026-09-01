@@ -1,4 +1,5 @@
 import type { AnalyzerGraphTransform } from './camera';
+import type { DirectoryHandleLike } from './fileDiscovery';
 import type { AnalyzerFilter, AnalyzerProjectStore, AnalyzerViewId } from './types';
 
 export interface AnalyzerViewSession {
@@ -14,6 +15,7 @@ export interface AnalyzerViewSession {
 
 export interface AnalyzerSessionState {
   store?: AnalyzerProjectStore;
+  folderHandle?: DirectoryHandleLike;
   views: Record<AnalyzerViewId, AnalyzerViewSession>;
   scanVersion: number;
 }
@@ -21,7 +23,7 @@ export interface AnalyzerSessionState {
 export type AnalyzerViewSessionUpdate = Partial<AnalyzerViewSession> | ((current: AnalyzerViewSession) => AnalyzerViewSession);
 
 export type AnalyzerSessionAction =
-  | { type: 'replaceProject'; store: AnalyzerProjectStore }
+  | { type: 'replaceProject'; store: AnalyzerProjectStore; folderHandle?: DirectoryHandleLike }
   | { type: 'updateView'; view: AnalyzerViewId; update: AnalyzerViewSessionUpdate };
 
 export const analyzerViewIds: AnalyzerViewId[] = ['architecture', 'workspace', 'command', 'dependencies'];
@@ -46,6 +48,7 @@ export function analyzerSessionReducer(state: AnalyzerSessionState, action: Anal
   if (action.type === 'replaceProject') {
     return {
       store: action.store,
+      folderHandle: action.folderHandle,
       views: Object.fromEntries(analyzerViewIds.map((view) => [view, createInitialAnalyzerViewSession()])) as Record<AnalyzerViewId, AnalyzerViewSession>,
       scanVersion: state.scanVersion + 1,
     };

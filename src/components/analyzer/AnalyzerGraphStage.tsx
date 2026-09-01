@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
-import { ANALYZER_DEFAULT_TRANSFORM, ANALYZER_EXTERNAL_SUMMARY_ID, ANALYZER_NODE_WIDTH, analyzerFocusDepths, analyzerPresentationCount, analyzerPresentationCountLabel, displayedZoomLevelForNode, fitAnalyzerTransform, focusAnalyzerTransform, layoutAnalyzerView, nodeMatchesSearch, preserveAnalyzerTransformOnViewportResize, presentAnalyzerView, semanticZoomLevelForScale, shouldShowAnalyzerEvidencePreview, type AnalyzerGraphTransform, type AnalyzerViewCounts, type AnalyzerViewEdge, type AnalyzerViewModel, type PositionedNode } from '../../analyzer';
+import { ANALYZER_DEFAULT_TRANSFORM, ANALYZER_EXTERNAL_SUMMARY_ID, ANALYZER_NODE_WIDTH, analyzerEdgeObstacles, analyzerEdgePath, analyzerFocusDepths, analyzerPresentationCount, analyzerPresentationCountLabel, displayedZoomLevelForNode, evidenceRangeLabel, fitAnalyzerTransform, focusAnalyzerTransform, layoutAnalyzerView, nodeMatchesSearch, preserveAnalyzerTransformOnViewportResize, presentAnalyzerView, semanticZoomLevelForScale, shouldShowAnalyzerEvidencePreview, type AnalyzerGraphTransform, type AnalyzerViewCounts, type AnalyzerViewEdge, type AnalyzerViewModel, type PositionedNode } from '../../analyzer';
 import { nodeTypeLabels } from '../../analyzer';
 import { EvidencePreview } from './EvidenceCodeBlock';
 
@@ -38,20 +38,6 @@ interface PresentationCameraSnapshot {
 function displayNodeType(node: AnalyzerViewModel['nodes'][number]): string {
   const displayRole = node.metadata.displayRole;
   return typeof displayRole === 'string' ? displayRole : nodeTypeLabels[node.type] ?? node.type;
-}
-
-function edgePath(source: PositionedNode, target: PositionedNode): string {
-  const sourceCenter = source.x + ANALYZER_NODE_WIDTH / 2;
-  const targetCenter = target.x + ANALYZER_NODE_WIDTH / 2;
-  const goesRight = targetCenter >= sourceCenter;
-  const sourceX = goesRight ? source.x + ANALYZER_NODE_WIDTH : source.x;
-  const targetX = goesRight ? target.x : target.x + ANALYZER_NODE_WIDTH;
-  const sourceY = source.y + source.height / 2;
-  const targetY = target.y + target.height / 2;
-  const bend = Math.max(54, Math.abs(targetX - sourceX) * 0.38);
-  const sourceControlX = sourceX + (goesRight ? bend : -bend);
-  const targetControlX = targetX + (goesRight ? -bend : bend);
-  return `M ${sourceX} ${sourceY} C ${sourceControlX} ${sourceY}, ${targetControlX} ${targetY}, ${targetX} ${targetY}`;
 }
 
 function nodeStyle(positionedNode: PositionedNode): CSSProperties {
@@ -100,7 +86,7 @@ function evidenceHint(node: AnalyzerViewModel['nodes'][number], view: AnalyzerVi
   const evidence = node.evidenceIds
     .map((evidenceId) => view.evidence.find((candidate) => candidate.id === evidenceId))
     .find((candidate): candidate is NonNullable<typeof candidate> => Boolean(candidate));
-  return evidence ? `${evidence.filePath}:${evidence.contextStartLine}` : undefined;
+  return evidence ? evidenceRangeLabel(evidence) : undefined;
 }
 
 export function AnalyzerGraphStage({
@@ -210,6 +196,12 @@ export function AnalyzerGraphStage({
   }, [cameraKey, expandedPresentationKey, layout, onTransformChange, selectedNodeId, transform.scale, transform.x, transform.y, view]);
   const foregroundEdges = useMemo(() => filteredView.edges.filter((edge) => edge.id === selectedEdgeId || Boolean(selectedNodeId && (edge.sourceId === selectedNodeId || edge.targetId === selectedNodeId))), [filteredView.edges, selectedEdgeId, selectedNodeId]);
   const backgroundEdges = useMemo(() => filteredView.edges.filter((edge) => !foregroundEdges.includes(edge)), [filteredView.edges, foregroundEdges]);
+  const edgeObstacles = useMemo(() => analyzerEdgeObstacles(layout), [layout]);
+  const edgePaths = useMemo(() => new Map(filteredView.edges.flatMap((edge) => {
+    const source = positionedById.get(edge.sourceId) ?? semanticAnchorPosition(layout, filteredView, edge.sourceId);
+    const target = positionedById.get(edge.targetId) ?? semanticAnchorPosition(layout, filteredView, edge.targetId);
+    return source && target ? [[edge.id, analyzerEdgePath(source, target, edgeObstacles)] as const] : [];
+  })), [edgeObstacles, filteredView, layout, positionedById]);
   const selectionContext = useMemo(() => {
     const connectedNodeIds = new Set<string>();
     const contextClusterIds = new Set<string>();
@@ -384,7 +376,8 @@ export function AnalyzerGraphStage({
   const renderEdge = (edge: AnalyzerViewEdge) => {
     const source = positionedById.get(edge.sourceId) ?? semanticAnchorPosition(layout, filteredView, edge.sourceId);
     const target = positionedById.get(edge.targetId) ?? semanticAnchorPosition(layout, filteredView, edge.targetId);
-    if (!source || !target) return null;
+    const path = edgePaths.get(edge.id);
+    if (!source || !target || !path) return null;
     const selected = edge.id === selectedEdgeId;
     const connected = selectedNodeId ? edge.sourceId === selectedNodeId || edge.targetId === selectedNodeId : false;
     const inContext = Boolean(
@@ -407,7 +400,7 @@ export function AnalyzerGraphStage({
       <g key={edge.id} className={`analyzer-edge-group${selected ? ' is-selected' : ''}${connected ? ' is-connected' : ''}${focusDepth !== undefined ? ' is-focus-depth' : ''}${emphasis === 'secondary' ? ' is-secondary' : ''}${emphasis === 'deep' ? ' is-deep' : ''}${edge.presentation?.displayKind === 'bundle' ? ' is-bundle' : ''}${contextual ? ' is-context' : ''}${dimmed ? ' is-dimmed' : ''}`}>
         <path
           className="analyzer-edge-hit"
-          d={edgePath(source, target)}
+          d={path}
           markerEnd="url(#analyzer-edge-arrow)"
           role="button"
           tabIndex={0}

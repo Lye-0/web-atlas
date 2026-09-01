@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { parseCommandExpression } from './commandParser';
-import { makeEvidence, positionAt } from './evidence';
+import { evidenceRangeLabel, makeEvidence, positionAt } from './evidence';
 import { isAnalyzerSourcePath, isExcludedPath, sourceFilesFromInput } from './fileDiscovery';
 import { parseDotnetProject, parsePackageJson, parsePnpmWorkspace, parseWranglerConfig } from './parsers';
 import { ANALYZER_COMMAND_COMMON_LANE_ID, projectArchitecture, projectCommand, projectDependencies, projectWorkspace } from './projectors';
 import { analyzerSummarySubtitle, presentationOwnsNode, presentAnalyzerView } from './presentation';
 import { scanProjectFiles } from './scan';
-import { packageIdForPath, scriptIdFor, type AnalyzerSourceFile, type AnalyzerViewModel } from './types';
+import { packageIdForPath, scriptIdFor, type AnalyzerProjectStore, type AnalyzerSourceFile, type AnalyzerViewModel } from './types';
 import { ANALYZER_NEAR_NODE_HEIGHT, ANALYZER_NODE_HEIGHT, ANALYZER_NODE_WIDTH, layoutAnalyzerView } from './layout';
 import { ANALYZER_FIT_PADDING, fitAnalyzerTransform, focusAnalyzerTransform, preserveAnalyzerTransformOnViewportResize } from './camera';
 import { analyzerRelationInverseLabels, relationLabelForNode } from './relations';
@@ -130,6 +130,13 @@ describe('Analyzer parsers and evidence', () => {
     });
     expect(evidence.contextStartLine).toBe(3);
     expect(evidence.contextEndLine).toBe(7);
+    expect(evidenceRangeLabel(evidence)).toBe(`package.json:${evidence.highlightRanges[0].start.line}`);
+
+    const multiLineEvidence = makeEvidence('package.json', source, {
+      start: source.indexOf('"scripts"'),
+      end: source.indexOf('"dependencies"'),
+    }, 'script', 'multi-line-test');
+    expect(evidenceRangeLabel(multiLineEvidence)).toBe('package.json:4–7');
   });
 
   it('parses workspace patterns, Wrangler bindings, and .NET WPF projects', () => {
@@ -315,7 +322,7 @@ describe('Analyzer scan and projectors', () => {
     expect(dependencies.nodes.map((node) => node.id)).toEqual(expect.arrayContaining(['package:.', 'package:apps/web', 'technology:react', 'external-package:mystery-lib']));
     expect(dependencies.nodes.map((node) => node.id)).toContain('dependencies:external:summary');
     expect(dependencies.nodes.map((node) => node.id)).not.toContain('technology:pnpm');
-    expect(dependencies.nodes.find((node) => node.id === 'external-package:mystery-lib')?.presentation?.parentId).toMatch(/^dependencies:external:source:/);
+    expect(dependencies.nodes.find((node) => node.id === 'external-package:mystery-lib')?.presentation?.parentId).toBe('dependencies:external:summary');
     expect(dependencies.edges.some((edge) => edge.metadata.dependencyType === 'workspaceDependency')).toBe(true);
     expect(dependencies.edges.some((edge) => edge.presentation?.displayKind === 'bundle')).toBe(true);
     expect(command.entryScriptId).toBe(scriptIdFor(packageIdForPath('.'), 'dev'));
@@ -327,37 +334,28 @@ describe('Analyzer scan and projectors', () => {
     expect(command.evidence.length).toBeGreaterThan(store.evidence.length);
   });
 
-  it('keeps External Package details in the presentation and reveals them progressively', async () => {
+  it('flattens a single-source External Summary without changing the underlying dependency facts', async () => {
     const store = await scanProjectFiles(analyzerFixture());
     const dependencies = projectDependencies(store);
     const options = { expandedPresentationIds: new Set<string>(), filter: 'all', search: '' };
     const collapsed = presentAnalyzerView(dependencies, options);
-    const sourceSummary = dependencies.nodes.find((node) => node.presentation?.role === 'summary' && typeof node.metadata.externalGroupId === 'string');
     const expanded = presentAnalyzerView(dependencies, { ...options, expandedPresentationIds: new Set(['dependencies:external:summary']) });
-    const sourceExpanded = sourceSummary
-      ? presentAnalyzerView(dependencies, { ...options, expandedPresentationIds: new Set(['dependencies:external:summary', sourceSummary.id]) })
-      : expanded;
     const collapsedAgain = presentAnalyzerView(dependencies, options);
     const searchRevealed = presentAnalyzerView(dependencies, { ...options, search: 'mystery-lib' });
 
-    expect(sourceSummary).toBeDefined();
     expect(dependencies.nodes.map((node) => node.id)).toContain('external-package:mystery-lib');
+    expect(dependencies.nodes.map((node) => node.id)).not.toContain('dependencies:external:source:package:.');
     expect(collapsed.nodes.map((node) => node.id)).toContain('dependencies:external:summary');
     expect(collapsed.nodes.map((node) => node.id)).not.toContain('external-package:mystery-lib');
-    expect(expanded.nodes.map((node) => node.id)).toContain(sourceSummary?.id);
-    expect(expanded.nodes.map((node) => node.id)).not.toContain('external-package:mystery-lib');
+    expect(expanded.nodes.map((node) => node.id)).toContain('external-package:mystery-lib');
     expect(expanded.nodes.map((node) => node.id)).not.toContain('dependencies:external:summary');
-    expect(sourceExpanded.nodes.map((node) => node.id)).toContain('external-package:mystery-lib');
-    expect(sourceExpanded.nodes.map((node) => node.id)).not.toContain(sourceSummary?.id);
     expect(collapsedAgain.nodes.map((node) => node.id)).not.toContain('external-package:mystery-lib');
     expect(searchRevealed.nodes.map((node) => node.id)).toContain('external-package:mystery-lib');
     expect(collapsed.edges.some((edge) => edge.targetId === 'dependencies:external:summary')).toBe(true);
     expect(collapsed.edges.some((edge) => edge.presentation?.displayKind === 'bundle')).toBe(true);
-    expect(expanded.edges.some((edge) => edge.targetId === sourceSummary?.id)).toBe(true);
-    expect(expanded.edges.some((edge) => edge.presentation?.displayKind === 'bundle')).toBe(true);
-    expect(sourceExpanded.edges.some((edge) => edge.targetId === 'external-package:mystery-lib')).toBe(true);
-    expect(sourceExpanded.edges.some((edge) => edge.presentation?.displayKind === 'bundle')).toBe(false);
-    expect(sourceExpanded.counts?.visibleNodes).toBe(sourceExpanded.counts?.totalNodes);
+    expect(expanded.edges.some((edge) => edge.targetId === 'external-package:mystery-lib')).toBe(true);
+    expect(expanded.edges.some((edge) => edge.presentation?.displayKind === 'bundle')).toBe(false);
+    expect(expanded.counts?.visibleNodes).toBe(expanded.counts?.totalNodes);
     expect(expanded.presentationGroups).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: 'dependencies:external:summary', label: 'External Packages', count: expect.any(Number), countLabel: 'PACKAGES', expanded: true }),
     ]));
@@ -367,32 +365,73 @@ describe('Analyzer scan and projectors', () => {
     expect(externalSummaryGroup).toMatchObject({ id: 'dependencies:external:summary', label: 'External Packages', countLabel: 'PACKAGES' });
     expect(externalSummaryGroup?.width).toBeGreaterThan(0);
     expect(externalSummaryGroup?.height).toBeGreaterThan(0);
-    const nestedSummaryNodes = externalGroupLayout.nodes.filter((positionedNode) => positionedNode.node.presentation?.parentId === 'dependencies:external:summary');
-    expect(nestedSummaryNodes.length).toBeGreaterThan(0);
-    expect(Math.min(...nestedSummaryNodes.map((positionedNode) => positionedNode.y)) - (externalSummaryGroup?.y ?? 0)).toBeGreaterThan(40);
-    const sourceExpandedLayout = layoutAnalyzerView(sourceExpanded);
-    expect(sourceExpandedLayout.bands).toEqual(expect.arrayContaining([
-      expect.objectContaining({ presentationId: sourceSummary?.id, countLabel: 'PACKAGES', depth: 2 }),
-    ]));
-    expect(sourceExpandedLayout.nodes.some((positionedNode) => positionedNode.node.id === sourceSummary?.id)).toBe(false);
-    expect(sourceExpandedLayout.summaryGroups.some((group) => group.id === sourceSummary?.id)).toBe(false);
-    expect(nestedSummaryNodes.every((positionedNode) => positionedNode.height < ANALYZER_NODE_HEIGHT)).toBe(true);
-    const sourceBand = sourceExpandedLayout.bands.find((band) => band.presentationId === sourceSummary?.id);
-    const sourceParentGroup = sourceExpandedLayout.summaryGroups.find((group) => group.id === 'dependencies:external:summary');
-    expect(sourceBand).toBeDefined();
-    expect(sourceBand?.x).toBeGreaterThan(sourceParentGroup?.x ?? -1);
-    expect((sourceBand?.x ?? 0) + (sourceBand?.width ?? 0)).toBeLessThan((sourceParentGroup?.x ?? 0) + (sourceParentGroup?.width ?? 0));
-    expect((sourceBand?.y ?? 0) - (sourceParentGroup?.y ?? 0)).toBeGreaterThan(30);
-    expect((sourceParentGroup?.y ?? 0) + 8 + 22 + 16).toBeLessThanOrEqual((sourceBand?.y ?? 0) + 8);
-    const sourceBandMembers = sourceExpandedLayout.nodes.filter((positionedNode) => positionedNode.node.presentation?.parentId === sourceSummary?.id);
-    expect(sourceBandMembers.length).toBeGreaterThan(0);
-    expect(Math.min(...sourceBandMembers.map((positionedNode) => positionedNode.y))).toBeGreaterThanOrEqual((sourceBand?.y ?? 0) + 8 + 22 + 16);
+    const directExternalNodes = externalGroupLayout.nodes.filter((positionedNode) => positionedNode.node.type === 'external-package');
+    expect(directExternalNodes.length).toBeGreaterThan(0);
+    expect(externalGroupLayout.bands).toHaveLength(0);
+    expect(Math.min(...directExternalNodes.map((positionedNode) => positionedNode.y)) - (externalSummaryGroup?.y ?? 0)).toBeGreaterThan(40);
     const summary = dependencies.nodes.find((node) => node.id === 'dependencies:external:summary');
     expect(summary).toBeDefined();
     expect(analyzerSummarySubtitle(summary!, false)).toContain('expand for details');
     expect(analyzerSummarySubtitle(summary!, true)).toContain('expanded · Collapse');
     expect(presentationOwnsNode(dependencies, 'dependencies:external:summary', 'external-package:mystery-lib')).toBe(true);
-    expect(presentationOwnsNode(dependencies, sourceSummary!.id, 'external-package:mystery-lib')).toBe(true);
+    expect(summary?.metadata.externalLayoutMode).toBe('flat');
+  });
+
+  it('keeps source grouping and Shared External behavior when multiple sources exist', () => {
+    const packageFact = (id: string, label: string) => ({
+      id,
+      kind: 'workspace-package' as const,
+      label,
+      packagePath: id.replace('package:', ''),
+      packageName: label,
+      manifestPath: `${id.replace('package:', '')}/package.json`,
+      scripts: {},
+      dependencies: [],
+      isRoot: false,
+      evidenceIds: [],
+      metadata: {},
+    });
+    const externalFact = (id: string, label: string) => ({
+      id,
+      kind: 'external-package' as const,
+      label,
+      packageName: label,
+      versionRanges: ['^1.0.0'],
+      dependencyTypes: ['dependency' as const],
+      evidenceIds: [],
+      metadata: {},
+    });
+    const store: AnalyzerProjectStore = {
+      files: [],
+      facts: [packageFact('package:a', 'Package A'), packageFact('package:b', 'Package B'), externalFact('external:shared', 'shared-lib'), externalFact('external:solo', 'solo-lib')],
+      relations: [
+        { id: 'relation:a-shared', sourceId: 'package:a', targetId: 'external:shared', kind: 'depends-on', evidenceIds: [], metadata: {} },
+        { id: 'relation:b-shared', sourceId: 'package:b', targetId: 'external:shared', kind: 'depends-on', evidenceIds: [], metadata: {} },
+        { id: 'relation:a-solo', sourceId: 'package:a', targetId: 'external:solo', kind: 'depends-on', evidenceIds: [], metadata: {} },
+      ],
+      evidence: [],
+      sources: {},
+      warnings: [],
+      scannedAt: 'multiple-sources',
+    };
+    const dependencies = projectDependencies(store);
+    const options = { expandedPresentationIds: new Set<string>(), filter: 'all', search: '' };
+    const expanded = presentAnalyzerView(dependencies, { ...options, expandedPresentationIds: new Set(['dependencies:external:summary']) });
+    const sourceSummaries = expanded.nodes.filter((node) => node.presentation?.role === 'summary' && typeof node.metadata.externalGroupId === 'string');
+
+    expect(sourceSummaries.map((node) => node.label)).toEqual(['Shared External', 'Package A Dependencies']);
+    expect(expanded.nodes.map((node) => node.id)).not.toContain('external:shared');
+    expect(dependencies.nodes.find((node) => node.id === 'external:shared')?.presentation?.parentId).toBe('dependencies:external:source:shared');
+    expect(dependencies.nodes.find((node) => node.id === 'external:solo')?.presentation?.parentId).toBe('dependencies:external:source:package:a');
+
+    const sharedExpanded = presentAnalyzerView(dependencies, {
+      ...options,
+      expandedPresentationIds: new Set(['dependencies:external:summary', 'dependencies:external:source:shared']),
+    });
+    expect(sharedExpanded.nodes.map((node) => node.id)).toContain('external:shared');
+    expect(sharedExpanded.nodes.map((node) => node.id)).not.toContain('external:solo');
+    expect(sharedExpanded.edges.some((edge) => edge.sourceId.startsWith('external:') && edge.targetId.startsWith('external:'))).toBe(false);
+    expect(dependencies.nodes.filter((node) => node.metadata.externalLayoutMode === 'flat')).toHaveLength(0);
   });
 
   it('keeps Architecture Overview concise while retaining expandable detail Facts', async () => {

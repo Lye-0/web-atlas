@@ -1,6 +1,6 @@
 import { analyzerPresentationCount, analyzerPresentationCountLabel } from './presentation';
 import type { AnalyzerCluster, AnalyzerPresentationGroup, AnalyzerViewModel, AnalyzerViewNode } from './types';
-import { ANALYZER_COMMAND_COMMON_LANE_ID } from './projectors';
+import { ANALYZER_COMMAND_COMMON_LANE_ID, ANALYZER_EXTERNAL_SUMMARY_ID } from './projectors';
 
 export const ANALYZER_NODE_WIDTH = 244;
 export const ANALYZER_NODE_HEIGHT = 106;
@@ -34,7 +34,8 @@ const SUMMARY_GROUP_HEADING_CLEARANCE = SUMMARY_GROUP_NESTED_GAP;
 const SUMMARY_GROUP_HEADING_OVERHANG = SUMMARY_GROUP_HEADER_HEIGHT + SUMMARY_GROUP_HEADING_CLEARANCE;
 const SUMMARY_GROUP_EXTERNAL_GAP = 16;
 const SUMMARY_GROUP_BOTTOM_PADDING = 20;
-const STRUCTURAL_HEADING_HEIGHT = 28;
+export const ANALYZER_STRUCTURAL_HEADING_HEIGHT = 28;
+const STRUCTURAL_HEADING_HEIGHT = ANALYZER_STRUCTURAL_HEADING_HEIGHT;
 const DEPENDENCY_EXTERNAL_GROUP_HEADER = SUMMARY_GROUP_MEMBER_OFFSET;
 
 export interface PositionedNode {
@@ -455,6 +456,25 @@ function dependencyFlowLayout(view: AnalyzerViewModel, expandedNodeIds: Readonly
     if (cluster.id === 'dependencies:external' && nodes.some((node) => node.type === 'external-package')) {
       const width = 40 + ANALYZER_NODE_WIDTH;
       const y = 20;
+      const flatExternalExpanded = view.presentationGroups?.some((group) => group.id === ANALYZER_EXTERNAL_SUMMARY_ID && group.expanded)
+        && nodes.some((node) => node.type === 'external-package' && node.presentation?.parentId === ANALYZER_EXTERNAL_SUMMARY_ID)
+        && !nodes.some((node) => node.type === 'external-package' && node.presentation?.role === 'summary' && typeof node.metadata.externalGroupId === 'string');
+      if (flatExternalExpanded) {
+        const externalDetails = nodes
+          .filter((node) => node.type === 'external-package' && node.presentation?.role !== 'summary')
+          .sort((first, second) => first.label.localeCompare(second.label));
+        let cursor = y + TOP_PADDING;
+        externalDetails.forEach((node) => {
+          const height = nodeHeight(view, node, expandedNodeIds);
+          positionedNodes.push({ node, x: x + 20, y: cursor, height });
+          cursor += height + NODE_GAP;
+        });
+        const height = Math.max(220, cursor - y + 8);
+        positionedClusters.push({ id: cluster.id, label: cluster.label, tone: cluster.tone, x, y, width, height });
+        x += width + CLUSTER_GAP;
+        maxHeight = Math.max(maxHeight, height + 40);
+        return;
+      }
       const anchorNodes = nodes.filter((node) => node.presentation?.role === 'summary' && typeof node.metadata.externalGroupId !== 'string');
       const externalGroups = dependencyExternalGroups(view, nodes);
       let cursor = y + TOP_PADDING;

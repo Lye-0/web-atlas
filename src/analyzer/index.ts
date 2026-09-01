@@ -14,3 +14,4 @@ export * from './focus';
 export * from './session';
 export * from './sessionContext';
 export * from './sessionProvider';
+export * from './edgeRouting';

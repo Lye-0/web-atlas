@@ -1,10 +1,11 @@
 import { createContext, useContext } from 'react';
+import type { DirectoryHandleLike } from './fileDiscovery';
 import type { AnalyzerProjectStore, AnalyzerViewId } from './types';
 import type { AnalyzerSessionState, AnalyzerViewSessionUpdate } from './session';
 
 export interface AnalyzerSessionContextValue {
   state: AnalyzerSessionState;
-  replaceProject: (store: AnalyzerProjectStore) => void;
+  replaceProject: (store: AnalyzerProjectStore, folderHandle?: DirectoryHandleLike) => void;
   updateView: (view: AnalyzerViewId, update: AnalyzerViewSessionUpdate) => void;
 }
 

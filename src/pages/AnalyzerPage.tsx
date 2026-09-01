@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { ANALYZER_DEFAULT_TRANSFORM, ANALYZER_EXTERNAL_SUMMARY_ID, analyzerViewCounts, analyzerViewLabels, presentationOwnsNode, presentAnalyzerView, projectAnalyzerView, useAnalyzerSession, viewNodeSearchText } from '../analyzer';
-import type { AnalyzerGraphTransform, AnalyzerProjectStore, AnalyzerViewCounts, AnalyzerViewId, AnalyzerViewModel, AnalyzerViewSession } from '../analyzer';
+import type { AnalyzerGraphTransform, AnalyzerProjectStore, AnalyzerViewCounts, AnalyzerViewId, AnalyzerViewModel, AnalyzerViewSession, DirectoryHandleLike } from '../analyzer';
 import { AnalyzerDetailPanel } from '../components/analyzer/AnalyzerDetailPanel';
 import { AnalyzerEmptyOrbit } from '../components/analyzer/AnalyzerEmptyOrbit';
 import { AnalyzerGraphStage } from '../components/analyzer/AnalyzerGraphStage';
@@ -45,8 +45,8 @@ export function AnalyzerPage() {
     setReportedCounts(undefined);
   }, [view]);
 
-  const handleScanned = (nextStore: AnalyzerProjectStore) => {
-    replaceProject(nextStore);
+  const handleScanned = (nextStore: AnalyzerProjectStore, folderHandle?: DirectoryHandleLike) => {
+    replaceProject(nextStore, folderHandle);
     setFocusRequest(undefined);
     setReportedCounts(undefined);
   };

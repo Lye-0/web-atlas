@@ -80,6 +80,21 @@ export function makeFileEvidence(
   return makeEvidence(filePath, source, { start, end: Math.min(source.length, start + 1) }, kind, detectorId, description);
 }
 
+/** Returns the line span occupied by the exact highlighted source ranges. */
+export function evidenceLineRange(evidence: AnalyzerEvidence): { start: number; end: number } | undefined {
+  if (evidence.highlightRanges.length === 0) return undefined;
+  const start = Math.min(...evidence.highlightRanges.map((range) => range.start.line));
+  const end = Math.max(...evidence.highlightRanges.map((range) => range.end.line));
+  return { start, end: Math.max(start, end) };
+}
+
+/** Formats a compact Evidence hint without leaking the surrounding context window. */
+export function evidenceRangeLabel(evidence: AnalyzerEvidence): string {
+  const lineRange = evidenceLineRange(evidence);
+  if (!lineRange) return evidence.filePath;
+  return `${evidence.filePath}:${lineRange.start}${lineRange.end > lineRange.start ? `–${lineRange.end}` : ''}`;
+}
+
 function maskCharacters(value: string): string {
   return [...value].map((character) => (character === '\n' || character === '\r' ? character : '•')).join('');
 }

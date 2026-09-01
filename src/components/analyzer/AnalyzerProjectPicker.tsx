@@ -3,7 +3,7 @@ import { filesFromDirectoryHandle, scanProjectFiles, sourceFilesFromInput, type 
 import type { AnalyzerProjectStore } from '../../analyzer';
 
 interface AnalyzerProjectPickerProps {
-  onScanned: (store: AnalyzerProjectStore) => void;
+  onScanned: (store: AnalyzerProjectStore, folderHandle?: DirectoryHandleLike) => void;
 }
 
 interface DirectoryPickerWindow extends Window {
@@ -15,7 +15,7 @@ export function AnalyzerProjectPicker({ onScanned }: AnalyzerProjectPickerProps)
   const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState<string | undefined>();
 
-  const scanFiles = async (files: ReturnType<typeof sourceFilesFromInput>) => {
+  const scanFiles = async (files: ReturnType<typeof sourceFilesFromInput>, folderHandle?: DirectoryHandleLike) => {
     if (files.length === 0) {
       setError('解析できるファイルが選択されていません。');
       return;
@@ -23,7 +23,7 @@ export function AnalyzerProjectPicker({ onScanned }: AnalyzerProjectPickerProps)
     setError(undefined);
     setIsScanning(true);
     try {
-      onScanned(await scanProjectFiles(files));
+      onScanned(await scanProjectFiles(files), folderHandle);
     } catch {
       setError('プロジェクトを解析できませんでした。別のフォルダを選択してください。');
     } finally {
@@ -41,7 +41,7 @@ export function AnalyzerProjectPicker({ onScanned }: AnalyzerProjectPickerProps)
     setIsScanning(true);
     try {
       const directory = await picker();
-      await scanFiles(await filesFromDirectoryHandle(directory));
+      await scanFiles(await filesFromDirectoryHandle(directory), directory);
     } catch (reason) {
       if (reason instanceof DOMException && reason.name === 'AbortError') {
         setIsScanning(false);
