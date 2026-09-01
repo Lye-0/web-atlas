@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
-import { ANALYZER_DEFAULT_TRANSFORM, ANALYZER_EXTERNAL_SUMMARY_ID, ANALYZER_NODE_WIDTH, analyzerEdgeArrowMarkerId, analyzerEdgeObstacles, analyzerEdgePaths, analyzerFocusDepths, analyzerForegroundEdges, analyzerPresentationCount, analyzerPresentationCountLabel, displayedZoomLevelForNode, evidenceRangeLabel, fitAnalyzerTransform, focusAnalyzerTransform, layoutAnalyzerView, nodeMatchesSearch, preserveAnalyzerTransformOnViewportResize, presentAnalyzerView, semanticZoomLevelForScale, shouldRunAnalyzerInitialFit, shouldShowAnalyzerEvidencePreview, type AnalyzerGraphTransform, type AnalyzerViewCounts, type AnalyzerViewEdge, type AnalyzerViewModel, type PositionedNode } from '../../analyzer';
+import { ANALYZER_DEFAULT_TRANSFORM, ANALYZER_EXTERNAL_SUMMARY_ID, ANALYZER_NODE_WIDTH, analyzerEdgeArrowMarkerId, analyzerEdgeObstacles, analyzerEdgePaths, analyzerFocusDepths, analyzerForegroundEdges, analyzerPresentationCount, analyzerPresentationCountLabel, displayedZoomLevelForNode, evidenceRangeLabel, fitAnalyzerTransform, focusAnalyzerTransform, layoutAnalyzerView, nodeMatchesSearch, preserveAnalyzerTransformOnViewportResize, presentAnalyzerView, semanticZoomLevelForScale, shouldRunAnalyzerInitialFit, shouldShowAnalyzerEvidencePreview, type AnalyzerEdgeRoutingDiagnostic, type AnalyzerFanoutRoutingDiagnostic, type AnalyzerGraphTransform, type AnalyzerViewCounts, type AnalyzerViewEdge, type AnalyzerViewModel, type PositionedNode } from '../../analyzer';
 import { nodeTypeLabels } from '../../analyzer';
 import { EvidencePreview } from './EvidenceCodeBlock';
 
@@ -210,10 +210,25 @@ export function AnalyzerGraphStage({
   const hasSelectedEdge = Boolean(selectedEdgeId && filteredView.edges.some((edge) => edge.id === selectedEdgeId));
   const edgeObstacles = useMemo(() => analyzerEdgeObstacles(layout), [layout]);
   const edgeFlowDirection = view.view === 'command' || view.view === 'dependencies' ? 'horizontal' as const : 'auto' as const;
-  const edgePaths = useMemo(() => analyzerEdgePaths(filteredView.edges, edgePositions, edgeObstacles, {
-    flowDirection: edgeFlowDirection,
-    bounds: { x: 0, y: 0, width: layout.width, height: layout.height },
-  }), [edgeFlowDirection, edgeObstacles, edgePositions, filteredView.edges, layout.height, layout.width]);
+  const edgeRoutingResult = useMemo(() => {
+    const fanoutDiagnostics = new Map<string, AnalyzerFanoutRoutingDiagnostic>();
+    const edgeDiagnostics = new Map<string, AnalyzerEdgeRoutingDiagnostic>();
+    const diagnosticsEnabled = import.meta.env.DEV;
+    const edgePaths = analyzerEdgePaths(filteredView.edges, edgePositions, edgeObstacles, {
+      flowDirection: edgeFlowDirection,
+      bounds: { x: 0, y: 0, width: layout.width, height: layout.height },
+      ...(diagnosticsEnabled ? {
+        onFanoutDiagnostic: (diagnostic: AnalyzerFanoutRoutingDiagnostic) => {
+          fanoutDiagnostics.set(diagnostic.fanoutGroupId, diagnostic);
+        },
+        onEdgeDiagnostic: (diagnostic: AnalyzerEdgeRoutingDiagnostic) => {
+          edgeDiagnostics.set(diagnostic.edgeId, diagnostic);
+        },
+      } : {}),
+    });
+    return { edgePaths, fanoutDiagnostics, edgeDiagnostics };
+  }, [edgeFlowDirection, edgeObstacles, edgePositions, filteredView.edges, layout.height, layout.width]);
+  const edgePaths = edgeRoutingResult.edgePaths;
   const selectionContext = useMemo(() => {
     const connectedNodeIds = new Set<string>();
     const contextClusterIds = new Set<string>();
@@ -245,6 +260,75 @@ export function AnalyzerGraphStage({
     });
     return { connectedNodeIds, contextClusterIds, contextNodeIds };
   }, [filteredView.edges, filteredView.nodes, selectedEdgeId, selectedNodeId]);
+  useEffect(() => {
+    if (!import.meta.env.DEV || (!selectedNodeId && !selectedEdgeId)) return;
+    filteredView.edges.forEach((edge) => {
+      const explicitlySelected = edge.id === selectedEdgeId;
+      const relatedToSelectedNode = Boolean(selectedNodeId && (edge.sourceId === selectedNodeId || edge.targetId === selectedNodeId));
+      if (!explicitlySelected && !relatedToSelectedNode) return;
+      const routing = edgeRoutingResult.edgeDiagnostics.get(edge.id);
+      const source = edgePositions.get(edge.sourceId);
+      const target = edgePositions.get(edge.targetId);
+      if (!routing || !source || !target) return;
+
+      const isBundleEdge = edge.presentation?.displayKind === 'bundle';
+      const isSummaryEdge = source.node.presentation?.role === 'summary' || target.node.presentation?.role === 'summary';
+      const isPresentationEdge = Boolean(edge.presentation?.displayKind || edge.presentation?.parentId || edge.presentation?.initiallyHidden);
+      const isFactEdge = !isBundleEdge && !isSummaryEdge;
+      const edgeCollection = isBundleEdge
+        ? 'bundleEdges'
+        : isSummaryEdge
+          ? 'summaryEdges'
+          : isPresentationEdge
+            ? 'presentationEdges'
+            : 'factEdges';
+      const pathId = `analyzer-edge-path-${edge.id}`;
+      const fanoutGroupDiagnostic = routing.fanoutGroupId
+        ? edgeRoutingResult.fanoutDiagnostics.get(routing.fanoutGroupId)
+        : undefined;
+
+      console.info('[Analyzer Edge Diagnostic]', {
+        edgeId: routing.edgeId,
+        fromNodeId: routing.sourceId,
+        toNodeId: routing.targetId,
+        fromNodeLabel: source.node.label,
+        toNodeLabel: target.node.label,
+        relation: edge.label,
+        relationType: routing.edgeKind,
+        presentationKind: edge.presentation?.displayKind ?? (edge.presentation ? 'presentation-metadata' : 'none'),
+        presentation: edge.presentation,
+        isFactEdge,
+        isBundleEdge,
+        isSummaryEdge,
+        isPresentationEdge,
+        renderer: 'AnalyzerGraphStage.renderEdge',
+        sourceCollection: foregroundEdges.some((candidate) => candidate.id === edge.id) ? 'foregroundEdges' : 'backgroundEdges',
+        edgeCollection,
+        routingStrategy: routing.routingStrategy,
+        routeCollection: routing.routingStrategy === 'structural-fanout'
+          ? 'fanoutRoutes'
+          : routing.routingStrategy === 'generic-fallback'
+            ? 'genericRoutes (fanout fallback)'
+            : 'genericRoutes',
+        fanoutGroupId: routing.fanoutGroupId,
+        fanoutDetected: routing.fanoutDetected,
+        busUsed: routing.busUsed,
+        busX: routing.selectedBusX,
+        busY: routing.selectedBusY,
+        busCandidateCount: routing.busCandidateCount,
+        targetGroupBounds: routing.targetGroupBounds,
+        fallbackUsed: routing.fallbackUsed,
+        fallbackReason: routing.fallbackReason,
+        pathPoints: routing.pathPoints,
+        pathData: edgeRoutingResult.edgePaths.get(edge.id),
+        basePathId: pathId,
+        highlightPathId: pathId,
+        sameGeometry: true,
+        highlight: explicitlySelected ? 'explicit-selected-edge' : 'node-related-edge',
+        fanoutGroupDiagnostic,
+      });
+    });
+  }, [edgePositions, edgeRoutingResult, filteredView.edges, foregroundEdges, selectedEdgeId, selectedNodeId]);
   const architectureFocusDepths = useMemo(() => {
     if (filteredView.view !== 'architecture' || !selectedNodeId) return new Map<string, number>();
     const degree = new Set(filteredView.edges.flatMap((edge) => {
@@ -390,6 +474,7 @@ export function AnalyzerGraphStage({
     const target = edgePositions.get(edge.targetId);
     const path = edgePaths.get(edge.id);
     if (!source || !target || !path) return null;
+    const routing = edgeRoutingResult.edgeDiagnostics.get(edge.id);
     const selected = edge.id === selectedEdgeId;
     const connected = selectedNodeId ? edge.sourceId === selectedNodeId || edge.targetId === selectedNodeId : false;
     const inContext = Boolean(
@@ -417,7 +502,12 @@ export function AnalyzerGraphStage({
     return (
       <g key={edge.id} className={`analyzer-edge-group${selected ? ' is-selected' : ''}${connected ? ' is-connected' : ''}${focusDepth !== undefined ? ' is-focus-depth' : ''}${emphasis === 'secondary' ? ' is-secondary' : ''}${emphasis === 'deep' ? ' is-deep' : ''}${edge.presentation?.displayKind === 'bundle' ? ' is-bundle' : ''}${contextual ? ' is-context' : ''}${dimmed ? ' is-dimmed' : ''}`}>
         <path
+          id={import.meta.env.DEV ? `analyzer-edge-path-${edge.id}` : undefined}
           className="analyzer-edge-hit"
+          data-analyzer-edge-id={import.meta.env.DEV ? edge.id : undefined}
+          data-analyzer-routing-strategy={import.meta.env.DEV ? routing?.routingStrategy : undefined}
+          data-analyzer-fanout-detected={import.meta.env.DEV ? (routing?.fanoutDetected ? 'true' : 'false') : undefined}
+          data-analyzer-bus-used={import.meta.env.DEV ? (routing?.busUsed ? 'true' : 'false') : undefined}
           d={path}
           markerEnd={`url(#${arrowMarkerId})`}
           role="button"

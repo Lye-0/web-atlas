@@ -11,6 +11,9 @@ import {
   analyzerRoundedOrthogonalPath,
   isAnalyzerEdgeObstacleHard,
   simplifyAnalyzerOrthogonalRoute,
+  type AnalyzerEdgeRoutingDiagnostic,
+  type AnalyzerFanoutRoutingDiagnostic,
+  type AnalyzerEdgePoint,
   type AnalyzerEdgeObstacle,
 } from './edgeRouting';
 import { ANALYZER_NODE_WIDTH, type AnalyzerLayout, type PositionedNode } from './layout';
@@ -339,6 +342,170 @@ describe('Analyzer same-source fan-out', () => {
     expect(trunkX).toBeDefined();
     expect(trunkX).toBeGreaterThanOrEqual(source.x + ANALYZER_NODE_WIDTH);
     expect(trunkX).toBeLessThanOrEqual(Math.min(...targets.map((target) => target.x)));
+  });
+
+  it('keeps a tall same-source fan-out on a dedicated corridor outside the target group', () => {
+    const source = positionedNode('source', 0, 400);
+    const targets = [
+      positionedNode('target-a', 700, 40),
+      positionedNode('target-b', 700, 200),
+      positionedNode('target-c', 700, 360),
+      positionedNode('target-d', 700, 520),
+      positionedNode('target-e', 700, 680),
+      positionedNode('target-f', 700, 840),
+    ];
+    const nodes = [source, ...targets];
+    const positionedById = new Map(nodes.map((node) => [node.node.id, node]));
+    const edges = targets.map((target) => edge(`edge:${target.node.id}`, 'source', target.node.id));
+    const diagnostics: AnalyzerFanoutRoutingDiagnostic[] = [];
+    const routes = analyzerEdgeRoutes(edges, positionedById, nodes.map(nodeObstacle), {
+      flowDirection: 'horizontal',
+      onFanoutDiagnostic: (diagnostic) => diagnostics.push(diagnostic),
+    });
+    const targetGroupLeft = Math.min(...targets.map((target) => target.x));
+    const targetGroupRight = Math.max(...targets.map((target) => target.x + ANALYZER_NODE_WIDTH));
+    const diagnostic = diagnostics[0];
+
+    expect(routes.size).toBe(targets.length);
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostic).toMatchObject({
+      fanoutDetected: true,
+      busCandidateCount: expect.any(Number),
+      targetGroupBounds: { x: targetGroupLeft, y: 40, width: ANALYZER_NODE_WIDTH, height: 906 },
+      fallbackUsed: false,
+    });
+    const selectedBusX = diagnostic?.selectedBusX;
+    expect(selectedBusX).toBeLessThanOrEqual(targetGroupLeft - 32);
+    const firstRoute = routes.get('edge:target-a') ?? [];
+    const lastRoute = routes.get('edge:target-f') ?? [];
+    expect(firstRoute.slice(0, 2)).toEqual(lastRoute.slice(0, 2));
+    expect(firstRoute.some((point) => point.x > targetGroupLeft && point.x < targetGroupRight)).toBe(false);
+    expect(firstRoute.some((point) => point.x > source.x + ANALYZER_NODE_WIDTH && point.x < targetGroupLeft)).toBe(true);
+    targets.forEach((target) => {
+      const route = routes.get(`edge:${target.node.id}`) ?? [];
+      expect(route.every((point, index) => index === 0 || point.x >= route[index - 1]!.x)).toBe(true);
+      expect(route.some((point) => point.x === selectedBusX)).toBe(true);
+    });
+  });
+
+  it('keeps selected and related presentation state out of fan-out geometry', () => {
+    const source = positionedNode('source', 0, 400);
+    const targets = [
+      positionedNode('target-a', 700, 160),
+      positionedNode('target-b', 700, 340),
+      positionedNode('target-c', 700, 520),
+    ];
+    const nodes = [source, ...targets];
+    const positionedById = new Map(nodes.map((node) => [node.node.id, node]));
+    const edges = targets.map((target) => edge(`edge:${target.node.id}`, 'source', target.node.id));
+    const selectedEdges = edges.map((currentEdge) => currentEdge.id === 'edge:target-b'
+      ? { ...currentEdge, presentation: { emphasis: 'primary' as const } }
+      : currentEdge);
+    const diagnostics: AnalyzerEdgeRoutingDiagnostic[] = [];
+
+    const normalRoutes = analyzerEdgeRoutes(edges, positionedById, nodes.map(nodeObstacle), { flowDirection: 'horizontal' });
+    const presentedRoutes = analyzerEdgeRoutes(selectedEdges, positionedById, nodes.map(nodeObstacle), {
+      flowDirection: 'horizontal',
+      onEdgeDiagnostic: (diagnostic) => diagnostics.push(diagnostic),
+    });
+    const selectedDiagnostic = diagnostics.find((diagnostic) => diagnostic.edgeId === 'edge:target-b');
+
+    expect(presentedRoutes).toEqual(normalRoutes);
+    expect(selectedDiagnostic).toMatchObject({
+      edgeId: 'edge:target-b',
+      sourceId: 'source',
+      targetId: 'target-b',
+      routingStrategy: 'structural-fanout',
+      fanoutGroupId: expect.stringContaining('fanout:source'),
+      fanoutDetected: true,
+      busUsed: true,
+      fallbackUsed: false,
+    });
+    expect(selectedDiagnostic?.pathPoints).toEqual(presentedRoutes.get('edge:target-b'));
+  });
+
+  it('recomputes the vertical bus from the current target group bounds', () => {
+    const source = positionedNode('source', 360, 700);
+    const compactTargets = [
+      positionedNode('target-a', 100, 100),
+      positionedNode('target-b', 400, 240),
+    ];
+    const expandedTargets = [
+      positionedNode('target-a', 100, 100),
+      positionedNode('target-b', 400, 240, 260),
+    ];
+    const edgeModels = [edge('edge:a', 'source', 'target-a'), edge('edge:b', 'source', 'target-b')];
+    const routeFor = (targets: PositionedNode[]): { route: AnalyzerEdgePoint[]; diagnostic?: AnalyzerFanoutRoutingDiagnostic } => {
+      const nodes = [source, ...targets];
+      const positionedById = new Map(nodes.map((node) => [node.node.id, node]));
+      const diagnostics: AnalyzerFanoutRoutingDiagnostic[] = [];
+      const routes = analyzerEdgeRoutes(edgeModels, positionedById, nodes.map(nodeObstacle), {
+        flowDirection: 'vertical',
+        onFanoutDiagnostic: (diagnostic) => diagnostics.push(diagnostic),
+      });
+      return { route: routes.get('edge:a') ?? [], diagnostic: diagnostics[0] };
+    };
+    const compact = routeFor(compactTargets);
+    const expanded = routeFor(expandedTargets);
+    const compactRoute = compact.route;
+    const expandedRoute = expanded.route;
+    const compactGroupBottom = Math.max(...compactTargets.map((target) => target.y + target.height));
+    const expandedGroupBottom = Math.max(...expandedTargets.map((target) => target.y + target.height));
+    const busCoordinate = (route: AnalyzerEdgePoint[], groupBottom: number): number | undefined => route
+      .map((point) => point.y)
+      .find((y) => y > groupBottom && y < source.y - 20);
+
+    const compactBusY = busCoordinate(compactRoute, compactGroupBottom);
+    const expandedBusY = busCoordinate(expandedRoute, expandedGroupBottom);
+
+    expect(compactBusY).toBeDefined();
+    expect(expandedBusY).toBeDefined();
+    expect(expandedBusY).toBeGreaterThan(compactBusY!);
+    expect(expandedBusY).toBeGreaterThan(expandedGroupBottom);
+    expect(compact.diagnostic?.targetGroupBounds.height).toBe(compactGroupBottom - Math.min(...compactTargets.map((target) => target.y)));
+    expect(expanded.diagnostic?.targetGroupBounds.height).toBe(expandedGroupBottom - Math.min(...expandedTargets.map((target) => target.y)));
+    expect(expanded.diagnostic?.selectedBusY).toBe(expandedBusY);
+  });
+
+  it('falls back to generic routing when the source-target gap cannot contain a bus', () => {
+    const source = positionedNode('source', 0, 200);
+    const targets = [positionedNode('target-a', 270, 100), positionedNode('target-b', 270, 300)];
+    const nodes = [source, ...targets];
+    const positionedById = new Map(nodes.map((node) => [node.node.id, node]));
+    const edges = targets.map((target) => edge(`edge:${target.node.id}`, 'source', target.node.id));
+    const diagnostics: AnalyzerFanoutRoutingDiagnostic[] = [];
+    const edgeDiagnostics: AnalyzerEdgeRoutingDiagnostic[] = [];
+    const routes = analyzerEdgeRoutes(edges, positionedById, nodes.map(nodeObstacle), {
+      flowDirection: 'horizontal',
+      onFanoutDiagnostic: (diagnostic) => diagnostics.push(diagnostic),
+      onEdgeDiagnostic: (diagnostic) => edgeDiagnostics.push(diagnostic),
+    });
+
+    expect(routes.size).toBe(2);
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]).toMatchObject({
+      fanoutDetected: true,
+      busCandidateCount: 0,
+      fallbackUsed: true,
+      fallbackReason: 'no-bus-candidates',
+    });
+    expect(edgeDiagnostics).toHaveLength(2);
+    expect(edgeDiagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        sourceId: 'source',
+        routingStrategy: 'generic-fallback',
+        fanoutDetected: true,
+        busUsed: false,
+        fallbackUsed: true,
+        fallbackReason: 'no-bus-candidates',
+      }),
+    ]));
+    edges.forEach((currentEdge) => {
+      const route = routes.get(currentEdge.id);
+      expect(route).toBeDefined();
+      expect(route?.[0]).toEqual({ x: source.x + ANALYZER_NODE_WIDTH, y: source.y + source.height / 2 });
+      expect(route?.at(-1)).toEqual({ x: targets.find((target) => target.node.id === currentEdge.targetId)?.x, y: (targets.find((target) => target.node.id === currentEdge.targetId)?.y ?? 0) + 53 });
+    });
   });
 
   it('keeps an A-to-C route from looking like a relation through the middle sibling B', () => {
