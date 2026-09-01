@@ -1,4 +1,17 @@
-import { ANALYZER_NODE_WIDTH, type AnalyzerLayout, type PositionedNode } from './layout';
+import { ANALYZER_NODE_WIDTH, ANALYZER_STRUCTURAL_HEADING_HEIGHT, type AnalyzerLayout, type PositionedNode } from './layout';
+import type { AnalyzerViewEdge } from './types';
+
+export type AnalyzerEdgeObstacleKind =
+  | 'node'
+  | 'fact-node'
+  | 'summary-card'
+  | 'summary-heading'
+  | 'label'
+  // Kept as soft aliases for callers that still describe painted surfaces.
+  | 'summary'
+  | 'band'
+  | 'cluster'
+  | 'lane';
 
 export interface AnalyzerEdgeObstacle {
   id: string;
@@ -6,7 +19,10 @@ export interface AnalyzerEdgeObstacle {
   y: number;
   width: number;
   height: number;
-  kind?: 'node' | 'summary' | 'band' | 'cluster' | 'lane';
+  kind?: AnalyzerEdgeObstacleKind;
+  /** Explicitly overrides the kind-derived hardness for custom layout bounds. */
+  hard?: boolean;
+  priority?: number;
 }
 
 export interface AnalyzerEdgePoint {
@@ -14,16 +30,43 @@ export interface AnalyzerEdgePoint {
   y: number;
 }
 
-export interface AnalyzerEdgeRoutingOptions {
-  clearance?: number;
+export interface AnalyzerEdgeBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 
+export interface AnalyzerEdgeRoutingOptions {
+  clearance?: number;
+  cornerRadius?: number;
+  bendPenalty?: number;
+  obstaclePenalty?: number;
+  crossingPenalty?: number;
+  existingRoutes?: readonly (readonly AnalyzerEdgePoint[])[];
+  enableFanout?: boolean;
+  /** Prefer a view's primary flow axis when choosing source/target ports. */
+  flowDirection?: 'auto' | 'horizontal' | 'vertical';
+  bounds?: AnalyzerEdgeBounds;
+}
+
+export type AnalyzerRoutableEdge = Pick<AnalyzerViewEdge, 'id' | 'sourceId' | 'targetId'>
+  & Partial<Pick<AnalyzerViewEdge, 'kind' | 'presentation'>>;
+
 const DEFAULT_EDGE_CLEARANCE = 14;
-const DIRECT_CURVE_SAMPLES = 48;
-const TURN_PENALTY = 120;
+const DEFAULT_CORNER_RADIUS = 10;
+const DEFAULT_BEND_PENALTY = 150;
+const DEFAULT_OBSTACLE_PENALTY = 18;
+const DEFAULT_CROSSING_PENALTY = 900;
+const SHORT_ZIGZAG_LENGTH = 12;
+const FANOUT_TRUNK_GAP = 28;
+const FANOUT_MAX_SPREAD = 360;
+const VISIBILITY_ESCAPE_MARGIN = 32;
 const MAX_GRID_POINTS = 20_000;
+const EPSILON = 0.0001;
 
 type Direction = 'horizontal' | 'vertical';
+type AxisDirection = 'left' | 'right' | 'up' | 'down';
 
 interface InflatedObstacle extends AnalyzerEdgeObstacle {
   right: number;
@@ -41,8 +84,46 @@ interface RouteState {
   direction?: Direction;
 }
 
+interface EdgePortGeometry {
+  sourceBoundary: AnalyzerEdgePoint;
+  targetBoundary: AnalyzerEdgePoint;
+  start: AnalyzerEdgePoint;
+  end: AnalyzerEdgePoint;
+  direction: AxisDirection;
+}
+
+interface MonotonicConstraint {
+  axis: 'x' | 'y';
+  sign: -1 | 1;
+}
+
+export interface AnalyzerRouteSimplificationOptions {
+  shortZigzagLength?: number;
+  obstacles?: readonly InflatedObstacle[];
+}
+
+interface ResolvedRoutingOptions {
+  clearance: number;
+  cornerRadius: number;
+  bendPenalty: number;
+  obstaclePenalty: number;
+  crossingPenalty: number;
+  existingRoutes: readonly (readonly AnalyzerEdgePoint[])[];
+  enableFanout: boolean;
+  flowDirection: 'auto' | 'horizontal' | 'vertical';
+  bounds?: AnalyzerEdgeBounds;
+}
+
 function pointKey(point: AnalyzerEdgePoint): string {
   return `${point.x}:${point.y}`;
+}
+
+function approximatelyEqual(first: number, second: number): boolean {
+  return Math.abs(first - second) <= EPSILON;
+}
+
+function samePoint(first: AnalyzerEdgePoint, second: AnalyzerEdgePoint): boolean {
+  return approximatelyEqual(first.x, second.x) && approximatelyEqual(first.y, second.y);
 }
 
 function validObstacle(obstacle: AnalyzerEdgeObstacle): boolean {
@@ -54,6 +135,15 @@ function validObstacle(obstacle: AnalyzerEdgeObstacle): boolean {
     && obstacle.height > 0;
 }
 
+export function isAnalyzerEdgeObstacleHard(obstacle: AnalyzerEdgeObstacle): boolean {
+  if (!validObstacle(obstacle)) return false;
+  if (obstacle.hard !== undefined) return obstacle.hard;
+  return obstacle.kind !== 'summary'
+    && obstacle.kind !== 'band'
+    && obstacle.kind !== 'cluster'
+    && obstacle.kind !== 'lane';
+}
+
 function containsPoint(obstacle: AnalyzerEdgeObstacle, point: AnalyzerEdgePoint): boolean {
   return point.x >= obstacle.x
     && point.x <= obstacle.x + obstacle.width
@@ -62,10 +152,10 @@ function containsPoint(obstacle: AnalyzerEdgeObstacle, point: AnalyzerEdgePoint)
 }
 
 function containsPointStrict(obstacle: InflatedObstacle, point: AnalyzerEdgePoint): boolean {
-  return point.x > obstacle.x
-    && point.x < obstacle.right
-    && point.y > obstacle.y
-    && point.y < obstacle.bottom;
+  return point.x > obstacle.x + EPSILON
+    && point.x < obstacle.right - EPSILON
+    && point.y > obstacle.y + EPSILON
+    && point.y < obstacle.bottom - EPSILON;
 }
 
 function inflateObstacle(obstacle: AnalyzerEdgeObstacle, clearance: number): InflatedObstacle {
@@ -80,65 +170,114 @@ function inflateObstacle(obstacle: AnalyzerEdgeObstacle, clearance: number): Inf
   };
 }
 
-function directEdgePoints(source: PositionedNode, target: PositionedNode, clearance = DEFAULT_EDGE_CLEARANCE): {
-  start: AnalyzerEdgePoint;
-  end: AnalyzerEdgePoint;
-  sourceBoundary: AnalyzerEdgePoint;
-  targetBoundary: AnalyzerEdgePoint;
-  goesRight: boolean;
-} {
-  const sourceCenterX = source.x + ANALYZER_NODE_WIDTH / 2;
-  const targetCenterX = target.x + ANALYZER_NODE_WIDTH / 2;
-  const goesRight = targetCenterX >= sourceCenterX;
-  const sourceX = goesRight ? source.x + ANALYZER_NODE_WIDTH : source.x;
-  const targetX = goesRight ? target.x : target.x + ANALYZER_NODE_WIDTH;
-  const direction = goesRight ? 1 : -1;
-  const sourceY = source.y + source.height / 2;
-  const targetY = target.y + target.height / 2;
-
+function resolveRoutingOptions(options: AnalyzerEdgeRoutingOptions): ResolvedRoutingOptions {
+  const clearance = Math.max(4, options.clearance ?? DEFAULT_EDGE_CLEARANCE);
+  const requestedRadius = options.cornerRadius ?? DEFAULT_CORNER_RADIUS;
   return {
-    sourceBoundary: { x: sourceX, y: sourceY },
-    targetBoundary: { x: targetX, y: targetY },
-    start: { x: sourceX + direction * clearance, y: sourceY },
-    end: { x: targetX - direction * clearance, y: targetY },
-    goesRight,
+    clearance,
+    cornerRadius: Math.max(0, Math.min(Number.isFinite(requestedRadius) ? requestedRadius : DEFAULT_CORNER_RADIUS, clearance)),
+    bendPenalty: Math.max(0, options.bendPenalty ?? DEFAULT_BEND_PENALTY),
+    obstaclePenalty: Math.max(0, options.obstaclePenalty ?? DEFAULT_OBSTACLE_PENALTY),
+    crossingPenalty: Math.max(0, options.crossingPenalty ?? DEFAULT_CROSSING_PENALTY),
+    existingRoutes: options.existingRoutes ?? [],
+    enableFanout: options.enableFanout !== false,
+    flowDirection: options.flowDirection ?? 'auto',
+    ...(options.bounds ? { bounds: options.bounds } : {}),
   };
 }
 
-function cubicPoint(
-  start: AnalyzerEdgePoint,
-  firstControl: AnalyzerEdgePoint,
-  secondControl: AnalyzerEdgePoint,
-  end: AnalyzerEdgePoint,
-  progress: number,
-): AnalyzerEdgePoint {
-  const inverse = 1 - progress;
+function nodeRight(node: PositionedNode): number {
+  return node.x + ANALYZER_NODE_WIDTH;
+}
+
+function nodeBottom(node: PositionedNode): number {
+  return node.y + node.height;
+}
+
+function nodeCenter(node: PositionedNode): AnalyzerEdgePoint {
+  return { x: node.x + ANALYZER_NODE_WIDTH / 2, y: node.y + node.height / 2 };
+}
+
+function movePoint(point: AnalyzerEdgePoint, direction: AxisDirection, distance: number): AnalyzerEdgePoint {
+  if (direction === 'right') return { x: point.x + distance, y: point.y };
+  if (direction === 'left') return { x: point.x - distance, y: point.y };
+  if (direction === 'down') return { x: point.x, y: point.y + distance };
+  return { x: point.x, y: point.y - distance };
+}
+
+function oppositeDirection(direction: AxisDirection): AxisDirection {
+  if (direction === 'right') return 'left';
+  if (direction === 'left') return 'right';
+  if (direction === 'down') return 'up';
+  return 'down';
+}
+
+function edgePortGeometry(
+  source: PositionedNode,
+  target: PositionedNode,
+  clearance: number,
+  flowDirection: ResolvedRoutingOptions['flowDirection'] = 'auto',
+): EdgePortGeometry {
+  const sourceCenter = nodeCenter(source);
+  const targetCenter = nodeCenter(target);
+  const deltaX = targetCenter.x - sourceCenter.x;
+  const deltaY = targetCenter.y - sourceCenter.y;
+  const horizontal = flowDirection === 'horizontal'
+    || (flowDirection === 'auto' && Math.abs(deltaX) >= Math.abs(deltaY));
+  const direction: AxisDirection = horizontal
+    ? (deltaX >= 0 ? 'right' : 'left')
+    : (deltaY >= 0 ? 'down' : 'up');
+  const sourceBoundary = direction === 'right'
+    ? { x: nodeRight(source), y: sourceCenter.y }
+    : direction === 'left'
+      ? { x: source.x, y: sourceCenter.y }
+      : direction === 'down'
+        ? { x: sourceCenter.x, y: nodeBottom(source) }
+        : { x: sourceCenter.x, y: source.y };
+  const targetBoundary = direction === 'right'
+    ? { x: target.x, y: targetCenter.y }
+    : direction === 'left'
+      ? { x: nodeRight(target), y: targetCenter.y }
+      : direction === 'down'
+        ? { x: targetCenter.x, y: target.y }
+        : { x: targetCenter.x, y: nodeBottom(target) };
+
   return {
-    x: inverse ** 3 * start.x
-      + 3 * inverse ** 2 * progress * firstControl.x
-      + 3 * inverse * progress ** 2 * secondControl.x
-      + progress ** 3 * end.x,
-    y: inverse ** 3 * start.y
-      + 3 * inverse ** 2 * progress * firstControl.y
-      + 3 * inverse * progress ** 2 * secondControl.y
-      + progress ** 3 * end.y,
+    sourceBoundary,
+    targetBoundary,
+    start: movePoint(sourceBoundary, direction, clearance),
+    end: movePoint(targetBoundary, oppositeDirection(direction), clearance),
+    direction,
   };
 }
 
-function directEdgeGeometry(source: PositionedNode, target: PositionedNode): {
-  start: AnalyzerEdgePoint;
-  firstControl: AnalyzerEdgePoint;
-  secondControl: AnalyzerEdgePoint;
-  end: AnalyzerEdgePoint;
-} {
-  const { sourceBoundary, targetBoundary, goesRight } = directEdgePoints(source, target);
-  const bend = Math.max(54, Math.abs(targetBoundary.x - sourceBoundary.x) * 0.38);
-  return {
-    start: sourceBoundary,
-    firstControl: { x: sourceBoundary.x + (goesRight ? bend : -bend), y: sourceBoundary.y },
-    secondControl: { x: targetBoundary.x + (goesRight ? -bend : bend), y: targetBoundary.y },
-    end: targetBoundary,
-  };
+function monotonicConstraint(direction: AxisDirection): MonotonicConstraint {
+  return direction === 'right'
+    ? { axis: 'x', sign: 1 }
+    : direction === 'left'
+      ? { axis: 'x', sign: -1 }
+      : direction === 'down'
+        ? { axis: 'y', sign: 1 }
+        : { axis: 'y', sign: -1 };
+}
+
+function segmentRespectsMonotonicity(
+  first: AnalyzerEdgePoint,
+  second: AnalyzerEdgePoint,
+  constraint: MonotonicConstraint,
+): boolean {
+  const firstValue = constraint.axis === 'x' ? first.x : first.y;
+  const secondValue = constraint.axis === 'x' ? second.x : second.y;
+  return constraint.sign === 1
+    ? secondValue >= firstValue - EPSILON
+    : secondValue <= firstValue + EPSILON;
+}
+
+function routeRespectsMonotonicity(
+  points: readonly AnalyzerEdgePoint[],
+  constraint: MonotonicConstraint,
+): boolean {
+  return points.slice(1).every((point, index) => segmentRespectsMonotonicity(points[index]!, point, constraint));
 }
 
 function segmentIntersectsRect(first: AnalyzerEdgePoint, second: AnalyzerEdgePoint, obstacle: InflatedObstacle): boolean {
@@ -148,7 +287,7 @@ function segmentIntersectsRect(first: AnalyzerEdgePoint, second: AnalyzerEdgePoi
   let maximum = 1;
 
   const clip = (origin: number, direction: number, minimumBound: number, maximumBound: number): boolean => {
-    if (direction === 0) return origin >= minimumBound && origin <= maximumBound;
+    if (approximatelyEqual(direction, 0)) return origin >= minimumBound && origin <= maximumBound;
     const firstIntersection = (minimumBound - origin) / direction;
     const secondIntersection = (maximumBound - origin) / direction;
     const near = Math.min(firstIntersection, secondIntersection);
@@ -162,28 +301,36 @@ function segmentIntersectsRect(first: AnalyzerEdgePoint, second: AnalyzerEdgePoi
     && clip(first.y, dy, obstacle.y, obstacle.bottom);
 }
 
-function segmentClear(first: AnalyzerEdgePoint, second: AnalyzerEdgePoint, obstacles: InflatedObstacle[]): boolean {
-  if (first.x !== second.x && first.y !== second.y) return false;
+function segmentClear(first: AnalyzerEdgePoint, second: AnalyzerEdgePoint, obstacles: readonly InflatedObstacle[]): boolean {
+  if (!approximatelyEqual(first.x, second.x) && !approximatelyEqual(first.y, second.y)) return false;
   return !obstacles.some((obstacle) => {
-    if (first.y === second.y) {
+    if (approximatelyEqual(first.y, second.y)) {
       const left = Math.min(first.x, second.x);
       const right = Math.max(first.x, second.x);
-      return first.y > obstacle.y
-        && first.y < obstacle.bottom
-        && left < obstacle.right
-        && right > obstacle.x;
+      return first.y > obstacle.y + EPSILON
+        && first.y < obstacle.bottom - EPSILON
+        && left < obstacle.right - EPSILON
+        && right > obstacle.x + EPSILON;
     }
     const top = Math.min(first.y, second.y);
     const bottom = Math.max(first.y, second.y);
-    return first.x > obstacle.x
-      && first.x < obstacle.right
-      && top < obstacle.bottom
-      && bottom > obstacle.y;
+    return first.x > obstacle.x + EPSILON
+      && first.x < obstacle.right - EPSILON
+      && top < obstacle.bottom - EPSILON
+      && bottom > obstacle.y + EPSILON;
   });
 }
 
-function pointClear(point: AnalyzerEdgePoint, obstacles: InflatedObstacle[]): boolean {
+function pointClear(point: AnalyzerEdgePoint, obstacles: readonly InflatedObstacle[]): boolean {
   return !obstacles.some((obstacle) => containsPointStrict(obstacle, point));
+}
+
+function isEndpointObstacle(obstacle: AnalyzerEdgeObstacle, node: PositionedNode): boolean {
+  const center = nodeCenter(node);
+  return obstacle.id === node.node.id
+    || obstacle.id === `node:${node.node.id}`
+    || obstacle.id === `summary-card:${node.node.id}`
+    || containsPoint(obstacle, center);
 }
 
 function relevantObstacles(
@@ -192,25 +339,86 @@ function relevantObstacles(
   obstacles: readonly AnalyzerEdgeObstacle[],
   clearance: number,
 ): InflatedObstacle[] {
-  const sourceCenter = { x: source.x + ANALYZER_NODE_WIDTH / 2, y: source.y + source.height / 2 };
-  const targetCenter = { x: target.x + ANALYZER_NODE_WIDTH / 2, y: target.y + target.height / 2 };
   return obstacles
+    .filter(isAnalyzerEdgeObstacleHard)
     .filter(validObstacle)
-    // A parent Summary / Cluster is a related container when an endpoint is inside it.
-    .filter((obstacle) => !containsPoint(obstacle, sourceCenter) && !containsPoint(obstacle, targetCenter))
+    .filter((obstacle) => !isEndpointObstacle(obstacle, source) && !isEndpointObstacle(obstacle, target))
     .map((obstacle) => inflateObstacle(obstacle, clearance));
 }
 
-function directPathIntersectsAnyObstacle(source: PositionedNode, target: PositionedNode, obstacles: InflatedObstacle[]): boolean {
-  if (obstacles.length === 0) return false;
-  const geometry = directEdgeGeometry(source, target);
-  let previous = geometry.start;
-  for (let index = 1; index <= DIRECT_CURVE_SAMPLES; index += 1) {
-    const current = cubicPoint(geometry.start, geometry.firstControl, geometry.secondControl, geometry.end, index / DIRECT_CURVE_SAMPLES);
-    if (obstacles.some((obstacle) => segmentIntersectsRect(previous, current, obstacle))) return true;
-    previous = current;
-  }
-  return false;
+function segmentDirection(first: AnalyzerEdgePoint, second: AnalyzerEdgePoint): Direction | undefined {
+  if (approximatelyEqual(first.x, second.x) && approximatelyEqual(first.y, second.y)) return undefined;
+  return approximatelyEqual(first.y, second.y) ? 'horizontal' : 'vertical';
+}
+
+function segmentsCross(
+  firstStart: AnalyzerEdgePoint,
+  firstEnd: AnalyzerEdgePoint,
+  secondStart: AnalyzerEdgePoint,
+  secondEnd: AnalyzerEdgePoint,
+): boolean {
+  const firstDirection = segmentDirection(firstStart, firstEnd);
+  const secondDirection = segmentDirection(secondStart, secondEnd);
+  if (!firstDirection || !secondDirection || firstDirection === secondDirection) return false;
+  const horizontalStart = firstDirection === 'horizontal' ? firstStart : secondStart;
+  const horizontalEnd = firstDirection === 'horizontal' ? firstEnd : secondEnd;
+  const verticalStart = firstDirection === 'vertical' ? firstStart : secondStart;
+  const verticalEnd = firstDirection === 'vertical' ? firstEnd : secondEnd;
+  const horizontalLeft = Math.min(horizontalStart.x, horizontalEnd.x);
+  const horizontalRight = Math.max(horizontalStart.x, horizontalEnd.x);
+  const verticalTop = Math.min(verticalStart.y, verticalEnd.y);
+  const verticalBottom = Math.max(verticalStart.y, verticalEnd.y);
+  return verticalStart.x > horizontalLeft + EPSILON
+    && verticalStart.x < horizontalRight - EPSILON
+    && horizontalStart.y > verticalTop + EPSILON
+    && horizontalStart.y < verticalBottom - EPSILON;
+}
+
+function routeCrossesExisting(first: AnalyzerEdgePoint, second: AnalyzerEdgePoint, routes: readonly (readonly AnalyzerEdgePoint[])[]): boolean {
+  return routes.some((route) => route.slice(1).some((point, index) => segmentsCross(first, second, route[index]!, point)));
+}
+
+function routeSegmentPenalty(
+  first: AnalyzerEdgePoint,
+  second: AnalyzerEdgePoint,
+  obstacles: readonly InflatedObstacle[],
+  options: ResolvedRoutingOptions,
+): number {
+  const obstaclePenalty = obstacles.some((obstacle) => segmentIntersectsRect(first, second, obstacle))
+    ? options.obstaclePenalty
+    : 0;
+  const crossingPenalty = routeCrossesExisting(first, second, options.existingRoutes)
+    ? options.crossingPenalty
+    : 0;
+  return obstaclePenalty + crossingPenalty;
+}
+
+function routeCost(
+  points: readonly AnalyzerEdgePoint[],
+  obstacles: readonly InflatedObstacle[],
+  options: ResolvedRoutingOptions,
+): number {
+  return points.slice(1).reduce((cost, point, index) => {
+    const previous = points[index]!;
+    const distance = Math.abs(point.x - previous.x) + Math.abs(point.y - previous.y);
+    return cost
+      + distance
+      + routeSegmentPenalty(previous, point, obstacles, options)
+      + (index > 0 ? options.bendPenalty : 0);
+  }, 0);
+}
+
+function routeIsClear(points: readonly AnalyzerEdgePoint[], obstacles: readonly InflatedObstacle[]): boolean {
+  if (points.length < 2 || points.some((point) => !pointClear(point, obstacles))) return false;
+  return points.slice(1).every((point, index) => segmentClear(points[index]!, point, obstacles));
+}
+
+function routeWithinBounds(points: readonly AnalyzerEdgePoint[], bounds?: AnalyzerEdgeBounds): boolean {
+  if (!bounds) return true;
+  return points.every((point) => point.x >= bounds.x - EPSILON
+    && point.x <= bounds.x + bounds.width + EPSILON
+    && point.y >= bounds.y - EPSILON
+    && point.y <= bounds.y + bounds.height + EPSILON);
 }
 
 function addCoordinate(values: Set<number>, value: number): void {
@@ -220,7 +428,9 @@ function addCoordinate(values: Set<number>, value: number): void {
 function buildVisibilityGraph(
   start: AnalyzerEdgePoint,
   end: AnalyzerEdgePoint,
-  obstacles: InflatedObstacle[],
+  obstacles: readonly InflatedObstacle[],
+  bounds?: AnalyzerEdgeBounds,
+  monotonicity?: MonotonicConstraint,
 ): Map<string, Neighbor[]> | undefined {
   const xCoordinates = new Set<number>();
   const yCoordinates = new Set<number>();
@@ -235,8 +445,23 @@ function buildVisibilityGraph(
     addCoordinate(yCoordinates, obstacle.bottom);
   });
 
-  const xs = [...xCoordinates].sort((first, second) => first - second);
-  const ys = [...yCoordinates].sort((first, second) => first - second);
+  if (obstacles.length > 0) {
+    const minimumX = bounds ? bounds.x : Math.min(start.x, end.x, ...obstacles.map((obstacle) => obstacle.x));
+    const maximumX = bounds ? bounds.x + bounds.width : Math.max(start.x, end.x, ...obstacles.map((obstacle) => obstacle.right));
+    const minimumY = bounds ? bounds.y : Math.min(start.y, end.y, ...obstacles.map((obstacle) => obstacle.y));
+    const maximumY = bounds ? bounds.y + bounds.height : Math.max(start.y, end.y, ...obstacles.map((obstacle) => obstacle.bottom));
+    addCoordinate(xCoordinates, bounds ? minimumX : minimumX - VISIBILITY_ESCAPE_MARGIN);
+    addCoordinate(xCoordinates, bounds ? maximumX : maximumX + VISIBILITY_ESCAPE_MARGIN);
+    addCoordinate(yCoordinates, bounds ? minimumY : minimumY - VISIBILITY_ESCAPE_MARGIN);
+    addCoordinate(yCoordinates, bounds ? maximumY : maximumY + VISIBILITY_ESCAPE_MARGIN);
+  }
+
+  const xs = [...xCoordinates]
+    .filter((x) => !bounds || (x >= bounds.x && x <= bounds.x + bounds.width))
+    .sort((first, second) => first - second);
+  const ys = [...yCoordinates]
+    .filter((y) => !bounds || (y >= bounds.y && y <= bounds.y + bounds.height))
+    .sort((first, second) => first - second);
   if (xs.length * ys.length > MAX_GRID_POINTS) return undefined;
 
   const points = new Map<string, AnalyzerEdgePoint>();
@@ -244,19 +469,23 @@ function buildVisibilityGraph(
     const point = { x, y };
     if (pointClear(point, obstacles)) points.set(pointKey(point), point);
   }));
+  if (!pointClear(start, obstacles) || !pointClear(end, obstacles)) return undefined;
   points.set(pointKey(start), start);
   points.set(pointKey(end), end);
-  if (!pointClear(start, obstacles) || !pointClear(end, obstacles)) return undefined;
 
   const graph = new Map<string, Neighbor[]>();
   points.forEach((point, key) => graph.set(key, []));
   const connect = (first: AnalyzerEdgePoint, second: AnalyzerEdgePoint): void => {
     if (!segmentClear(first, second, obstacles)) return;
-    const direction: Direction = first.x === second.x ? 'vertical' : 'horizontal';
+    const direction = segmentDirection(first, second);
+    if (!direction) return;
     const distance = Math.abs(first.x - second.x) + Math.abs(first.y - second.y);
-    if (distance === 0) return;
-    graph.get(pointKey(first))?.push({ point: second, direction, distance });
-    graph.get(pointKey(second))?.push({ point: first, direction, distance });
+    if (!monotonicity || segmentRespectsMonotonicity(first, second, monotonicity)) {
+      graph.get(pointKey(first))?.push({ point: second, direction, distance });
+    }
+    if (!monotonicity || segmentRespectsMonotonicity(second, first, monotonicity)) {
+      graph.get(pointKey(second))?.push({ point: first, direction, distance });
+    }
   };
 
   const pointsByX = new Map<number, AnalyzerEdgePoint[]>();
@@ -271,17 +500,23 @@ function buildVisibilityGraph(
   });
   pointsByX.forEach((sameX) => {
     sameX.sort((first, second) => first.y - second.y);
-    for (let index = 1; index < sameX.length; index += 1) connect(sameX[index - 1], sameX[index]);
+    for (let index = 1; index < sameX.length; index += 1) connect(sameX[index - 1]!, sameX[index]!);
   });
   pointsByY.forEach((sameY) => {
     sameY.sort((first, second) => first.x - second.x);
-    for (let index = 1; index < sameY.length; index += 1) connect(sameY[index - 1], sameY[index]);
+    for (let index = 1; index < sameY.length; index += 1) connect(sameY[index - 1]!, sameY[index]!);
   });
   return graph;
 }
 
-function shortestVisibilityRoute(start: AnalyzerEdgePoint, end: AnalyzerEdgePoint, obstacles: InflatedObstacle[]): AnalyzerEdgePoint[] | undefined {
-  const graph = buildVisibilityGraph(start, end, obstacles);
+function shortestVisibilityRoute(
+  start: AnalyzerEdgePoint,
+  end: AnalyzerEdgePoint,
+  obstacles: readonly InflatedObstacle[],
+  options: ResolvedRoutingOptions,
+  monotonicity?: MonotonicConstraint,
+): AnalyzerEdgePoint[] | undefined {
+  const graph = buildVisibilityGraph(start, end, obstacles, options.bounds, monotonicity);
   if (!graph) return undefined;
   const startKey = pointKey(start);
   const endKey = pointKey(end);
@@ -301,15 +536,18 @@ function shortestVisibilityRoute(start: AnalyzerEdgePoint, end: AnalyzerEdgePoin
       finalStateKey = current.key;
       break;
     }
-    const currentPoint = graph.get(current.state.pointKey);
-    if (!currentPoint) continue;
-    currentPoint.forEach((neighbor) => {
+    const currentNeighbors = graph.get(current.state.pointKey);
+    if (!currentNeighbors) continue;
+    const [currentX, currentY] = current.state.pointKey.split(':').map(Number);
+    const segmentStart = { x: currentX, y: currentY };
+    currentNeighbors.forEach((neighbor) => {
       const nextDirection = neighbor.direction;
       const nextState: RouteState = { pointKey: pointKey(neighbor.point), direction: nextDirection };
       const nextKey = `${nextState.pointKey}|${nextDirection}`;
       const nextCost = current.cost
         + neighbor.distance
-        + (current.state.direction && current.state.direction !== nextDirection ? TURN_PENALTY : 0);
+        + routeSegmentPenalty(segmentStart, neighbor.point, obstacles, options)
+        + (current.state.direction && current.state.direction !== nextDirection ? options.bendPenalty : 0);
       if (nextCost >= (distances.get(nextKey) ?? Number.POSITIVE_INFINITY)) return;
       distances.set(nextKey, nextCost);
       previous.set(nextKey, current.key);
@@ -332,23 +570,184 @@ function shortestVisibilityRoute(start: AnalyzerEdgePoint, end: AnalyzerEdgePoin
   return route.length > 0 ? route : undefined;
 }
 
-function compactPoints(points: AnalyzerEdgePoint[]): AnalyzerEdgePoint[] {
-  const compacted: AnalyzerEdgePoint[] = [];
-  points.forEach((point) => {
-    const previous = compacted.at(-1);
-    if (previous && previous.x === point.x && previous.y === point.y) return;
-    const beforePrevious = compacted.at(-2);
-    if (beforePrevious && previous && ((beforePrevious.x === previous.x && previous.x === point.x)
-      || (beforePrevious.y === previous.y && previous.y === point.y))) {
-      compacted[compacted.length - 1] = point;
-      return;
-    }
-    compacted.push(point);
+function orthogonalCandidateRoutes(
+  start: AnalyzerEdgePoint,
+  end: AnalyzerEdgePoint,
+  obstacles: readonly InflatedObstacle[],
+  monotonicity?: MonotonicConstraint,
+): AnalyzerEdgePoint[][] {
+  const candidates: AnalyzerEdgePoint[][] = [];
+  const add = (points: AnalyzerEdgePoint[]): void => {
+    if (points.every((point, index) => index === 0 || Boolean(segmentDirection(points[index - 1]!, point)))
+      && (!monotonicity || routeRespectsMonotonicity(points, monotonicity))) candidates.push(points);
+  };
+  if (approximatelyEqual(start.x, end.x) || approximatelyEqual(start.y, end.y)) add([start, end]);
+  else {
+    add([start, { x: end.x, y: start.y }, end]);
+    add([start, { x: start.x, y: end.y }, end]);
+  }
+
+  const xCoordinates = new Set<number>([start.x, end.x]);
+  const yCoordinates = new Set<number>([start.y, end.y]);
+  obstacles.forEach((obstacle) => {
+    xCoordinates.add(obstacle.x);
+    xCoordinates.add(obstacle.right);
+    yCoordinates.add(obstacle.y);
+    yCoordinates.add(obstacle.bottom);
   });
+  [...xCoordinates].forEach((x) => {
+    if (approximatelyEqual(x, start.x) || approximatelyEqual(x, end.x)) return;
+    add([start, { x, y: start.y }, { x, y: end.y }, end]);
+  });
+  [...yCoordinates].forEach((y) => {
+    if (approximatelyEqual(y, start.y) || approximatelyEqual(y, end.y)) return;
+    add([start, { x: start.x, y }, { x: end.x, y }, end]);
+  });
+  return candidates;
+}
+
+function fallbackRoute(
+  start: AnalyzerEdgePoint,
+  end: AnalyzerEdgePoint,
+  obstacles: readonly InflatedObstacle[],
+  bounds?: AnalyzerEdgeBounds,
+  monotonicity?: MonotonicConstraint,
+): AnalyzerEdgePoint[] {
+  const monotonicCandidates = orthogonalCandidateRoutes(start, end, obstacles, monotonicity);
+  const relaxedCandidates = monotonicity ? orthogonalCandidateRoutes(start, end, obstacles) : [];
+  const minimumX = bounds ? bounds.x : Math.min(start.x, end.x, ...obstacles.map((obstacle) => obstacle.x)) - VISIBILITY_ESCAPE_MARGIN;
+  const maximumX = bounds ? bounds.x + bounds.width : Math.max(start.x, end.x, ...obstacles.map((obstacle) => obstacle.right)) + VISIBILITY_ESCAPE_MARGIN;
+  const minimumY = bounds ? bounds.y : Math.min(start.y, end.y, ...obstacles.map((obstacle) => obstacle.y)) - VISIBILITY_ESCAPE_MARGIN;
+  const maximumY = bounds ? bounds.y + bounds.height : Math.max(start.y, end.y, ...obstacles.map((obstacle) => obstacle.bottom)) + VISIBILITY_ESCAPE_MARGIN;
+  const escapeCandidates = [
+    [start, { x: minimumX, y: start.y }, { x: minimumX, y: end.y }, end],
+    [start, { x: maximumX, y: start.y }, { x: maximumX, y: end.y }, end],
+    [start, { x: start.x, y: minimumY }, { x: end.x, y: minimumY }, end],
+    [start, { x: start.x, y: maximumY }, { x: end.x, y: maximumY }, end],
+  ];
+  const allCandidates = [...monotonicCandidates, ...relaxedCandidates, ...escapeCandidates];
+  return monotonicCandidates.find((candidate) => routeWithinBounds(candidate, bounds) && routeIsClear(candidate, obstacles))
+    ?? allCandidates.find((candidate) => routeWithinBounds(candidate, bounds) && routeIsClear(candidate, obstacles))
+    ?? allCandidates.find((candidate) => routeWithinBounds(candidate, bounds))
+    ?? allCandidates[0]
+    ?? [start, end];
+}
+
+function candidateRoute(
+  source: PositionedNode,
+  target: PositionedNode,
+  obstacles: readonly InflatedObstacle[],
+  options: ResolvedRoutingOptions,
+): AnalyzerEdgePoint[] {
+  const ports = edgePortGeometry(source, target, options.clearance, options.flowDirection);
+  const monotonicity = monotonicConstraint(ports.direction);
+  const usable = (candidate: AnalyzerEdgePoint[]): boolean => routeWithinBounds(candidate, options.bounds) && routeIsClear(candidate, obstacles);
+  const best = (candidates: AnalyzerEdgePoint[][]): AnalyzerEdgePoint[] | undefined => candidates
+    .filter(usable)
+    .sort((first, second) => routeCost(first, obstacles, options) - routeCost(second, obstacles, options))[0];
+  const monotonicCandidates = orthogonalCandidateRoutes(ports.start, ports.end, obstacles, monotonicity);
+  const monotonicVisibility = shortestVisibilityRoute(ports.start, ports.end, obstacles, options, monotonicity);
+  if (monotonicVisibility) monotonicCandidates.push(monotonicVisibility);
+  const relaxedCandidates = orthogonalCandidateRoutes(ports.start, ports.end, obstacles);
+  const relaxedVisibility = shortestVisibilityRoute(ports.start, ports.end, obstacles, options);
+  if (relaxedVisibility) relaxedCandidates.push(relaxedVisibility);
+  const internalRoute = best(monotonicCandidates)
+    ?? best(relaxedCandidates)
+    ?? fallbackRoute(ports.start, ports.end, obstacles, options.bounds, monotonicity);
+  return simplifyAnalyzerOrthogonalRoute([
+    ports.sourceBoundary,
+    ...internalRoute,
+    ports.targetBoundary,
+  ], { obstacles, shortZigzagLength: SHORT_ZIGZAG_LENGTH });
+}
+
+function replaceSlice(points: AnalyzerEdgePoint[], index: number, replacement: AnalyzerEdgePoint[]): AnalyzerEdgePoint[] {
+  return [...points.slice(0, index), ...replacement, ...points.slice(index + 3)];
+}
+
+function validSimplification(points: AnalyzerEdgePoint[], obstacles?: readonly InflatedObstacle[]): boolean {
+  return points.every((point, index) => index === 0 || Boolean(segmentDirection(points[index - 1]!, point)))
+    && (!obstacles || routeIsClear(points, obstacles));
+}
+
+export function simplifyAnalyzerOrthogonalRoute(
+  points: readonly AnalyzerEdgePoint[],
+  options: AnalyzerRouteSimplificationOptions = {},
+): AnalyzerEdgePoint[] {
+  let compacted = points
+    .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y))
+    .reduce<AnalyzerEdgePoint[]>((result, point) => {
+      if (!result.at(-1) || !samePoint(result.at(-1)!, point)) result.push({ x: point.x, y: point.y });
+      return result;
+    }, []);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    const withoutCollinear: AnalyzerEdgePoint[] = [];
+    compacted.forEach((point) => {
+      const previous = withoutCollinear.at(-1);
+      const beforePrevious = withoutCollinear.at(-2);
+      if (beforePrevious && previous && (approximatelyEqual(beforePrevious.x, previous.x) && approximatelyEqual(previous.x, point.x)
+        || approximatelyEqual(beforePrevious.y, previous.y) && approximatelyEqual(previous.y, point.y))) {
+        withoutCollinear[withoutCollinear.length - 1] = point;
+        changed = true;
+      } else {
+        withoutCollinear.push(point);
+      }
+    });
+    compacted = withoutCollinear;
+    const threshold = options.shortZigzagLength ?? SHORT_ZIGZAG_LENGTH;
+    for (let index = 1; index + 2 < compacted.length; index += 1) {
+      const first = compacted[index - 1]!;
+      const second = compacted[index]!;
+      const third = compacted[index + 1]!;
+      const fourth = compacted[index + 2]!;
+      const firstDirection = segmentDirection(first, second);
+      const middleDirection = segmentDirection(second, third);
+      const lastDirection = segmentDirection(third, fourth);
+      const middleLength = Math.abs(third.x - second.x) + Math.abs(third.y - second.y);
+      if (!firstDirection || !middleDirection || !lastDirection || firstDirection !== lastDirection || firstDirection === middleDirection || middleLength > threshold) continue;
+      const replacement = firstDirection === 'horizontal'
+        ? [first, { x: fourth.x, y: first.y }, fourth]
+        : [first, { x: first.x, y: fourth.y }, fourth];
+      if (!validSimplification(replacement, options.obstacles)) continue;
+      compacted = replaceSlice(compacted, index, replacement);
+      changed = true;
+      break;
+    }
+  }
   return compacted;
 }
 
+function labelObstacle(id: string, x: number, y: number, width: number, label: string): AnalyzerEdgeObstacle {
+  const estimatedWidth = Math.min(Math.max(48, width - 24), Math.max(48, label.length * 7 + 24));
+  return {
+    id,
+    x: x + 12,
+    y: y + 7,
+    width: estimatedWidth,
+    height: Math.max(22, ANALYZER_STRUCTURAL_HEADING_HEIGHT - 6),
+    kind: 'label',
+    priority: 4,
+  };
+}
+
+function summaryHeadingObstacle(id: string, x: number, y: number, width: number): AnalyzerEdgeObstacle {
+  return {
+    id,
+    x: x + 8,
+    y: y + 4,
+    width: Math.max(24, width - 16),
+    height: 30,
+    kind: 'summary-heading',
+    priority: 3,
+  };
+}
+
 export function analyzerEdgeObstacles(layout: AnalyzerLayout): AnalyzerEdgeObstacle[] {
+  // `layout.nodes` is the same current geometry passed to `nodeStyle` by the
+  // graph stage. Rebuilding this list from the current layout keeps selected
+  // Evidence Preview and Summary presentation resizes in sync with routing.
   return [
     ...layout.nodes.map((positionedNode) => ({
       id: `node:${positionedNode.node.id}`,
@@ -356,56 +755,281 @@ export function analyzerEdgeObstacles(layout: AnalyzerLayout): AnalyzerEdgeObsta
       y: positionedNode.y,
       width: ANALYZER_NODE_WIDTH,
       height: positionedNode.height,
-      kind: 'node' as const,
+      kind: positionedNode.node.presentation?.role === 'summary' ? 'summary-card' as const : 'node' as const,
+      priority: positionedNode.node.presentation?.role === 'summary' ? 2 : 1,
     })),
-    ...layout.summaryGroups.map((group) => ({
-      id: `summary:${group.id}`,
-      x: group.x,
-      y: group.y,
-      width: group.width,
-      height: group.height,
-      kind: 'summary' as const,
-    })),
-    ...layout.bands.map((band) => ({
-      id: `band:${band.id}`,
-      x: band.x,
-      y: band.y,
-      width: band.width,
-      height: band.height,
-      kind: 'band' as const,
-    })),
-    ...layout.clusters.map((cluster) => ({
-      id: `cluster:${cluster.id}`,
-      x: cluster.x,
-      y: cluster.y,
-      width: cluster.width,
-      height: cluster.height,
-      kind: 'cluster' as const,
-    })),
-    ...layout.lanes.map((lane) => ({
-      id: `lane:${lane.id}`,
-      x: lane.x,
-      y: lane.y,
-      width: lane.width,
-      height: lane.height,
-      kind: 'lane' as const,
-    })),
+    ...layout.summaryGroups.map((group) => summaryHeadingObstacle(`summary-heading:${group.id}`, group.x, group.y, group.width)),
+    ...layout.bands.map((band) => summaryHeadingObstacle(`band-heading:${band.id}`, band.x, band.y, band.width)),
+    ...layout.clusters.map((cluster) => labelObstacle(`cluster-label:${cluster.id}`, cluster.x, cluster.y, cluster.width, cluster.label)),
+    ...layout.lanes.map((lane) => labelObstacle(`lane-label:${lane.id}`, lane.x, lane.y, lane.width, lane.label)),
   ];
+}
+
+interface FanoutMember {
+  edge: AnalyzerRoutableEdge;
+  target: PositionedNode;
+}
+
+function fanoutDirection(
+  source: PositionedNode,
+  target: PositionedNode,
+  clearance: number,
+  flowDirection: ResolvedRoutingOptions['flowDirection'],
+): AxisDirection {
+  return edgePortGeometry(source, target, clearance, flowDirection).direction;
+}
+
+function fanoutTrunkCandidates(
+  ports: readonly EdgePortGeometry[],
+): Array<{ x?: number; y?: number }> {
+  const first = ports[0];
+  if (!first) return [];
+  const horizontal = first.direction === 'left' || first.direction === 'right';
+  if (horizontal) {
+    const endXs = ports.map((port) => port.end.x);
+    const minimumEnd = Math.min(...endXs);
+    const maximumEnd = Math.max(...endXs);
+    if (first.direction === 'right') {
+      const nearest = minimumEnd - FANOUT_TRUNK_GAP;
+      const midpoint = first.start.x + (minimumEnd - first.start.x) / 2;
+      return [{ x: midpoint }, { x: nearest }].filter((candidate) => candidate.x !== undefined && candidate.x > first.start.x + 4 && candidate.x < minimumEnd - 4);
+    }
+    const nearest = maximumEnd + FANOUT_TRUNK_GAP;
+    const midpoint = first.start.x - (first.start.x - maximumEnd) / 2;
+    return [{ x: midpoint }, { x: nearest }].filter((candidate) => candidate.x !== undefined && candidate.x < first.start.x - 4 && candidate.x > maximumEnd + 4);
+  }
+  const endYs = ports.map((port) => port.end.y);
+  const minimumEnd = Math.min(...endYs);
+  const maximumEnd = Math.max(...endYs);
+  if (first.direction === 'down') {
+    const nearest = minimumEnd - FANOUT_TRUNK_GAP;
+    const midpoint = first.start.y + (minimumEnd - first.start.y) / 2;
+    return [{ y: midpoint }, { y: nearest }].filter((candidate) => candidate.y !== undefined && candidate.y > first.start.y + 4 && candidate.y < minimumEnd - 4);
+  }
+  const nearest = maximumEnd + FANOUT_TRUNK_GAP;
+  const midpoint = first.start.y - (first.start.y - maximumEnd) / 2;
+  return [{ y: midpoint }, { y: nearest }].filter((candidate) => candidate.y !== undefined && candidate.y < first.start.y - 4 && candidate.y > maximumEnd + 4);
+}
+
+function fanoutRoute(
+  source: PositionedNode,
+  members: readonly FanoutMember[],
+  obstacles: readonly AnalyzerEdgeObstacle[],
+  options: ResolvedRoutingOptions,
+): Map<string, AnalyzerEdgePoint[]> | undefined {
+  if (members.length < 2) return undefined;
+  const ports = members.map(({ target }) => edgePortGeometry(source, target, options.clearance, options.flowDirection));
+  const direction = ports[0]?.direction;
+  if (!direction || ports.some((port) => port.direction !== direction)) return undefined;
+  const horizontal = direction === 'left' || direction === 'right';
+  const spreadValues = members.map(({ target }) => horizontal ? nodeCenter(target).y : nodeCenter(target).x);
+  if (Math.max(...spreadValues) - Math.min(...spreadValues) > FANOUT_MAX_SPREAD) return undefined;
+  const candidates = fanoutTrunkCandidates(ports);
+  const hardObstacles = obstacles
+    .filter(isAnalyzerEdgeObstacleHard)
+    .filter(validObstacle)
+    .filter((obstacle) => !isEndpointObstacle(obstacle, source))
+    .map((obstacle) => inflateObstacle(obstacle, options.clearance));
+  const relevantByEdgeId = new Map(members.map(({ edge, target }) => [
+    edge.id,
+    hardObstacles.filter((obstacle) => !isEndpointObstacle(obstacle, target)),
+  ]));
+  const monotonicity = monotonicConstraint(direction);
+  const candidateRoutes: Array<{ routes: Map<string, AnalyzerEdgePoint[]>; cost: number }> = [];
+  candidates.forEach((trunk) => {
+    const routes = new Map<string, AnalyzerEdgePoint[]>();
+    let valid = true;
+    let cost = 0;
+    const trunkSpreadStart = Math.min(ports[0]!.start[horizontal ? 'y' : 'x'], ...ports.map((port) => port.end[horizontal ? 'y' : 'x']));
+    const trunkSpreadEnd = Math.max(ports[0]!.start[horizontal ? 'y' : 'x'], ...ports.map((port) => port.end[horizontal ? 'y' : 'x']));
+    const sharedTrunk = horizontal
+      ? [
+          ports[0]!.sourceBoundary,
+          ports[0]!.start,
+          { x: trunk.x!, y: ports[0]!.start.y },
+          { x: trunk.x!, y: trunkSpreadStart },
+          { x: trunk.x!, y: trunkSpreadEnd },
+        ]
+      : [
+          ports[0]!.sourceBoundary,
+          ports[0]!.start,
+          { x: ports[0]!.start.x, y: trunk.y! },
+          { x: trunkSpreadStart, y: trunk.y! },
+          { x: trunkSpreadEnd, y: trunk.y! },
+        ];
+    if (!routeIsClear(sharedTrunk, hardObstacles)) valid = false;
+    ports.forEach((port, index) => {
+      const member = members[index]!;
+      const route = horizontal
+        ? [port.sourceBoundary, port.start, { x: trunk.x!, y: port.start.y }, { x: trunk.x!, y: port.end.y }, port.end, port.targetBoundary]
+        : [port.sourceBoundary, port.start, { x: port.start.x, y: trunk.y! }, { x: port.end.x, y: trunk.y! }, port.end, port.targetBoundary];
+      const relevant = relevantByEdgeId.get(member.edge.id) ?? [];
+      if (!routeWithinBounds(route, options.bounds) || !routeRespectsMonotonicity(route, monotonicity) || !routeIsClear(route, relevant)) valid = false;
+      const compacted = simplifyAnalyzerOrthogonalRoute(route, { obstacles: relevant, shortZigzagLength: SHORT_ZIGZAG_LENGTH });
+      if (!routeRespectsMonotonicity(compacted, monotonicity)) valid = false;
+      routes.set(member.edge.id, compacted);
+      cost += routeCost(compacted, relevant, options);
+    });
+    if (valid) candidateRoutes.push({ routes, cost });
+  });
+  return candidateRoutes.sort((first, second) => first.cost - second.cost)[0]?.routes;
+}
+
+function fanoutTargetGroupKey(target: PositionedNode): string {
+  if (target.node.presentation?.role === 'summary') return `summary:${target.node.id}`;
+  if (target.node.presentation?.parentId) return `presentation:${target.node.presentation.parentId}`;
+  return `cluster:${target.node.clusterId ?? target.node.type}`;
+}
+
+function canUseFanout(edge: AnalyzerRoutableEdge): boolean {
+  // Bundle edges represent a presentation aggregate, not a sibling set of
+  // Fact Relations. Keeping them out of Fact fan-out prevents a summary path
+  // from visually implying a relation between its member Nodes.
+  return edge.presentation?.displayKind !== 'bundle';
 }
 
 export function analyzerEdgeRoute(
   source: PositionedNode,
   target: PositionedNode,
-  obstacles: readonly AnalyzerEdgeObstacle[],
+  obstacles: readonly AnalyzerEdgeObstacle[] = [],
   options: AnalyzerEdgeRoutingOptions = {},
 ): AnalyzerEdgePoint[] | undefined {
-  const clearance = Math.max(4, options.clearance ?? DEFAULT_EDGE_CLEARANCE);
-  const relevant = relevantObstacles(source, target, obstacles, clearance);
-  if (!directPathIntersectsAnyObstacle(source, target, relevant)) return undefined;
-  const direct = directEdgePoints(source, target, clearance);
-  const route = shortestVisibilityRoute(direct.start, direct.end, relevant);
-  if (!route) return undefined;
-  return compactPoints([direct.sourceBoundary, ...route, direct.targetBoundary]);
+  const resolved = resolveRoutingOptions(options);
+  const relevant = relevantObstacles(source, target, obstacles, resolved.clearance);
+  return candidateRoute(source, target, relevant, resolved);
+}
+
+export function analyzerEdgeRoutes(
+  edges: readonly AnalyzerRoutableEdge[],
+  positionedById: ReadonlyMap<string, PositionedNode>,
+  obstacles: readonly AnalyzerEdgeObstacle[] = [],
+  options: AnalyzerEdgeRoutingOptions = {},
+): Map<string, AnalyzerEdgePoint[]> {
+  const resolved = resolveRoutingOptions(options);
+  const routes = new Map<string, AnalyzerEdgePoint[]>();
+  const grouped = new Map<string, FanoutMember[]>();
+  if (resolved.enableFanout) {
+    edges.forEach((edge) => {
+      if (!canUseFanout(edge) || edge.sourceId === edge.targetId) return;
+      const source = positionedById.get(edge.sourceId);
+      const target = positionedById.get(edge.targetId);
+      if (!source || !target) return;
+      const key = [
+        edge.sourceId,
+        fanoutDirection(source, target, resolved.clearance, resolved.flowDirection),
+        edge.kind ?? 'unknown',
+        fanoutTargetGroupKey(target),
+      ].join('\u0000');
+      const group = grouped.get(key) ?? [];
+      group.push({ edge, target });
+      grouped.set(key, group);
+    });
+    grouped.forEach((group) => {
+      if (group.length < 2) return;
+      const source = positionedById.get(group[0]!.edge.sourceId);
+      if (!source) return;
+      const fanout = fanoutRoute(source, group, obstacles, resolved);
+      if (!fanout) return;
+      group.forEach(({ edge }) => {
+        const route = fanout.get(edge.id);
+        if (route) routes.set(edge.id, route);
+      });
+    });
+  }
+
+  edges.forEach((edge) => {
+    if (routes.has(edge.id)) return;
+    const source = positionedById.get(edge.sourceId);
+    const target = positionedById.get(edge.targetId);
+    if (!source || !target) return;
+    const route = analyzerEdgeRoute(source, target, obstacles, {
+      ...options,
+      existingRoutes: [...resolved.existingRoutes, ...routes.values()],
+    });
+    if (route) routes.set(edge.id, route);
+  });
+  return routes;
+}
+
+export function analyzerRoundedOrthogonalPath(
+  points: readonly AnalyzerEdgePoint[],
+  radius = DEFAULT_CORNER_RADIUS,
+): string {
+  // Routing already simplified with its obstacle set. Drawing must not
+  // collapse a short detour again without those obstacles in scope.
+  const compacted = simplifyAnalyzerOrthogonalRoute(points, { shortZigzagLength: 0 });
+  if (compacted.length === 0) return '';
+  const format = (value: number): string => String(Number(value.toFixed(3)));
+  const path: string[] = [`M ${format(compacted[0]!.x)} ${format(compacted[0]!.y)}`];
+  const safeRadius = Math.max(0, Number.isFinite(radius) ? radius : DEFAULT_CORNER_RADIUS);
+  for (let index = 1; index < compacted.length; index += 1) {
+    const point = compacted[index]!;
+    const previous = compacted[index - 1]!;
+    const next = compacted[index + 1];
+    if (!next) {
+      path.push(`L ${format(point.x)} ${format(point.y)}`);
+      continue;
+    }
+    const incomingLength = Math.abs(point.x - previous.x) + Math.abs(point.y - previous.y);
+    const outgoingLength = Math.abs(next.x - point.x) + Math.abs(next.y - point.y);
+    const cornerRadius = Math.min(safeRadius, incomingLength / 2, outgoingLength / 2);
+    if (cornerRadius <= EPSILON) {
+      path.push(`L ${format(point.x)} ${format(point.y)}`);
+      continue;
+    }
+    const before = {
+      x: point.x + Math.sign(previous.x - point.x) * cornerRadius,
+      y: point.y + Math.sign(previous.y - point.y) * cornerRadius,
+    };
+    const after = {
+      x: point.x + Math.sign(next.x - point.x) * cornerRadius,
+      y: point.y + Math.sign(next.y - point.y) * cornerRadius,
+    };
+    path.push(`L ${format(before.x)} ${format(before.y)} Q ${format(point.x)} ${format(point.y)} ${format(after.x)} ${format(after.y)}`);
+  }
+  return path.join(' ');
+}
+
+function quadraticPoint(first: AnalyzerEdgePoint, control: AnalyzerEdgePoint, second: AnalyzerEdgePoint, progress: number): AnalyzerEdgePoint {
+  const inverse = 1 - progress;
+  return {
+    x: inverse ** 2 * first.x + 2 * inverse * progress * control.x + progress ** 2 * second.x,
+    y: inverse ** 2 * first.y + 2 * inverse * progress * control.y + progress ** 2 * second.y,
+  };
+}
+
+function roundedPathPolyline(points: readonly AnalyzerEdgePoint[], radius: number): AnalyzerEdgePoint[] {
+  const compacted = simplifyAnalyzerOrthogonalRoute(points, { shortZigzagLength: 0 });
+  if (compacted.length === 0) return [];
+  const sampled: AnalyzerEdgePoint[] = [compacted[0]!];
+  const safeRadius = Math.max(0, Number.isFinite(radius) ? radius : DEFAULT_CORNER_RADIUS);
+  for (let index = 1; index < compacted.length; index += 1) {
+    const point = compacted[index]!;
+    const previous = compacted[index - 1]!;
+    const next = compacted[index + 1];
+    if (!next) {
+      sampled.push(point);
+      continue;
+    }
+    const incomingLength = Math.abs(point.x - previous.x) + Math.abs(point.y - previous.y);
+    const outgoingLength = Math.abs(next.x - point.x) + Math.abs(next.y - point.y);
+    const cornerRadius = Math.min(safeRadius, incomingLength / 2, outgoingLength / 2);
+    if (cornerRadius <= EPSILON) {
+      sampled.push(point);
+      continue;
+    }
+    const before = {
+      x: point.x + Math.sign(previous.x - point.x) * cornerRadius,
+      y: point.y + Math.sign(previous.y - point.y) * cornerRadius,
+    };
+    const after = {
+      x: point.x + Math.sign(next.x - point.x) * cornerRadius,
+      y: point.y + Math.sign(next.y - point.y) * cornerRadius,
+    };
+    sampled.push(before);
+    for (let step = 1; step <= 16; step += 1) sampled.push(quadraticPoint(before, point, after, step / 16));
+  }
+  return sampled;
 }
 
 export function analyzerEdgePath(
@@ -414,11 +1038,33 @@ export function analyzerEdgePath(
   obstacles: readonly AnalyzerEdgeObstacle[] = [],
   options: AnalyzerEdgeRoutingOptions = {},
 ): string {
-  const geometry = directEdgeGeometry(source, target);
-  const directPath = `M ${geometry.start.x} ${geometry.start.y} C ${geometry.firstControl.x} ${geometry.firstControl.y}, ${geometry.secondControl.x} ${geometry.secondControl.y}, ${geometry.end.x} ${geometry.end.y}`;
   const route = analyzerEdgeRoute(source, target, obstacles, options);
-  if (!route || route.length < 2) return directPath;
-  return route.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ');
+  if (!route || route.length < 2) return '';
+  const resolved = resolveRoutingOptions(options);
+  return analyzerRoundedOrthogonalPath(route, Math.min(resolved.cornerRadius, resolved.clearance));
+}
+
+export function analyzerEdgePaths(
+  edges: readonly AnalyzerRoutableEdge[],
+  positionedById: ReadonlyMap<string, PositionedNode>,
+  obstacles: readonly AnalyzerEdgeObstacle[] = [],
+  options: AnalyzerEdgeRoutingOptions = {},
+): Map<string, string> {
+  const routes = analyzerEdgeRoutes(edges, positionedById, obstacles, options);
+  const resolved = resolveRoutingOptions(options);
+  return new Map([...routes.entries()].map(([id, route]) => [id, analyzerRoundedOrthogonalPath(route, Math.min(resolved.cornerRadius, resolved.clearance))]));
+}
+
+export function analyzerEdgePathIntersectsObstacle(
+  source: PositionedNode,
+  target: PositionedNode,
+  obstacle: AnalyzerEdgeObstacle,
+  clearance = DEFAULT_EDGE_CLEARANCE,
+): boolean {
+  const options = resolveRoutingOptions({ clearance });
+  const route = analyzerEdgeRoute(source, target, [obstacle], { clearance });
+  const rounded = roundedPathPolyline(route ?? [], Math.min(options.cornerRadius, options.clearance));
+  return analyzerEdgeRouteIntersectsObstacle(rounded, obstacle);
 }
 
 export function analyzerEdgeRouteIntersectsObstacle(
@@ -426,23 +1072,7 @@ export function analyzerEdgeRouteIntersectsObstacle(
   obstacle: AnalyzerEdgeObstacle,
   clearance = 0,
 ): boolean {
+  if (!validObstacle(obstacle) || route.length < 2) return false;
   const inflated = inflateObstacle(obstacle, clearance);
-  return route.slice(1).some((point, index) => segmentIntersectsRect(route[index], point, inflated));
-}
-
-export function analyzerEdgePathIntersectsObstacle(
-  source: PositionedNode,
-  target: PositionedNode,
-  obstacle: AnalyzerEdgeObstacle,
-  clearance = 0,
-): boolean {
-  const inflated = inflateObstacle(obstacle, clearance);
-  const geometry = directEdgeGeometry(source, target);
-  let previous = geometry.start;
-  for (let index = 1; index <= DIRECT_CURVE_SAMPLES; index += 1) {
-    const current = cubicPoint(geometry.start, geometry.firstControl, geometry.secondControl, geometry.end, index / DIRECT_CURVE_SAMPLES);
-    if (segmentIntersectsRect(previous, current, inflated)) return true;
-    previous = current;
-  }
-  return false;
+  return route.slice(1).some((point, index) => segmentIntersectsRect(route[index]!, point, inflated));
 }

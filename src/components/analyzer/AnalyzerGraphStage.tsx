@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
-import { ANALYZER_DEFAULT_TRANSFORM, ANALYZER_EXTERNAL_SUMMARY_ID, ANALYZER_NODE_WIDTH, analyzerEdgeObstacles, analyzerEdgePath, analyzerFocusDepths, analyzerPresentationCount, analyzerPresentationCountLabel, displayedZoomLevelForNode, evidenceRangeLabel, fitAnalyzerTransform, focusAnalyzerTransform, layoutAnalyzerView, nodeMatchesSearch, preserveAnalyzerTransformOnViewportResize, presentAnalyzerView, semanticZoomLevelForScale, shouldRunAnalyzerInitialFit, shouldShowAnalyzerEvidencePreview, type AnalyzerGraphTransform, type AnalyzerViewCounts, type AnalyzerViewEdge, type AnalyzerViewModel, type PositionedNode } from '../../analyzer';
+import { ANALYZER_DEFAULT_TRANSFORM, ANALYZER_EXTERNAL_SUMMARY_ID, ANALYZER_NODE_WIDTH, analyzerEdgeObstacles, analyzerEdgePaths, analyzerFocusDepths, analyzerPresentationCount, analyzerPresentationCountLabel, displayedZoomLevelForNode, evidenceRangeLabel, fitAnalyzerTransform, focusAnalyzerTransform, layoutAnalyzerView, nodeMatchesSearch, preserveAnalyzerTransformOnViewportResize, presentAnalyzerView, semanticZoomLevelForScale, shouldRunAnalyzerInitialFit, shouldShowAnalyzerEvidencePreview, type AnalyzerGraphTransform, type AnalyzerViewCounts, type AnalyzerViewEdge, type AnalyzerViewModel, type PositionedNode } from '../../analyzer';
 import { nodeTypeLabels } from '../../analyzer';
 import { EvidencePreview } from './EvidenceCodeBlock';
 
@@ -145,6 +145,17 @@ export function AnalyzerGraphStage({
   const expandedNodeIds = useMemo(() => new Set(expandedNodeKey ? expandedNodeKey.split('\u0000') : []), [expandedNodeKey]);
   const layout = useMemo(() => layoutAnalyzerView(filteredView, expandedNodeIds), [expandedNodeIds, filteredView]);
   const positionedById = useMemo(() => new Map(layout.nodes.map((positionedNode) => [positionedNode.node.id, positionedNode])), [layout.nodes]);
+  const edgePositions = useMemo(() => {
+    const positions = new Map(positionedById);
+    filteredView.edges.forEach((edge) => {
+      [edge.sourceId, edge.targetId].forEach((nodeId) => {
+        if (positions.has(nodeId)) return;
+        const anchor = semanticAnchorPosition(layout, filteredView, nodeId);
+        if (anchor) positions.set(nodeId, anchor);
+      });
+    });
+    return positions;
+  }, [filteredView, layout, positionedById]);
   const selectedPosition = useMemo(() => {
     if (selectedNodeId) return positionedById.get(selectedNodeId) ?? semanticAnchorPosition(layout, filteredView, selectedNodeId);
     const selectedEdge = selectedEdgeId ? filteredView.edges.find((edge) => edge.id === selectedEdgeId) : undefined;
@@ -197,11 +208,11 @@ export function AnalyzerGraphStage({
   const foregroundEdges = useMemo(() => filteredView.edges.filter((edge) => edge.id === selectedEdgeId || Boolean(selectedNodeId && (edge.sourceId === selectedNodeId || edge.targetId === selectedNodeId))), [filteredView.edges, selectedEdgeId, selectedNodeId]);
   const backgroundEdges = useMemo(() => filteredView.edges.filter((edge) => !foregroundEdges.includes(edge)), [filteredView.edges, foregroundEdges]);
   const edgeObstacles = useMemo(() => analyzerEdgeObstacles(layout), [layout]);
-  const edgePaths = useMemo(() => new Map(filteredView.edges.flatMap((edge) => {
-    const source = positionedById.get(edge.sourceId) ?? semanticAnchorPosition(layout, filteredView, edge.sourceId);
-    const target = positionedById.get(edge.targetId) ?? semanticAnchorPosition(layout, filteredView, edge.targetId);
-    return source && target ? [[edge.id, analyzerEdgePath(source, target, edgeObstacles)] as const] : [];
-  })), [edgeObstacles, filteredView, layout, positionedById]);
+  const edgeFlowDirection = view.view === 'command' || view.view === 'dependencies' ? 'horizontal' as const : 'auto' as const;
+  const edgePaths = useMemo(() => analyzerEdgePaths(filteredView.edges, edgePositions, edgeObstacles, {
+    flowDirection: edgeFlowDirection,
+    bounds: { x: 0, y: 0, width: layout.width, height: layout.height },
+  }), [edgeFlowDirection, edgeObstacles, edgePositions, filteredView.edges, layout.height, layout.width]);
   const selectionContext = useMemo(() => {
     const connectedNodeIds = new Set<string>();
     const contextClusterIds = new Set<string>();
@@ -374,8 +385,8 @@ export function AnalyzerGraphStage({
   }, [onClearSelection]);
 
   const renderEdge = (edge: AnalyzerViewEdge) => {
-    const source = positionedById.get(edge.sourceId) ?? semanticAnchorPosition(layout, filteredView, edge.sourceId);
-    const target = positionedById.get(edge.targetId) ?? semanticAnchorPosition(layout, filteredView, edge.targetId);
+    const source = edgePositions.get(edge.sourceId);
+    const target = edgePositions.get(edge.targetId);
     const path = edgePaths.get(edge.id);
     if (!source || !target || !path) return null;
     const selected = edge.id === selectedEdgeId;
