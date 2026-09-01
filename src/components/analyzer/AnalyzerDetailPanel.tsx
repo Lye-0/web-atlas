@@ -158,7 +158,11 @@ function NodeDetails({ node, view, store, expandedPresentationIds, onSelectNode,
           <span className="analyzer-node-type">{displayNodeType(node)}</span>
           <button type="button" className="analyzer-focus-selected" onClick={() => onSelectNode(node.id, true)}>Focus Selected</button>
         </div>
-        <h2>{node.label}</h2>
+        <h2>
+          {dictionary
+            ? <Link className="analyzer-detail-title-link" to={stackPath(dictionary.id)}>{node.label}</Link>
+            : node.label}
+        </h2>
         {displayedSubtitle && <p>{displayedSubtitle}</p>}
         {summary && (
           <div className="analyzer-presentation-actions">
@@ -172,7 +176,6 @@ function NodeDetails({ node, view, store, expandedPresentationIds, onSelectNode,
       <section className="analyzer-detail-section">
         <h3>Overview</h3>
         <p>{detectionReason(node, fact, view)}</p>
-        {dictionary && <Link className="analyzer-dictionary-link" to={stackPath(dictionary.id)}>Dictionaryで見る <span aria-hidden="true">→</span></Link>}
       </section>
       {summary ? (
         <section className="analyzer-detail-section">

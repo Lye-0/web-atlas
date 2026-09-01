@@ -3800,20 +3800,23 @@ summary:focus-visible {
   text-transform: uppercase;
 }
 
-.analyzer-dictionary-link {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-  margin-top: 12px;
-  color: var(--accent-strong);
-  font-size: 0.78rem;
-  font-weight: 650;
+.analyzer-detail-title-link {
+  color: inherit;
   text-decoration: none;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.14em;
 }
 
-.analyzer-dictionary-link:hover {
+.analyzer-detail-title-link:hover,
+.analyzer-detail-title-link:focus-visible {
+  color: var(--accent-strong);
   text-decoration: underline;
-  text-underline-offset: 3px;
+}
+
+.analyzer-detail-title-link:focus-visible {
+  border-radius: 3px;
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
 }
 
 .analyzer-evidence-list {

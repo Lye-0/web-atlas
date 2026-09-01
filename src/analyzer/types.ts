@@ -54,6 +54,20 @@ export type AnalyzerNodeType =
   | 'resource'
   | 'dotnet-project';
 
+export type AnalyzerFilter =
+  | 'all'
+  | 'application'
+  | 'workspace-package'
+  | 'workspace-config'
+  | 'workspace-pattern'
+  | 'package-script'
+  | 'command'
+  | 'technology'
+  | 'runtime'
+  | 'resource'
+  | 'dotnet-project'
+  | 'external-package';
+
 export type AnalyzerMetadataValue = string | number | boolean | string[] | undefined;
 export type AnalyzerMetadata = Record<string, AnalyzerMetadataValue>;
 

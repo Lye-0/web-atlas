@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Analyzerは、ブラウザでユーザーが選択したローカルProject Folderを、アップロードせずに解析する機能です。解析結果は現在のBrowser session内のReact stateだけに保持し、Reload後は再選択します。
+Analyzerは、ブラウザでユーザーが選択したローカルProject Folderを、アップロードせずに解析する機能です。解析結果とView別の操作状態はApp lifecycleのAnalyzer Session Storeに保持し、DictionaryなどのSPA routeへ移動しても再スキャンしません。Reload後は再選択します。
 
 実装の入口は [`src/pages/AnalyzerPage.tsx`](../../src/pages/AnalyzerPage.tsx) です。`showDirectoryPicker()` を優先し、未対応Browserでは `webkitdirectory` のfile inputへフォールバックします。
 
@@ -14,13 +14,14 @@ Project Folder
   -> parsers
   -> detectors / scan
   -> Fact + Evidence + Relation store
+  -> App-lifetime Analyzer Session Store
   -> view projectors
   -> deterministic SVG / DOM graph
 ```
 
 解析対象は構造情報を持つ設定ファイルに限定しています。`.git`、依存・生成物、`.env`、秘密情報用拡張子は除外し、JSON/JSONCの設定値はサイズ上限（1 MiB）も設けています。
 
-Graphは新しい可視化ライブラリへ依存せず、[`src/analyzer/layout.ts`](../../src/analyzer/layout.ts) のView別の決定的なlayoutと、[`src/components/analyzer/AnalyzerGraphStage.tsx`](../../src/components/analyzer/AnalyzerGraphStage.tsx) のSVG/DOM rendererで構成しています。Workspaceはcolumn flow、Architectureはcompact grid、Commandはexecution rankとbranch lane、Dependencyは責務ごとのlaneで配置します。Summaryの展開状態は [`src/pages/AnalyzerPage.tsx`](../../src/pages/AnalyzerPage.tsx) の単一stateをGraph / Detail / Toolbar / Cluster・Lane headerで共有し、展開・折りたたみ時はsemantic anchorを同じ画面位置へ保ちます。初回表示と明示的なFitだけが現在のlayout boundsに合わせてカメラを収め、Detail Panelの開閉などでGraphの表示幅が変わる場合は、選択Node（Edge選択時は端点）が表示領域外へ出るときだけ最小限の補正を行い、表示中ならカメラ位置を維持します。Fitは全体表示、Resetはカメラと表示状態の初期化として役割を分けています。
+Graphは新しい可視化ライブラリへ依存せず、[`src/analyzer/layout.ts`](../../src/analyzer/layout.ts) のView別の決定的なlayoutと、[`src/components/analyzer/AnalyzerGraphStage.tsx`](../../src/components/analyzer/AnalyzerGraphStage.tsx) のSVG/DOM rendererで構成しています。Workspaceはcolumn flow、Architectureはcompact grid、Commandはexecution rankとbranch lane、Dependencyは責務ごとのlaneで配置します。Summaryの展開、選択、検索/Filter、Entry、Detail開閉、カメラは [`src/analyzer/session.ts`](../../src/analyzer/session.ts) のApp-lifetime Session Storeを単一のsource of truthとしてGraph / Detail / Toolbar / Cluster・Lane headerで共有し、Viewごとに保持します。展開・折りたたみ時はsemantic anchorを同じ画面位置へ保ちます。初回表示と明示的なFitだけが現在のlayout boundsに合わせてカメラを収め、Detail Panelの開閉などでGraphの表示幅が変わる場合は、選択Node（Edge選択時は端点）が表示領域外へ出るときだけ最小限の補正を行い、表示中ならカメラ位置を維持します。Fitは全体表示、Resetはカメラと表示状態の初期化として役割を分けています。
 
 ## Fact / Evidence model
 
@@ -43,7 +44,7 @@ View専用のSummary / detail表示は `AnalyzerViewNode.presentation`、`Analyz
 - `vite.config.*`、`tsconfig*.json`: Vite / TypeScript configuration
 - `.csproj`、`.sln`、`.slnx`: project name、`UseWPF`、`ProjectReference`
 
-Parserは値とsource rangeを返し、detectorがFact・Evidence・Relationを生成します。Package dependencyは4つのdirect dependency sectionだけを読み、`workspace:*` は検出済みworkspace packageへ解決します。Dictionaryとのtechnology matchingは既存canonical stackの `packageNames` を利用し、未登録のdirect dependencyはExternal Packageとして残します。`firebase` は設定から検出されるFirebase本体をprimary technologyとし、`firebase.json` のAuthはresourceのcapability/detailとして扱います。Dictionaryのstack定義は変更していません。
+Parserは値とsource rangeを返し、detectorがFact・Evidence・Relationを生成します。Package dependencyは4つのdirect dependency sectionだけを読み、`workspace:*` は検出済みworkspace packageへ解決します。Dictionaryとのtechnology matchingは [`src/data/index.ts`](../../src/data/index.ts) のcanonical `packageNames` lookupを利用し、未登録のdirect dependencyはExternal Packageとして残します。Factに確定した`dictionaryStackId`がある場合だけ、Detail PanelのNode titleを既存のstable Stack routeへ内部Link化します。表示labelからURLを組み立てず、bare `firebase`のようにProduct / capabilityの解釈が曖昧な値はリンクしません。`firebase` は設定から検出されるFirebase本体をprimary technologyとし、`firebase.json` のAuthはresourceのcapability/detailとして扱います。Dictionaryのstack定義は変更していません。
 
 ## Views
 
@@ -55,6 +56,12 @@ Analyzer shellには次の4つのprojectorがあります。
 4. **Package Dependency** — workspace package、直接のdependency declarationから解決されたDictionary technology、未登録のExternal Packageをdirect dependency edgeで表示します。packageManager由来だけのpnpmは含めません。Externalは閉じた状態ではExternal Summaryとsourceごとのbundle edgeを表示し、External Summaryを展開するとsource Summaryをcompact rowで表示します。source Summaryを個別に展開すると、そのsourceのpackageだけを表示し、Shared ExternalはNodeを重複させません。Global toggleは全source groupを一括展開 / 折りたたみします。展開されたExternalはsource packageごとの縦groupへ配置され、External同士のedgeや横方向のchainに見える配置を作りません。External Packagesのtop-level headingはCluster titleと重ねず、source SummaryのNested Region headingは深度に応じて内側へ配置します。検索・type filter・detail選択時は該当detailと1-hop contextを一時表示します。
 
 全ViewでNode search、type filter、Node/Edge選択、detail panel、Evidence previewを利用できます。Architectureで高degree Nodeを選ぶと、1-hopをprimary、2-hopをsecondary、3-hop以降をdeepとしてemphasisします。
+
+## Analyzer session / Dictionary link
+
+[`src/analyzer/session.ts`](../../src/analyzer/session.ts) と [`src/analyzer/sessionProvider.tsx`](../../src/analyzer/sessionProvider.tsx) のContext + reducerがAnalyzerのproject storeとView別の状態を保持します。Architecture、Workspace、Command、Dependencyはそれぞれ別のSummary展開、選択、検索/Filter、Entry、Detail開閉、camera transformを持ち、route移動やBrowser Back / Forwardで再利用します。Folderを明示的に選び直した場合だけproject storeと全View状態を新しいSessionへ置き換えます。Sessionはreloadやtab closeを越えて永続化しません。
+
+Dictionaryへの導線は、Fact / Resourceが保持する検証済みの`dictionaryStackId`を [`src/analyzer/projectors.ts`](../../src/analyzer/projectors.ts) でcanonical Stackへ解決し、Detail Panelのtitle自体をReact Routerの内部Linkとして描画します。Project、workspace/package、command、Summary、未登録・曖昧なNodeはplain titleのままです。Link移動でもAnalyzer Session Storeのscan result、selection、Detail、View別cameraは失われません。
 
 ## Semantic zoom / 2.5D presentation
 
@@ -90,11 +97,11 @@ BrowserのFile System Access APIがない場合はdirectory file inputを使い�
 
 ## Validation
 
-合成fixtureは [`src/analyzer/analyzer.test.ts`](../../src/analyzer/analyzer.test.ts) にあり、parser range、workspace解決、Dictionary matching、D1/B2/Firebase/.NET detection、command recursion/concurrently/cycle、forward / inverse relation label、COMMON / branch summary / lane、view scope、visible / total count、masking、Semantic Zoom、Summary Card / Summary GroupのPresentation metadata・count・共通bounds・展開Summaryの内側Node非表示、heading専用領域とmember gap、heading visual bounds / overhang、直前Blockとのcollision、Nested Regionの親子間隔、Architecture初期projection / high-degree depth emphasis / Summary detailの連続配置、execution layout、External collapse / source別expand / global expandの元Fact保持・compact nested row・nested depth・horizontal inset、External source grouping / shared node / no-chain、collapsed search、Summary headingを含むFit boundsを検証します。
+合成fixtureは [`src/analyzer/analyzer.test.ts`](../../src/analyzer/analyzer.test.ts) にあり、parser range、workspace解決、Dictionary matching、D1/B2/Firebase/.NET detection、command recursion/concurrently/cycle、forward / inverse relation label、COMMON / branch summary / lane、view scope、visible / total count、masking、Semantic Zoom、Summary Card / Summary GroupのPresentation metadata・count・共通bounds・展開Summaryの内側Node非表示、heading専用領域とmember gap、heading visual bounds / overhang、直前Blockとのcollision、Nested Regionの親子間隔、Architecture初期projection / high-degree depth emphasis / Summary detailの連続配置、execution layout、External collapse / source別expand / global expandの元Fact保持・compact nested row・nested depth・horizontal inset、External source grouping / shared node / no-chain、collapsed search、Summary headingを含むFit boundsを検証します。 [`src/data/stackLookup.test.ts`](../../src/data/stackLookup.test.ts) はpackage / alias / ambiguous lookup、[`src/components/analyzer/AnalyzerDetailPanel.test.tsx`](../../src/components/analyzer/AnalyzerDetailPanel.test.tsx) はstable IDによるtitle Linkとplain title、[`src/analyzer/session.test.ts`](../../src/analyzer/session.test.ts) はView別Session / camera保持と新規Project時のresetを検証します。
 
 実装時の検証結果:
 
-- `pnpm test`: 4 test files / 31 tests passed（Analyzer単体21 testsを含む）
+- `pnpm test`: 7 test files / 38 tests passed（Analyzer単体21 testsを含む）
 - `pnpm typecheck`: passed
 - `pnpm lint`: passed
 - `pnpm build`: passed（Vite production bundle。Three.js lazy chunkのサイズ警告あり）

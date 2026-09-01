@@ -1,8 +1,8 @@
 import { NavLink } from 'react-router-dom';
 import { analyzerRoutes } from '../../utils/routes';
-import { analyzerViewLabels, type AnalyzerViewCounts, type AnalyzerViewId, type PackageScriptFact } from '../../analyzer';
+import { analyzerViewLabels, type AnalyzerFilter, type AnalyzerViewCounts, type AnalyzerViewId, type PackageScriptFact } from '../../analyzer';
 
-export type AnalyzerFilter = 'all' | 'application' | 'workspace-package' | 'workspace-config' | 'workspace-pattern' | 'package-script' | 'command' | 'technology' | 'runtime' | 'resource' | 'dotnet-project' | 'external-package';
+export type { AnalyzerFilter } from '../../analyzer';
 
 interface AnalyzerToolbarProps {
   view: AnalyzerViewId;

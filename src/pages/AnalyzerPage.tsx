@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { ANALYZER_EXTERNAL_SUMMARY_ID, analyzerViewCounts, presentationOwnsNode, presentAnalyzerView, projectAnalyzerView, viewNodeSearchText, analyzerViewLabels } from '../analyzer';
-import type { AnalyzerProjectStore, AnalyzerViewCounts, AnalyzerViewId, AnalyzerViewModel } from '../analyzer';
+import { ANALYZER_DEFAULT_TRANSFORM, ANALYZER_EXTERNAL_SUMMARY_ID, analyzerViewCounts, analyzerViewLabels, presentationOwnsNode, presentAnalyzerView, projectAnalyzerView, useAnalyzerSession, viewNodeSearchText } from '../analyzer';
+import type { AnalyzerGraphTransform, AnalyzerProjectStore, AnalyzerViewCounts, AnalyzerViewId, AnalyzerViewModel, AnalyzerViewSession } from '../analyzer';
 import { AnalyzerDetailPanel } from '../components/analyzer/AnalyzerDetailPanel';
 import { AnalyzerEmptyOrbit } from '../components/analyzer/AnalyzerEmptyOrbit';
 import { AnalyzerGraphStage } from '../components/analyzer/AnalyzerGraphStage';
 import { AnalyzerProjectPicker } from '../components/analyzer/AnalyzerProjectPicker';
-import { AnalyzerToolbar, type AnalyzerFilter } from '../components/analyzer/AnalyzerToolbar';
+import { AnalyzerToolbar } from '../components/analyzer/AnalyzerToolbar';
 
 const viewIds = new Set<AnalyzerViewId>(['architecture', 'workspace', 'command', 'dependencies']);
 
@@ -18,16 +18,11 @@ function viewFromPath(pathname: string): AnalyzerViewId {
 export function AnalyzerPage() {
   const location = useLocation();
   const view = viewFromPath(location.pathname);
-  const [store, setStore] = useState<AnalyzerProjectStore>();
-  const [selectedNodeId, setSelectedNodeId] = useState<string>();
-  const [selectedEdgeId, setSelectedEdgeId] = useState<string>();
-  const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<AnalyzerFilter>('all');
-  const [expandedPresentationIds, setExpandedPresentationIds] = useState<ReadonlySet<string>>(new Set());
-  const [entryScriptId, setEntryScriptId] = useState<string>();
-  const [scanVersion, setScanVersion] = useState(0);
-  const [focusRequest, setFocusRequest] = useState<{ nodeId: string; nonce: number }>();
-  const [detailOpen, setDetailOpen] = useState(false);
+  const { state: session, replaceProject, updateView } = useAnalyzerSession();
+  const store = session.store;
+  const viewState = session.views[view];
+  const { selectedNodeId, selectedEdgeId, search, filter, expandedPresentationIds, entryScriptId, detailOpen } = viewState;
+  const [focusRequest, setFocusRequest] = useState<{ view: AnalyzerViewId; nodeId: string; nonce: number }>();
   const [reportedCounts, setReportedCounts] = useState<{ model: AnalyzerViewModel; counts: AnalyzerViewCounts }>();
 
   const model = useMemo(() => store ? projectAnalyzerView(store, view, entryScriptId) : undefined, [entryScriptId, store, view]);
@@ -46,33 +41,28 @@ export function AnalyzerPage() {
   const nodeCounts = reportedCounts && reportedCounts.model === model ? reportedCounts.counts : fallbackCounts;
 
   useEffect(() => {
-    setSelectedNodeId(undefined);
-    setSelectedEdgeId(undefined);
-    setSearch('');
-    setFilter('all');
-    setExpandedPresentationIds(new Set());
     setFocusRequest(undefined);
-    setDetailOpen(false);
     setReportedCounts(undefined);
   }, [view]);
 
   const handleScanned = (nextStore: AnalyzerProjectStore) => {
-    setStore(nextStore);
-    setScanVersion((current) => current + 1);
-    setSelectedNodeId(undefined);
-    setSelectedEdgeId(undefined);
-    setEntryScriptId(undefined);
-    setSearch('');
-    setFilter('all');
-    setExpandedPresentationIds(new Set());
+    replaceProject(nextStore);
     setFocusRequest(undefined);
-    setDetailOpen(false);
     setReportedCounts(undefined);
   };
 
   const requestFocus = useCallback((nodeId: string) => {
-    setFocusRequest((current) => ({ nodeId, nonce: (current?.nonce ?? 0) + 1 }));
-  }, []);
+    setFocusRequest((current) => ({ view, nodeId, nonce: (current?.nonce ?? 0) + 1 }));
+  }, [view]);
+
+  const updateCamera = useCallback((update: AnalyzerGraphTransform | ((current: AnalyzerGraphTransform) => AnalyzerGraphTransform)) => {
+    updateView(view, (current) => ({
+      ...current,
+      camera: typeof update === 'function'
+        ? update(current.camera ?? ANALYZER_DEFAULT_TRANSFORM)
+        : update,
+    }));
+  }, [updateView, view]);
 
   const reportCounts = useCallback((counts: AnalyzerViewCounts) => {
     if (!model) return;
@@ -85,27 +75,21 @@ export function AnalyzerPage() {
   }, [model]);
 
   const selectNode = useCallback((nodeId: string, focus = false) => {
-    setSelectedNodeId(nodeId);
-    setSelectedEdgeId(undefined);
-    setDetailOpen(true);
+    updateView(view, { selectedNodeId: nodeId, selectedEdgeId: undefined, detailOpen: true });
     if (focus) requestFocus(nodeId);
-  }, [requestFocus]);
+  }, [requestFocus, updateView, view]);
 
   const selectEdge = useCallback((edgeId: string) => {
-    setSelectedEdgeId(edgeId);
-    setSelectedNodeId(undefined);
-    setDetailOpen(true);
-  }, []);
+    updateView(view, { selectedEdgeId: edgeId, selectedNodeId: undefined, detailOpen: true });
+  }, [updateView, view]);
 
   const clearSelection = useCallback(() => {
-    setSelectedNodeId(undefined);
-    setSelectedEdgeId(undefined);
-    setDetailOpen(false);
-  }, []);
+    updateView(view, { selectedNodeId: undefined, selectedEdgeId: undefined, detailOpen: false });
+  }, [updateView, view]);
 
   const closeDetail = useCallback(() => {
-    setDetailOpen(false);
-  }, []);
+    updateView(view, { detailOpen: false });
+  }, [updateView, view]);
 
   const togglePresentation = useCallback((presentationId: string, options: { select?: boolean } = {}) => {
     if (!model) return;
@@ -122,14 +106,14 @@ export function AnalyzerPage() {
     const effectivelyExpanded = currentlyExpanded || selectedNodeIsDescendant || selectedEdgeTouchesDescendant;
     if (effectivelyExpanded) next.delete(presentationId);
     else next.add(presentationId);
-    setExpandedPresentationIds(next);
     const shouldFallbackToSummary = effectivelyExpanded && (selectedNodeIsDescendant || selectedEdgeTouchesDescendant);
-    if (options.select || shouldFallbackToSummary) {
-      setSelectedNodeId(presentationId);
-      setSelectedEdgeId(undefined);
-      setDetailOpen(true);
-    }
-  }, [expandedPresentationIds, model, selectedEdgeId, selectedNodeId]);
+    updateView(view, {
+      expandedPresentationIds: next,
+      ...(options.select || shouldFallbackToSummary
+        ? { selectedNodeId: presentationId, selectedEdgeId: undefined, detailOpen: true }
+        : {}),
+    });
+  }, [expandedPresentationIds, model, selectedEdgeId, selectedNodeId, updateView, view]);
 
   const externalPresentationIds = useMemo(() => model?.nodes
     .filter((node) => node.presentation?.role === 'summary'
@@ -148,7 +132,7 @@ export function AnalyzerPage() {
       if (isExpanded) next.delete(presentationId);
       else next.add(presentationId);
     });
-    setExpandedPresentationIds(next);
+    const update: Partial<AnalyzerViewSession> = { expandedPresentationIds: next };
     if (isExpanded) {
       const selectedNodeIsDescendant = Boolean(selectedNodeId && presentationOwnsNode(model, ANALYZER_EXTERNAL_SUMMARY_ID, selectedNodeId));
       const selectedEdgeTouchesDescendant = Boolean(selectedEdgeId && (() => {
@@ -156,29 +140,36 @@ export function AnalyzerPage() {
         return selectedEdge
           ? presentationOwnsNode(model, ANALYZER_EXTERNAL_SUMMARY_ID, selectedEdge.sourceId)
             || presentationOwnsNode(model, ANALYZER_EXTERNAL_SUMMARY_ID, selectedEdge.targetId)
-          : false;
+            : false;
       })());
       if (selectedNodeIsDescendant || selectedEdgeTouchesDescendant) {
-        setSelectedNodeId(ANALYZER_EXTERNAL_SUMMARY_ID);
-        setSelectedEdgeId(undefined);
-        setDetailOpen(true);
+        update.selectedNodeId = ANALYZER_EXTERNAL_SUMMARY_ID;
+        update.selectedEdgeId = undefined;
+        update.detailOpen = true;
       }
     }
-  }, [expandedPresentationIds, externalPresentationIds, model, selectedEdgeId, selectedNodeId]);
+    updateView(view, update);
+  }, [expandedPresentationIds, externalPresentationIds, model, selectedEdgeId, selectedNodeId, updateView, view]);
 
   const resetPresentation = useCallback(() => {
-    setExpandedPresentationIds(new Set());
-    setSearch('');
-    setFilter('all');
-    clearSelection();
+    updateView(view, {
+      expandedPresentationIds: new Set(),
+      search: '',
+      filter: 'all',
+      selectedNodeId: undefined,
+      selectedEdgeId: undefined,
+      detailOpen: false,
+    });
     setFocusRequest(undefined);
-  }, [clearSelection]);
+  }, [updateView, view]);
 
   useEffect(() => {
-    if (!search.trim() || searchResults.length !== 1) return;
+    if (!search.trim() || searchResults.length !== 1 || selectedNodeId || selectedEdgeId) return;
     const [result] = searchResults;
     if (result) selectNode(result.id, true);
-  }, [search, searchResults, selectNode]);
+  }, [search, searchResults, selectedEdgeId, selectedNodeId, selectNode]);
+
+  const activeFocusRequest = focusRequest?.view === view ? focusRequest : undefined;
 
   return (
     <div className="page-stack analyzer-page">
@@ -221,14 +212,14 @@ export function AnalyzerPage() {
           <AnalyzerToolbar
             view={view}
             search={search}
-            onSearchChange={setSearch}
+            onSearchChange={(value) => updateView(view, { search: value })}
             filter={filter}
-            onFilterChange={setFilter}
+            onFilterChange={(value) => updateView(view, { filter: value })}
             externalExpanded={externalExpanded}
             onToggleExternal={toggleExternal}
             scripts={scripts}
             entryScriptId={effectiveEntryScriptId}
-            onEntryChange={setEntryScriptId}
+            onEntryChange={(value) => updateView(view, { entryScriptId: value || undefined })}
             counts={nodeCounts}
           />
 
@@ -258,8 +249,11 @@ export function AnalyzerPage() {
               sources={store.sources}
               onSelectNode={selectNode}
               onSelectEdge={selectEdge}
-              focusRequest={focusRequest}
-              cameraResetKey={scanVersion}
+              focusRequest={activeFocusRequest}
+              transform={viewState.camera ?? ANALYZER_DEFAULT_TRANSFORM}
+              hasStoredCamera={Boolean(viewState.camera)}
+              onTransformChange={updateCamera}
+              cameraResetKey={session.scanVersion}
               onCountsChange={reportCounts}
             />
             {detailOpen && (

@@ -17,6 +17,9 @@ interface AnalyzerGraphStageProps {
   onSelectNode: (nodeId: string, focus?: boolean) => void;
   onSelectEdge: (edgeId: string) => void;
   focusRequest?: { nodeId: string; nonce: number };
+  transform: AnalyzerGraphTransform;
+  hasStoredCamera: boolean;
+  onTransformChange: (update: AnalyzerGraphTransform | ((current: AnalyzerGraphTransform) => AnalyzerGraphTransform)) => void;
   cameraResetKey: string | number;
   onCountsChange: (counts: AnalyzerViewCounts) => void;
 }
@@ -114,6 +117,9 @@ export function AnalyzerGraphStage({
   onSelectEdge,
   sources,
   focusRequest,
+  transform,
+  hasStoredCamera,
+  onTransformChange,
   cameraResetKey,
   onCountsChange,
 }: AnalyzerGraphStageProps) {
@@ -123,17 +129,16 @@ export function AnalyzerGraphStage({
   const presentationCameraSnapshotRef = useRef<PresentationCameraSnapshot | undefined>(undefined);
   const focusNonceRef = useRef<number>(-1);
   const previousViewportRef = useRef({ width: 0, height: 0 });
-  const [transform, setTransform] = useState<GraphTransform>(ANALYZER_DEFAULT_TRANSFORM);
   const [hoveredEdgeId, setHoveredEdgeId] = useState<string | undefined>();
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const [showHelp, setShowHelp] = useState(false);
   const cameraKey = `${cameraResetKey}:${view.view}`;
   const expandedPresentationKey = useMemo(() => [...expandedPresentationIds].sort().join('\u0000'), [expandedPresentationIds]);
 
-  useEffect(() => {
-    cameraRef.current = { key: cameraKey, initialized: false };
+  useLayoutEffect(() => {
+    cameraRef.current = { key: cameraKey, initialized: hasStoredCamera };
     focusNonceRef.current = -1;
-  }, [cameraKey]);
+  }, [cameraKey, hasStoredCamera]);
 
   const togglePresentation = useCallback((nodeId: string) => {
     onTogglePresentation(nodeId);
@@ -183,7 +188,7 @@ export function AnalyzerGraphStage({
         const currentCenter = nodeCenter(anchor.current);
         const targetX = previous.transform.x + previousCenter.x * previous.transform.scale;
         const targetY = previous.transform.y + previousCenter.y * previous.transform.scale;
-        setTransform((currentTransform) => {
+        onTransformChange((currentTransform) => {
           const next = {
             ...currentTransform,
             x: targetX - currentCenter.x * currentTransform.scale,
@@ -202,7 +207,7 @@ export function AnalyzerGraphStage({
       transform: { x: transform.x, y: transform.y, scale: transform.scale },
       selectedNodeId,
     };
-  }, [cameraKey, expandedPresentationKey, layout, selectedNodeId, transform.scale, transform.x, transform.y, view]);
+  }, [cameraKey, expandedPresentationKey, layout, onTransformChange, selectedNodeId, transform.scale, transform.x, transform.y, view]);
   const foregroundEdges = useMemo(() => filteredView.edges.filter((edge) => edge.id === selectedEdgeId || Boolean(selectedNodeId && (edge.sourceId === selectedNodeId || edge.targetId === selectedNodeId))), [filteredView.edges, selectedEdgeId, selectedNodeId]);
   const backgroundEdges = useMemo(() => filteredView.edges.filter((edge) => !foregroundEdges.includes(edge)), [filteredView.edges, foregroundEdges]);
   const selectionContext = useMemo(() => {
@@ -265,25 +270,23 @@ export function AnalyzerGraphStage({
     const previous = previousViewportRef.current;
     previousViewportRef.current = viewportSize;
     if (!cameraRef.current.initialized || previous.width <= 0 || previous.height <= 0) return;
-    setTransform((current) => {
-      return preserveAnalyzerTransformOnViewportResize(current, previous, viewportSize, selectedPosition);
-    });
-  }, [selectedPosition, viewportSize]);
+    onTransformChange((current) => preserveAnalyzerTransformOnViewportResize(current, previous, viewportSize, selectedPosition));
+  }, [onTransformChange, selectedPosition, viewportSize]);
 
   useLayoutEffect(() => {
     const element = stageRef.current;
     if (!element || layout.nodes.length === 0 || viewportSize.width <= 0 || viewportSize.height <= 0) return;
-    if (cameraRef.current.key !== cameraKey) cameraRef.current = { key: cameraKey, initialized: false };
+    if (cameraRef.current.key !== cameraKey) cameraRef.current = { key: cameraKey, initialized: hasStoredCamera };
     if (cameraRef.current.initialized) return;
     const applyFit = () => {
       const width = element.clientWidth;
       const height = element.clientHeight;
       if (width <= 0 || height <= 0) return;
       cameraRef.current = { key: cameraKey, initialized: true };
-      setTransform(fitAnalyzerTransform(layout, width, height));
+      onTransformChange(fitAnalyzerTransform(layout, width, height));
     };
     applyFit();
-  }, [cameraKey, layout, viewportSize.height, viewportSize.width]);
+  }, [cameraKey, hasStoredCamera, layout, onTransformChange, viewportSize.height, viewportSize.width]);
 
   useEffect(() => {
     if (!focusRequest || focusRequest.nonce === focusNonceRef.current) return;
@@ -291,20 +294,20 @@ export function AnalyzerGraphStage({
     const selectedPosition = positionedById.get(focusRequest.nodeId) ?? semanticAnchorPosition(layout, filteredView, focusRequest.nodeId);
     if (!element || !selectedPosition || element.clientWidth <= 0 || element.clientHeight <= 0) return;
     focusNonceRef.current = focusRequest.nonce;
-    setTransform((current) => focusAnalyzerTransform(selectedPosition, element.clientWidth, element.clientHeight, current.scale));
-  }, [filteredView, focusRequest, layout, positionedById]);
+    onTransformChange((current) => focusAnalyzerTransform(selectedPosition, element.clientWidth, element.clientHeight, current.scale));
+  }, [filteredView, focusRequest, layout, onTransformChange, positionedById]);
 
-  const changeZoom = (factor: number) => setTransform((current) => ({ ...current, scale: Math.max(0.35, Math.min(1.4, current.scale * factor)) }));
+  const changeZoom = (factor: number) => onTransformChange((current) => ({ ...current, scale: Math.max(0.35, Math.min(1.4, current.scale * factor)) }));
   const resetTransform = () => {
     cameraRef.current = { key: cameraKey, initialized: true };
     onResetPresentation();
-    setTransform(ANALYZER_DEFAULT_TRANSFORM);
+    onTransformChange(ANALYZER_DEFAULT_TRANSFORM);
   };
   const fit = () => {
     const element = stageRef.current;
     if (!element) return;
     cameraRef.current = { key: cameraKey, initialized: true };
-    setTransform(fitAnalyzerTransform(layout, element.clientWidth, element.clientHeight));
+    onTransformChange(fitAnalyzerTransform(layout, element.clientWidth, element.clientHeight));
   };
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
@@ -330,7 +333,7 @@ export function AnalyzerGraphStage({
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
     if (Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) > 3) drag.moved = true;
-    setTransform((current) => ({ ...current, x: drag.originX + event.clientX - drag.startX, y: drag.originY + event.clientY - drag.startY }));
+    onTransformChange((current) => ({ ...current, x: drag.originX + event.clientX - drag.startX, y: drag.originY + event.clientY - drag.startY }));
   };
 
   const handlePointerUp = (event: PointerEvent<HTMLDivElement>, clear = true) => {
@@ -348,13 +351,13 @@ export function AnalyzerGraphStage({
     const pointX = clientX - rect.left;
     const pointY = clientY - rect.top;
     const factor = deltaY < 0 ? 1.08 : 0.92;
-    setTransform((current) => {
+    onTransformChange((current) => {
       const nextScale = Math.max(0.35, Math.min(1.4, current.scale * factor));
       const worldX = (pointX - current.x) / current.scale;
       const worldY = (pointY - current.y) / current.scale;
       return { scale: nextScale, x: pointX - worldX * nextScale, y: pointY - worldY * nextScale };
     });
-  }, []);
+  }, [onTransformChange]);
 
   useEffect(() => {
     const element = stageRef.current;

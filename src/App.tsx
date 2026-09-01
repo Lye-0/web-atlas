@@ -8,9 +8,18 @@ import { MapPage } from './pages/MapPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { StackDetailPage } from './pages/StackDetailPage';
 import { StacksPage } from './pages/StacksPage';
+import { AnalyzerSessionProvider } from './analyzer';
 import { analyzerRoutes } from './utils/routes';
 
 export default function App() {
+  return (
+    <AnalyzerSessionProvider>
+      <AppRoutes />
+    </AnalyzerSessionProvider>
+  );
+}
+
+function AppRoutes() {
   const { pathname } = useLocation();
   const isAnalyzer = pathname.startsWith('/analyzer');
   return (

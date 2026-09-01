@@ -1,4 +1,4 @@
-import { getStack, stacks } from '../data';
+import { findCanonicalStackByPackageName, getStack } from '../data';
 import { isAnalyzerSourcePath, normalizeRelativePath } from './fileDiscovery';
 import { makeEvidence, makeFileEvidence, maskSensitiveSource, type OffsetRange } from './evidence';
 import {
@@ -392,7 +392,8 @@ function technologyForPackageName(packageName: string): { id: string } | undefin
   const normalized = packageName.toLowerCase();
   const primaryTechnologyId = PRIMARY_PACKAGE_TECHNOLOGY[normalized];
   if (primaryTechnologyId) return { id: primaryTechnologyId };
-  return stacks.find((stack) => stack.packageNames?.some((candidate) => candidate.toLowerCase() === normalized));
+  const stack = findCanonicalStackByPackageName(packageName);
+  return stack ? { id: stack.id } : undefined;
 }
 
 function addTechnologyFact(builder: AnalyzerStoreBuilder, stackId: string, packageName: string | undefined, evidenceId: string | undefined, explicit: boolean, labelOverride?: string): string {
