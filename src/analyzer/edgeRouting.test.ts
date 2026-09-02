@@ -58,12 +58,19 @@ function emptyLayout(nodes: PositionedNode[]): AnalyzerLayout {
   return { width: 1200, height: 800, nodes, clusters: [], lanes: [], bands: [], summaryGroups: [] };
 }
 
-function positionedRegion(id: string, x: number, y: number, width = 280, height = 220): PositionedSemanticRegion {
+function positionedRegion(
+  id: string,
+  x: number,
+  y: number,
+  width = 280,
+  height = 220,
+  extras: Partial<Pick<AnalyzerSemanticRegion, 'parentRegionId' | 'label' | 'childRegionIds' | 'depth'>> = {},
+): PositionedSemanticRegion {
   const region: AnalyzerSemanticRegion = {
     id,
     entityKind: 'region',
     regionKind: 'scope',
-    label: id,
+    label: extras.label ?? id,
     childIds: [],
     ports: [
       { id: `${id}:top`, side: 'top' },
@@ -74,8 +81,75 @@ function positionedRegion(id: string, x: number, y: number, width = 280, height 
     selectable: true,
     evidenceIds: [],
     metadata: {},
+    ...(extras.parentRegionId ? { parentRegionId: extras.parentRegionId } : {}),
+    ...(extras.childRegionIds ? { childRegionIds: extras.childRegionIds } : {}),
+    ...(extras.depth !== undefined ? { depth: extras.depth } : {}),
   };
   return { region, x, y, width, height, headingHeight: 28, memberGap: 14 };
+}
+
+function containsEdge(id: string, sourceId: string, targetId: string): AnalyzerViewEdge {
+  return {
+    id,
+    sourceId,
+    targetId,
+    kind: 'contains',
+    label: 'contains',
+    evidenceIds: [],
+    metadata: { fromEndpointKind: 'node', toEndpointKind: 'region' },
+  };
+}
+
+function stackUsageNode(id: string, x: number, y: number): PositionedNode {
+  const node: AnalyzerViewNode = {
+    id,
+    type: 'stack-usage',
+    label: id,
+    evidenceIds: [],
+    metadata: {},
+  };
+  return { node, x, y, height: 86 };
+}
+
+function verticalSiblingBorderFollow(
+  route: readonly AnalyzerEdgePoint[],
+  bounds: { x: number; y: number; width: number; height: number },
+  proximity = 20,
+): number {
+  return route.slice(1).reduce((total, point, index) => {
+    const previous = route[index]!;
+    if (Math.abs(previous.x - point.x) > 0.0001) return total;
+    const nearLeft = Math.abs(previous.x - bounds.x) <= proximity;
+    const nearRight = Math.abs(previous.x - (bounds.x + bounds.width)) <= proximity;
+    if (!nearLeft && !nearRight) return total;
+    const overlap = Math.min(Math.max(previous.y, point.y), bounds.y + bounds.height)
+      - Math.max(Math.min(previous.y, point.y), bounds.y);
+    return overlap > 0 ? total + overlap : total;
+  }, 0);
+}
+
+function routeUsesBusY(route: readonly AnalyzerEdgePoint[], busY: number): boolean {
+  if (route.some((point) => Math.abs(point.y - busY) <= 0.0001)) return true;
+  return route.slice(1).some((point, index) => {
+    const previous = route[index]!;
+    const vertical = Math.abs(previous.x - point.x) <= 0.0001;
+    const minY = Math.min(previous.y, point.y);
+    const maxY = Math.max(previous.y, point.y);
+    return vertical && busY >= minY - 0.0001 && busY <= maxY + 0.0001;
+  });
+}
+
+function onRegionBoundary(
+  point: AnalyzerEdgePoint,
+  region: PositionedSemanticRegion,
+): boolean {
+  const right = region.x + region.width;
+  const bottom = region.y + region.height;
+  const onTop = Math.abs(point.y - region.y) <= 0.0001 && point.x >= region.x - 0.0001 && point.x <= right + 0.0001;
+  const onBottom = Math.abs(point.y - bottom) <= 0.0001 && point.x >= region.x - 0.0001 && point.x <= right + 0.0001;
+  const onLeft = Math.abs(point.x - region.x) <= 0.0001 && point.y >= region.y - 0.0001 && point.y <= bottom + 0.0001;
+  const onRight = Math.abs(point.x - right) <= 0.0001 && point.y >= region.y - 0.0001 && point.y <= bottom + 0.0001;
+  return onTop || onBottom || onLeft || onRight;
 }
 
 describe('Analyzer edge obstacle classification', () => {
@@ -779,5 +853,244 @@ describe('Analyzer same-source fan-out', () => {
     expect(expandedRoute).not.toEqual(compactRoute);
     expect(expandedObstacle).toBeDefined();
     expect(analyzerEdgeRouteIntersectsObstacle(expandedRoute ?? [], expandedObstacle!)).toBe(false);
+  });
+});
+
+describe('Analyzer Stack Map project-region fan-out', () => {
+  const project = positionedNode('project:vehicle', 384, 34, 86);
+  const tooling = positionedRegion('region:scope:tooling', 52, 206, 280, 180, { label: 'PROJECT / TOOLING' });
+  const api = positionedRegion('region:scope:api', 366, 206, 280, 520, { label: 'API', childRegionIds: ['region:scope:test'], depth: 0 });
+  const web = positionedRegion('region:scope:web', 680, 206, 280, 220, { label: 'WEB' });
+  const database = positionedRegion('region:scope:database', 52, 760, 280, 180, { label: 'DATABASE' });
+  const services = positionedRegion('region:scope:services', 366, 760, 280, 180, { label: 'PROJECT / SERVICES' });
+  const testRegion = positionedRegion('region:scope:test', 384, 560, 244, 140, {
+    label: 'TEST',
+    parentRegionId: api.region.id,
+    depth: 1,
+  });
+  const apiStacks = [
+    stackUsageNode('stack:drizzle', 384, 250),
+    stackUsageNode('stack:workers', 384, 346),
+    stackUsageNode('stack:d1', 384, 442),
+  ];
+  const topLevelRegions = [tooling, api, web, database, services];
+  const layout: AnalyzerLayout = {
+    width: 1012,
+    height: 980,
+    nodes: [project, ...apiStacks],
+    clusters: [],
+    lanes: [],
+    bands: [],
+    summaryGroups: [],
+    regions: [...topLevelRegions, testRegion],
+  };
+  const positionedById = new Map<string, PositionedNode | PositionedSemanticRegion>([
+    [project.node.id, project],
+    ...topLevelRegions.map((region) => [region.region.id, region] as const),
+    [testRegion.region.id, testRegion],
+    ...apiStacks.map((node) => [node.node.id, node] as const),
+  ]);
+  const projectEdges = [
+    containsEdge('view-edge:stack-map:contains:tooling', project.node.id, tooling.region.id),
+    containsEdge('view-edge:stack-map:contains:api', project.node.id, api.region.id),
+    containsEdge('view-edge:stack-map:contains:web', project.node.id, web.region.id),
+    containsEdge('view-edge:stack-map:contains:database', project.node.id, database.region.id),
+    containsEdge('view-edge:stack-map:contains:services', project.node.id, services.region.id),
+  ];
+  const routingOptions = {
+    flowDirection: 'auto' as const,
+    bounds: { x: 0, y: 0, width: layout.width, height: layout.height },
+  };
+
+  it('detects a Project fan-out group of top-level Regions only', () => {
+    const diagnostics: AnalyzerFanoutRoutingDiagnostic[] = [];
+    const edges = [
+      ...projectEdges,
+      containsEdge('view-edge:stack-map:contains:test', project.node.id, testRegion.region.id),
+    ];
+    analyzerEdgeRoutes(edges, positionedById, analyzerEdgeObstacles(layout), {
+      ...routingOptions,
+      onFanoutDiagnostic: (diagnostic) => diagnostics.push(diagnostic),
+    });
+    const projectRegion = diagnostics.find((diagnostic) => diagnostic.fanoutKind === 'project-region');
+
+    expect(projectRegion).toMatchObject({
+      fanoutKind: 'project-region',
+      sourceId: project.node.id,
+      fanoutDetected: true,
+      fallbackUsed: false,
+    });
+    expect(projectRegion?.targetIds).toEqual([
+      tooling.region.id,
+      api.region.id,
+      web.region.id,
+      database.region.id,
+      services.region.id,
+    ]);
+    expect(projectRegion?.targetIds).not.toContain(testRegion.region.id);
+    expect(diagnostics.every((diagnostic) => !diagnostic.targetIds.includes(testRegion.region.id) || diagnostic.fanoutKind !== 'project-region')).toBe(true);
+  });
+
+  it('uses a shared Project bus instead of independent long-haul routes', () => {
+    const diagnostics: AnalyzerFanoutRoutingDiagnostic[] = [];
+    const edgeDiagnostics: AnalyzerEdgeRoutingDiagnostic[] = [];
+    const routes = analyzerEdgeRoutes(projectEdges, positionedById, analyzerEdgeObstacles(layout), {
+      ...routingOptions,
+      onFanoutDiagnostic: (diagnostic) => diagnostics.push(diagnostic),
+      onEdgeDiagnostic: (diagnostic) => edgeDiagnostics.push(diagnostic),
+    });
+    const diagnostic = diagnostics.find((candidate) => candidate.fanoutKind === 'project-region');
+    const firstRoute = routes.get(projectEdges[0]!.id) ?? [];
+    const apiRoute = routes.get('view-edge:stack-map:contains:api') ?? [];
+
+    expect(diagnostic).toMatchObject({
+      fanoutKind: 'project-region',
+      fanoutDetected: true,
+      fallbackUsed: false,
+      selectedDirection: 'down',
+    });
+    expect(diagnostic?.selectedBusY).toBeGreaterThan(project.y + project.height);
+    expect(diagnostic?.selectedBusY).toBeLessThan(api.y);
+    expect(firstRoute[0]).toEqual(apiRoute[0]);
+    expect(firstRoute[0]).toEqual({ x: project.x + ANALYZER_NODE_WIDTH / 2, y: project.y + project.height });
+    projectEdges.forEach((currentEdge) => {
+      const route = routes.get(currentEdge.id) ?? [];
+      expect(route[0]).toEqual(firstRoute[0]);
+      expect(routeUsesBusY(route, diagnostic?.selectedBusY ?? Number.NaN)).toBe(true);
+    });
+    expect(edgeDiagnostics.every((item) => item.routingStrategy === 'project-region-fanout')).toBe(true);
+    expect(edgeDiagnostics.every((item) => item.busUsed)).toBe(true);
+    expect(diagnostic?.selectedPorts?.every((port) => port.side === 'top')).toBe(true);
+  });
+
+  it('avoids a long sibling-border-following corridor when a clearer fan-out exists', () => {
+    const hugging = [
+      { x: project.x + ANALYZER_NODE_WIDTH / 2, y: project.y + project.height },
+      { x: api.x - 8, y: project.y + project.height + 20 },
+      { x: api.x - 8, y: database.y + 40 },
+      { x: database.x + database.width / 2, y: database.y },
+    ];
+    const routes = analyzerEdgeRoutes(projectEdges, positionedById, analyzerEdgeObstacles(layout), routingOptions);
+    const databaseRoute = routes.get('view-edge:stack-map:contains:database') ?? [];
+    const apiBounds = { x: api.x, y: api.y, width: api.width, height: api.height };
+
+    expect(verticalSiblingBorderFollow(hugging, apiBounds)).toBeGreaterThan(88);
+    expect(verticalSiblingBorderFollow(databaseRoute, apiBounds)).toBeLessThan(88);
+    expect(databaseRoute.slice(0, 2)).not.toEqual(hugging.slice(0, 2));
+  });
+
+  it('does not present DATABASE or SERVICES as children of API', () => {
+    const diagnostics: AnalyzerFanoutRoutingDiagnostic[] = [];
+    const routes = analyzerEdgeRoutes(projectEdges, positionedById, analyzerEdgeObstacles(layout), {
+      ...routingOptions,
+      onFanoutDiagnostic: (diagnostic) => diagnostics.push(diagnostic),
+    });
+    const diagnostic = diagnostics.find((candidate) => candidate.fanoutKind === 'project-region');
+    const databaseRoute = routes.get('view-edge:stack-map:contains:database') ?? [];
+    const servicesRoute = routes.get('view-edge:stack-map:contains:services') ?? [];
+    const apiBounds = { x: api.x, y: api.y, width: api.width, height: api.height };
+    const apiInteriorOverlap = (route: readonly AnalyzerEdgePoint[]): number => route.slice(1).reduce((total, point, index) => {
+      const previous = route[index]!;
+      const left = Math.min(previous.x, point.x);
+      const right = Math.max(previous.x, point.x);
+      const top = Math.min(previous.y, point.y);
+      const bottom = Math.max(previous.y, point.y);
+      const overlapX = Math.min(right, api.x + api.width) - Math.max(left, api.x);
+      const overlapY = Math.min(bottom, api.y + api.height) - Math.max(top, api.y);
+      return overlapX > 0 && overlapY > 0
+        ? total + (Math.abs(previous.x - point.x) < 0.0001 ? overlapY : overlapX)
+        : total;
+    }, 0);
+
+    expect(diagnostic).toMatchObject({
+      selectedDirection: 'down',
+      fallbackUsed: false,
+      sourceId: project.node.id,
+    });
+    expect(verticalSiblingBorderFollow(databaseRoute, apiBounds)).toBeLessThan(88);
+    expect(verticalSiblingBorderFollow(servicesRoute, apiBounds)).toBeLessThan(88);
+    expect(apiInteriorOverlap(databaseRoute)).toBeLessThan(28);
+    expect(apiInteriorOverlap(servicesRoute)).toBeLessThan(28);
+    expect(databaseRoute.at(-1)?.y).toBe(database.y);
+    expect(servicesRoute.at(-1)?.y).toBe(services.y);
+  });
+
+  it('terminates every Project fan-out branch on a Region boundary port', () => {
+    const diagnostics: AnalyzerFanoutRoutingDiagnostic[] = [];
+    const routes = analyzerEdgeRoutes(projectEdges, positionedById, analyzerEdgeObstacles(layout), {
+      ...routingOptions,
+      onFanoutDiagnostic: (diagnostic) => diagnostics.push(diagnostic),
+    });
+    const diagnostic = diagnostics.find((candidate) => candidate.fanoutKind === 'project-region');
+    const regionById = new Map(topLevelRegions.map((region) => [region.region.id, region]));
+
+    projectEdges.forEach((currentEdge) => {
+      const route = routes.get(currentEdge.id) ?? [];
+      const region = regionById.get(currentEdge.targetId);
+      expect(route[0]).toEqual({ x: project.x + ANALYZER_NODE_WIDTH / 2, y: project.y + project.height });
+      expect(region).toBeDefined();
+      expect(onRegionBoundary(route.at(-1)!, region!)).toBe(true);
+    });
+    expect(diagnostic?.selectedPorts).toEqual(projectEdges.map((currentEdge) => ({
+      edgeId: currentEdge.id,
+      targetId: currentEdge.targetId,
+      side: 'top',
+    })));
+  });
+
+  it('keeps nested TEST out of the Project fan-out and does not add a Project edge to it', () => {
+    const diagnostics: AnalyzerFanoutRoutingDiagnostic[] = [];
+    analyzerEdgeRoutes(projectEdges, positionedById, analyzerEdgeObstacles(layout), {
+      ...routingOptions,
+      onFanoutDiagnostic: (diagnostic) => diagnostics.push(diagnostic),
+    });
+
+    expect(projectEdges.some((currentEdge) => currentEdge.targetId === testRegion.region.id)).toBe(false);
+    expect(diagnostics[0]?.targetIds).not.toContain(testRegion.region.id);
+    expect(testRegion.region.parentRegionId).toBe(api.region.id);
+  });
+
+  it('keeps three peer Regions on a shared Project bus without a false parent chain', () => {
+    const gitProject = positionedNode('project:git-lines', 330, 34, 86);
+    const toolingRegion = positionedRegion('region:scope:git-tooling', 52, 206, 280, 180, { label: 'PROJECT / TOOLING' });
+    const srcRegion = positionedRegion('region:scope:src', 366, 206, 280, 180, { label: 'SRC' });
+    const webviewRegion = positionedRegion('region:scope:webview', 680, 206, 280, 220, { label: 'WEBVIEW' });
+    const peers = [toolingRegion, srcRegion, webviewRegion];
+    const gitLayout: AnalyzerLayout = {
+      width: 1012,
+      height: 480,
+      nodes: [gitProject],
+      clusters: [],
+      lanes: [],
+      bands: [],
+      summaryGroups: [],
+      regions: peers,
+    };
+    const gitPositions = new Map<string, PositionedNode | PositionedSemanticRegion>([
+      [gitProject.node.id, gitProject],
+      ...peers.map((region) => [region.region.id, region] as const),
+    ]);
+    const gitEdges = peers.map((region) => containsEdge(`view-edge:stack-map:contains:${region.region.id}`, gitProject.node.id, region.region.id));
+    const diagnostics: AnalyzerFanoutRoutingDiagnostic[] = [];
+    const routes = analyzerEdgeRoutes(gitEdges, gitPositions, analyzerEdgeObstacles(gitLayout), {
+      flowDirection: 'auto',
+      bounds: { x: 0, y: 0, width: gitLayout.width, height: gitLayout.height },
+      onFanoutDiagnostic: (diagnostic) => diagnostics.push(diagnostic),
+    });
+    const diagnostic = diagnostics[0];
+    const first = routes.get(gitEdges[0]!.id) ?? [];
+    const srcRoute = routes.get(gitEdges[1]!.id) ?? [];
+    const webviewRoute = routes.get(gitEdges[2]!.id) ?? [];
+
+    expect(diagnostic).toMatchObject({
+      fanoutKind: 'project-region',
+      selectedDirection: 'down',
+      fallbackUsed: false,
+      targetIds: peers.map((region) => region.region.id),
+    });
+    expect(first.slice(0, 2)).toEqual(srcRoute.slice(0, 2));
+    expect(first.slice(0, 2)).toEqual(webviewRoute.slice(0, 2));
+    expect(verticalSiblingBorderFollow(srcRoute, { x: webviewRegion.x, y: webviewRegion.y, width: webviewRegion.width, height: webviewRegion.height })).toBeLessThan(88);
+    expect(verticalSiblingBorderFollow(webviewRoute, { x: srcRegion.x, y: srcRegion.y, width: srcRegion.width, height: srcRegion.height })).toBeLessThan(88);
   });
 });

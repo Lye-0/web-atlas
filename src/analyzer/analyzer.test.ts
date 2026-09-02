@@ -7,7 +7,8 @@ import { ANALYZER_COMMAND_COMMON_LANE_ID, projectArchitecture, projectCommand, p
 import { analyzerSummarySubtitle, presentationOwnsNode, presentAnalyzerView } from './presentation';
 import { scanProjectFiles } from './scan';
 import { packageIdForPath, scriptIdFor, type AnalyzerProjectStore, type AnalyzerSourceFile, type AnalyzerViewModel } from './types';
-import { ANALYZER_NEAR_NODE_HEIGHT, ANALYZER_NODE_HEIGHT, layoutAnalyzerView } from './layout';
+import { ANALYZER_NEAR_NODE_HEIGHT, ANALYZER_NODE_HEIGHT, layoutAnalyzerView, type PositionedGraphEndpoint } from './layout';
+import { analyzerEdgeObstacles, analyzerEdgeRoutes, type AnalyzerFanoutRoutingDiagnostic } from './edgeRouting';
 import { ANALYZER_FIT_PADDING, fitAnalyzerTransform, focusAnalyzerTransform, preserveAnalyzerTransformOnViewportResize, shouldRunAnalyzerInitialFit } from './camera';
 import { analyzerRelationInverseLabels, relationLabelForNode } from './relations';
 import { analyzerFocusedEdgeEmphasis } from './focus';
@@ -793,6 +794,48 @@ describe('Analyzer scan and projectors', () => {
     expect(childOnlyStackMap.nodes.some((node) => node.type === 'stack-usage'
       && node.metadata.scopePath === 'apps/api/test'
       && node.metadata.stackId === 'typescript')).toBe(true);
+  });
+
+  it('routes Project fan-out only to top-level Regions and keeps a shared bus', async () => {
+    const nestedStore = await scanProjectFiles(nestedScopeFixture());
+    const nestedStackMap = projectStackMap(nestedStore);
+    const layout = layoutAnalyzerView(nestedStackMap);
+    const project = layout.nodes.find((node) => node.node.type === 'project');
+    const apiRegion = layout.regions?.find((region) => region.region.metadata.scopePath === 'apps/api');
+    const testRegion = layout.regions?.find((region) => region.region.metadata.scopePath === 'apps/api/test');
+    const diagnostics: AnalyzerFanoutRoutingDiagnostic[] = [];
+    const positionedById = new Map<string, PositionedGraphEndpoint>([
+      ...layout.nodes.map((node) => [node.node.id, node] as const),
+      ...(layout.regions ?? []).map((region) => [region.region.id, region] as const),
+    ]);
+    const routes = analyzerEdgeRoutes(nestedStackMap.edges, positionedById, analyzerEdgeObstacles(layout), {
+      flowDirection: 'auto',
+      bounds: { x: 0, y: 0, width: layout.width, height: layout.height },
+      onFanoutDiagnostic: (diagnostic) => diagnostics.push(diagnostic),
+    });
+    const projectRegion = diagnostics.find((diagnostic) => diagnostic.fanoutKind === 'project-region');
+    const projectEdges = nestedStackMap.edges.filter((edge) => edge.sourceId === project?.node.id);
+
+    expect(project).toBeDefined();
+    expect(apiRegion).toBeDefined();
+    expect(testRegion?.region.parentRegionId).toBe(apiRegion?.region.id);
+    expect(projectEdges.map((edge) => edge.targetId)).toContain(apiRegion?.region.id);
+    expect(projectEdges.some((edge) => edge.targetId === testRegion?.region.id)).toBe(false);
+    expect(projectRegion).toMatchObject({
+      fanoutKind: 'project-region',
+      selectedDirection: 'down',
+      fallbackUsed: false,
+    });
+    expect(projectRegion?.targetIds).not.toContain(testRegion?.region.id);
+    expect(projectRegion?.targetIds.every((targetId) => nestedStackMap.regions?.some((region) => region.id === targetId && !region.parentRegionId))).toBe(true);
+    const first = routes.get(projectEdges[0]!.id) ?? [];
+    const second = routes.get(projectEdges[1]!.id) ?? first;
+    if (projectEdges.length >= 2) expect(first.slice(0, 2)).toEqual(second.slice(0, 2));
+    projectEdges.forEach((edge) => {
+      const route = routes.get(edge.id) ?? [];
+      const region = layout.regions?.find((candidate) => candidate.region.id === edge.targetId);
+      expect(route.at(-1)?.y).toBe(region?.y);
+    });
   });
 
   it('places Command Flow by execution rank and keeps concurrently branches on one stage', async () => {

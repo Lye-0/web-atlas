@@ -44,6 +44,8 @@ const STACK_MAP_REGION_GAP_Y = 34;
 const STACK_MAP_REGION_COLUMNS = 3;
 const STACK_MAP_PROJECT_TOP = 34;
 const STACK_MAP_PROJECT_REGION_GAP = 86;
+/** Room for a Project fan-out outer corridor without hugging the leftmost Region. */
+const STACK_MAP_SIDE_PADDING = 52;
 const STACK_MAP_REGION_NESTED_INSET = 18;
 const STACK_MAP_REGION_NESTED_GAP = 20;
 const STACK_MAP_REGION_MIN_HEIGHT = 180;
@@ -324,12 +326,12 @@ function layoutStackMap(view: AnalyzerViewModel, expandedNodeIds: ReadonlySet<st
   ));
   const width = Math.max(
     900,
-    SIDE_PADDING * 2 + columnWidths.reduce((total, columnWidth) => total + columnWidth, 0) + Math.max(0, columnCount - 1) * STACK_MAP_REGION_GAP_X,
+    STACK_MAP_SIDE_PADDING * 2 + columnWidths.reduce((total, columnWidth) => total + columnWidth, 0) + Math.max(0, columnCount - 1) * STACK_MAP_REGION_GAP_X,
   );
   const project = view.nodes.find((node) => node.type === 'project');
   const positionedNodes: PositionedNode[] = [];
   const positionedRegions: PositionedSemanticRegion[] = [];
-  const projectX = Math.max(SIDE_PADDING, (width - ANALYZER_NODE_WIDTH) / 2);
+  const projectX = Math.max(STACK_MAP_SIDE_PADDING, (width - ANALYZER_NODE_WIDTH) / 2);
   const projectY = STACK_MAP_PROJECT_TOP;
   if (project) {
     const projectHeight = architectureNodeHeight(view, project, expandedNodeIds);
@@ -379,7 +381,7 @@ function layoutStackMap(view: AnalyzerViewModel, expandedNodeIds: ReadonlySet<st
   measures.forEach((measure, index) => {
     const column = index % columnCount;
     const row = Math.floor(index / columnCount);
-    const x = SIDE_PADDING + columnWidths.slice(0, column).reduce((total, columnWidth) => total + columnWidth + STACK_MAP_REGION_GAP_X, 0);
+    const x = STACK_MAP_SIDE_PADDING + columnWidths.slice(0, column).reduce((total, columnWidth) => total + columnWidth + STACK_MAP_REGION_GAP_X, 0);
     const y = rowY[row] ?? firstRegionY;
     placeRegion(measure, x, y);
   });

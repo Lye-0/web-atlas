@@ -5,7 +5,7 @@ import {
   type AnalyzerLayout,
   type PositionedGraphEndpoint,
 } from './layout';
-import type { AnalyzerViewEdge } from './types';
+import type { AnalyzerRegionPortSide, AnalyzerViewEdge } from './types';
 
 export type AnalyzerEdgeObstacleKind =
   | 'node'
@@ -47,7 +47,9 @@ export interface AnalyzerEdgeBounds {
 
 export type AnalyzerFanoutFallbackReason = 'no-bus-candidates' | 'no-valid-bus-route' | 'direction-mismatch';
 
-export type AnalyzerEdgeRoutingStrategy = 'structural-fanout' | 'generic' | 'generic-fallback';
+export type AnalyzerEdgeRoutingStrategy = 'project-region-fanout' | 'structural-fanout' | 'generic' | 'generic-fallback';
+
+export type AnalyzerFanoutKind = 'project-region' | 'structural';
 
 export type AnalyzerFanoutDirection = 'left' | 'right' | 'up' | 'down';
 
@@ -70,6 +72,8 @@ export type AnalyzerFanoutCandidateRejectReason =
   | 'monotonicity-violation'
   | 'outside-valid-corridor'
   | 'summary-heading-collision'
+  | 'sibling-border-follow'
+  | 'false-parenthood'
   | 'candidate-invalid';
 
 export interface AnalyzerFanoutObstacleDiagnostic {
@@ -119,8 +123,15 @@ export interface AnalyzerFanoutCandidateDiagnostic {
   availableHeight?: number;
 }
 
+export interface AnalyzerFanoutSelectedPort {
+  edgeId: string;
+  targetId: string;
+  side: AnalyzerRegionPortSide;
+}
+
 export interface AnalyzerFanoutRoutingDiagnostic {
   fanoutGroupId: string;
+  fanoutKind: AnalyzerFanoutKind;
   sourceId: string;
   edgeIds: string[];
   targetIds: string[];
@@ -134,6 +145,7 @@ export interface AnalyzerFanoutRoutingDiagnostic {
   selectedDirection?: AnalyzerFanoutDirection;
   selectedBusX?: number;
   selectedBusY?: number;
+  selectedPorts?: AnalyzerFanoutSelectedPort[];
   fallbackUsed: boolean;
   fallbackReason?: AnalyzerFanoutFallbackReason;
 }
@@ -157,6 +169,7 @@ export interface AnalyzerEdgeRoutingDiagnostic {
   evaluatedDirections?: AnalyzerFanoutDirection[];
   preferredDirection?: AnalyzerFanoutDirection;
   selectedDirection?: AnalyzerFanoutDirection;
+  selectedPorts?: AnalyzerFanoutSelectedPort[];
   fallbackUsed: boolean;
   fallbackReason?: AnalyzerFanoutFallbackReason;
   pathPoints: AnalyzerEdgePoint[];
@@ -187,6 +200,11 @@ export interface AnalyzerEdgeRoutingOptions {
   /** Prefer a view's primary flow axis when choosing source/target ports. */
   flowDirection?: 'auto' | 'horizontal' | 'vertical';
   bounds?: AnalyzerEdgeBounds;
+  /**
+   * Sibling Semantic Region bounds used only as a false-parenthood /
+   * border-follow cost. Surfaces stay pass-through and are never hard obstacles.
+   */
+  siblingRegions?: readonly AnalyzerEdgeBounds[];
 }
 
 export type AnalyzerRoutableEdge = Pick<AnalyzerViewEdge, 'id' | 'sourceId' | 'targetId'>
@@ -207,6 +225,12 @@ const FANOUT_BUS_CLEARANCE = 32;
 const FANOUT_CORRIDOR_PRIORITY_PENALTY = 80;
 const VISIBILITY_ESCAPE_MARGIN = 32;
 const FANOUT_CORRIDOR_MARGIN = 4;
+const SIBLING_BORDER_PROXIMITY = 20;
+const SIBLING_BORDER_FOLLOW_LIMIT = 88;
+const SIBLING_SURFACE_TRAVERSAL_LIMIT = 28;
+const SIBLING_BORDER_FOLLOW_PENALTY = 16;
+const SIBLING_SURFACE_TRAVERSAL_PENALTY = 24;
+const PROJECT_REGION_SIDE_BUS_PENALTY = 12_000;
 const SOFT_ZONE_VISIT_THRESHOLD = 4;
 const MAX_GRID_POINTS = 20_000;
 const EPSILON = 0.0001;
@@ -301,6 +325,7 @@ interface ResolvedRoutingOptions {
   onEdgeDiagnostic?: (diagnostic: AnalyzerEdgeRoutingDiagnostic) => void;
   flowDirection: 'auto' | 'horizontal' | 'vertical';
   bounds?: AnalyzerEdgeBounds;
+  siblingRegions: readonly AnalyzerEdgeBounds[];
 }
 
 function pointKey(point: AnalyzerEdgePoint): string {
@@ -379,6 +404,7 @@ function resolveRoutingOptions(options: AnalyzerEdgeRoutingOptions): ResolvedRou
     ...(options.onFanoutDiagnostic ? { onFanoutDiagnostic: options.onFanoutDiagnostic } : {}),
     ...(options.onEdgeDiagnostic ? { onEdgeDiagnostic: options.onEdgeDiagnostic } : {}),
     flowDirection: options.flowDirection ?? 'auto',
+    siblingRegions: options.siblingRegions ?? [],
     ...(options.bounds ? { bounds: options.bounds } : {}),
   };
 }
@@ -393,6 +419,128 @@ function endpointId(endpoint: PositionedGraphEndpoint): string {
 
 function endpointLabel(endpoint: PositionedGraphEndpoint): string {
   return 'region' in endpoint ? endpoint.region.label : endpoint.node.label;
+}
+
+function isProjectNodeEndpoint(endpoint: PositionedGraphEndpoint): boolean {
+  return !('region' in endpoint) && endpoint.node.type === 'project';
+}
+
+function isTopLevelRegionEndpoint(endpoint: PositionedGraphEndpoint): boolean {
+  return 'region' in endpoint && !endpoint.region.parentRegionId;
+}
+
+function isProjectRegionFanoutPair(source: PositionedGraphEndpoint, target: PositionedGraphEndpoint): boolean {
+  return isProjectNodeEndpoint(source) && isTopLevelRegionEndpoint(target);
+}
+
+function isProjectRegionFanoutGroup(source: PositionedGraphEndpoint, members: readonly FanoutMember[]): boolean {
+  return members.length >= 2
+    && isProjectNodeEndpoint(source)
+    && members.every((member) => isTopLevelRegionEndpoint(member.target));
+}
+
+function fanoutTargetPortSide(direction: AnalyzerFanoutDirection): AnalyzerRegionPortSide {
+  if (direction === 'down') return 'top';
+  if (direction === 'up') return 'bottom';
+  if (direction === 'right') return 'left';
+  return 'right';
+}
+
+interface SiblingRegionBounds {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  right: number;
+  bottom: number;
+}
+
+function siblingRegionBounds(target: PositionedGraphEndpoint): SiblingRegionBounds {
+  return {
+    id: endpointId(target),
+    x: target.x,
+    y: target.y,
+    width: endpointWidth(target),
+    height: target.height,
+    right: nodeRight(target),
+    bottom: nodeBottom(target),
+  };
+}
+
+function siblingBoundsFromMembers(members: readonly FanoutMember[], excludeId?: string): SiblingRegionBounds[] {
+  return members
+    .filter(({ target }) => 'region' in target && endpointId(target) !== excludeId)
+    .map(({ target }) => siblingRegionBounds(target));
+}
+
+function siblingBoundsFromOptions(options: ResolvedRoutingOptions, excludeId?: string): SiblingRegionBounds[] {
+  return options.siblingRegions
+    .filter((region) => (region as AnalyzerEdgeBounds & { id?: string }).id !== excludeId)
+    .map((region, index) => ({
+      id: `sibling:${index}`,
+      x: region.x,
+      y: region.y,
+      width: region.width,
+      height: region.height,
+      right: region.x + region.width,
+      bottom: region.y + region.height,
+    }));
+}
+
+function segmentSiblingBorderFollowLength(
+  first: AnalyzerEdgePoint,
+  second: AnalyzerEdgePoint,
+  sibling: SiblingRegionBounds,
+  proximity = SIBLING_BORDER_PROXIMITY,
+): number {
+  if (segmentDirection(first, second) !== 'vertical') return 0;
+  const nearLeft = Math.abs(first.x - sibling.x) <= proximity;
+  const nearRight = Math.abs(first.x - sibling.right) <= proximity;
+  if (!nearLeft && !nearRight) return 0;
+  const overlap = Math.min(Math.max(first.y, second.y), sibling.bottom) - Math.max(Math.min(first.y, second.y), sibling.y);
+  return overlap > EPSILON ? overlap : 0;
+}
+
+function routeSiblingBorderFollowLength(
+  points: readonly AnalyzerEdgePoint[],
+  siblings: readonly SiblingRegionBounds[],
+): number {
+  return points.slice(1).reduce((total, point, index) => {
+    const previous = points[index]!;
+    return total + siblings.reduce((sum, sibling) => sum + segmentSiblingBorderFollowLength(previous, point, sibling), 0);
+  }, 0);
+}
+
+function routeSiblingSurfaceOverlap(
+  points: readonly AnalyzerEdgePoint[],
+  siblings: readonly SiblingRegionBounds[],
+): number {
+  return points.slice(1).reduce((total, point, index) => {
+    const previous = points[index]!;
+    return total + siblings.reduce((sum, sibling) => sum + segmentOverlapLength(previous, point, sibling), 0);
+  }, 0);
+}
+
+function projectRegionBranchPenalty(
+  points: readonly AnalyzerEdgePoint[],
+  siblings: readonly SiblingRegionBounds[],
+): { valid: boolean; cost: number; reason?: AnalyzerFanoutCandidateRejectReason } {
+  const follow = routeSiblingBorderFollowLength(points, siblings);
+  const through = routeSiblingSurfaceOverlap(points, siblings);
+  const cost = follow * SIBLING_BORDER_FOLLOW_PENALTY + through * SIBLING_SURFACE_TRAVERSAL_PENALTY;
+  if (through > SIBLING_SURFACE_TRAVERSAL_LIMIT) return { valid: false, cost, reason: 'false-parenthood' };
+  if (follow > SIBLING_BORDER_FOLLOW_LIMIT) return { valid: false, cost, reason: 'sibling-border-follow' };
+  return { valid: true, cost };
+}
+
+function siblingFollowCost(points: readonly AnalyzerEdgePoint[], options: ResolvedRoutingOptions, excludeId?: string): number {
+  const siblings = options.siblingRegions.length > 0
+    ? siblingBoundsFromOptions(options, excludeId)
+    : [];
+  if (siblings.length === 0) return 0;
+  const penalty = projectRegionBranchPenalty(points, siblings);
+  return penalty.cost + (penalty.valid ? 0 : PROJECT_REGION_SIDE_BUS_PENALTY);
 }
 
 function nodeRight(node: PositionedGraphEndpoint): number {
@@ -843,7 +991,7 @@ function routeCost(
       + routeSegmentPenalty(previous, point, obstacles, options)
       + (index > 0 ? options.bendPenalty : 0);
   }, 0);
-  return geometricCost + routeReadabilityPenalty(points, options);
+  return geometricCost + routeReadabilityPenalty(points, options) + siblingFollowCost(points, options);
 }
 
 function routeIsClear(points: readonly AnalyzerEdgePoint[], obstacles: readonly InflatedObstacle[]): boolean {
@@ -1472,6 +1620,69 @@ function fanoutTrunkCandidates(
   ], corridorStart, first.start.y, 'y');
 }
 
+function clampApproachCoordinate(
+  value: number,
+  axis: 'x' | 'y',
+  options: ResolvedRoutingOptions,
+): number {
+  if (!options.bounds) return value;
+  const minimum = (axis === 'x' ? options.bounds.x : options.bounds.y) + options.clearance;
+  const maximum = (axis === 'x'
+    ? options.bounds.x + options.bounds.width
+    : options.bounds.y + options.bounds.height) - options.clearance;
+  return Math.min(maximum, Math.max(minimum, value));
+}
+
+function projectRegionApproachCoordinates(
+  direction: AnalyzerFanoutDirection,
+  port: EdgePortGeometry,
+  targetGroupBounds: FanoutGroupBounds,
+  options: ResolvedRoutingOptions,
+): number[] {
+  const horizontal = direction === 'left' || direction === 'right';
+  const axis = horizontal ? 'y' : 'x';
+  const defaultCoord = horizontal ? port.end.y : port.end.x;
+  const outerStart = horizontal
+    ? targetGroupBounds.top - FANOUT_BUS_CLEARANCE
+    : targetGroupBounds.left - FANOUT_BUS_CLEARANCE;
+  const outerEnd = horizontal
+    ? targetGroupBounds.bottom + FANOUT_BUS_CLEARANCE
+    : targetGroupBounds.right + FANOUT_BUS_CLEARANCE;
+  return [...new Set([
+    defaultCoord,
+    clampApproachCoordinate(outerStart, axis, options),
+    clampApproachCoordinate(outerEnd, axis, options),
+  ].filter((value) => Number.isFinite(value)))];
+}
+
+function fanoutBranchPoints(
+  port: EdgePortGeometry,
+  trunk: FanoutTrunkCandidate,
+  direction: AnalyzerFanoutDirection,
+  approach: number,
+): AnalyzerEdgePoint[] {
+  if (direction === 'left' || direction === 'right') {
+    return [
+      port.sourceBoundary,
+      port.start,
+      { x: trunk.x!, y: port.start.y },
+      { x: trunk.x!, y: approach },
+      { x: port.end.x, y: approach },
+      port.end,
+      port.targetBoundary,
+    ];
+  }
+  return [
+    port.sourceBoundary,
+    port.start,
+    { x: port.start.x, y: trunk.y! },
+    { x: approach, y: trunk.y! },
+    { x: approach, y: port.end.y },
+    port.end,
+    port.targetBoundary,
+  ];
+}
+
 function fanoutRouteForDirection(
   source: PositionedGraphEndpoint,
   members: readonly FanoutMember[],
@@ -1480,6 +1691,7 @@ function fanoutRouteForDirection(
   targetGroupBounds: FanoutGroupBounds,
   direction: AnalyzerFanoutDirection,
 ): FanoutDirectionalRouteResult {
+  const projectRegionFanout = isProjectRegionFanoutGroup(source, members);
   const ports = members.map(({ target }) => edgePortGeometryForDirection(source, target, options.clearance, direction));
   const horizontal = direction === 'left' || direction === 'right';
   const hardObstacleInputs = obstacles
@@ -1632,42 +1844,65 @@ function fanoutRouteForDirection(
     const trunkOptions = { ...options, softObstacles };
     cost += routeSoftProximityCost(sharedTrunk, trunkOptions) + routeReadabilityPenalty(sharedTrunk, trunkOptions);
     cost += fanoutCandidatePriorityCost(trunk.priority) * FANOUT_CORRIDOR_PRIORITY_PENALTY;
+    if (projectRegionFanout && (direction === 'left' || direction === 'right') && targetGroupBounds.top - nodeBottom(source) > EPSILON) {
+      cost += PROJECT_REGION_SIDE_BUS_PENALTY;
+    }
     ports.forEach((port, index) => {
       const member = members[index]!;
-      const route = horizontal
-        ? [port.sourceBoundary, port.start, { x: trunk.x!, y: port.start.y }, { x: trunk.x!, y: port.end.y }, port.end, port.targetBoundary]
-        : [port.sourceBoundary, port.start, { x: port.start.x, y: trunk.y! }, { x: port.end.x, y: trunk.y! }, port.end, port.targetBoundary];
       const relevant = relevantByEdgeId.get(member.edge.id) ?? [];
       const relevantSoft = relevantSoftByEdgeId.get(member.edge.id) ?? [];
       const memberOptions = { ...options, softObstacles: relevantSoft };
-      const routeOutsideBounds = !routeWithinBounds(route, options.bounds);
-      const routeMonotonicityViolation = !routeRespectsMonotonicity(route, monotonicity);
-      const routeClear = routeIsClear(route, relevant);
-      const routeObstacle = firstRouteObstacle(route, relevant);
-      if (routeOutsideBounds || routeMonotonicityViolation || !routeClear) valid = false;
-      const compacted = simplifyAnalyzerOrthogonalRoute(route, {
-        obstacles: [...relevant, ...relevantSoft],
-        shortZigzagLength: SHORT_ZIGZAG_LENGTH,
+      const siblings = projectRegionFanout ? siblingBoundsFromMembers(members, endpointId(member.target)) : [];
+      const approaches = projectRegionFanout
+        ? projectRegionApproachCoordinates(direction, port, targetGroupBounds, options)
+        : [horizontal ? port.end.y : port.end.x];
+      const scoredApproaches = approaches.map((approach) => {
+        const route = fanoutBranchPoints(port, trunk, direction, approach);
+        const compacted = simplifyAnalyzerOrthogonalRoute(route, {
+          obstacles: [...relevant, ...relevantSoft],
+          shortZigzagLength: SHORT_ZIGZAG_LENGTH,
+        });
+        const routeOutsideBounds = !routeWithinBounds(route, options.bounds);
+        const routeMonotonicityViolation = !routeRespectsMonotonicity(route, monotonicity);
+        const compactedMonotonicityViolation = !routeRespectsMonotonicity(compacted, monotonicity);
+        const routeClear = routeIsClear(route, relevant);
+        const routeObstacle = firstRouteObstacle(route, relevant);
+        const parenthood = siblings.length > 0 ? projectRegionBranchPenalty(compacted, siblings) : { valid: true, cost: 0 };
+        const branchValid = !routeOutsideBounds
+          && !routeMonotonicityViolation
+          && routeClear
+          && !compactedMonotonicityViolation
+          && parenthood.valid;
+        const branchReason = routeObstacle
+          ? fanoutRejectReason('branch', routeObstacle)
+          : routeOutsideBounds
+            ? 'outside-valid-corridor' as const
+            : routeMonotonicityViolation || compactedMonotonicityViolation
+              ? 'monotonicity-violation' as const
+              : !routeClear
+                ? 'candidate-invalid' as const
+                : parenthood.reason;
+        return {
+          compacted,
+          valid: branchValid,
+          cost: routeCost(compacted, relevant, memberOptions) + parenthood.cost,
+          reason: branchReason,
+          obstacle: routeObstacle,
+        };
+      }).sort((first, second) => {
+        if (first.valid !== second.valid) return first.valid ? -1 : 1;
+        return first.cost - second.cost;
       });
-      const compactedMonotonicityViolation = !routeRespectsMonotonicity(compacted, monotonicity);
-      if (compactedMonotonicityViolation) valid = false;
-      routes.set(member.edge.id, compacted);
-      cost += routeCost(compacted, relevant, memberOptions);
+      const chosen = scoredApproaches[0]!;
+      if (!chosen.valid) valid = false;
+      routes.set(member.edge.id, chosen.compacted);
+      cost += chosen.cost;
       const exclusion = excludedObstacleIdsByEdgeId.get(member.edge.id) ?? {
         excludedObstacleIds: [],
         excludedHardObstacleIds: [],
         excludedSoftObstacleIds: [],
       };
-      const rejectedObstacle = fanoutObstacleDiagnostic(routeObstacle, obstacles);
-      const branchReason = routeObstacle
-        ? fanoutRejectReason('branch', routeObstacle)
-        : routeOutsideBounds
-          ? 'outside-valid-corridor' as const
-          : routeMonotonicityViolation || compactedMonotonicityViolation
-            ? 'monotonicity-violation' as const
-            : !routeClear
-              ? 'candidate-invalid' as const
-            : undefined;
+      const rejectedObstacle = fanoutObstacleDiagnostic(chosen.obstacle, obstacles);
       const branchPoints = horizontal
         ? [{ x: trunk.x!, y: port.end.y }, port.end, port.targetBoundary]
         : [{ x: port.end.x, y: trunk.y! }, port.end, port.targetBoundary];
@@ -1675,10 +1910,10 @@ function fanoutRouteForDirection(
         edgeId: member.edge.id,
         targetId: endpointId(member.target),
         targetLabel: endpointLabel(member.target),
-        valid: !routeOutsideBounds && !routeMonotonicityViolation && routeClear && !compactedMonotonicityViolation,
-        ...(branchReason ? { reason: branchReason } : {}),
+        valid: chosen.valid,
+        ...(chosen.reason ? { reason: chosen.reason } : {}),
         branchPoints,
-        pathPoints: compacted,
+        pathPoints: chosen.compacted,
         ...(rejectedObstacle ? {
           rejectedByObstacleId: rejectedObstacle.id,
           rejectedByObstacleKind: rejectedObstacle.kind,
@@ -1774,7 +2009,8 @@ function fanoutRoute(
   };
 }
 
-function fanoutTargetGroupKey(target: PositionedGraphEndpoint): string {
+function fanoutTargetGroupKey(source: PositionedGraphEndpoint, target: PositionedGraphEndpoint): string {
+  if (isProjectRegionFanoutPair(source, target)) return 'project-region';
   if ('region' in target) return `region:${target.region.id}`;
   if (target.node.presentation?.role === 'summary') return `summary:${target.node.id}`;
   if (target.node.presentation?.parentId) return `presentation:${target.node.presentation.parentId}`;
@@ -1816,7 +2052,7 @@ export function analyzerEdgeRoutes(
       const source = positionedById.get(edge.sourceId);
       const target = positionedById.get(edge.targetId);
       if (!source || !target) return;
-      const targetGroupKey = fanoutTargetGroupKey(target);
+      const targetGroupKey = fanoutTargetGroupKey(source, target);
       const key = [
         edge.sourceId,
         edge.kind ?? 'unknown',
@@ -1836,9 +2072,18 @@ export function analyzerEdgeRoutes(
       const fanoutGroupDirection = fanout?.selectedDirection
         ?? fanout?.preferredDirection
         ?? fanoutDirectionSelection(source, targetGroupBounds, resolved.flowDirection).preferredDirection;
-      const fanoutGroupId = `fanout:${endpointId(source)}:${fanoutGroupDirection}:${group[0]!.edge.kind ?? 'unknown'}:${fanoutTargetGroupKey(group[0]!.target)}`;
+      const projectRegionFanout = isProjectRegionFanoutGroup(source, group);
+      const fanoutGroupId = `fanout:${endpointId(source)}:${fanoutGroupDirection}:${group[0]!.edge.kind ?? 'unknown'}:${fanoutTargetGroupKey(source, group[0]!.target)}`;
+      const selectedPorts = fanout?.selectedDirection
+        ? group.map(({ edge: groupEdge }) => ({
+            edgeId: groupEdge.id,
+            targetId: groupEdge.targetId,
+            side: fanoutTargetPortSide(fanout.selectedDirection!),
+          }))
+        : undefined;
       const fanoutDiagnostic: AnalyzerFanoutRoutingDiagnostic = {
         fanoutGroupId,
+        fanoutKind: projectRegionFanout ? 'project-region' : 'structural',
         sourceId: endpointId(source),
         edgeIds: group.map(({ edge }) => edge.id),
         targetIds: group.map(({ edge }) => edge.targetId),
@@ -1857,6 +2102,7 @@ export function analyzerEdgeRoutes(
         },
         ...(fanout?.selectedBus?.x !== undefined ? { selectedBusX: fanout.selectedBus.x } : {}),
         ...(fanout?.selectedBus?.y !== undefined ? { selectedBusY: fanout.selectedBus.y } : {}),
+        ...(selectedPorts ? { selectedPorts } : {}),
         fallbackUsed: !fanout?.routes,
         ...(fanout?.fallbackReason ? { fallbackReason: fanout.fallbackReason } : {}),
       };
@@ -1876,24 +2122,40 @@ export function analyzerEdgeRoutes(
     const source = positionedById.get(edge.sourceId);
     const target = positionedById.get(edge.targetId);
     if (!source || !target) return;
+    const siblingRegions = isProjectRegionFanoutPair(source, target)
+      ? [...positionedById.values()]
+        .filter((endpoint) => isTopLevelRegionEndpoint(endpoint) && endpointId(endpoint) !== endpointId(target))
+        .map((endpoint) => ({
+          x: endpoint.x,
+          y: endpoint.y,
+          width: endpointWidth(endpoint),
+          height: endpoint.height,
+        }))
+      : [];
     const route = analyzerEdgeRoute(source, target, obstacles, {
       ...options,
       existingRoutes: [...resolved.existingRoutes, ...routes.values()],
+      ...(siblingRegions.length > 0 ? { siblingRegions } : {}),
     });
     if (route) routes.set(edge.id, route);
   });
   if (resolved.onEdgeDiagnostic) {
     edges.forEach((edge) => {
       const fanoutDiagnostic = fanoutDiagnosticsByEdgeId.get(edge.id);
+      const fanoutStrategy: AnalyzerEdgeRoutingStrategy | undefined = fanoutDiagnostic
+        ? fanoutDiagnostic.fallbackUsed
+          ? 'generic-fallback'
+          : fanoutDiagnostic.fanoutKind === 'project-region'
+            ? 'project-region-fanout'
+            : 'structural-fanout'
+        : undefined;
       resolved.onEdgeDiagnostic?.({
         edgeId: edge.id,
         sourceId: edge.sourceId,
         targetId: edge.targetId,
         edgeKind: edge.kind,
         presentation: edge.presentation,
-        routingStrategy: fanoutDiagnostic
-          ? fanoutDiagnostic.fallbackUsed ? 'generic-fallback' : 'structural-fanout'
-          : 'generic',
+        routingStrategy: fanoutStrategy ?? 'generic',
         ...(fanoutDiagnostic?.fanoutGroupId ? { fanoutGroupId: fanoutDiagnostic.fanoutGroupId } : {}),
         fanoutDetected: Boolean(fanoutDiagnostic),
         busUsed: Boolean(fanoutDiagnostic && !fanoutDiagnostic.fallbackUsed),
@@ -1906,6 +2168,7 @@ export function analyzerEdgeRoutes(
         ...(fanoutDiagnostic?.evaluatedDirections ? { evaluatedDirections: fanoutDiagnostic.evaluatedDirections } : {}),
         ...(fanoutDiagnostic?.preferredDirection ? { preferredDirection: fanoutDiagnostic.preferredDirection } : {}),
         ...(fanoutDiagnostic?.selectedDirection ? { selectedDirection: fanoutDiagnostic.selectedDirection } : {}),
+        ...(fanoutDiagnostic?.selectedPorts ? { selectedPorts: fanoutDiagnostic.selectedPorts } : {}),
         fallbackUsed: fanoutDiagnostic?.fallbackUsed ?? false,
         ...(fanoutDiagnostic?.fallbackReason ? { fallbackReason: fanoutDiagnostic.fallbackReason } : {}),
         pathPoints: routes.get(edge.id)?.map(({ x, y }) => ({ x, y })) ?? [],

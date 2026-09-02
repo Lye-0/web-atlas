@@ -339,6 +339,7 @@ export function AnalyzerGraphStage({
         loggedFanoutGroups.add(fanoutGroupDiagnostic.fanoutGroupId);
         console.info('[Analyzer Fanout Candidate Diagnostic]', {
           fanoutGroupId: fanoutGroupDiagnostic.fanoutGroupId,
+          fanoutKind: fanoutGroupDiagnostic.fanoutKind,
           sourceId: fanoutGroupDiagnostic.sourceId,
           edgeIds: fanoutGroupDiagnostic.edgeIds,
           targetIds: fanoutGroupDiagnostic.targetIds,
@@ -346,6 +347,7 @@ export function AnalyzerGraphStage({
           busCandidateCount: fanoutGroupDiagnostic.busCandidateCount,
           preferredDirection: fanoutGroupDiagnostic.preferredDirection,
           selectedDirection: fanoutGroupDiagnostic.selectedDirection,
+          selectedPorts: fanoutGroupDiagnostic.selectedPorts,
           evaluatedDirections: fanoutGroupDiagnostic.evaluatedDirections,
           directionDiagnostics: fanoutGroupDiagnostic.directionDiagnostics,
           targetGroupBounds: fanoutGroupDiagnostic.targetGroupBounds,
@@ -377,7 +379,7 @@ export function AnalyzerGraphStage({
         sourceCollection: foregroundEdges.some((candidate) => candidate.id === edge.id) ? 'foregroundEdges' : 'backgroundEdges',
         edgeCollection,
         routingStrategy: routing.routingStrategy,
-        routeCollection: routing.routingStrategy === 'structural-fanout'
+        routeCollection: routing.routingStrategy === 'structural-fanout' || routing.routingStrategy === 'project-region-fanout'
           ? 'fanoutRoutes'
           : routing.routingStrategy === 'generic-fallback'
             ? 'genericRoutes (fanout fallback)'
@@ -390,6 +392,7 @@ export function AnalyzerGraphStage({
         busCandidateCount: routing.busCandidateCount,
         preferredDirection: routing.preferredDirection,
         selectedDirection: routing.selectedDirection,
+        selectedPorts: routing.selectedPorts,
         evaluatedDirections: routing.evaluatedDirections,
         directionDiagnostics: routing.directionDiagnostics,
         targetGroupBounds: routing.targetGroupBounds,
