@@ -102,7 +102,7 @@ export interface AnalyzerLayout {
 }
 
 function clusterOrder(view: AnalyzerViewModel['view']): string[] {
-  if (view === 'architecture') return ['architecture:project', 'architecture:apps', 'architecture:workspace', 'architecture:technology', 'architecture:runtime', 'architecture:resources', 'architecture:desktop'];
+  if (view === 'architecture') return ['stack-map:project'];
   if (view === 'workspace') return ['workspace:project', 'workspace:config', 'workspace:patterns', 'workspace:packages'];
   if (view === 'command') return ['command:user', 'command:scripts', 'command:commands', 'command:packages'];
   return ['dependencies:packages', 'dependencies:technology', 'dependencies:external'];

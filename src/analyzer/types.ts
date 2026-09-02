@@ -42,6 +42,8 @@ export type AnalyzerRelationKind =
 
 export type AnalyzerNodeType =
   | 'project'
+  | 'stack-scope'
+  | 'stack-usage'
   | 'application'
   | 'workspace-package'
   | 'workspace-config'
@@ -56,6 +58,8 @@ export type AnalyzerNodeType =
 
 export type AnalyzerFilter =
   | 'all'
+  | 'stack-scope'
+  | 'stack-usage'
   | 'application'
   | 'workspace-package'
   | 'workspace-config'
@@ -279,6 +283,16 @@ export interface AnalyzerPresentationGroup {
   expanded: boolean;
 }
 
+/** A view-level usage of one canonical Dictionary Stack inside one scope. */
+export interface AnalyzerStackUsage {
+  id: string;
+  stackId: string;
+  scopeId: string;
+  evidenceIds: string[];
+  sourceFactIds: string[];
+  roles: string[];
+}
+
 export interface AnalyzerViewEdge {
   id: string;
   sourceId: string;
@@ -316,6 +330,7 @@ export interface AnalyzerViewModel {
   edges: AnalyzerViewEdge[];
   clusters: AnalyzerCluster[];
   presentationGroups?: AnalyzerPresentationGroup[];
+  stackUsages?: AnalyzerStackUsage[];
   counts?: AnalyzerViewCounts;
   evidence: AnalyzerEvidence[];
   warnings: AnalyzerWarning[];
@@ -323,7 +338,7 @@ export interface AnalyzerViewModel {
 }
 
 export const analyzerViewLabels: Record<AnalyzerViewId, string> = {
-  architecture: 'Architecture Overview',
+  architecture: 'Stack Map',
   workspace: 'Workspace Flow',
   command: 'Command Flow',
   dependencies: 'Package Dependency',
@@ -346,6 +361,8 @@ export const relationLabels: Record<AnalyzerRelationKind, string> = {
 
 export const nodeTypeLabels: Record<AnalyzerNodeType, string> = {
   project: 'Project',
+  'stack-scope': 'Scope / Area',
+  'stack-usage': 'Stack Usage',
   application: 'Application',
   'workspace-package': 'Workspace Package',
   'workspace-config': 'Workspace Config',

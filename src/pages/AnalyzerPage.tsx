@@ -183,7 +183,7 @@ export function AnalyzerPage() {
         <div>
           <p className="eyebrow">04 / LOCAL ANALYSIS</p>
           <h1>Analyzer</h1>
-          <p className="intro-copy">プロジェクトの構造・workspace・command・依存関係を、直接Evidenceとともにたどります。</p>
+          <p className="intro-copy">プロジェクトをScopeごとに分け、どのCanonical Stackを使っているかを直接Evidenceとともにたどります。</p>
         </div>
         <AnalyzerProjectPicker onScanned={handleScanned} />
       </section>

@@ -53,6 +53,13 @@ function sameStringSet(first: ReadonlySet<string>, second: ReadonlySet<string>):
   return true;
 }
 
+function normalizedFilterForView(filter: AnalyzerFilter, view: AnalyzerViewModel['view']): AnalyzerFilter {
+  if (view !== 'architecture') return filter;
+  if (filter === 'technology' || filter === 'runtime' || filter === 'resource') return 'stack-usage';
+  if (filter === 'application' || filter === 'workspace-package' || filter === 'dotnet-project') return 'stack-scope';
+  return filter;
+}
+
 /**
  * Reconnects serializable session IDs to the freshly projected view model.
  * The session keeps IDs, never graph objects, so route remounts can safely
@@ -77,14 +84,16 @@ export function restoreAnalyzerViewSession(session: AnalyzerViewSession, view: A
   const entryScriptId = view.view === 'command'
     && session.entryScriptId
     && session.entryScriptId !== view.entryScriptId
-    ? view.entryScriptId
-    : session.entryScriptId;
+      ? view.entryScriptId
+      : session.entryScriptId;
+  const filter = normalizedFilterForView(session.filter, view.view);
   const detailOpen = session.detailOpen && Boolean(selectedNodeId || selectedEdgeId);
 
   if (
     selectedNodeId === session.selectedNodeId
     && selectedEdgeId === session.selectedEdgeId
     && sameStringSet(expandedPresentationIds, session.expandedPresentationIds)
+    && filter === session.filter
     && entryScriptId === session.entryScriptId
     && detailOpen === session.detailOpen
   ) return session;
@@ -94,6 +103,7 @@ export function restoreAnalyzerViewSession(session: AnalyzerViewSession, view: A
     selectedNodeId,
     selectedEdgeId,
     expandedPresentationIds,
+    filter,
     entryScriptId,
     detailOpen,
   };

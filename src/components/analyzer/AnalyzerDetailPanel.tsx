@@ -91,10 +91,32 @@ function evidenceFiles(node: AnalyzerViewNode, view: AnalyzerViewModel): string[
     .filter((filePath): filePath is string => Boolean(filePath)))];
 }
 
+function metadataString(node: AnalyzerViewNode, key: string): string | undefined {
+  const value = node.metadata[key];
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+function metadataStrings(node: AnalyzerViewNode, key: string): string[] {
+  const value = node.metadata[key];
+  return Array.isArray(value) ? value : value === undefined ? [] : [String(value)];
+}
+
 function detectionReason(node: AnalyzerViewNode, fact: ReturnType<typeof factForNode>, view: AnalyzerViewModel): string {
   if (node.presentation?.role === 'summary') {
     const childCount = typeof node.metadata.childCount === 'number' ? node.metadata.childCount : node.presentation.childNodeIds?.length ?? 0;
     return `${childCount}件の詳細Factをまとめた表示上のSummary Nodeです。展開して元のNodeとEvidenceを確認できます。`;
+  }
+
+  if (node.metadata.stackUsage === true) {
+    const scopeLabel = metadataString(node, 'scopeLabel') ?? 'Project Root / Tooling';
+    const scopePath = metadataString(node, 'scopePath');
+    return `${scopeLabel}${scopePath ? `（${scopePath}）` : ''}で使用されているDictionaryのCanonical Stackです。`;
+  }
+
+  if (node.metadata.stackMapScope === true) {
+    const scopeLabel = metadataString(node, 'scopeLabel') ?? node.label;
+    const scopePath = metadataString(node, 'scopePath');
+    return `${scopeLabel}${scopePath ? `（${scopePath}）` : ''}の既存Project Fact / Evidenceを基準にしたStack MapのScopeです。`;
   }
 
   if (!fact) {
@@ -144,6 +166,12 @@ function detectionReason(node: AnalyzerViewNode, fact: ReturnType<typeof factFor
 function NodeDetails({ node, view, store, expandedPresentationIds, onSelectNode, onTogglePresentation }: { node: AnalyzerViewNode; view: AnalyzerViewModel; store: AnalyzerProjectStore; expandedPresentationIds: ReadonlySet<string>; onSelectNode: (nodeId: string, focus?: boolean) => void; onTogglePresentation: (presentationId: string) => void }) {
   const fact = factForNode(store, node);
   const dictionary = displayDictionaryStack(factDictionaryStackId(fact ?? node));
+  const stackUsage = node.metadata.stackUsage === true;
+  const usageScopeLabel = metadataString(node, 'scopeLabel') ?? 'Project Root / Tooling';
+  const usageScopePath = metadataString(node, 'scopePath') ?? '.';
+  const usageCategory = metadataString(node, 'categoryLabel') ?? node.subtitle;
+  const usageRoles = metadataStrings(node, 'roles');
+  const usageEvidenceFiles = evidenceFiles(node, view);
   const summary = node.presentation?.role === 'summary';
   const summaryExpanded = summary && analyzerSummaryExpanded(node.id, expandedPresentationIds);
   const displayedSubtitle = summary ? analyzerSummarySubtitle(node, summaryExpanded) : node.subtitle;
@@ -177,6 +205,18 @@ function NodeDetails({ node, view, store, expandedPresentationIds, onSelectNode,
         <h3>Overview</h3>
         <p>{detectionReason(node, fact, view)}</p>
       </section>
+      {stackUsage && (
+        <section className="analyzer-detail-section">
+          <h3>Stack Usage</h3>
+          <dl className="analyzer-metadata-list analyzer-stack-usage-list">
+            <div><dt>Stack</dt><dd>{dictionary?.name ?? node.label}</dd></div>
+            <div><dt>Used in</dt><dd>{usageScopeLabel} · {usageScopePath}</dd></div>
+            {usageCategory && <div><dt>Category</dt><dd>{usageCategory}</dd></div>}
+            {usageRoles.length > 0 && <div><dt>Role</dt><dd>{usageRoles.join(', ')}</dd></div>}
+            {usageEvidenceFiles.length > 0 && <div><dt>Evidence files</dt><dd>{usageEvidenceFiles.join(', ')}</dd></div>}
+          </dl>
+        </section>
+      )}
       {summary ? (
         <section className="analyzer-detail-section">
           <h3>Contained Nodes</h3>

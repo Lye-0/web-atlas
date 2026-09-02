@@ -3,11 +3,11 @@ import { parseCommandExpression } from './commandParser';
 import { evidenceRangeLabel, makeEvidence, positionAt } from './evidence';
 import { isAnalyzerSourcePath, isExcludedPath, sourceFilesFromInput } from './fileDiscovery';
 import { parseDotnetProject, parsePackageJson, parsePnpmWorkspace, parseWranglerConfig } from './parsers';
-import { ANALYZER_COMMAND_COMMON_LANE_ID, projectArchitecture, projectCommand, projectDependencies, projectWorkspace } from './projectors';
+import { ANALYZER_COMMAND_COMMON_LANE_ID, projectArchitecture, projectCommand, projectDependencies, projectStackMap, projectWorkspace } from './projectors';
 import { analyzerSummarySubtitle, presentationOwnsNode, presentAnalyzerView } from './presentation';
 import { scanProjectFiles } from './scan';
 import { packageIdForPath, scriptIdFor, type AnalyzerProjectStore, type AnalyzerSourceFile, type AnalyzerViewModel } from './types';
-import { ANALYZER_NEAR_NODE_HEIGHT, ANALYZER_NODE_HEIGHT, ANALYZER_NODE_WIDTH, layoutAnalyzerView } from './layout';
+import { ANALYZER_NEAR_NODE_HEIGHT, ANALYZER_NODE_HEIGHT, layoutAnalyzerView } from './layout';
 import { ANALYZER_FIT_PADDING, fitAnalyzerTransform, focusAnalyzerTransform, preserveAnalyzerTransformOnViewportResize, shouldRunAnalyzerInitialFit } from './camera';
 import { analyzerRelationInverseLabels, relationLabelForNode } from './relations';
 import { analyzerFocusedEdgeEmphasis } from './focus';
@@ -96,6 +96,39 @@ function analyzerFixture(): AnalyzerSourceFile[] {
     fixtureFile('Shared/Shared.csproj', '<Project Sdk="Microsoft.NET.Sdk" />'),
     fixtureFile('node_modules/ignored/package.json', '{ "name": "ignored" }'),
     fixtureFile('.env', 'B2_APPLICATION_KEY=do-not-read'),
+  ];
+}
+
+function stackMapScopeFixture(): AnalyzerSourceFile[] {
+  return [
+    fixtureFile('package.json', `{
+  "name": "scope-fixture",
+  "devDependencies": {
+    "vitest": "^3.0.0",
+    "@types/node": "^24.0.0"
+  }
+}`),
+    fixtureFile('pnpm-workspace.yaml', `packages:
+  - "apps/*"
+  - "packages/*"
+`),
+    fixtureFile('tsconfig.json', '{ "compilerOptions": { "strict": true } }\n'),
+    fixtureFile('apps/web/package.json', `{
+  "name": "@scope/web",
+  "dependencies": {
+    "react": "^19.0.0",
+    "vite": "^7.0.0"
+  }
+}`),
+    fixtureFile('apps/web/tsconfig.json', '{ "extends": "../../tsconfig.json" }\n'),
+    fixtureFile('apps/api/package.json', `{
+  "name": "@scope/api",
+  "dependencies": {
+    "typescript": "^5.0.0"
+  }
+}`),
+    fixtureFile('apps/api/tsconfig.json', '{ "compilerOptions": { "strict": true } }\n'),
+    fixtureFile('packages/shared/package.json', '{ "name": "@scope/shared" }\n'),
   ];
 }
 
@@ -439,62 +472,65 @@ describe('Analyzer scan and projectors', () => {
     expect(dependencies.nodes.filter((node) => node.metadata.externalLayoutMode === 'flat')).toHaveLength(0);
   });
 
-  it('keeps Architecture Overview concise while retaining expandable detail Facts', async () => {
+  it('projects Stack Map as Project -> Scope -> canonical Stack Usage without dependency-detail pollution', async () => {
     const store = await scanProjectFiles(analyzerFixture());
-    const architecture = projectArchitecture(store);
-    const desktopSummary = architecture.nodes.find((node) => node.id === 'architecture:desktop:summary');
-    const workspaceSummary = architecture.nodes.find((node) => node.id === 'architecture:workspace:summary');
-    const technologySummary = architecture.nodes.find((node) => node.id === 'architecture:technology:summary');
+    const stackMap = projectStackMap(store);
+    const compatibilityProjection = projectArchitecture(store);
+    const usage = (scopeId: string, stackId: string) => stackMap.nodes.find((node) => node.id === `stack-usage:${scopeId}:${stackId}`);
 
-    expect(desktopSummary).toMatchObject({ label: '.NET / WPF', presentation: { role: 'summary' } });
-    expect(desktopSummary?.presentation?.childNodeIds).toHaveLength(2);
-    expect(architecture.nodes.filter((node) => node.presentation?.parentId === desktopSummary?.id)).toHaveLength(2);
-    expect(workspaceSummary).toMatchObject({ label: 'Shared Workspace', presentation: { role: 'summary' } });
-    expect(workspaceSummary?.presentation?.childNodeIds).toEqual(expect.arrayContaining(['package:.', 'package:packages/shared']));
-    expect(technologySummary).toMatchObject({ label: 'Technology details', presentation: { role: 'summary' } });
-    expect(architecture.edges.some((edge) => edge.presentation?.parentId === technologySummary?.id && edge.presentation?.initiallyHidden)).toBe(true);
-    const presented = presentAnalyzerView(architecture, { expandedPresentationIds: new Set(), filter: 'all', search: '' });
-    expect(presented.edges.some((edge) => edge.sourceId === 'project:root' && edge.targetId === 'technology:pnpm')).toBe(false);
-    expect(presented.edges.some((edge) => edge.presentation?.displayKind === 'bundle' && edge.targetId === technologySummary?.id)).toBe(true);
-    expect(presented.counts).toEqual({ visibleNodes: 12, totalNodes: 15, hiddenNodes: 3 });
-    expect(presented.edges).toHaveLength(19);
-    const presentedLayout = layoutAnalyzerView(presented);
-    expect(presentedLayout.nodes.find((positionedNode) => positionedNode.node.id === 'technology:firebase')?.height).toBeGreaterThanOrEqual(80);
-    expect(fitAnalyzerTransform(presentedLayout, 1000, 600).scale).toBeGreaterThan(0.6);
-    expect(presented.presentationGroups).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: technologySummary?.id, label: 'Technology details', countLabel: 'TECHNOLOGIES', expanded: false }),
-    ]));
-    expect(layoutAnalyzerView(presented).summaryGroups).toHaveLength(0);
-    const expandedArchitecture = presentAnalyzerView(architecture, {
-      expandedPresentationIds: new Set([technologySummary?.id].filter((id): id is string => Boolean(id))),
-      filter: 'all',
-      search: '',
+    expect(stackMap.view).toBe('architecture');
+    expect(compatibilityProjection.nodes.map((node) => node.type)).toEqual(stackMap.nodes.map((node) => node.type));
+    expect(stackMap.nodes.map((node) => node.type)).toEqual(expect.arrayContaining(['project', 'stack-scope', 'stack-usage']));
+    expect(stackMap.nodes.some((node) => node.type === 'technology' || node.type === 'external-package')).toBe(false);
+    expect(stackMap.nodes.some((node) => node.label === 'mystery-lib' || node.label === '@types/node')).toBe(false);
+
+    expect(usage('package:apps/web', 'react')).toMatchObject({
+      type: 'stack-usage',
+      label: 'React',
+      metadata: { scopeLabel: 'WEB', scopePath: 'apps/web', dictionaryStackId: 'react' },
     });
-    const expandedArchitectureLayout = layoutAnalyzerView(expandedArchitecture);
-    const technologyGroup = expandedArchitectureLayout.summaryGroups.find((group) => group.id === technologySummary?.id);
-    const technologyChildren = expandedArchitectureLayout.nodes.filter((positionedNode) => positionedNode.node.presentation?.parentId === technologySummary?.id);
-    const technologyChildIds = new Set(technologyChildren.map((positionedNode) => positionedNode.node.id));
-    const technologyClusterNodes = expandedArchitectureLayout.nodes
-      .filter((positionedNode) => positionedNode.node.clusterId === technologyChildren[0]?.node.clusterId)
-      .sort((first, second) => first.y - second.y);
-    const technologyChildIndexes = technologyClusterNodes
-      .map((positionedNode, index) => technologyChildIds.has(positionedNode.node.id) ? index : -1)
-      .filter((index) => index >= 0);
-    expect(technologyGroup).toMatchObject({ id: technologySummary?.id, label: 'Technology details', countLabel: 'TECHNOLOGIES' });
-    expect(technologyChildren.length).toBe(technologySummary?.presentation?.childNodeIds?.length);
-    expect(expandedArchitectureLayout.nodes.some((positionedNode) => positionedNode.node.id === technologySummary?.id)).toBe(false);
-    expect(technologyChildIndexes.length).toBe(technologyChildren.length);
-    expect(Math.max(...technologyChildIndexes) - Math.min(...technologyChildIndexes) + 1).toBe(technologyChildIndexes.length);
-    expect(technologyGroup?.depth).toBe(1);
-    expect(Math.min(...technologyChildren.map((node) => node.y)) - (technologyGroup?.y ?? 0)).toBeGreaterThan(40);
-    const previousTechnologyNode = technologyClusterNodes.filter((positionedNode) => !technologyChildIds.has(positionedNode.node.id)).at(-1);
-    expect(previousTechnologyNode).toBeDefined();
-    expect((technologyGroup?.y ?? 0) + 8).toBeGreaterThanOrEqual((previousTechnologyNode?.y ?? 0) + (previousTechnologyNode?.height ?? 0) + 16);
-    expect(technologyGroup?.x).toBeLessThanOrEqual(Math.min(...technologyChildren.map((node) => node.x)));
-    expect((technologyGroup?.x ?? 0) + (technologyGroup?.width ?? 0)).toBeGreaterThanOrEqual(Math.max(...technologyChildren.map((node) => node.x + ANALYZER_NODE_WIDTH)));
-    expect(expandedArchitectureLayout.width).toBeGreaterThanOrEqual((technologyGroup?.x ?? 0) + (technologyGroup?.width ?? 0));
-    expect(expandedArchitectureLayout.height).toBeGreaterThanOrEqual((technologyGroup?.y ?? 0) + (technologyGroup?.height ?? 0));
-    expect(architecture.edges.some((edge) => edge.sourceId === 'project:root' && edge.targetId.startsWith('technology:') && edge.presentation?.emphasis === 'deep')).toBe(true);
+    expect(usage('root', 'react')).toMatchObject({ metadata: { scopeLabel: 'PROJECT / TOOLING', scopePath: '.' } });
+    expect(usage('package:apps/web', 'vite')).toBeDefined();
+    expect(usage('root', 'vite')).toBeDefined();
+    expect(usage('services', 'cloudflare-workers')).toMatchObject({ metadata: { scopeLabel: 'PROJECT / SERVICES' } });
+    expect(usage('services', 'cloudflare-d1')).toBeDefined();
+    expect(usage('services', 'backblaze-b2')).toBeDefined();
+    expect(usage('services', 'firebase-authentication')).toBeDefined();
+
+    const sharedScope = stackMap.nodes.find((node) => node.id === 'stack-scope:package:packages/shared');
+    expect(sharedScope).toMatchObject({ type: 'stack-scope', label: 'packages/shared', subtitle: 'SHARED' });
+    expect(stackMap.nodes.some((node) => node.type === 'stack-scope' && node.metadata.scopeLabel === 'DESKTOP')).toBe(true);
+    expect(stackMap.edges.every((edge) => stackMap.nodes.some((node) => node.id === edge.sourceId) && stackMap.nodes.some((node) => node.id === edge.targetId))).toBe(true);
+    expect(stackMap.edges.some((edge) => edge.sourceId.startsWith('stack-usage:') || edge.targetId.startsWith('technology:'))).toBe(false);
+
+    const presented = presentAnalyzerView(stackMap, { expandedPresentationIds: new Set(), filter: 'all', search: '' });
+    expect(presented.counts).toEqual({ visibleNodes: stackMap.nodes.length, totalNodes: stackMap.nodes.length, hiddenNodes: 0 });
+    expect(presented.edges).toHaveLength(stackMap.edges.length);
+    expect(presented.presentationGroups).toEqual([]);
+    const layout = layoutAnalyzerView(presented);
+    expect(layout.clusters.some((cluster) => cluster.label === 'WEB')).toBe(true);
+    expect(layout.clusters.some((cluster) => cluster.label === 'PROJECT / SERVICES')).toBe(true);
+    expect(fitAnalyzerTransform(layout, 1000, 600).scale).toBeGreaterThan(0);
+  });
+
+  it('attributes the same canonical Stack to each evidence-backed scope and isolates root tooling', async () => {
+    const stackMap = projectStackMap(await scanProjectFiles(stackMapScopeFixture()));
+    const usage = (scopeId: string, stackId: string) => stackMap.nodes.find((node) => node.id === `stack-usage:${scopeId}:${stackId}`);
+    const typescriptUsages = stackMap.stackUsages?.filter((entry) => entry.stackId === 'typescript') ?? [];
+
+    expect(usage('package:apps/web', 'typescript')).toMatchObject({ metadata: { scopeLabel: 'WEB', scopePath: 'apps/web' } });
+    expect(usage('package:apps/api', 'typescript')).toMatchObject({ metadata: { scopeLabel: 'API', scopePath: 'apps/api' } });
+    expect(usage('root', 'typescript')).toMatchObject({ metadata: { scopeLabel: 'PROJECT / TOOLING' } });
+    expect(typescriptUsages).toHaveLength(3);
+    expect(usage('root', 'vitest')).toMatchObject({ metadata: { scopeLabel: 'PROJECT / TOOLING' } });
+    expect(usage('package:apps/web', 'vitest')).toBeUndefined();
+    expect(usage('package:apps/api', 'vitest')).toBeUndefined();
+    expect(stackMap.nodes.some((node) => node.label === '@types/node')).toBe(false);
+
+    const stackOnly = presentAnalyzerView(stackMap, { expandedPresentationIds: new Set(), filter: 'stack-usage', search: '' });
+    expect(stackOnly.nodes.map((node) => node.type)).toEqual(expect.arrayContaining(['project', 'stack-scope', 'stack-usage']));
+    expect(stackOnly.nodes.every((node) => ['project', 'stack-scope', 'stack-usage'].includes(node.type))).toBe(true);
+    expect(stackOnly.edges.every((edge) => stackOnly.nodes.some((node) => node.id === edge.sourceId) && stackOnly.nodes.some((node) => node.id === edge.targetId))).toBe(true);
   });
 
   it('places Command Flow by execution rank and keeps concurrently branches on one stage', async () => {

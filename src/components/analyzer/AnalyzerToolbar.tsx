@@ -23,12 +23,8 @@ const viewPaths: Record<AnalyzerViewId, string> = analyzerRoutes;
 function filterOptions(view: AnalyzerViewId): Array<{ value: AnalyzerFilter; label: string }> {
   if (view === 'architecture') return [
     { value: 'all', label: 'すべてのNode' },
-    { value: 'application', label: 'Applications' },
-    { value: 'workspace-package', label: 'Packages' },
-    { value: 'technology', label: 'Technologies' },
-    { value: 'runtime', label: 'Runtime / Platform' },
-    { value: 'resource', label: 'Resources' },
-    { value: 'dotnet-project', label: '.NET Applications' },
+    { value: 'stack-scope', label: 'Scopes / Areas' },
+    { value: 'stack-usage', label: 'Canonical Stacks' },
   ];
   if (view === 'workspace') return [
     { value: 'all', label: 'すべてのNode' },

@@ -3513,8 +3513,13 @@ summary:focus-visible {
 }
 
 .analyzer-node.node-type-workspace-config .analyzer-node-type::before,
-.analyzer-node.node-type-technology .analyzer-node-type::before {
+.analyzer-node.node-type-technology .analyzer-node-type::before,
+.analyzer-node.node-type-stack-usage .analyzer-node-type::before {
   border-radius: 50%;
+}
+
+.analyzer-node.node-type-stack-scope .analyzer-node-type::before {
+  transform: rotate(45deg);
 }
 
 .analyzer-node.node-type-workspace-pattern .analyzer-node-type::before,
@@ -3546,6 +3551,18 @@ summary:focus-visible {
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.analyzer-node-title-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.analyzer-node-title-link:hover,
+.analyzer-node-title-link:focus-visible {
+  color: var(--accent-strong);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .analyzer-node-subtitle {

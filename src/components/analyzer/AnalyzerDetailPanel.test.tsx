@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 import { AnalyzerDetailPanel } from './AnalyzerDetailPanel';
-import type { AnalyzerFact, AnalyzerProjectStore, AnalyzerViewModel, AnalyzerViewNode, CommandFact, ProjectFact, TechnologyFact } from '../../analyzer';
+import type { AnalyzerEvidence, AnalyzerFact, AnalyzerProjectStore, AnalyzerViewModel, AnalyzerViewNode, CommandFact, ProjectFact, TechnologyFact } from '../../analyzer';
 
 const storeBase: Omit<AnalyzerProjectStore, 'facts'> = {
   files: [],
@@ -58,6 +58,49 @@ function technologyFact(overrides: Partial<TechnologyFact> = {}): TechnologyFact
   };
 }
 
+function renderStackUsageDetail(): string {
+  const fact = technologyFact({ id: 'technology:react', label: 'React', dictionaryStackId: 'react', packageNames: ['react'] });
+  const evidence: AnalyzerEvidence = {
+    id: 'evidence:web-react',
+    filePath: 'apps/web/package.json',
+    contextStartLine: 1,
+    contextEndLine: 3,
+    highlightRanges: [],
+    kind: 'dependency',
+    detectorId: 'package-dependency',
+  };
+  const node: AnalyzerViewNode = {
+    id: 'stack-usage:package:apps/web:react',
+    factId: fact.id,
+    type: 'stack-usage',
+    label: 'React',
+    evidenceIds: [evidence.id],
+    metadata: {
+      displayRole: 'STACK',
+      stackUsage: true,
+      dictionaryStackId: 'react',
+      categoryLabel: 'UIライブラリ',
+      scopeLabel: 'WEB',
+      scopePath: 'apps/web',
+      roles: ['package dependency'],
+    },
+  };
+  const view: AnalyzerViewModel = { view: 'architecture', nodes: [node], edges: [], clusters: [], evidence: [evidence], warnings: [] };
+  return renderToStaticMarkup(
+    <MemoryRouter>
+      <AnalyzerDetailPanel
+        store={{ ...storeBase, facts: [fact], evidence: [evidence], sources: { 'apps/web/package.json': '{"dependencies":{"react":"^19.0.0"}}' } }}
+        view={view}
+        selectedNodeId={node.id}
+        expandedPresentationIds={new Set()}
+        onSelectNode={() => undefined}
+        onTogglePresentation={() => undefined}
+        onClose={() => undefined}
+      />
+    </MemoryRouter>,
+  );
+}
+
 describe('Analyzer Dictionary title link', () => {
   it('links a recognized Stack through its stable dictionaryStackId', () => {
     const markup = renderFactDetail(technologyFact({ label: 'React', dictionaryStackId: 'react', packageNames: ['react'] }), 'technology');
@@ -97,5 +140,15 @@ describe('Analyzer Dictionary title link', () => {
     expect(labelOnly).not.toContain('<a ');
     expect(renderFactDetail(project, 'project')).not.toContain('<a ');
     expect(renderFactDetail(command, 'command')).not.toContain('<a ');
+  });
+
+  it('shows Stack Usage scope, category, and evidence file details', () => {
+    const markup = renderStackUsageDetail();
+    expect(markup).toContain('<h3>Stack Usage</h3>');
+    expect(markup).toContain('Used in');
+    expect(markup).toContain('WEB · apps/web');
+    expect(markup).toContain('UIライブラリ');
+    expect(markup).toContain('apps/web/package.json');
+    expect(markup).toContain('href="/dictionary/stacks/react"');
   });
 });

@@ -1,4 +1,4 @@
-import { getStack } from '../data';
+import { getCategory, getStack } from '../data';
 import { makeEvidence, type OffsetRange } from './evidence';
 import { parseCommandExpression, type CommandFragment } from './commandParser';
 import {
@@ -11,11 +11,13 @@ import {
   type AnalyzerNodeType,
   type AnalyzerProjectStore,
   type AnalyzerRelation,
+  type AnalyzerStackUsage,
   type AnalyzerViewEdge,
   type AnalyzerViewModel,
   type AnalyzerViewNode,
   type AnalyzerWarning,
   type CommandFact,
+  type PackageManifestFact,
   type PackageScriptFact,
   type WorkspacePackageFact,
 } from './types';
@@ -83,12 +85,6 @@ function summaryNode(
   };
 }
 
-function markPresentationChildren(nodes: AnalyzerViewNode[], parentId: string, childIds: ReadonlySet<string>): AnalyzerViewNode[] {
-  return nodes.map((node) => childIds.has(node.id)
-    ? { ...node, presentation: { role: 'detail', parentId } }
-    : node);
-}
-
 function cluster(id: string, label: string, tone: AnalyzerCluster['tone'], nodes: AnalyzerViewNode[]): AnalyzerCluster {
   return { id, label, tone, nodeIds: nodes.filter((node) => node.clusterId === id).map((node) => node.id) };
 }
@@ -125,137 +121,353 @@ function edgesForRelations(
     });
 }
 
-function architectureCluster(fact: AnalyzerFact): { id: string; label: string; tone: AnalyzerCluster['tone']; type?: AnalyzerNodeType } {
-  if (fact.kind === 'project') return { id: 'architecture:project', label: 'Project', tone: 'neutral' };
-  if (fact.kind === 'workspace-package') {
-    if (fact.packagePath.startsWith('apps/')) return { id: 'architecture:apps', label: 'Applications', tone: 'accent', type: 'application' };
-    return { id: 'architecture:workspace', label: 'Shared Workspace', tone: 'neutral' };
-  }
-  if (fact.kind === 'technology') return { id: 'architecture:technology', label: 'Technologies', tone: 'accent' };
-  if (fact.kind === 'runtime') return { id: 'architecture:runtime', label: 'Runtime / Platform', tone: 'cool' };
-  if (fact.kind === 'resource') return { id: 'architecture:resources', label: 'Resources', tone: 'cool' };
-  return { id: 'architecture:desktop', label: 'Desktop', tone: 'violet' };
+type StackMapScopeKind = 'root' | 'services' | 'application' | 'workspace' | 'package' | 'desktop';
+
+interface StackMapScopeRecord {
+  id: string;
+  nodeId: string;
+  clusterId: string;
+  label: string;
+  path: string;
+  kind: StackMapScopeKind;
+  factId?: string;
+  evidenceIds: Set<string>;
+  usageIds: Set<string>;
 }
 
-const ARCHITECTURE_PRIMARY_TECHNOLOGY_CATEGORIES = new Set([
-  'runtime',
-  'fullstack-web-framework',
-  'web-api-framework',
-  'ui-library',
-  'auth-framework',
-  'auth-library',
-  'auth-service',
-  'build-tool',
-  'relational-database',
-  'document-database',
-  'object-database',
-  'object-storage',
-  'serverless-runtime',
-  'application-platform',
-  'web-hosting',
-]);
-
-function isPrimaryArchitectureTechnology(fact: AnalyzerFact | undefined): boolean {
-  if (!fact || fact.kind !== 'technology') return false;
-  if (!fact.dictionaryStackId) return fact.explicit;
-  return ARCHITECTURE_PRIMARY_TECHNOLOGY_CATEGORIES.has(getStack(fact.dictionaryStackId)?.categoryId ?? '');
+interface StackMapPackageRecord {
+  packagePath: string;
+  factId: string;
+  isRoot: boolean;
+  evidenceIds: string[];
 }
 
-export function projectArchitecture(store: AnalyzerProjectStore): AnalyzerViewModel {
-  const baseNodes = store.facts
-    .filter((fact) => ['project', 'workspace-package', 'technology', 'runtime', 'resource', 'dotnet-project'].includes(fact.kind))
-    .map((fact) => {
-      const placement = architectureCluster(fact);
-      return nodeForFact(fact, placement.id, placement.type);
+interface StackMapUsageRecord extends AnalyzerStackUsage {
+  stackName: string;
+  categoryLabel: string;
+  sourceFactKinds: Set<string>;
+}
+
+function stackMapScopeNodeId(scopeId: string): string {
+  return `stack-scope:${scopeId}`;
+}
+
+function stackMapScopeClusterId(scopeId: string): string {
+  return `stack-map:scope:${scopeId}`;
+}
+
+function humanizeScopeSegment(segment: string): string {
+  return segment.replace(/[-_]+/g, ' ').trim().toUpperCase();
+}
+
+function packageScopeKind(packagePath: string): StackMapScopeKind {
+  if (packagePath.startsWith('apps/')) return 'application';
+  if (packagePath.startsWith('packages/')) return 'workspace';
+  return 'package';
+}
+
+function packageScopeLabel(packagePath: string): string {
+  const segments = packagePath.split('/').filter(Boolean);
+  return humanizeScopeSegment(segments.at(-1) ?? packagePath);
+}
+
+function packageScopeId(packagePath: string): string {
+  return packagePath === '.' ? 'root' : `package:${packagePath}`;
+}
+
+function serviceConfigPath(filePath: string): boolean {
+  const name = filePath.split('/').at(-1)?.toLowerCase();
+  return name === 'wrangler.json'
+    || name === 'wrangler.jsonc'
+    || name === 'wrangler.toml'
+    || name === 'firebase.json'
+    || name === '.firebaserc';
+}
+
+function pathBelongsToPackage(filePath: string, packagePath: string): boolean {
+  if (packagePath === '.') return true;
+  return filePath === packagePath || filePath.startsWith(`${packagePath}/`);
+}
+
+function nearestPackageScope(filePath: string, packages: StackMapPackageRecord[]): StackMapPackageRecord | undefined {
+  return [...packages]
+    .filter((candidate) => pathBelongsToPackage(filePath, candidate.packagePath))
+    .sort((first, second) => second.packagePath.length - first.packagePath.length)[0];
+}
+
+function canonicalStackForFact(fact: AnalyzerFact): ReturnType<typeof getStack> {
+  const stackId = fact.kind === 'technology' || fact.kind === 'resource'
+    ? fact.dictionaryStackId
+    : fact.kind === 'runtime' && typeof fact.metadata.dictionaryStackId === 'string'
+      ? fact.metadata.dictionaryStackId
+      : undefined;
+  return stackId ? getStack(stackId) : undefined;
+}
+
+function stackUsageRole(fact: AnalyzerFact): string | undefined {
+  if (fact.kind === 'technology') return fact.explicit ? 'explicit configuration' : 'package dependency';
+  if (fact.kind === 'runtime') return 'runtime';
+  if (fact.kind === 'resource') return fact.resourceType;
+  return undefined;
+}
+
+function buildStackMap(store: AnalyzerProjectStore): AnalyzerViewModel {
+  const projectFact = store.facts.find((fact): fact is Extract<AnalyzerFact, { kind: 'project' }> => fact.kind === 'project');
+  const rootWorkspacePackage = store.facts.find((fact): fact is WorkspacePackageFact => fact.kind === 'workspace-package' && fact.isRoot);
+  const rootManifest = store.facts.find((fact): fact is PackageManifestFact => fact.kind === 'package-manifest' && fact.packagePath === '.');
+  const rootPackage = rootWorkspacePackage ?? rootManifest;
+  const packageRecords = new Map<string, StackMapPackageRecord>();
+  store.facts
+    .filter((fact): fact is WorkspacePackageFact | PackageManifestFact => fact.kind === 'workspace-package' || fact.kind === 'package-manifest')
+    .forEach((fact) => {
+      const existing = packageRecords.get(fact.packagePath);
+      packageRecords.set(fact.packagePath, {
+        packagePath: fact.packagePath,
+        factId: fact.kind === 'workspace-package' ? fact.id : existing?.factId ?? fact.id,
+        isRoot: fact.packagePath === '.',
+        evidenceIds: [...new Set([...(existing?.evidenceIds ?? []), ...fact.evidenceIds])],
+      });
     });
-  const desktopDetails = baseNodes.filter((node) => node.type === 'dotnet-project');
-  const technologyDetails = baseNodes.filter((node) => node.type === 'technology' && !isPrimaryArchitectureTechnology(store.facts.find((fact) => fact.id === node.factId)));
-  const sharedWorkspaceDetails = baseNodes.filter((node) => node.type === 'workspace-package');
-  const desktopSummaryId = 'architecture:desktop:summary';
-  const sharedWorkspaceSummaryId = 'architecture:workspace:summary';
-  const technologySummaryId = 'architecture:technology:summary';
-  const nodesWithWorkspaceSummary = sharedWorkspaceDetails.length > 1
-    ? [
-        ...markPresentationChildren(baseNodes, sharedWorkspaceSummaryId, new Set(sharedWorkspaceDetails.map((node) => node.id))),
-        summaryNode(sharedWorkspaceSummaryId, 'Shared Workspace', `${sharedWorkspaceDetails.length} packages · expand for details`, 'workspace-package', 'architecture:workspace', sharedWorkspaceDetails),
-      ]
-    : baseNodes;
-  const nodesWithDesktopSummary = desktopDetails.length > 0
-    ? [
-        ...markPresentationChildren(nodesWithWorkspaceSummary, desktopSummaryId, new Set(desktopDetails.map((node) => node.id))),
-        summaryNode(desktopSummaryId, '.NET / WPF', `${desktopDetails.length} projects · expand for details`, 'dotnet-project', 'architecture:desktop', desktopDetails),
-      ]
-    : nodesWithWorkspaceSummary;
-  const nodes = technologyDetails.length > 0
-    ? [
-        ...markPresentationChildren(nodesWithDesktopSummary, technologySummaryId, new Set(technologyDetails.map((node) => node.id))),
-        summaryNode(technologySummaryId, 'Technology details', `${technologyDetails.length} additional technologies`, 'technology', 'architecture:technology', technologyDetails),
-      ]
-    : nodesWithDesktopSummary;
-  const architectureEdges = edgesForRelations(
-    store,
-    baseNodes,
-    (relation) => ['contains', 'uses', 'binds-to', 'depends-on'].includes(relation.kind),
-    (relation) => relation.kind === 'depends-on' ? 'uses' : relation.kind,
-  );
-  const nodeById = new Map(baseNodes.map((node) => [node.id, node]));
-  const architectureEdgeEmphasis = (edge: AnalyzerViewEdge): 'primary' | 'secondary' | 'deep' => {
-    const source = nodeById.get(edge.sourceId);
-    const target = nodeById.get(edge.targetId);
-    if (edge.sourceId === 'project:root') {
-      if (target?.type === 'technology') return 'deep';
-      return 'primary';
+  const packages = [...packageRecords.values()];
+  const desktopFacts = store.facts.filter((fact): fact is Extract<AnalyzerFact, { kind: 'dotnet-project' }> => fact.kind === 'dotnet-project');
+  const scopes = new Map<string, StackMapScopeRecord>();
+
+  const ensureScope = (scope: Omit<StackMapScopeRecord, 'nodeId' | 'clusterId' | 'evidenceIds' | 'usageIds'>, evidenceIds: readonly string[] = []): StackMapScopeRecord => {
+    const existing = scopes.get(scope.id);
+    if (existing) {
+      evidenceIds.forEach((evidenceId) => existing.evidenceIds.add(evidenceId));
+      if (!existing.factId && scope.factId) existing.factId = scope.factId;
+      return existing;
     }
-    if (edge.kind === 'binds-to' || target?.type === 'runtime' || target?.type === 'resource') return 'primary';
-    if (target?.type === 'technology') return source?.type === 'workspace-package' || source?.type === 'application' ? 'primary' : 'secondary';
-    return 'secondary';
+    const created: StackMapScopeRecord = {
+      ...scope,
+      nodeId: stackMapScopeNodeId(scope.id),
+      clusterId: stackMapScopeClusterId(scope.id),
+      evidenceIds: new Set(evidenceIds),
+      usageIds: new Set(),
+    };
+    scopes.set(scope.id, created);
+    return created;
   };
-  const technologyDetailEdges = architectureEdges.filter((edge) => technologyDetails.some((node) => node.id === edge.targetId));
-  const technologyEdgesBySource = new Map<string, AnalyzerViewEdge[]>();
-  technologyDetailEdges.forEach((edge) => {
-    const sourceEdges = technologyEdgesBySource.get(edge.sourceId) ?? [];
-    sourceEdges.push(edge);
-    technologyEdgesBySource.set(edge.sourceId, sourceEdges);
+
+  if (projectFact || rootPackage) {
+    ensureScope({
+      id: 'root',
+      label: 'PROJECT / TOOLING',
+      path: '.',
+      kind: 'root',
+      ...(rootPackage?.id ?? projectFact?.id ? { factId: rootPackage?.id ?? projectFact?.id } : {}),
+    }, [...new Set([...(projectFact?.evidenceIds ?? []), ...(rootPackage?.evidenceIds ?? [])])]);
+  }
+  packages.filter((fact) => !fact.isRoot).forEach((fact) => {
+    const kind = packageScopeKind(fact.packagePath);
+    ensureScope({
+      id: packageScopeId(fact.packagePath),
+      label: packageScopeLabel(fact.packagePath),
+      path: fact.packagePath,
+      kind,
+      factId: fact.factId,
+    }, fact.evidenceIds);
   });
-  const technologyBundleEdges = technologyEdgesBySource.size > 0
-    ? [...technologyEdgesBySource.entries()].map(([sourceId, sourceEdges]) => ({
-        id: `view-edge:architecture-technology-bundle:${sourceId}`,
-        sourceId,
-        targetId: technologySummaryId,
-        kind: 'uses' as const,
-        label: `${sourceEdges.length} additional ${sourceEdges.length === 1 ? 'technology' : 'technologies'}`,
-        evidenceIds: [...new Set(sourceEdges.flatMap((edge) => edge.evidenceIds))],
-        metadata: { presentation: 'bundle', technologyCount: sourceEdges.length },
-        presentation: { displayKind: 'bundle' as const, parentId: technologySummaryId, emphasis: sourceId === 'project:root' ? 'secondary' as const : 'primary' as const },
-      }))
-    : [];
-  const edges = architectureEdges.map((edge) => ({
-    ...edge,
-    presentation: {
-      emphasis: architectureEdgeEmphasis(edge),
-      ...(technologyDetails.some((node) => node.id === edge.targetId)
-        ? { parentId: technologySummaryId, initiallyHidden: true }
-        : {}),
+  desktopFacts.forEach((fact) => {
+    ensureScope({
+      id: `dotnet:${fact.id}`,
+      label: 'DESKTOP',
+      path: fact.projectPath,
+      kind: 'desktop',
+      factId: fact.id,
+    }, fact.evidenceIds);
+  });
+
+  const evidenceById = new Map(store.evidence.map((evidence) => [evidence.id, evidence]));
+  const usageById = new Map<string, StackMapUsageRecord>();
+  const serviceScope = () => ensureScope({
+    id: 'services',
+    label: 'PROJECT / SERVICES',
+    path: '.',
+    kind: 'services',
+    ...(projectFact ? { factId: projectFact.id } : {}),
+  }, projectFact?.evidenceIds ?? []);
+  const scopeForEvidence = (filePath: string): StackMapScopeRecord => {
+    const desktopFact = desktopFacts.find((fact) => fact.projectPath === filePath);
+    if (desktopFact) {
+      return ensureScope({
+        id: `dotnet:${desktopFact.id}`,
+        label: 'DESKTOP',
+        path: desktopFact.projectPath,
+        kind: 'desktop',
+        factId: desktopFact.id,
+      }, desktopFact.evidenceIds);
+    }
+    const packageFact = nearestPackageScope(filePath, packages);
+    if (packageFact && !packageFact.isRoot) {
+      return ensureScope({
+        id: packageScopeId(packageFact.packagePath),
+        label: packageScopeLabel(packageFact.packagePath),
+        path: packageFact.packagePath,
+        kind: packageScopeKind(packageFact.packagePath),
+        factId: packageFact.factId,
+      }, packageFact.evidenceIds);
+    }
+    if (serviceConfigPath(filePath)) return serviceScope();
+    return ensureScope({
+      id: 'root',
+      label: 'PROJECT / TOOLING',
+      path: '.',
+      kind: 'root',
+      ...(rootPackage?.id ?? projectFact?.id ? { factId: rootPackage?.id ?? projectFact?.id } : {}),
+    }, [...new Set([...(projectFact?.evidenceIds ?? []), ...(rootPackage?.evidenceIds ?? [])])]);
+  };
+
+  store.facts.forEach((fact) => {
+    const stack = canonicalStackForFact(fact);
+    if (!stack) return;
+    const evidence = fact.evidenceIds
+      .map((evidenceId) => evidenceById.get(evidenceId))
+      .filter((candidate): candidate is NonNullable<typeof candidate> => Boolean(candidate));
+    if (evidence.length === 0) return;
+    const evidenceByScope = new Map<string, { scope: StackMapScopeRecord; evidenceIds: Set<string> }>();
+    evidence.forEach((item) => {
+      const scope = scopeForEvidence(item.filePath);
+      const entry = evidenceByScope.get(scope.id) ?? { scope, evidenceIds: new Set<string>() };
+      entry.evidenceIds.add(item.id);
+      evidenceByScope.set(scope.id, entry);
+    });
+    evidenceByScope.forEach(({ scope, evidenceIds }) => {
+      const usageId = `stack-usage:${scope.id}:${stack.id}`;
+      const usage = usageById.get(usageId) ?? {
+        id: usageId,
+        stackId: stack.id,
+        scopeId: scope.id,
+        evidenceIds: [],
+        sourceFactIds: [],
+        roles: [],
+        stackName: stack.name,
+        categoryLabel: getCategory(stack.categoryId)?.name ?? stack.categoryId,
+        sourceFactKinds: new Set<string>(),
+      };
+      usage.evidenceIds = [...new Set([...usage.evidenceIds, ...evidenceIds])];
+      if (!usage.sourceFactIds.includes(fact.id)) usage.sourceFactIds.push(fact.id);
+      usage.sourceFactKinds.add(fact.kind);
+      const role = stackUsageRole(fact);
+      if (role && !usage.roles.includes(role)) usage.roles.push(role);
+      usageById.set(usageId, usage);
+      scope.usageIds.add(usageId);
+      usage.evidenceIds.forEach((evidenceId) => scope.evidenceIds.add(evidenceId));
+    });
+  });
+
+  const orderedScopes = [...scopes.values()].sort((first, second) => {
+    const rank: Record<StackMapScopeKind, number> = { root: 0, application: 1, workspace: 2, package: 3, desktop: 4, services: 5 };
+    return rank[first.kind] - rank[second.kind] || first.path.localeCompare(second.path) || first.id.localeCompare(second.id);
+  });
+  const projectNode = projectFact ? nodeForFact(projectFact, 'stack-map:project') : undefined;
+  const scopeNodes = orderedScopes.map((scope): AnalyzerViewNode => ({
+    id: scope.nodeId,
+    ...(scope.factId ? { factId: scope.factId } : {}),
+    type: 'stack-scope',
+    label: scope.kind === 'root' ? 'Project Root' : scope.kind === 'services' ? 'Project Services' : scope.path,
+    subtitle: scope.label,
+    clusterId: scope.clusterId,
+    evidenceIds: [...scope.evidenceIds],
+    metadata: {
+      displayRole: 'SCOPE',
+      stackMapScope: true,
+      scopeId: scope.id,
+      scopeLabel: scope.label,
+      scopePath: scope.path,
+      scopeKind: scope.kind,
+      usageCount: scope.usageIds.size,
+      ...(projectNode ? { stackMapParentId: projectNode.id } : {}),
     },
-  })).concat(technologyBundleEdges);
-  const clusterDefinitions = [
-    ['architecture:project', 'Project', 'neutral'],
-    ['architecture:apps', 'Applications', 'accent'],
-    ['architecture:workspace', 'Shared Workspace', 'neutral'],
-    ['architecture:technology', 'Technologies', 'accent'],
-    ['architecture:runtime', 'Runtime / Platform', 'cool'],
-    ['architecture:resources', 'Resources', 'cool'],
-    ['architecture:desktop', 'Desktop', 'violet'],
-  ] as const;
-  const clusters = clusterDefinitions.map(([id, label, tone]) => cluster(id, label, tone, nodes)).filter((entry) => entry.nodeIds.length > 0);
+  }));
+  const usageRecords = orderedScopes.flatMap((scope) => [...scope.usageIds]
+    .map((usageId) => usageById.get(usageId))
+    .filter((usage): usage is StackMapUsageRecord => Boolean(usage))
+    .sort((first, second) => first.stackName.localeCompare(second.stackName)));
+  const usageNodes = usageRecords.map((usage): AnalyzerViewNode => ({
+    id: usage.id,
+    factId: usage.sourceFactIds[0],
+    type: 'stack-usage',
+    label: usage.stackName,
+    subtitle: usage.categoryLabel,
+    clusterId: stackMapScopeClusterId(usage.scopeId),
+    evidenceIds: usage.evidenceIds,
+    metadata: {
+      displayRole: 'STACK',
+      stackUsage: true,
+      stackId: usage.stackId,
+      dictionaryStackId: usage.stackId,
+      categoryId: getStack(usage.stackId)?.categoryId ?? '',
+      categoryLabel: usage.categoryLabel,
+      scopeId: usage.scopeId,
+      scopeLabel: scopes.get(usage.scopeId)?.label ?? usage.scopeId,
+      scopePath: scopes.get(usage.scopeId)?.path ?? '.',
+      stackMapParentId: stackMapScopeNodeId(usage.scopeId),
+      sourceFactIds: usage.sourceFactIds,
+      sourceFactKinds: [...usage.sourceFactKinds],
+      roles: usage.roles,
+    },
+  }));
+  const nodes = [...(projectNode ? [projectNode] : []), ...scopeNodes, ...usageNodes];
+  const edges: AnalyzerViewEdge[] = [];
+  if (projectNode) {
+    orderedScopes.forEach((scope) => {
+      edges.push({
+        id: `view-edge:stack-map:contains:${scope.id}`,
+        sourceId: projectNode.id,
+        targetId: scope.nodeId,
+        kind: 'contains',
+        label: relationLabels.contains,
+        evidenceIds: [...scope.evidenceIds],
+        metadata: { presentation: 'stack-map', scopeId: scope.id },
+      });
+    });
+  }
+  usageRecords.forEach((usage) => {
+    edges.push({
+      id: `view-edge:stack-map:uses:${usage.id}`,
+      sourceId: stackMapScopeNodeId(usage.scopeId),
+      targetId: usage.id,
+      kind: 'uses',
+      label: relationLabels.uses,
+      evidenceIds: usage.evidenceIds,
+      metadata: { presentation: 'stack-map', scopeId: usage.scopeId, stackId: usage.stackId },
+    });
+  });
+  const clusterDefinitions: ReadonlyArray<readonly [string, string, AnalyzerCluster['tone']]> = [
+    ...(projectNode ? [['stack-map:project', 'Project', 'neutral'] as const] : []),
+    ...orderedScopes.map((scope) => [
+      scope.clusterId,
+      scope.label,
+      scope.kind === 'application' ? 'accent' : scope.kind === 'desktop' ? 'violet' : scope.kind === 'services' ? 'cool' : 'neutral',
+    ] as const),
+  ];
   return {
     view: 'architecture',
     nodes,
     edges,
-    clusters,
+    clusters: clusterDefinitions.map(([id, label, tone]) => cluster(id, label, tone, nodes)).filter((entry) => entry.nodeIds.length > 0),
+    stackUsages: usageRecords.map(({ id, stackId, scopeId, evidenceIds, sourceFactIds, roles }) => ({
+      id,
+      stackId,
+      scopeId,
+      evidenceIds,
+      sourceFactIds,
+      roles,
+    })),
     evidence: store.evidence,
     warnings: baseWarnings(store, 'architecture'),
   };
+}
+
+/** Compatibility name for the `architecture` session/route ID. */
+export function projectStackMap(store: AnalyzerProjectStore): AnalyzerViewModel {
+  return buildStackMap(store);
+}
+
+export function projectArchitecture(store: AnalyzerProjectStore): AnalyzerViewModel {
+  return buildStackMap(store);
 }
 
 export function projectWorkspace(store: AnalyzerProjectStore): AnalyzerViewModel {

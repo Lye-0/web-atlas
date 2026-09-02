@@ -44,7 +44,7 @@ function viewModel(): AnalyzerViewModel {
 }
 
 describe('Analyzer session store', () => {
-  it('starts at Architecture and restores the active view without touching other view sessions', () => {
+  it('starts at Stack Map and restores the active view without touching other view sessions', () => {
     let state = createInitialAnalyzerSessionState();
     expect(state.activeView).toBe('architecture');
     state = analyzerSessionReducer(state, { type: 'setActiveView', view: 'command' });
@@ -82,6 +82,16 @@ describe('Analyzer session store', () => {
     }, view);
     expect(missing.selectedNodeId).toBeUndefined();
     expect(missing.detailOpen).toBe(false);
+  });
+
+  it('maps legacy Architecture filters to the Stack Map filter vocabulary', () => {
+    const view: AnalyzerViewModel = { ...viewModel(), view: 'architecture' };
+    const restored = restoreAnalyzerViewSession({
+      ...createInitialAnalyzerSessionState().views.architecture,
+      filter: 'technology',
+    }, view);
+
+    expect(restored.filter).toBe('stack-usage');
   });
 
   it('keeps the selected folder handle alongside the analysis result', () => {

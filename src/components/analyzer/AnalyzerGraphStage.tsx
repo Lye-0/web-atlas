@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
+import { Link } from 'react-router-dom';
 import { ANALYZER_DEFAULT_TRANSFORM, ANALYZER_EXTERNAL_SUMMARY_ID, ANALYZER_NODE_WIDTH, analyzerEdgeArrowMarkerId, analyzerEdgeObstacles, analyzerEdgePaths, analyzerFocusDepths, analyzerForegroundEdges, analyzerPresentationCount, analyzerPresentationCountLabel, displayedZoomLevelForNode, evidenceRangeLabel, fitAnalyzerTransform, focusAnalyzerTransform, layoutAnalyzerView, nodeMatchesSearch, preserveAnalyzerTransformOnViewportResize, presentAnalyzerView, semanticZoomLevelForScale, shouldRunAnalyzerInitialFit, shouldShowAnalyzerEvidencePreview, type AnalyzerEdgeRoutingDiagnostic, type AnalyzerFanoutRoutingDiagnostic, type AnalyzerGraphTransform, type AnalyzerViewCounts, type AnalyzerViewEdge, type AnalyzerViewModel, type PositionedNode } from '../../analyzer';
-import { nodeTypeLabels } from '../../analyzer';
+import { displayDictionaryStack, factDictionaryStackId, nodeTypeLabels } from '../../analyzer';
+import { stackPath } from '../../utils/routes';
 import { EvidencePreview } from './EvidenceCodeBlock';
 
 interface AnalyzerGraphStageProps {
@@ -38,6 +40,12 @@ interface PresentationCameraSnapshot {
 function displayNodeType(node: AnalyzerViewModel['nodes'][number]): string {
   const displayRole = node.metadata.displayRole;
   return typeof displayRole === 'string' ? displayRole : nodeTypeLabels[node.type] ?? node.type;
+}
+
+function dictionaryStackForNode(node: AnalyzerViewModel['nodes'][number]): { name: string; id: string } | undefined {
+  return node.metadata.stackUsage === true
+    ? displayDictionaryStack(factDictionaryStackId(node))
+    : undefined;
 }
 
 function nodeStyle(positionedNode: PositionedNode): CSSProperties {
@@ -693,6 +701,7 @@ export function AnalyzerGraphStage({
               const compactEvidenceHint = !summary && zoomLevel === 'near' && node.evidenceIds.length > 0 && !hasEvidencePreview ? evidenceHint(node, view) : undefined;
               const summaryCount = summary ? analyzerPresentationCount(node) : 0;
               const summaryCountLabel = summary ? analyzerPresentationCountLabel(node) : '';
+              const dictionaryStack = dictionaryStackForNode(node);
               const dimmed = Boolean(search.trim() && !matches && !selected) || Boolean((selectedNodeId || selectedEdgeId) && !selected && !inSelectionContext && focusDepth === undefined);
               return (
                 <div
@@ -732,7 +741,18 @@ export function AnalyzerGraphStage({
                   ) : (
                     <>
                       <span className="analyzer-node-type">{displayNodeType(node)}</span>
-                      <strong>{node.label}</strong>
+                      <strong>
+                        {dictionaryStack ? (
+                          <Link
+                            className="analyzer-node-title-link"
+                            to={stackPath(dictionaryStack.id)}
+                            onClick={(event) => event.stopPropagation()}
+                            onKeyDown={(event) => event.stopPropagation()}
+                          >
+                            {node.label}
+                          </Link>
+                        ) : node.label}
+                      </strong>
                       {nodeZoom !== 'far' && node.subtitle && <span className="analyzer-node-subtitle">{node.subtitle}</span>}
                     </>
                   )}

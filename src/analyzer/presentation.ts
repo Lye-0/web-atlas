@@ -75,6 +75,25 @@ export function analyzerViewCounts(view: AnalyzerViewModel, visibleNodes: Analyz
   };
 }
 
+function stackMapFilterContextIds(view: AnalyzerViewModel, filter: string): ReadonlySet<string> {
+  if (view.view !== 'architecture' || filter === 'all') return new Set();
+  const nodeById = new Map(view.nodes.map((node) => [node.id, node]));
+  const contextIds = new Set<string>();
+  view.nodes
+    .filter((node) => node.type === filter)
+    .forEach((node) => {
+      let current: AnalyzerViewNode | undefined = node;
+      const visited = new Set<string>();
+      while (current && !visited.has(current.id)) {
+        contextIds.add(current.id);
+        visited.add(current.id);
+        const parentId: AnalyzerViewNode['metadata'][string] = current.metadata.stackMapParentId;
+        current = typeof parentId === 'string' ? nodeById.get(parentId) : undefined;
+      }
+    });
+  return contextIds;
+}
+
 export function presentAnalyzerView(view: AnalyzerViewModel, options: AnalyzerPresentationOptions): AnalyzerViewModel {
   const nodeById = new Map(view.nodes.map((node) => [node.id, node]));
   const parentByChildId = new Map(view.nodes.flatMap((node) => node.presentation?.parentId
@@ -84,6 +103,7 @@ export function presentAnalyzerView(view: AnalyzerViewModel, options: AnalyzerPr
   const searchMatchedIds = new Set(hasSearch
     ? view.nodes.filter((node) => nodeMatchesSearch(node, options.search)).map((node) => node.id)
     : []);
+  const stackMapContextIds = stackMapFilterContextIds(view, options.filter);
 
   const selectedContextIds = new Set<string>();
   if (options.selectedNodeId) {
@@ -152,7 +172,7 @@ export function presentAnalyzerView(view: AnalyzerViewModel, options: AnalyzerPr
   });
 
   const visibleNodes = view.nodes.filter((node) => presentationVisibleIds.has(node.id)
-    && (options.filter === 'all' || node.type === options.filter || selectedContextIds.has(node.id)));
+    && (options.filter === 'all' || node.type === options.filter || selectedContextIds.has(node.id) || stackMapContextIds.has(node.id)));
   const visibleIds = new Set(visibleNodes.map((node) => node.id));
   const resolvedEdges = new Map<string, AnalyzerViewEdge>();
   const presentationPathExpanded = (presentationId: string): boolean => {
