@@ -262,6 +262,7 @@ export function AnalyzerGraphStage({
   }, [filteredView.edges, filteredView.nodes, selectedEdgeId, selectedNodeId]);
   useEffect(() => {
     if (!import.meta.env.DEV || (!selectedNodeId && !selectedEdgeId)) return;
+    const loggedFanoutGroups = new Set<string>();
     filteredView.edges.forEach((edge) => {
       const explicitlySelected = edge.id === selectedEdgeId;
       const relatedToSelectedNode = Boolean(selectedNodeId && (edge.sourceId === selectedNodeId || edge.targetId === selectedNodeId));
@@ -286,6 +287,26 @@ export function AnalyzerGraphStage({
       const fanoutGroupDiagnostic = routing.fanoutGroupId
         ? edgeRoutingResult.fanoutDiagnostics.get(routing.fanoutGroupId)
         : undefined;
+
+      if (fanoutGroupDiagnostic && !loggedFanoutGroups.has(fanoutGroupDiagnostic.fanoutGroupId)) {
+        loggedFanoutGroups.add(fanoutGroupDiagnostic.fanoutGroupId);
+        console.info('[Analyzer Fanout Candidate Diagnostic]', {
+          fanoutGroupId: fanoutGroupDiagnostic.fanoutGroupId,
+          sourceId: fanoutGroupDiagnostic.sourceId,
+          edgeIds: fanoutGroupDiagnostic.edgeIds,
+          targetIds: fanoutGroupDiagnostic.targetIds,
+          fanoutDetected: fanoutGroupDiagnostic.fanoutDetected,
+          busCandidateCount: fanoutGroupDiagnostic.busCandidateCount,
+          preferredDirection: fanoutGroupDiagnostic.preferredDirection,
+          selectedDirection: fanoutGroupDiagnostic.selectedDirection,
+          evaluatedDirections: fanoutGroupDiagnostic.evaluatedDirections,
+          directionDiagnostics: fanoutGroupDiagnostic.directionDiagnostics,
+          targetGroupBounds: fanoutGroupDiagnostic.targetGroupBounds,
+          fallbackUsed: fanoutGroupDiagnostic.fallbackUsed,
+          fallbackReason: fanoutGroupDiagnostic.fallbackReason,
+          candidateDiagnostics: fanoutGroupDiagnostic.candidateDiagnostics,
+        });
+      }
 
       console.info('[Analyzer Edge Diagnostic]', {
         edgeId: routing.edgeId,
@@ -316,7 +337,12 @@ export function AnalyzerGraphStage({
         busX: routing.selectedBusX,
         busY: routing.selectedBusY,
         busCandidateCount: routing.busCandidateCount,
+        preferredDirection: routing.preferredDirection,
+        selectedDirection: routing.selectedDirection,
+        evaluatedDirections: routing.evaluatedDirections,
+        directionDiagnostics: routing.directionDiagnostics,
         targetGroupBounds: routing.targetGroupBounds,
+        candidateDiagnostics: routing.candidateDiagnostics,
         fallbackUsed: routing.fallbackUsed,
         fallbackReason: routing.fallbackReason,
         pathPoints: routing.pathPoints,

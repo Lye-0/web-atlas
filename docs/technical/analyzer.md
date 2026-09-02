@@ -25,6 +25,8 @@ Graphは新しい可視化ライブラリへ依存せず、[`src/analyzer/layout
 
 Fan-out成立時は、generic routerへ各Fact Edgeを再投入せず、現在のtarget group boundsからBus Corridorを先に確定します。確定したbusを共有する`source segment → shared bus segment → target branch → target boundary`を各Edge IDごとに構成し、成功したrouteを先に登録して後段のgeneric routingによる上書きを防ぎます。left-to-rightの専用busはtarget group左端から32px以上離し、source側のx-monotonicityを維持します。候補がない、またはhard obstacle・bounds・x-monotonicityを満たす候補がない場合だけgeneric routingへfallbackします。`AnalyzerEdgeRoutingOptions.onFanoutDiagnostic`を指定すると、開発・テスト時にfan-out検出、候補数、選択bus座標、target bounds、fallback理由を取得できます。これはUIには表示しません。
 
+Fan-outの方向は個別Nodeの中心距離だけで決めず、sourceとtarget groupのright / left / down / up side gapを比較します。明確な水平分離がある場合は、縦長target groupの中心が下にある場合でもright / leftを先に評価します。preferred directionのBusが成立しない場合は他の方向候補も検証し、validなstructural Busがあればgeneric fallbackを行いません。診断には方向別のside gap、候補数、valid候補数、preferred / selected direction、評価順を含めます。
+
 ## Fact / Evidence model
 
 共通モデルは [`src/analyzer/types.ts`](../../src/analyzer/types.ts) にあります。
@@ -100,11 +102,11 @@ BrowserのFile System Access APIがない場合はdirectory file inputを使い�
 ## Validation
 
 合成fixtureは [`src/analyzer/analyzer.test.ts`](../../src/analyzer/analyzer.test.ts) にあり、parser range、workspace解決、Dictionary matching、D1/B2/Firebase/.NET detection、command recursion/concurrently/cycle、forward / inverse relation label、COMMON / branch summary / lane、view scope、visible / total count、masking、Semantic Zoom、exact Evidence range hint、Summary Card / Summary GroupのPresentation metadata・count・共通bounds・展開Summaryの内側Node非表示、heading専用領域とmember gap、heading visual bounds / overhang、直前Blockとのcollision、Nested Regionの親子間隔、Architecture初期projection / high-degree depth emphasis / Summary detailの連続配置、execution layout、single-source Externalのflat presentation、multi-source External / Shared Externalのgrouping、collapsed search、Summary headingを含むFit boundsを検証します。 [`src/analyzer/edgeRouting.test.ts`](../../src/analyzer/edgeRouting.test.ts) はhard / soft obstacle分類、Fact Node・Collapsed Summary・headingの迂回、orthogonal routeのboundary port、collinear / short-zigzag簡略化、角丸描画、交差 penalty、Node外周のsoft keep-out、連続遮蔽の非線形penalty、alternative corridor、source / target terminal leg、shared trunkのreadability cost、sibling targetを含む同一source fan-out、target group boundsを使った構造的な専用busとbranch、individual Edgeの独立reroute防止、target group外側のbus clearance、target group内部candidateの回避、branchのsibling obstacle、dynamic bounds、corridor unavailable時のgeneric fallback、選択Presentationによるgeometry不変、x-monotonicity、個別Edge ID保持を検証します。 [`src/analyzer/edgePresentation.test.ts`](../../src/analyzer/edgePresentation.test.ts) は選択Edgeをforeground内の最後に配置する優先順位とNode選択時のconnected edge順序を検証します。 [`src/data/stackLookup.test.ts`](../../src/data/stackLookup.test.ts) はpackage / alias / ambiguous lookup、[`src/components/analyzer/AnalyzerDetailPanel.test.tsx`](../../src/components/analyzer/AnalyzerDetailPanel.test.tsx) はstable IDによるtitle Linkとplain title、[`src/analyzer/session.test.ts`](../../src/analyzer/session.test.ts) はactive view、View別Session / camera / folder handle保持、Projection後のstable ID再解決、新規Project時のresetを検証します。Cameraのsaved/initial-fit判定は [`src/analyzer/analyzer.test.ts`](../../src/analyzer/analyzer.test.ts) で検証します。
-Fan-out diagnosticsは`AnalyzerEdgeRoutingOptions.onFanoutDiagnostic`を使って、Bus成立時の選択座標と、corridor不足・候補無効時のgeneric fallback理由を検証します。
+Fan-out diagnosticsは`AnalyzerEdgeRoutingOptions.onFanoutDiagnostic`を使って、方向候補別のside gap・Bus成立数、候補単位のObstacle reject理由、Bus成立時の選択方向 / 座標、corridor不足・候補無効時のgeneric fallback理由を検証します。
 
 実装時の検証結果:
 
-- `pnpm test`: 9 test files / 74 tests passed（Analyzerの既存回帰23 tests、Edge Routingの26 tests、Readability-aware RoutingとStructural Fan-out Route Compositionの回帰を含む）
+- `pnpm test`: 9 test files / 78 tests passed（Analyzerの既存回帰23 tests、Edge Routingの30 tests、Readability-aware RoutingとStructural Fan-out Route Composition、Geometry-aware Fan-out Direction Selectionの回帰を含む）
 - `pnpm typecheck`: passed
 - `pnpm lint`: passed
 - `pnpm build`: passed（Vite production bundle。Three.js lazy chunkのサイズ警告あり）

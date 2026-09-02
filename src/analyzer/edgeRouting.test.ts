@@ -13,6 +13,7 @@ import {
   simplifyAnalyzerOrthogonalRoute,
   type AnalyzerEdgeRoutingDiagnostic,
   type AnalyzerFanoutRoutingDiagnostic,
+  type AnalyzerFanoutCandidateDiagnostic,
   type AnalyzerEdgePoint,
   type AnalyzerEdgeObstacle,
 } from './edgeRouting';
@@ -376,6 +377,20 @@ describe('Analyzer same-source fan-out', () => {
     });
     const selectedBusX = diagnostic?.selectedBusX;
     expect(selectedBusX).toBeLessThanOrEqual(targetGroupLeft - 32);
+    const candidateDiagnostics: AnalyzerFanoutCandidateDiagnostic[] = diagnostic?.candidateDiagnostics ?? [];
+    expect(candidateDiagnostics).toHaveLength(diagnostic?.busCandidateCount ?? 0);
+    const selectedCandidate = candidateDiagnostics.find((candidate) => candidate.candidateX === selectedBusX);
+    expect(selectedCandidate).toMatchObject({
+      status: 'accepted',
+      sourceRight: source.x + ANALYZER_NODE_WIDTH,
+      targetGroupLeft,
+      availableWidth: targetGroupLeft - (source.x + ANALYZER_NODE_WIDTH),
+      clearance: 14,
+      sourceEntry: { valid: true, pathPoints: expect.any(Array) },
+      trunk: { valid: true, pathPoints: expect.any(Array) },
+    });
+    expect(selectedCandidate?.branches).toHaveLength(targets.length);
+    expect(selectedCandidate?.branches.every((branch) => branch.valid)).toBe(true);
     const firstRoute = routes.get('edge:target-a') ?? [];
     const lastRoute = routes.get('edge:target-f') ?? [];
     expect(firstRoute.slice(0, 2)).toEqual(lastRoute.slice(0, 2));
@@ -386,6 +401,148 @@ describe('Analyzer same-source fan-out', () => {
       expect(route.every((point, index) => index === 0 || point.x >= route[index - 1]!.x)).toBe(true);
       expect(route.some((point) => point.x === selectedBusX)).toBe(true);
     });
+  });
+
+  it('explains rejected bus candidates with obstacle identity and endpoint exclusions', () => {
+    const source = positionedNode('source', 0, 200);
+    const targets = [
+      positionedNode('target-a', 700, 100),
+      positionedNode('target-b', 700, 300),
+    ];
+    const blocker = obstacle('blocking-corridor', 400, 0, 300, 600, 'fact-node');
+    const nodes = [source, ...targets];
+    const positionedById = new Map(nodes.map((node) => [node.node.id, node]));
+    const edges = targets.map((target) => edge(`edge:${target.node.id}`, 'source', target.node.id));
+    const diagnostics: AnalyzerFanoutRoutingDiagnostic[] = [];
+
+    analyzerEdgeRoutes(edges, positionedById, [...nodes.map(nodeObstacle), blocker], {
+      flowDirection: 'horizontal',
+      onFanoutDiagnostic: (diagnostic) => diagnostics.push(diagnostic),
+    });
+
+    const diagnostic = diagnostics[0];
+    expect(diagnostic).toMatchObject({
+      fanoutDetected: true,
+      busCandidateCount: expect.any(Number),
+      fallbackUsed: true,
+      fallbackReason: 'no-valid-bus-route',
+    });
+    expect(diagnostic?.busCandidateCount).toBeGreaterThan(0);
+    expect(diagnostic?.candidateDiagnostics).toHaveLength(diagnostic?.busCandidateCount ?? 0);
+    expect(diagnostic?.candidateDiagnostics.every((candidate) => candidate.status === 'rejected')).toBe(true);
+    expect(diagnostic?.candidateDiagnostics.some((candidate) => candidate.finalReason === 'trunk-intersects-obstacle')).toBe(true);
+    expect(diagnostic?.candidateDiagnostics.some((candidate) => candidate.branches.some((branch) => (
+      branch.reason === 'branch-intersects-obstacle'
+      && branch.rejectedByObstacleId === blocker.id
+      && branch.rejectedByObstacleKind === blocker.kind
+      && branch.rejectedByObstacleBounds?.x === blocker.x
+    )))).toBe(true);
+
+    const candidate = diagnostic?.candidateDiagnostics.find((current) => current.finalReason === 'trunk-intersects-obstacle');
+    expect(candidate).toMatchObject({
+      candidateX: expect.any(Number),
+      busX: expect.any(Number),
+      sourceRight: source.x + ANALYZER_NODE_WIDTH,
+      targetGroupLeft: targets[0]!.x,
+      clearance: 14,
+      sourceEntry: { valid: true },
+      trunk: {
+        valid: false,
+        reason: 'trunk-intersects-obstacle',
+        rejectedByObstacleId: blocker.id,
+        rejectedByObstacleKind: blocker.kind,
+        rejectedByObstacleBounds: { x: blocker.x, y: blocker.y, width: blocker.width, height: blocker.height },
+      },
+    });
+    const firstBranch = candidate?.branches.find((branch) => branch.targetId === 'target-a');
+    expect(firstBranch?.excludedObstacleIds).toEqual(expect.arrayContaining(['node:source', 'node:target-a']));
+    expect(firstBranch?.excludedHardObstacleIds).toEqual(expect.arrayContaining(['node:source', 'node:target-a']));
+    expect(firstBranch?.excludedObstacleIds).not.toContain('node:target-b');
+    expect(firstBranch?.branchPoints).toEqual(expect.any(Array));
+    expect(firstBranch?.pathPoints).toEqual(expect.any(Array));
+  });
+
+  it('prefers a clear horizontal side separation over a larger vertical center distance', () => {
+    const source = positionedNode('source', 0, 0);
+    const targets = [
+      positionedNode('target-a', 500, 700),
+      positionedNode('target-b', 500, 880),
+    ];
+    const positionedById = new Map([source, ...targets].map((node) => [node.node.id, node]));
+    const edges = targets.map((target) => edge(`edge:${target.node.id}`, 'source', target.node.id));
+    const diagnostics: AnalyzerFanoutRoutingDiagnostic[] = [];
+    const routes = analyzerEdgeRoutes(edges, positionedById, [source, ...targets].map(nodeObstacle), {
+      onFanoutDiagnostic: (diagnostic) => diagnostics.push(diagnostic),
+    });
+    const diagnostic = diagnostics[0];
+
+    expect(diagnostic).toMatchObject({
+      preferredDirection: 'right',
+      selectedDirection: 'right',
+      evaluatedDirections: expect.arrayContaining(['right', 'down']),
+      fallbackUsed: false,
+    });
+    expect(diagnostic?.directionDiagnostics.find((current) => current.direction === 'right')).toMatchObject({
+      sideGap: targets[0]!.x - (source.x + ANALYZER_NODE_WIDTH),
+      validCandidateCount: expect.any(Number),
+    });
+    expect(routes.get('edge:target-a')?.every((point, index, route) => index === 0 || point.x >= route[index - 1]!.x)).toBe(true);
+  });
+
+  it('selects down when the target group is vertically separated and horizontally overlaps the source', () => {
+    const source = positionedNode('source', 360, 0);
+    const targets = [
+      positionedNode('target-a', 300, 400),
+      positionedNode('target-b', 560, 580),
+    ];
+    const positionedById = new Map([source, ...targets].map((node) => [node.node.id, node]));
+    const edges = targets.map((target) => edge(`edge:${target.node.id}`, 'source', target.node.id));
+    const diagnostics: AnalyzerFanoutRoutingDiagnostic[] = [];
+    const routes = analyzerEdgeRoutes(edges, positionedById, [source, ...targets].map(nodeObstacle), {
+      onFanoutDiagnostic: (diagnostic) => diagnostics.push(diagnostic),
+    });
+    const diagnostic = diagnostics[0];
+
+    expect(diagnostic).toMatchObject({
+      preferredDirection: 'down',
+      selectedDirection: 'down',
+      fallbackUsed: false,
+    });
+    expect(diagnostic?.directionDiagnostics.find((current) => current.direction === 'down')).toMatchObject({
+      sideGap: targets[0]!.y - (source.y + source.height),
+      validCandidateCount: expect.any(Number),
+    });
+    expect(routes.get('edge:target-a')?.every((point, index, route) => index === 0 || point.y >= route[index - 1]!.y)).toBe(true);
+  });
+
+  it('tries an alternate direction when the preferred horizontal Bus is invalid', () => {
+    const source = positionedNode('source', 0, 0);
+    const targets = [
+      positionedNode('target-a', 500, 200),
+      positionedNode('target-b', 760, 360),
+    ];
+    const rightEntryBlocker = obstacle('right-entry-blocker', 250, 0, 250, 80, 'fact-node');
+    const nodes = [source, ...targets];
+    const positionedById = new Map(nodes.map((node) => [node.node.id, node]));
+    const edges = targets.map((target) => edge(`edge:${target.node.id}`, 'source', target.node.id));
+    const diagnostics: AnalyzerFanoutRoutingDiagnostic[] = [];
+    const routes = analyzerEdgeRoutes(edges, positionedById, [...nodes.map(nodeObstacle), rightEntryBlocker], {
+      onFanoutDiagnostic: (diagnostic) => diagnostics.push(diagnostic),
+    });
+    const diagnostic = diagnostics[0];
+    const rightEvaluation = diagnostic?.directionDiagnostics.find((current) => current.direction === 'right');
+    const downEvaluation = diagnostic?.directionDiagnostics.find((current) => current.direction === 'down');
+
+    expect(diagnostic).toMatchObject({
+      preferredDirection: 'right',
+      selectedDirection: 'down',
+      evaluatedDirections: expect.arrayContaining(['right', 'down']),
+      fallbackUsed: false,
+    });
+    expect(rightEvaluation).toMatchObject({ validCandidateCount: 0 });
+    expect(downEvaluation).toMatchObject({ validCandidateCount: expect.any(Number) });
+    expect(downEvaluation?.validCandidateCount).toBeGreaterThan(0);
+    expect(routes.get('edge:target-a')?.every((point, index, route) => index === 0 || point.y >= route[index - 1]!.y)).toBe(true);
   });
 
   it('keeps selected and related presentation state out of fan-out geometry', () => {
