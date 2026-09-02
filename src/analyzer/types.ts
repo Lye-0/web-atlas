@@ -27,6 +27,9 @@ export type AnalyzerEvidenceKind =
 /** Describes how an Evidence item participates in Stack Map attribution. */
 export type AnalyzerEvidenceRole = 'declaration' | 'usage' | 'scope';
 
+/** Describes the strength of a signal considered for Semantic Region promotion. */
+export type AnalyzerScopeEvidenceStrength = 'structural' | 'explicit-boundary' | 'usage-only';
+
 export type AnalyzerDependencyType = 'dependency' | 'devDependency' | 'peerDependency' | 'optionalDependency' | 'workspaceDependency';
 
 export type AnalyzerRelationKind =
@@ -104,6 +107,8 @@ export interface AnalyzerEvidence {
   role?: AnalyzerEvidenceRole;
   /** Repository-relative scope path supplied by an explicit config boundary. */
   scopePath?: string;
+  /** Promotion strength; usage-only signals never create a Semantic Region. */
+  scopeStrength?: AnalyzerScopeEvidenceStrength;
   description?: string;
 }
 
@@ -311,6 +316,12 @@ export interface AnalyzerSemanticRegion {
   evidenceIds: string[];
   factId?: string;
   scopeKind?: AnalyzerRegionScopeKind;
+  /** Nearest promoted Semantic Region containing this Region, when nested. */
+  parentRegionId?: string;
+  /** Direct promoted child Regions. Stack `childIds` remain direct Stack Usage nodes. */
+  childRegionIds?: string[];
+  /** Zero-based depth among promoted Regions. */
+  depth?: number;
   /** Layout fills this after the region's children have been positioned. */
   bounds?: AnalyzerRect;
   metadata: AnalyzerMetadata;

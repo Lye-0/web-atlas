@@ -149,6 +149,65 @@ describe('Analyzer session store', () => {
     expect(oldScopePrefix.selectedRegionId).toBe('region:scope:apps/web');
   });
 
+  it('restores a nested Region by stable ID and clears only a stale nested selection', () => {
+    const parentId = 'region:scope:apps/api';
+    const childId = 'region:scope:apps/api/test';
+    const view: AnalyzerViewModel = {
+      ...viewModel(),
+      view: 'architecture',
+      nodes: [
+        { id: 'stack-map:project', type: 'project', label: 'Project', evidenceIds: [], metadata: {} },
+        { id: 'stack-usage:api:typescript', type: 'stack-usage', label: 'TypeScript', evidenceIds: [], metadata: { stackMapRegionId: parentId } },
+        { id: 'stack-usage:test:vitest', type: 'stack-usage', label: 'Vitest', evidenceIds: [], metadata: { stackMapRegionId: childId } },
+      ],
+      edges: [{ id: 'edge:parent', sourceId: 'stack-map:project', targetId: parentId, kind: 'contains', label: 'contains', evidenceIds: [], metadata: {} }],
+      regions: [
+        {
+          id: parentId,
+          entityKind: 'region',
+          regionKind: 'scope',
+          label: 'API',
+          subtitle: 'apps/api',
+          childIds: ['stack-usage:api:typescript'],
+          childRegionIds: [childId],
+          ports: [],
+          selectable: true,
+          evidenceIds: [],
+          metadata: { scopePath: 'apps/api', stackMapProjectId: 'stack-map:project' },
+        },
+        {
+          id: childId,
+          entityKind: 'region',
+          regionKind: 'scope',
+          label: 'TEST',
+          subtitle: 'apps/api/test',
+          childIds: ['stack-usage:test:vitest'],
+          parentRegionId: parentId,
+          ports: [],
+          selectable: true,
+          evidenceIds: [],
+          metadata: { scopePath: 'apps/api/test', stackMapProjectId: 'stack-map:project', stackMapParentId: parentId },
+        },
+      ],
+    };
+
+    const restored = restoreAnalyzerViewSession({
+      ...createInitialAnalyzerSessionState().views.architecture,
+      selectedRegionId: childId,
+      detailOpen: true,
+    }, view);
+    expect(restored.selectedRegionId).toBe(childId);
+    expect(restored.detailOpen).toBe(true);
+
+    const stale = restoreAnalyzerViewSession({
+      ...createInitialAnalyzerSessionState().views.architecture,
+      selectedRegionId: `${childId}:removed`,
+      detailOpen: true,
+    }, view);
+    expect(stale.selectedRegionId).toBeUndefined();
+    expect(stale.detailOpen).toBe(false);
+  });
+
   it('keeps the selected folder handle alongside the analysis result', () => {
     const folderHandle: DirectoryHandleLike = {
       kind: 'directory',

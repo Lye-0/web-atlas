@@ -14,6 +14,7 @@ import {
   type AnalyzerProjectStore,
   type AnalyzerRelation,
   type AnalyzerSemanticRegion,
+  type AnalyzerScopeEvidenceStrength,
   type AnalyzerStackUsage,
   type AnalyzerViewEdge,
   type AnalyzerViewModel,
@@ -133,6 +134,7 @@ interface StackMapScopeCandidate {
   kind: StackMapScopeKind;
   label: string;
   source: StackMapScopeSource;
+  promotionStrength: Exclude<AnalyzerScopeEvidenceStrength, 'usage-only'>;
   factId?: string;
   evidenceIds: string[];
 }
@@ -142,6 +144,7 @@ interface StackMapScopeRecord {
   label: string;
   path: string;
   kind: StackMapScopeKind;
+  promotionStrength: Exclude<AnalyzerScopeEvidenceStrength, 'usage-only'>;
   factId?: string;
   evidenceIds: Set<string>;
   usageIds: Set<string>;
@@ -287,6 +290,7 @@ function makeScopeCandidate(
   source: StackMapScopeSource,
   factId?: string,
   evidenceIds: readonly string[] = [],
+  promotionStrength: Exclude<AnalyzerScopeEvidenceStrength, 'usage-only'> = source === 'config' ? 'explicit-boundary' : 'structural',
 ): StackMapScopeCandidate {
   const normalizedPath = normalizeScopePath(path);
   return {
@@ -295,6 +299,7 @@ function makeScopeCandidate(
     kind,
     label: kind === 'desktop' ? 'DESKTOP' : normalizedPath === '.' ? source === 'services' ? 'PROJECT / SERVICES' : 'PROJECT / TOOLING' : packageScopeLabel(normalizedPath),
     source,
+    promotionStrength,
     ...(factId ? { factId } : {}),
     evidenceIds: [...new Set(evidenceIds)],
   };
@@ -334,6 +339,9 @@ function addScopeCandidate(candidates: Map<string, StackMapScopeCandidate>, cand
     kind,
     label: kind === 'desktop' ? 'DESKTOP' : preferred.label,
     source,
+    promotionStrength: existing.promotionStrength === 'explicit-boundary' || candidate.promotionStrength === 'explicit-boundary'
+      ? 'explicit-boundary'
+      : 'structural',
     ...(factId ? { factId } : {}),
     evidenceIds: [...new Set([...existing.evidenceIds, ...candidate.evidenceIds])],
   });
@@ -462,10 +470,21 @@ function buildStackMap(store: AnalyzerProjectStore): AnalyzerViewModel {
     if (kind === 'runtime' && directory !== '.') addScopeCandidate(scopeCandidates, makeScopeCandidate(directory, 'application', 'runtime'));
   });
   store.evidence
-    .filter((evidence) => evidence.role === 'scope' && typeof evidence.scopePath === 'string')
+    .filter((evidence) => evidence.role === 'scope'
+      && evidence.scopeStrength !== 'usage-only'
+      && typeof evidence.scopePath === 'string')
     .forEach((evidence) => {
       const scopePath = normalizeScopePath(evidence.scopePath ?? '.');
-      if (scopePath !== '.') addScopeCandidate(scopeCandidates, makeScopeCandidate(scopePath, 'application', 'config', undefined, [evidence.id]));
+      if (scopePath !== '.') {
+        addScopeCandidate(scopeCandidates, makeScopeCandidate(
+          scopePath,
+          'application',
+          'config',
+          undefined,
+          [evidence.id],
+          evidence.scopeStrength === 'structural' ? 'structural' : 'explicit-boundary',
+        ));
+      }
     });
   desktopFacts
     .filter((fact) => isDotnetProjectPath(fact.projectPath) && /\.(?:sln|slnx)$/i.test(fact.projectPath))
@@ -496,6 +515,7 @@ function buildStackMap(store: AnalyzerProjectStore): AnalyzerViewModel {
       label: candidate.label,
       path: candidate.path,
       kind: candidate.kind,
+      promotionStrength: candidate.promotionStrength,
       ...(candidate.factId ? { factId: candidate.factId } : {}),
       evidenceIds: new Set([...candidate.evidenceIds, ...evidenceIds]),
       usageIds: new Set(),
@@ -639,8 +659,44 @@ function buildStackMap(store: AnalyzerProjectStore): AnalyzerViewModel {
       roles: usage.roles,
     },
   }));
+  const regionIdByScopeId = new Map(orderedScopes.map((scope) => [scope.id, stackMapScopeRegionId(scope.id, scope.path)]));
+  const parentScopeById = new Map<string, StackMapScopeRecord>();
+  orderedScopes.forEach((scope) => {
+    const parent = orderedScopes
+      .filter((candidate) => candidate.id !== scope.id && candidate.path !== '.' && pathBelongsToPackage(scope.path, candidate.path))
+      .sort((first, second) => second.path.length - first.path.length || first.id.localeCompare(second.id))[0];
+    if (parent) parentScopeById.set(scope.id, parent);
+  });
+  const childScopeIdsByParentId = new Map<string, string[]>();
+  parentScopeById.forEach((parent, childId) => {
+    const childIds = childScopeIdsByParentId.get(parent.id) ?? [];
+    childIds.push(childId);
+    childScopeIdsByParentId.set(parent.id, childIds);
+  });
+  childScopeIdsByParentId.forEach((childIds) => childIds.sort((first, second) => {
+    const firstScope = scopes.get(first);
+    const secondScope = scopes.get(second);
+    return (firstScope?.path ?? first).localeCompare(secondScope?.path ?? second) || first.localeCompare(second);
+  }));
+  const depthByScopeId = new Map<string, number>();
+  const scopeDepth = (scopeId: string, visited = new Set<string>()): number => {
+    if (visited.has(scopeId)) return 0;
+    const parent = parentScopeById.get(scopeId);
+    if (!parent) return 0;
+    const nextVisited = new Set(visited);
+    nextVisited.add(scopeId);
+    const depth = scopeDepth(parent.id, nextVisited) + 1;
+    depthByScopeId.set(scopeId, depth);
+    return depth;
+  };
+  orderedScopes.forEach((scope) => scopeDepth(scope.id));
   const regions: AnalyzerSemanticRegion[] = orderedScopes.map((scope) => {
     const id = stackMapScopeRegionId(scope.id, scope.path);
+    const parentScope = parentScopeById.get(scope.id);
+    const parentRegionId = parentScope ? regionIdByScopeId.get(parentScope.id) : undefined;
+    const childRegionIds = (childScopeIdsByParentId.get(scope.id) ?? [])
+      .map((childScopeId) => regionIdByScopeId.get(childScopeId))
+      .filter((regionId): regionId is string => Boolean(regionId));
     const scopeKind = scope.kind === 'root' || scope.kind === 'services' ? 'logical' : 'physical';
     return {
       id,
@@ -656,6 +712,9 @@ function buildStackMap(store: AnalyzerProjectStore): AnalyzerViewModel {
       evidenceIds: [...scope.evidenceIds],
       ...(scope.factId ? { factId: scope.factId } : {}),
       scopeKind,
+      ...(parentRegionId ? { parentRegionId } : {}),
+      childRegionIds,
+      depth: depthByScopeId.get(scope.id) ?? 0,
       metadata: {
         displayRole: 'REGION',
         regionKind: 'scope',
@@ -665,14 +724,16 @@ function buildStackMap(store: AnalyzerProjectStore): AnalyzerViewModel {
         scopeType: scope.kind,
         scopeKind,
         usageCount: scope.usageIds.size,
-        ...(projectNode ? { stackMapParentId: projectNode.id } : {}),
+        scopePromotion: scope.promotionStrength,
+        scopeDepth: depthByScopeId.get(scope.id) ?? 0,
+        ...(projectNode ? { stackMapProjectId: projectNode.id, stackMapParentId: parentRegionId ?? projectNode.id } : {}),
       },
     };
   });
   const nodes = [...(projectNode ? [projectNode] : []), ...usageNodes];
   const edges: AnalyzerViewEdge[] = [];
   if (projectNode) {
-    orderedScopes.forEach((scope) => {
+    orderedScopes.filter((scope) => !parentScopeById.has(scope.id)).forEach((scope) => {
       const regionId = stackMapScopeRegionId(scope.id, scope.path);
       edges.push({
         id: `view-edge:stack-map:contains:${regionId}`,

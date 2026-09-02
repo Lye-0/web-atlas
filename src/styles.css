@@ -3306,6 +3306,26 @@ summary:focus-visible {
   box-shadow: inset 0 1px 0 rgba(203, 224, 215, 0.08), 10px 14px 26px rgba(0, 0, 0, 0.2);
 }
 
+.analyzer-semantic-region.is-nested {
+  border-color: rgba(132, 177, 197, 0.24);
+  background: linear-gradient(145deg, rgba(80, 126, 144, 0.055), rgba(12, 22, 24, 0.12) 72%, rgba(12, 22, 24, 0.05));
+  box-shadow: inset 0 1px 0 rgba(203, 224, 215, 0.035), 6px 9px 16px rgba(0, 0, 0, 0.09);
+}
+
+.analyzer-semantic-region.depth-2,
+.analyzer-semantic-region.depth-3 {
+  border-color: rgba(132, 177, 197, 0.18);
+  background: rgba(12, 22, 24, 0.08);
+  box-shadow: inset 0 1px 0 rgba(203, 224, 215, 0.02), 4px 6px 11px rgba(0, 0, 0, 0.06);
+}
+
+.analyzer-semantic-region.is-nested.is-selected,
+.analyzer-semantic-region.is-nested.is-match {
+  border-color: rgba(172, 220, 202, 0.46);
+  background: linear-gradient(145deg, rgba(91, 143, 126, 0.08), rgba(15, 25, 23, 0.18) 72%, rgba(15, 25, 23, 0.08));
+  box-shadow: inset 0 1px 0 rgba(203, 224, 215, 0.06), 7px 10px 18px rgba(0, 0, 0, 0.14);
+}
+
 .analyzer-semantic-region-heading {
   position: absolute;
   top: 14px;
@@ -3838,6 +3858,22 @@ summary:focus-visible {
 .analyzer-focus-selected {
   border-color: rgba(172, 220, 202, 0.4);
   color: var(--accent-strong);
+}
+
+.analyzer-detail-parent-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent-strong);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.analyzer-detail-parent-link:hover,
+.analyzer-detail-parent-link:focus-visible {
+  color: var(--text);
+  text-decoration: underline;
 }
 
 .analyzer-detail-empty,

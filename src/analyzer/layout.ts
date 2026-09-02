@@ -44,6 +44,9 @@ const STACK_MAP_REGION_GAP_Y = 34;
 const STACK_MAP_REGION_COLUMNS = 3;
 const STACK_MAP_PROJECT_TOP = 34;
 const STACK_MAP_PROJECT_REGION_GAP = 86;
+const STACK_MAP_REGION_NESTED_INSET = 18;
+const STACK_MAP_REGION_NESTED_GAP = 20;
+const STACK_MAP_REGION_MIN_HEIGHT = 180;
 export const ANALYZER_STRUCTURAL_HEADING_HEIGHT = 28;
 const STRUCTURAL_HEADING_HEIGHT = ANALYZER_STRUCTURAL_HEADING_HEIGHT;
 const DEPENDENCY_EXTERNAL_GROUP_HEADER = SUMMARY_GROUP_MEMBER_OFFSET;
@@ -236,6 +239,8 @@ function orderedArchitectureNodes(view: AnalyzerViewModel, nodes: AnalyzerViewNo
 interface StackMapRegionLayoutMeasure {
   region: AnalyzerSemanticRegion;
   children: AnalyzerViewNode[];
+  childRegions: StackMapRegionLayoutMeasure[];
+  width: number;
   height: number;
 }
 
@@ -243,32 +248,83 @@ function stackMapRegionMeasure(
   view: AnalyzerViewModel,
   region: AnalyzerSemanticRegion,
   expandedNodeIds: ReadonlySet<string>,
+  regionById: Map<string, AnalyzerSemanticRegion>,
+  childRegionIdsByParentId: Map<string, string[]>,
+  activeRegionIds = new Set<string>(),
 ): StackMapRegionLayoutMeasure {
   const nodeById = new Map(view.nodes.map((node) => [node.id, node]));
   const children = region.childIds
     .map((childId) => nodeById.get(childId))
     .filter((node): node is AnalyzerViewNode => Boolean(node));
   const childHeight = children.reduce((total, node) => total + architectureNodeHeight(view, node, expandedNodeIds), 0);
+  const nextActiveRegionIds = new Set(activeRegionIds);
+  nextActiveRegionIds.add(region.id);
+  const childRegions = (childRegionIdsByParentId.get(region.id) ?? [])
+    .map((childId) => regionById.get(childId))
+    .filter((child): child is AnalyzerSemanticRegion => Boolean(child))
+    .map((child) => nextActiveRegionIds.has(child.id)
+      ? stackMapRegionMeasure(view, child, expandedNodeIds, regionById, new Map(), nextActiveRegionIds)
+      : stackMapRegionMeasure(view, child, expandedNodeIds, regionById, childRegionIdsByParentId, nextActiveRegionIds));
+  const ownContentTop = ANALYZER_REGION_HEADING_TOP + ANALYZER_REGION_HEADING_HEIGHT + ANALYZER_REGION_MEMBER_GAP;
+  const ownContentHeight = childHeight + Math.max(0, children.length - 1) * ARCHITECTURE_NODE_GAP;
+  const nestedContentHeight = childRegions.reduce((total, childRegion) => total + childRegion.height, 0)
+    + Math.max(0, childRegions.length - 1) * STACK_MAP_REGION_NESTED_GAP;
+  const nestedStartGap = children.length > 0 && childRegions.length > 0 ? STACK_MAP_REGION_NESTED_GAP : 0;
+  const contentHeight = ownContentHeight + nestedStartGap + nestedContentHeight;
   return {
     region,
     children,
-    height: ANALYZER_REGION_HEADING_TOP
-      + ANALYZER_REGION_HEADING_HEIGHT
-      + ANALYZER_REGION_MEMBER_GAP
-      + childHeight
-      + Math.max(0, children.length - 1) * ARCHITECTURE_NODE_GAP
-      + STACK_MAP_REGION_BOTTOM_PADDING,
+    childRegions,
+    width: Math.max(
+      STACK_MAP_REGION_WIDTH,
+      ...childRegions.map((childRegion) => childRegion.width + STACK_MAP_REGION_NESTED_INSET * 2),
+    ),
+    height: Math.max(
+      STACK_MAP_REGION_MIN_HEIGHT,
+      ownContentTop + contentHeight + STACK_MAP_REGION_BOTTOM_PADDING,
+    ),
   };
 }
 
 function layoutStackMap(view: AnalyzerViewModel, expandedNodeIds: ReadonlySet<string>): AnalyzerLayout {
   const regions = view.regions ?? [];
-  const measures = regions.map((region) => stackMapRegionMeasure(view, region, expandedNodeIds));
+  const regionById = new Map(regions.map((region) => [region.id, region]));
+  const childRegionIdsByParentId = new Map<string, string[]>();
+  regions.forEach((region) => {
+    if (region.parentRegionId && regionById.has(region.parentRegionId)) {
+      const childIds = childRegionIdsByParentId.get(region.parentRegionId) ?? [];
+      childIds.push(region.id);
+      childRegionIdsByParentId.set(region.parentRegionId, childIds);
+    }
+  });
+  regions.forEach((region) => {
+    const declaredChildIds = region.childRegionIds ?? [];
+    declaredChildIds.forEach((childId) => {
+      if (!regionById.has(childId)) return;
+      const child = regionById.get(childId);
+      if (child?.parentRegionId && child.parentRegionId !== region.id) return;
+      const childIds = childRegionIdsByParentId.get(region.id) ?? [];
+      if (!childIds.includes(childId)) childIds.push(childId);
+      childRegionIdsByParentId.set(region.id, childIds);
+    });
+  });
+  childRegionIdsByParentId.forEach((childIds) => childIds.sort((first, second) => {
+    const firstRegion = regionById.get(first);
+    const secondRegion = regionById.get(second);
+    return (firstRegion?.subtitle ?? firstRegion?.label ?? first).localeCompare(secondRegion?.subtitle ?? secondRegion?.label ?? second) || first.localeCompare(second);
+  }));
+  const topLevelRegions = regions.filter((region) => !region.parentRegionId || !regionById.has(region.parentRegionId));
+  const rootRegions = topLevelRegions.length > 0 ? topLevelRegions : regions;
+  const measures = rootRegions.map((region) => stackMapRegionMeasure(view, region, expandedNodeIds, regionById, childRegionIdsByParentId));
   const columnCount = Math.min(STACK_MAP_REGION_COLUMNS, Math.max(1, measures.length));
-  const rowCount = Math.ceil(measures.length / columnCount);
+  const rowCount = measures.length === 0 ? 0 : Math.ceil(measures.length / columnCount);
+  const columnWidths = Array.from({ length: columnCount }, (_, column) => Math.max(
+    STACK_MAP_REGION_WIDTH,
+    ...measures.filter((_, index) => index % columnCount === column).map((measure) => measure.width),
+  ));
   const width = Math.max(
     900,
-    SIDE_PADDING * 2 + columnCount * STACK_MAP_REGION_WIDTH + Math.max(0, columnCount - 1) * STACK_MAP_REGION_GAP_X,
+    SIDE_PADDING * 2 + columnWidths.reduce((total, columnWidth) => total + columnWidth, 0) + Math.max(0, columnCount - 1) * STACK_MAP_REGION_GAP_X,
   );
   const project = view.nodes.find((node) => node.type === 'project');
   const positionedNodes: PositionedNode[] = [];
@@ -285,25 +341,24 @@ function layoutStackMap(view: AnalyzerViewModel, expandedNodeIds: ReadonlySet<st
   const firstRegionY = projectBottom + STACK_MAP_PROJECT_REGION_GAP;
   const rowHeights = Array.from({ length: rowCount }, (_, row) => Math.max(
     ...measures.slice(row * columnCount, (row + 1) * columnCount).map((measure) => measure.height),
-    180,
+    STACK_MAP_REGION_MIN_HEIGHT,
   ));
   const rowY: number[] = [];
   rowHeights.forEach((_, row) => {
     rowY.push(firstRegionY + rowHeights.slice(0, row).reduce((total, previous) => total + previous + STACK_MAP_REGION_GAP_Y, 0));
   });
-  measures.forEach((measure, index) => {
-    const column = index % columnCount;
-    const row = Math.floor(index / columnCount);
-    const x = SIDE_PADDING + column * (STACK_MAP_REGION_WIDTH + STACK_MAP_REGION_GAP_X);
-    const y = rowY[row] ?? firstRegionY;
+  const placedRegionIds = new Set<string>();
+  const placeRegion = (measure: StackMapRegionLayoutMeasure, x: number, y: number): void => {
+    if (placedRegionIds.has(measure.region.id)) return;
+    placedRegionIds.add(measure.region.id);
     const positionedRegion: PositionedSemanticRegion = {
       region: {
         ...measure.region,
-        bounds: { x, y, width: STACK_MAP_REGION_WIDTH, height: measure.height },
+        bounds: { x, y, width: measure.width, height: measure.height },
       },
       x,
       y,
-      width: STACK_MAP_REGION_WIDTH,
+      width: measure.width,
       height: measure.height,
       headingHeight: ANALYZER_REGION_HEADING_HEIGHT,
       memberGap: ANALYZER_REGION_MEMBER_GAP,
@@ -315,6 +370,18 @@ function layoutStackMap(view: AnalyzerViewModel, expandedNodeIds: ReadonlySet<st
       positionedNodes.push({ node, x: x + 18, y: childY, height });
       childY += height + ARCHITECTURE_NODE_GAP;
     });
+    if (measure.children.length > 0 && measure.childRegions.length > 0) childY += STACK_MAP_REGION_NESTED_GAP;
+    measure.childRegions.forEach((childRegion) => {
+      placeRegion(childRegion, x + STACK_MAP_REGION_NESTED_INSET, childY);
+      childY += childRegion.height + STACK_MAP_REGION_NESTED_GAP;
+    });
+  };
+  measures.forEach((measure, index) => {
+    const column = index % columnCount;
+    const row = Math.floor(index / columnCount);
+    const x = SIDE_PADDING + columnWidths.slice(0, column).reduce((total, columnWidth) => total + columnWidth + STACK_MAP_REGION_GAP_X, 0);
+    const y = rowY[row] ?? firstRegionY;
+    placeRegion(measure, x, y);
   });
   const projectCluster = project
     ? [{

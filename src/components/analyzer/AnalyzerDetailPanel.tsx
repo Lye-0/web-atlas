@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { analyzerSummaryExpanded, analyzerSummarySubtitle, displayDictionaryStack, factDictionaryStackId, factForNode, nodeTypeLabels, relationLabelForNode } from '../../analyzer';
+import { analyzerRegionParentId, analyzerSummaryExpanded, analyzerSummarySubtitle, displayDictionaryStack, factDictionaryStackId, factForNode, nodeTypeLabels, relationLabelForNode } from '../../analyzer';
 import type { AnalyzerProjectStore, AnalyzerSemanticRegion, AnalyzerViewEdge, AnalyzerViewModel, AnalyzerViewNode } from '../../analyzer';
 import { stackPath } from '../../utils/routes';
 import { EvidenceCodeBlock } from './EvidenceCodeBlock';
@@ -146,6 +146,10 @@ function RegionDetails({ region, view, store, onSelectNode, onSelectRegion }: { 
   const scopePath = typeof region.metadata.scopePath === 'string' ? region.metadata.scopePath : region.subtitle ?? '.';
   const scopeKind = typeof region.metadata.scopeKind === 'string' ? region.metadata.scopeKind : region.scopeKind ?? 'physical';
   const scopeType = typeof region.metadata.scopeType === 'string' ? region.metadata.scopeType : 'scope';
+  const parentRegionId = analyzerRegionParentId(view, region.id);
+  const parentRegion = parentRegionId
+    ? view.regions?.find((candidate) => candidate.id === parentRegionId)
+    : undefined;
   return (
     <>
       <div className="analyzer-detail-heading">
@@ -166,6 +170,9 @@ function RegionDetails({ region, view, store, onSelectNode, onSelectRegion }: { 
           <div><dt>Kind</dt><dd>{scopeKind}</dd></div>
           <div><dt>Scope type</dt><dd>{scopeType}</dd></div>
           <div><dt>Path</dt><dd>{scopePath}</dd></div>
+          <div><dt>Parent Scope</dt><dd>{parentRegion
+            ? <button type="button" className="analyzer-detail-parent-link" onClick={() => onSelectRegion?.(parentRegion.id, true)}>{parentRegion.label}{parentRegion.subtitle ? ` · ${parentRegion.subtitle}` : ''}</button>
+            : 'Project'}</dd></div>
           <div><dt>Stacks</dt><dd>{region.childIds.length}</dd></div>
         </dl>
       </section>

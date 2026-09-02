@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { ANALYZER_DEFAULT_TRANSFORM, ANALYZER_EXTERNAL_SUMMARY_ID, ANALYZER_NODE_WIDTH, analyzerEdgeArrowMarkerId, analyzerEdgeObstacles, analyzerEdgePaths, analyzerFocusDepths, analyzerForegroundEdges, analyzerPresentationCount, analyzerPresentationCountLabel, displayedZoomLevelForNode, evidenceRangeLabel, fitAnalyzerTransform, focusAnalyzerTransform, layoutAnalyzerView, nodeMatchesSearch, preserveAnalyzerTransformOnViewportResize, presentAnalyzerView, regionMatchesSearch, semanticZoomLevelForScale, shouldRunAnalyzerInitialFit, shouldShowAnalyzerEvidencePreview, type AnalyzerEdgeRoutingDiagnostic, type AnalyzerFanoutRoutingDiagnostic, type AnalyzerGraphTransform, type AnalyzerViewCounts, type AnalyzerViewEdge, type AnalyzerViewModel, type PositionedGraphEndpoint, type PositionedNode } from '../../analyzer';
-import { displayDictionaryStack, factDictionaryStackId, nodeTypeLabels } from '../../analyzer';
+import { analyzerRegionContextEntityIds, analyzerStackCountLabel, displayDictionaryStack, factDictionaryStackId, nodeTypeLabels } from '../../analyzer';
 import { stackPath } from '../../utils/routes';
 import { EvidencePreview } from './EvidenceCodeBlock';
 
@@ -271,11 +271,16 @@ export function AnalyzerGraphStage({
     }
     if (selectedRegionId) {
       connectedEntityIds.add(selectedRegionId);
-      const selectedRegion = filteredView.regions?.find((region) => region.id === selectedRegionId);
-      selectedRegion?.childIds.forEach((childId) => connectedEntityIds.add(childId));
+      analyzerRegionContextEntityIds(filteredView, selectedRegionId, true).forEach((entityId) => connectedEntityIds.add(entityId));
+      const contextRegionIds = new Set(analyzerRegionContextEntityIds(filteredView, selectedRegionId, true));
       filteredView.edges.forEach((edge) => {
-        if (edge.sourceId !== selectedRegionId && edge.targetId !== selectedRegionId) return;
+        if (!contextRegionIds.has(edge.sourceId) && !contextRegionIds.has(edge.targetId)) return;
         const otherId = edge.sourceId === selectedRegionId ? edge.targetId : edge.sourceId;
+        if (edge.sourceId !== selectedRegionId && edge.targetId !== selectedRegionId) {
+          connectedEntityIds.add(edge.sourceId);
+          connectedEntityIds.add(edge.targetId);
+          return;
+        }
         connectedEntityIds.add(otherId);
         const other = filteredView.nodes.find((node) => node.id === otherId);
         if (other?.clusterId) contextClusterIds.add(other.clusterId);
@@ -296,7 +301,7 @@ export function AnalyzerGraphStage({
       if (node.clusterId && contextClusterIds.has(node.clusterId)) contextNodeIds.add(node.id);
     });
     return { connectedEntityIds, contextClusterIds, contextNodeIds };
-  }, [filteredView.edges, filteredView.nodes, filteredView.regions, selectedEdgeId, selectedNodeId, selectedRegionId]);
+  }, [filteredView, selectedEdgeId, selectedNodeId, selectedRegionId]);
   useEffect(() => {
     if (!import.meta.env.DEV || (!selectedNodeId && !selectedRegionId && !selectedEdgeId)) return;
     const loggedFanoutGroups = new Set<string>();
@@ -707,7 +712,7 @@ export function AnalyzerGraphStage({
               return (
                 <section
                   key={region.id}
-                  className={`analyzer-semantic-region${selected ? ' is-selected' : ''}${matches && searchValue ? ' is-match' : ''}`}
+                  className={`analyzer-semantic-region depth-${Math.min(3, region.depth ?? 0)}${region.parentRegionId ? ' is-nested' : ''}${selected ? ' is-selected' : ''}${matches && searchValue ? ' is-match' : ''}`}
                   style={{ left: positionedRegion.x, top: positionedRegion.y, width: positionedRegion.width, height: positionedRegion.height }}
                   data-analyzer-region-id={import.meta.env.DEV ? region.id : undefined}
                   aria-label={`${region.label} semantic region`}
@@ -721,7 +726,7 @@ export function AnalyzerGraphStage({
                     <span className="analyzer-semantic-region-kicker" aria-hidden="true">◇</span>
                     <strong>{region.label}</strong>
                     {region.subtitle && <span className="analyzer-semantic-region-subtitle">{region.subtitle}</span>}
-                    <span className="analyzer-semantic-region-count">{region.childIds.length} STACKS</span>
+                    <span className="analyzer-semantic-region-count">{analyzerStackCountLabel(region.childIds.length)}</span>
                   </button>
                 </section>
               );

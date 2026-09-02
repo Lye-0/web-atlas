@@ -93,28 +93,115 @@ export function analyzerViewCounts(view: AnalyzerViewModel, visibleNodes: Analyz
   };
 }
 
+function regionById(view: AnalyzerViewModel): Map<string, AnalyzerSemanticRegion> {
+  return new Map((view.regions ?? []).map((region) => [region.id, region]));
+}
+
+/** Returns the nearest promoted Region parent, ignoring legacy Project metadata. */
+export function analyzerRegionParentId(view: AnalyzerViewModel, regionId: string): string | undefined {
+  const regions = regionById(view);
+  const region = regions.get(regionId);
+  if (!region) return undefined;
+  if (region.parentRegionId && region.parentRegionId !== regionId && regions.has(region.parentRegionId)) return region.parentRegionId;
+  const legacyParentId = region.metadata.stackMapParentId;
+  return typeof legacyParentId === 'string' && legacyParentId !== regionId && regions.has(legacyParentId)
+    ? legacyParentId
+    : undefined;
+}
+
+/** Returns direct promoted child Regions, with a legacy-safe derived fallback. */
+export function analyzerRegionChildIds(view: AnalyzerViewModel, regionId: string): string[] {
+  const regions = regionById(view);
+  const region = regions.get(regionId);
+  if (!region) return [];
+  const childIds = new Set<string>();
+  (region.childRegionIds ?? []).forEach((childId) => {
+    const child = regions.get(childId);
+    if (childId !== regionId && child && (!child.parentRegionId || child.parentRegionId === regionId)) childIds.add(childId);
+  });
+  regions.forEach((candidate) => {
+    if (candidate.id !== regionId && analyzerRegionParentId(view, candidate.id) === regionId) childIds.add(candidate.id);
+  });
+  return [...childIds].sort((first, second) => {
+    const firstRegion = regions.get(first);
+    const secondRegion = regions.get(second);
+    return (firstRegion?.subtitle ?? firstRegion?.label ?? first).localeCompare(secondRegion?.subtitle ?? secondRegion?.label ?? second) || first.localeCompare(second);
+  });
+}
+
+/** Returns ancestor Region IDs from nearest parent to the outermost promoted Region. */
+export function analyzerRegionAncestorIds(view: AnalyzerViewModel, regionId: string): string[] {
+  const ancestors: string[] = [];
+  const visited = new Set<string>([regionId]);
+  let parentId = analyzerRegionParentId(view, regionId);
+  while (parentId && !visited.has(parentId)) {
+    ancestors.push(parentId);
+    visited.add(parentId);
+    parentId = analyzerRegionParentId(view, parentId);
+  }
+  return ancestors;
+}
+
+/** Returns all promoted descendant Region IDs without following malformed cycles. */
+export function analyzerRegionDescendantIds(view: AnalyzerViewModel, regionId: string): string[] {
+  const descendants: string[] = [];
+  const visited = new Set<string>([regionId]);
+  const visit = (currentId: string): void => {
+    analyzerRegionChildIds(view, currentId).forEach((childId) => {
+      if (visited.has(childId)) return;
+      visited.add(childId);
+      descendants.push(childId);
+      visit(childId);
+    });
+  };
+  visit(regionId);
+  return descendants;
+}
+
+function analyzerRegionProjectId(view: AnalyzerViewModel, region: AnalyzerSemanticRegion): string | undefined {
+  const nodeIds = new Set(view.nodes.map((node) => node.id));
+  const explicitProjectId = region.metadata.stackMapProjectId;
+  if (typeof explicitProjectId === 'string' && nodeIds.has(explicitProjectId)) return explicitProjectId;
+  const legacyParentId = region.metadata.stackMapParentId;
+  return typeof legacyParentId === 'string' && nodeIds.has(legacyParentId) ? legacyParentId : undefined;
+}
+
+/** Returns the Region hierarchy plus its Stack Usage nodes and Project context. */
+export function analyzerRegionContextEntityIds(view: AnalyzerViewModel, regionId: string, includeDescendants = true): ReadonlySet<string> {
+  const regions = regionById(view);
+  const regionIds = [regionId, ...analyzerRegionAncestorIds(view, regionId)];
+  if (includeDescendants) regionIds.push(...analyzerRegionDescendantIds(view, regionId));
+  const contextIds = new Set<string>();
+  [...new Set(regionIds)].forEach((currentId) => {
+    const region = regions.get(currentId);
+    if (!region) return;
+    contextIds.add(currentId);
+    region.childIds.forEach((childId) => contextIds.add(childId));
+    const projectId = analyzerRegionProjectId(view, region);
+    if (projectId) contextIds.add(projectId);
+  });
+  return contextIds;
+}
+
+export function analyzerStackCountLabel(count: number): string {
+  return `${count} ${count === 1 ? 'STACK' : 'STACKS'}`;
+}
+
 function stackMapFilterContextIds(view: AnalyzerViewModel, filter: string): ReadonlySet<string> {
   if (view.view !== 'architecture' || filter === 'all') return new Set();
   const nodeById = new Map(view.nodes.map((node) => [node.id, node]));
-  const regionById = new Map((view.regions ?? []).map((region) => [region.id, region]));
   const contextIds = new Set<string>();
-  const addRegionContext = (region: AnalyzerSemanticRegion): void => {
-    contextIds.add(region.id);
-    region.childIds.forEach((childId) => contextIds.add(childId));
-    const parentId = region.metadata.stackMapParentId;
-    if (typeof parentId === 'string' && nodeById.has(parentId)) contextIds.add(parentId);
+  const addRegionContext = (regionId: string, includeDescendants: boolean): void => {
+    analyzerRegionContextEntityIds(view, regionId, includeDescendants).forEach((entityId) => contextIds.add(entityId));
   };
   if (filter === 'stack-scope') {
-    (view.regions ?? []).forEach(addRegionContext);
+    (view.regions ?? []).forEach((region) => addRegionContext(region.id, true));
     return contextIds;
   }
   view.nodes.filter((node) => node.type === filter).forEach((node) => {
     contextIds.add(node.id);
     const regionId = node.metadata.stackMapRegionId;
-    if (typeof regionId === 'string') {
-      const region = regionById.get(regionId);
-      if (region) addRegionContext(region);
-    }
+    if (typeof regionId === 'string' && nodeById.has(node.id)) addRegionContext(regionId, false);
   });
   return contextIds;
 }
@@ -145,10 +232,7 @@ export function presentAnalyzerView(view: AnalyzerViewModel, options: AnalyzerPr
   if (options.selectedRegionId) {
     const selectedRegion = regionById.get(options.selectedRegionId);
     if (selectedRegion) {
-      selectedContextIds.add(selectedRegion.id);
-      selectedRegion.childIds.forEach((childId) => selectedContextIds.add(childId));
-      const parentId = selectedRegion.metadata.stackMapParentId;
-      if (typeof parentId === 'string') selectedContextIds.add(parentId);
+      analyzerRegionContextEntityIds(view, selectedRegion.id, true).forEach((entityId) => selectedContextIds.add(entityId));
       view.edges.forEach((edge) => {
         if (edge.sourceId === selectedRegion.id) selectedContextIds.add(edge.targetId);
         if (edge.targetId === selectedRegion.id) selectedContextIds.add(edge.sourceId);
@@ -158,10 +242,7 @@ export function presentAnalyzerView(view: AnalyzerViewModel, options: AnalyzerPr
   searchMatchedRegionIds.forEach((regionId) => {
     const region = regionById.get(regionId);
     if (!region) return;
-    stackMapContextIds.add(regionId);
-    region.childIds.forEach((childId) => stackMapContextIds.add(childId));
-    const parentId = region.metadata.stackMapParentId;
-    if (typeof parentId === 'string') stackMapContextIds.add(parentId);
+    analyzerRegionContextEntityIds(view, region.id, true).forEach((entityId) => stackMapContextIds.add(entityId));
   });
   if (options.selectedEdgeId) {
     const selectedEdge = view.edges.find((edge) => edge.id === options.selectedEdgeId);
@@ -224,12 +305,17 @@ export function presentAnalyzerView(view: AnalyzerViewModel, options: AnalyzerPr
   const visibleNodes = view.nodes.filter((node) => presentationVisibleIds.has(node.id)
     && (options.filter === 'all' || node.type === options.filter || selectedContextIds.has(node.id) || stackMapContextIds.has(node.id)));
   const visibleIds = new Set(visibleNodes.map((node) => node.id));
-  const visibleRegionIds = new Set((view.regions ?? [])
-    .filter((region) => searchMatchedRegionIds.has(region.id)
+  const visibleRegionIds = new Set<string>();
+  const retainRegionAndAncestors = (regionId: string): void => {
+    visibleRegionIds.add(regionId);
+    analyzerRegionAncestorIds(view, regionId).forEach((ancestorId) => visibleRegionIds.add(ancestorId));
+  };
+  (view.regions ?? []).forEach((region) => {
+    if (searchMatchedRegionIds.has(region.id)
       || selectedContextIds.has(region.id)
       || stackMapContextIds.has(region.id)
-      || region.childIds.some((childId) => visibleIds.has(childId)))
-    .map((region) => region.id));
+      || region.childIds.some((childId) => visibleIds.has(childId))) retainRegionAndAncestors(region.id);
+  });
   const resolvedEdges = new Map<string, AnalyzerViewEdge>();
   const presentationPathExpanded = (presentationId: string): boolean => {
     const visited = new Set<string>();
@@ -286,7 +372,11 @@ export function presentAnalyzerView(view: AnalyzerViewModel, options: AnalyzerPr
       .filter((cluster) => cluster.nodeIds.length > 0),
     regions: (view.regions ?? [])
       .filter((region) => visibleRegionIds.has(region.id))
-      .map((region) => ({ ...region, childIds: region.childIds.filter((childId) => visibleIds.has(childId)) })),
+      .map((region) => ({
+        ...region,
+        childIds: region.childIds.filter((childId) => visibleIds.has(childId)),
+        ...(region.childRegionIds ? { childRegionIds: region.childRegionIds.filter((childId) => visibleRegionIds.has(childId)) } : {}),
+      })),
     presentationGroups,
   };
 }

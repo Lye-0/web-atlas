@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 import { AnalyzerDetailPanel } from './AnalyzerDetailPanel';
-import type { AnalyzerEvidence, AnalyzerFact, AnalyzerProjectStore, AnalyzerViewModel, AnalyzerViewNode, CommandFact, ProjectFact, TechnologyFact } from '../../analyzer';
+import type { AnalyzerEvidence, AnalyzerFact, AnalyzerProjectStore, AnalyzerSemanticRegion, AnalyzerViewModel, AnalyzerViewNode, CommandFact, ProjectFact, TechnologyFact } from '../../analyzer';
 
 const storeBase: Omit<AnalyzerProjectStore, 'facts'> = {
   files: [],
@@ -150,5 +150,52 @@ describe('Analyzer Dictionary title link', () => {
     expect(markup).toContain('UIライブラリ');
     expect(markup).toContain('apps/web/package.json');
     expect(markup).toContain('href="/dictionary/stacks/react"');
+  });
+
+  it('shows and links the promoted parent Scope for a nested Region', () => {
+    const parent: AnalyzerSemanticRegion = {
+      id: 'region:scope:apps/api',
+      entityKind: 'region',
+      regionKind: 'scope',
+      label: 'API',
+      subtitle: 'apps/api',
+      childIds: [],
+      childRegionIds: ['region:scope:apps/api/test'],
+      ports: [],
+      selectable: true,
+      evidenceIds: [],
+      metadata: {},
+    };
+    const child: AnalyzerSemanticRegion = {
+      id: 'region:scope:apps/api/test',
+      entityKind: 'region',
+      regionKind: 'scope',
+      label: 'TEST',
+      subtitle: 'apps/api/test',
+      childIds: [],
+      parentRegionId: parent.id,
+      ports: [],
+      selectable: true,
+      evidenceIds: [],
+      metadata: {},
+    };
+    const view: AnalyzerViewModel = { view: 'architecture', nodes: [], edges: [], clusters: [], regions: [parent, child], evidence: [], warnings: [] };
+    const markup = renderToStaticMarkup(
+      <MemoryRouter>
+        <AnalyzerDetailPanel
+          store={{ ...storeBase, facts: [] }}
+          view={view}
+          selectedRegionId={child.id}
+          expandedPresentationIds={new Set()}
+          onSelectNode={() => undefined}
+          onSelectRegion={() => undefined}
+          onTogglePresentation={() => undefined}
+          onClose={() => undefined}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(markup).toContain('Parent Scope');
+    expect(markup).toContain('API · apps/api');
   });
 });

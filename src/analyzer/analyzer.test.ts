@@ -186,6 +186,35 @@ describe('smoke', () => undefined);
   ];
 }
 
+function nestedScopeFixture(): AnalyzerSourceFile[] {
+  return [
+    fixtureFile('package.json', `{
+  "name": "nested-scope-fixture",
+  "packageManager": "pnpm@9.0.0"
+}`),
+    fixtureFile('pnpm-workspace.yaml', 'packages:\n  - "apps/*"\n'),
+    fixtureFile('apps/api/package.json', `{
+  "name": "@scope/api",
+  "dependencies": {
+    "typescript": "^5.0.0"
+  },
+  "devDependencies": {
+    "vitest": "^3.0.0"
+  }
+}`),
+    fixtureFile('apps/api/tsconfig.json', '{ "include": ["src/**/*.ts"] }\n'),
+    fixtureFile('apps/api/vitest.config.mts', "import { defineConfig } from 'vitest/config';\nexport default defineConfig({});\n"),
+    fixtureFile('apps/api/test/tsconfig.json', `{
+  "extends": "../tsconfig.json",
+  "compilerOptions": { "types": ["@cloudflare/vitest-pool-workers"] },
+  "include": ["./**/*.ts", "../worker-configuration.d.ts"],
+  "exclude": []
+}`),
+    fixtureFile('apps/api/src/worker.ts', "import ts from 'typescript';\nexport const worker = ts;\n"),
+    fixtureFile('apps/api/test/worker.test.ts', "import { describe } from 'vitest';\nimport ts from 'typescript';\ndescribe('worker', () => ts);\n"),
+  ];
+}
+
 describe('Analyzer parsers and evidence', () => {
   it('parses JSONC manifests and keeps exact script/dependency offsets', () => {
     const source = `{
@@ -664,6 +693,106 @@ describe('Analyzer scan and projectors', () => {
     expect(stackMap.regions?.some((region) => region.metadata.scopePath === 'webview')).toBe(true);
     expect(stackMap.regions?.some((region) => region.metadata.scopePath === 'src')).toBe(true);
     expect(stackMap.regions?.some((region) => region.metadata.scopePath === 'tests')).toBe(false);
+  });
+
+  it('promotes an explicit nested compilation boundary and keeps usage-only directories attributed to their package', async () => {
+    const nestedStore = await scanProjectFiles(nestedScopeFixture());
+    const nestedStackMap = projectStackMap(nestedStore);
+    const regionAt = (path: string) => nestedStackMap.regions?.find((region) => region.metadata.scopePath === path);
+    const apiRegion = regionAt('apps/api');
+    const testRegion = regionAt('apps/api/test');
+
+    expect(nestedStore.evidence.some((evidence) => evidence.role === 'scope'
+      && evidence.scopePath === 'apps/api/test'
+      && evidence.scopeStrength === 'explicit-boundary')).toBe(true);
+    expect(nestedStore.evidence.some((evidence) => evidence.role === 'scope'
+      && evidence.scopePath === 'apps/api'
+      && evidence.scopeStrength === 'explicit-boundary'
+      && evidence.description?.includes('Vitest'))).toBe(true);
+    expect(apiRegion).toBeDefined();
+    expect(testRegion).toMatchObject({
+      parentRegionId: apiRegion?.id,
+      depth: (apiRegion?.depth ?? 0) + 1,
+      metadata: { scopePromotion: 'explicit-boundary' },
+    });
+    expect(apiRegion?.childRegionIds).toEqual([testRegion?.id]);
+
+    const projectId = nestedStackMap.nodes.find((node) => node.type === 'project')?.id;
+    expect(nestedStackMap.edges.filter((edge) => edge.sourceId === projectId).map((edge) => edge.targetId)).toContain(apiRegion?.id);
+    expect(nestedStackMap.edges.some((edge) => edge.sourceId === projectId && edge.targetId === testRegion?.id)).toBe(false);
+    expect(nestedStackMap.edges.some((edge) => nestedStackMap.regions?.some((region) => region.id === edge.sourceId)
+      && nestedStackMap.regions?.some((region) => region.id === edge.targetId))).toBe(false);
+
+    const regionsById = new Map((nestedStackMap.regions ?? []).map((region) => [region.id, region]));
+    nestedStackMap.regions?.forEach((region) => {
+      const visited = new Set<string>();
+      let current: string | undefined = region.id;
+      while (current) {
+        expect(visited.has(current)).toBe(false);
+        visited.add(current);
+        current = regionsById.get(current)?.parentRegionId;
+      }
+    });
+
+    const nestedLayout = layoutAnalyzerView(nestedStackMap);
+    const positionedApi = nestedLayout.regions?.find((region) => region.region.id === apiRegion?.id);
+    const positionedTest = nestedLayout.regions?.find((region) => region.region.id === testRegion?.id);
+    expect(positionedApi).toBeDefined();
+    expect(positionedTest).toBeDefined();
+    expect(positionedTest!.x).toBeGreaterThan(positionedApi!.x);
+    expect(positionedTest!.y).toBeGreaterThan(positionedApi!.y);
+    expect(positionedTest!.x + positionedTest!.width).toBeLessThanOrEqual(positionedApi!.x + positionedApi!.width);
+    expect(positionedTest!.y + positionedTest!.height).toBeLessThanOrEqual(positionedApi!.y + positionedApi!.height);
+    const expandedNestedLayout = layoutAnalyzerView(nestedStackMap, new Set([nestedStackMap.nodes.find((node) => node.metadata.scopePath === 'apps/api/test' && node.metadata.stackId === 'typescript')?.id ?? '']));
+    const expandedApi = expandedNestedLayout.regions?.find((region) => region.region.id === apiRegion?.id);
+    const expandedTest = expandedNestedLayout.regions?.find((region) => region.region.id === testRegion?.id);
+    expect(expandedTest!.height).toBeGreaterThan(positionedTest!.height);
+    expect(expandedApi!.height).toBeGreaterThan(positionedApi!.height);
+    const fitted = fitAnalyzerTransform(nestedLayout, 1000, 600);
+    expect(fitted.x + (positionedTest!.x + positionedTest!.width) * fitted.scale).toBeLessThanOrEqual(1000 - 64 + 0.0001);
+
+    const usageOnlyFixture = nestedScopeFixture().filter((file) => file.relativePath !== 'apps/api/test/tsconfig.json');
+    const usageOnlyStackMap = projectStackMap(await scanProjectFiles(usageOnlyFixture));
+    expect(usageOnlyStackMap.regions?.some((region) => region.metadata.scopePath === 'apps/api/test')).toBe(false);
+    expect(usageOnlyStackMap.nodes.some((node) => node.metadata.stackId === 'vitest' && node.metadata.scopePath === 'apps/api')).toBe(true);
+
+    const searched = presentAnalyzerView(nestedStackMap, { expandedPresentationIds: new Set(), filter: 'all', search: 'Vitest' });
+    expect(searched.regions?.map((region) => region.id)).toEqual(expect.arrayContaining([apiRegion?.id, testRegion?.id]));
+    expect(searched.regions?.find((region) => region.id === apiRegion?.id)?.childRegionIds).toContain(testRegion?.id);
+    const filtered = presentAnalyzerView(nestedStackMap, { expandedPresentationIds: new Set(), filter: 'stack-usage', search: '' });
+    expect(filtered.regions?.map((region) => region.id)).toEqual(expect.arrayContaining([apiRegion?.id, testRegion?.id]));
+
+    const evidenceFor = (scopePath: string, stackId: string) => {
+      const node = nestedStackMap.nodes.find((candidate) => candidate.type === 'stack-usage'
+        && candidate.metadata.scopePath === scopePath
+        && candidate.metadata.stackId === stackId);
+      return node?.evidenceIds
+        .map((evidenceId) => nestedStore.evidence.find((evidence) => evidence.id === evidenceId))
+        .filter((evidence): evidence is NonNullable<typeof evidence> => Boolean(evidence)) ?? [];
+    };
+    const apiTypeScriptEvidence = evidenceFor('apps/api', 'typescript');
+    const testTypeScriptEvidence = evidenceFor('apps/api/test', 'typescript');
+    expect(apiTypeScriptEvidence.some((evidence) => evidence.role === 'usage' && evidence.filePath.startsWith('apps/api/src/'))).toBe(true);
+    expect(apiTypeScriptEvidence.some((evidence) => evidence.filePath === 'apps/api/test/tsconfig.json')).toBe(false);
+    expect(testTypeScriptEvidence.some((evidence) => evidence.role === 'scope' && evidence.filePath === 'apps/api/test/tsconfig.json')).toBe(true);
+    expect(testTypeScriptEvidence.some((evidence) => evidence.role === 'usage' && evidence.filePath.startsWith('apps/api/test/'))).toBe(true);
+    expect(apiTypeScriptEvidence.some((evidence) => evidence.role === 'declaration' && evidence.filePath === 'apps/api/package.json')).toBe(true);
+    expect(testTypeScriptEvidence.filter((evidence) => evidence.filePath === 'apps/api/package.json').every((evidence) => evidence.role === 'declaration')).toBe(true);
+    const apiVitestEvidence = evidenceFor('apps/api', 'vitest');
+    const testVitestEvidence = evidenceFor('apps/api/test', 'vitest');
+    expect(apiVitestEvidence.some((evidence) => evidence.role === 'usage' && evidence.filePath === 'apps/api/vitest.config.mts')).toBe(true);
+    expect(testVitestEvidence.some((evidence) => evidence.role === 'usage' && evidence.filePath.startsWith('apps/api/test/'))).toBe(true);
+    expect(apiVitestEvidence.some((evidence) => evidence.filePath.startsWith('apps/api/test/'))).toBe(false);
+
+    const childOnlyFixture = nestedScopeFixture().filter((file) => file.relativePath !== 'apps/api/tsconfig.json' && file.relativePath !== 'apps/api/src/worker.ts');
+    const childOnlyStore = await scanProjectFiles(childOnlyFixture);
+    const childOnlyStackMap = projectStackMap(childOnlyStore);
+    expect(childOnlyStackMap.nodes.some((node) => node.type === 'stack-usage'
+      && node.metadata.scopePath === 'apps/api'
+      && node.metadata.stackId === 'typescript')).toBe(false);
+    expect(childOnlyStackMap.nodes.some((node) => node.type === 'stack-usage'
+      && node.metadata.scopePath === 'apps/api/test'
+      && node.metadata.stackId === 'typescript')).toBe(true);
   });
 
   it('places Command Flow by execution rank and keeps concurrently branches on one stage', async () => {

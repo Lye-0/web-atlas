@@ -17,6 +17,7 @@ import type {
   AnalyzerFact,
   AnalyzerEvidence,
   AnalyzerEvidenceRole,
+  AnalyzerScopeEvidenceStrength,
   AnalyzerMetadata,
   AnalyzerProjectStore,
   AnalyzerRelation,
@@ -258,9 +259,10 @@ function createEvidence(
   description: string,
   role?: AnalyzerEvidenceRole,
   scopePath?: string,
+  scopeStrength?: AnalyzerScopeEvidenceStrength,
 ): string | undefined {
   if (!range) return undefined;
-  return builder.addEvidence(makeEvidence(filePath, source, range, kind, detectorId, description, 2, role, scopePath));
+  return builder.addEvidence(makeEvidence(filePath, source, range, kind, detectorId, description, 2, role, scopePath, scopeStrength));
 }
 
 function createFileEvidence(
@@ -272,8 +274,9 @@ function createFileEvidence(
   description: string,
   role?: AnalyzerEvidenceRole,
   scopePath?: string,
+  scopeStrength?: AnalyzerScopeEvidenceStrength,
 ): string {
-  return builder.addEvidence(makeFileEvidence(filePath, source, kind, detectorId, description, role, scopePath));
+  return builder.addEvidence(makeFileEvidence(filePath, source, kind, detectorId, description, role, scopePath, scopeStrength));
 }
 
 function addProjectFact(builder: AnalyzerStoreBuilder, rootPackage: ParsedPackageJson | undefined, rootSource: LoadedSource | undefined, fallbackSource: LoadedSource | undefined): ProjectFact {
@@ -493,6 +496,7 @@ function resolveRelativePath(baseFilePath: string, include: string): string {
 interface ConfigScopeBinding {
   path: string;
   description: string;
+  strength: AnalyzerScopeEvidenceStrength;
 }
 
 const nonApplicationScopeRoots = new Set(['script', 'scripts', 'spec', 'specs', 'test', 'tests', 'tool', 'tools']);
@@ -533,17 +537,26 @@ function resolveConfiguredScopePath(baseFilePath: string, configuredPath: string
   return configuredScopeBoundary(pathBeforeConfiguredGlob(resolveRelativePath(baseFilePath, value), isFile));
 }
 
+function pathBelongsToScope(filePath: string, scopePath: string): boolean {
+  const normalizedFilePath = normalizeRelativePath(filePath);
+  const normalizedScopePath = normalizeRelativePath(scopePath);
+  return normalizedScopePath === '.'
+    || normalizedFilePath === normalizedScopePath
+    || normalizedFilePath.startsWith(`${normalizedScopePath}/`);
+}
+
 function configuredScopeBindings(loaded: LoadedSource): ConfigScopeBinding[] {
   const lowerName = loaded.file.name.toLowerCase();
   const directory = directoryForFilePath(loaded.file.relativePath);
-  if (lowerName.startsWith('vite.config.')) {
+  if (lowerName.startsWith('vite.config.') || lowerName.startsWith('vitest.config.')) {
     const rootMatch = /\broot\s*:\s*(['"`])([^'"`]+)\1/.exec(loaded.source);
     // Vite resolves `root` from the project working directory rather than
     // from the directory containing the config file. This matters for a
     // repository-level invocation such as `vite --config webview/vite.config.ts`
     // where `root: 'webview'` must remain `webview`, not `webview/webview`.
     const rootPath = rootMatch ? resolveConfiguredScopePath('.', rootMatch[2] ?? '') : configuredScopeBoundary(directory);
-    return [{ path: rootPath ?? '.', description: rootMatch ? `Vite root ${rootMatch[2]}` : `Vite config boundary ${directory}` }];
+    const toolName = lowerName.startsWith('vitest.config.') ? 'Vitest' : 'Vite';
+    return [{ path: rootPath ?? '.', description: rootMatch ? `${toolName} root ${rootMatch[2]}` : `${toolName} config boundary ${directory}`, strength: 'explicit-boundary' }];
   }
   if (!lowerName.startsWith('tsconfig') || !lowerName.endsWith('.json')) return [];
 
@@ -577,13 +590,23 @@ function configuredScopeBindings(loaded: LoadedSource): ConfigScopeBinding[] {
     .map((configured) => ({ path: resolveConfiguredScopePath(loaded.file.relativePath, configured.value, configured.isFile), description: configured.source }))
     .filter((binding): binding is { path: string; description: string } => Boolean(binding.path));
   if (paths.length > 0) {
-    const unique = new Map(paths.map((binding) => [binding.path, binding]));
-    return [...unique.values()];
+    // A nested config may include a support file from its parent package
+    // (for example `../worker-configuration.d.ts`). That support file does
+    // not transfer the nested config's Evidence ownership to the parent. If
+    // the config also defines a boundary inside its own scope, keep only
+    // bindings owned by that boundary; parent usage must come from parent
+    // source/config Evidence of its own.
+    const configBoundary = configuredScopeBoundary(directory);
+    const ownedPaths = configBoundary && configBoundary !== '.' && paths.some((binding) => pathBelongsToScope(binding.path, configBoundary))
+      ? paths.filter((binding) => pathBelongsToScope(binding.path, configBoundary))
+      : paths;
+    const unique = new Map(ownedPaths.map((binding) => [binding.path, binding]));
+    return [...unique.values()].map((binding) => ({ ...binding, strength: 'explicit-boundary' }));
   }
   // A config file inside an already-known package / solution is still
   // Usage Evidence, but its directory alone must not create a new Region.
   return directory === '.'
-    ? [{ path: '.', description: 'TypeScript config at repository root' }]
+    ? [{ path: '.', description: 'TypeScript config at repository root', strength: 'explicit-boundary' }]
     : [];
 }
 
@@ -615,6 +638,7 @@ function addConfiguredTechnologyFact(builder: AnalyzerStoreBuilder, loaded: Load
       `Scope boundary · ${binding.description}`,
       'scope',
       binding.path,
+      binding.strength,
     );
     return [usageEvidenceId, scopeEvidenceId];
   });
@@ -709,6 +733,8 @@ function processPackageManager(builder: AnalyzerStoreBuilder, parsed: ParsedPack
 function processConfigTechnology(builder: AnalyzerStoreBuilder, loaded: LoadedSource): void {
   if (loaded.file.name.toLowerCase().startsWith('vite.config.')) {
     addConfiguredTechnologyFact(builder, loaded, 'vite', 'Vite configuration file');
+  } else if (loaded.file.name.toLowerCase().startsWith('vitest.config.')) {
+    addConfiguredTechnologyFact(builder, loaded, 'vitest', 'Vitest configuration file');
   } else if (loaded.file.name.toLowerCase().startsWith('tsconfig') && loaded.file.name.toLowerCase().endsWith('.json')) {
     addConfiguredTechnologyFact(builder, loaded, 'typescript', 'TypeScript configuration file');
   }

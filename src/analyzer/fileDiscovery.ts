@@ -127,6 +127,7 @@ export function isAnalyzerSourcePath(path: string): boolean {
     || name === 'wrangler.jsonc'
     || name === 'wrangler.toml'
     || name.startsWith('vite.config.')
+    || name.startsWith('vitest.config.')
     || (name.startsWith('tsconfig') && name.endsWith('.json'))
     || name.endsWith('.slnx')
     || name.endsWith('.sln')
