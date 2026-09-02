@@ -17,8 +17,8 @@ import {
   type AnalyzerEdgePoint,
   type AnalyzerEdgeObstacle,
 } from './edgeRouting';
-import { ANALYZER_NODE_WIDTH, type AnalyzerLayout, type PositionedNode } from './layout';
-import type { AnalyzerViewEdge, AnalyzerViewNode } from './types';
+import { ANALYZER_NODE_WIDTH, type AnalyzerLayout, type PositionedNode, type PositionedSemanticRegion } from './layout';
+import type { AnalyzerSemanticRegion, AnalyzerViewEdge, AnalyzerViewNode } from './types';
 
 function positionedNode(id: string, x: number, y: number, height = 106): PositionedNode {
   const node: AnalyzerViewNode = {
@@ -58,6 +58,26 @@ function emptyLayout(nodes: PositionedNode[]): AnalyzerLayout {
   return { width: 1200, height: 800, nodes, clusters: [], lanes: [], bands: [], summaryGroups: [] };
 }
 
+function positionedRegion(id: string, x: number, y: number, width = 280, height = 220): PositionedSemanticRegion {
+  const region: AnalyzerSemanticRegion = {
+    id,
+    entityKind: 'region',
+    regionKind: 'scope',
+    label: id,
+    childIds: [],
+    ports: [
+      { id: `${id}:top`, side: 'top' },
+      { id: `${id}:right`, side: 'right' },
+      { id: `${id}:bottom`, side: 'bottom' },
+      { id: `${id}:left`, side: 'left' },
+    ],
+    selectable: true,
+    evidenceIds: [],
+    metadata: {},
+  };
+  return { region, x, y, width, height, headingHeight: 28, memberGap: 14 };
+}
+
 describe('Analyzer edge obstacle classification', () => {
   it('treats fact nodes and collapsed Summary Cards as hard, but surfaces as pass-through', () => {
     const layout: AnalyzerLayout = {
@@ -79,6 +99,36 @@ describe('Analyzer edge obstacle classification', () => {
     expect(obstacles.find((candidate) => candidate.id === 'summary-heading:summary:external')).toMatchObject({ width: 344, height: 30, priority: 3 });
     expect(isAnalyzerEdgeObstacleHard(obstacle('surface', 0, 0, 100, 100, 'cluster'))).toBe(false);
     expect(isAnalyzerEdgeObstacleHard(obstacle('region', 0, 0, 100, 100, 'summary'))).toBe(false);
+  });
+
+  it('keeps a Semantic Region surface pass-through while protecting its heading', () => {
+    const region = positionedRegion('region:scope:web', 420, 100);
+    const layout: AnalyzerLayout = { ...emptyLayout([]), regions: [region] };
+    const obstacles = analyzerEdgeObstacles(layout);
+    const surface = obstacles.find((candidate) => candidate.id === 'region-surface:region:scope:web');
+    const heading = obstacles.find((candidate) => candidate.id === 'region-heading:region:scope:web');
+
+    expect(surface).toMatchObject({ kind: 'region-surface', hard: false, x: 420, y: 100, width: 280, height: 220 });
+    expect(heading).toMatchObject({ kind: 'region-heading', x: 428, y: 114, width: 264, height: 28 });
+    expect(isAnalyzerEdgeObstacleHard(surface!)).toBe(false);
+    expect(isAnalyzerEdgeObstacleHard(heading!)).toBe(true);
+  });
+});
+
+describe('Analyzer Semantic Region endpoints', () => {
+  it('routes a Project-to-Region relation to the Region boundary instead of a center endpoint', () => {
+    const source = positionedNode('source', 0, 100);
+    const region = positionedRegion('region:scope:web', 600, 100);
+    const positions = new Map<string, PositionedNode | PositionedSemanticRegion>([
+      [source.node.id, source],
+      [region.region.id, region],
+    ]);
+    const routes = analyzerEdgeRoutes([edge('edge:source-region', 'source', region.region.id)], positions, analyzerEdgeObstacles({ ...emptyLayout([source]), regions: [region] }), { flowDirection: 'horizontal' });
+    const route = routes.get('edge:source-region');
+
+    expect(route).toBeDefined();
+    expect(route?.[0]).toEqual({ x: source.x + ANALYZER_NODE_WIDTH, y: source.y + source.height / 2 });
+    expect(route?.at(-1)).toEqual({ x: region.x, y: region.y + region.height / 2 });
   });
 });
 

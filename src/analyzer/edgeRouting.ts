@@ -1,4 +1,10 @@
-import { ANALYZER_NODE_WIDTH, ANALYZER_STRUCTURAL_HEADING_HEIGHT, type AnalyzerLayout, type PositionedNode } from './layout';
+import {
+  ANALYZER_NODE_WIDTH,
+  ANALYZER_REGION_HEADING_TOP,
+  ANALYZER_STRUCTURAL_HEADING_HEIGHT,
+  type AnalyzerLayout,
+  type PositionedGraphEndpoint,
+} from './layout';
 import type { AnalyzerViewEdge } from './types';
 
 export type AnalyzerEdgeObstacleKind =
@@ -11,7 +17,9 @@ export type AnalyzerEdgeObstacleKind =
   | 'summary'
   | 'band'
   | 'cluster'
-  | 'lane';
+  | 'lane'
+  | 'region-surface'
+  | 'region-heading';
 
 export interface AnalyzerEdgeObstacle {
   id: string;
@@ -375,16 +383,28 @@ function resolveRoutingOptions(options: AnalyzerEdgeRoutingOptions): ResolvedRou
   };
 }
 
-function nodeRight(node: PositionedNode): number {
-  return node.x + ANALYZER_NODE_WIDTH;
+function endpointWidth(endpoint: PositionedGraphEndpoint): number {
+  return 'region' in endpoint ? endpoint.width : ANALYZER_NODE_WIDTH;
 }
 
-function nodeBottom(node: PositionedNode): number {
+function endpointId(endpoint: PositionedGraphEndpoint): string {
+  return 'region' in endpoint ? endpoint.region.id : endpoint.node.id;
+}
+
+function endpointLabel(endpoint: PositionedGraphEndpoint): string {
+  return 'region' in endpoint ? endpoint.region.label : endpoint.node.label;
+}
+
+function nodeRight(node: PositionedGraphEndpoint): number {
+  return node.x + endpointWidth(node);
+}
+
+function nodeBottom(node: PositionedGraphEndpoint): number {
   return node.y + node.height;
 }
 
-function nodeCenter(node: PositionedNode): AnalyzerEdgePoint {
-  return { x: node.x + ANALYZER_NODE_WIDTH / 2, y: node.y + node.height / 2 };
+function nodeCenter(node: PositionedGraphEndpoint): AnalyzerEdgePoint {
+  return { x: node.x + endpointWidth(node) / 2, y: node.y + node.height / 2 };
 }
 
 function movePoint(point: AnalyzerEdgePoint, direction: AxisDirection, distance: number): AnalyzerEdgePoint {
@@ -402,8 +422,8 @@ function oppositeDirection(direction: AxisDirection): AxisDirection {
 }
 
 function edgePortGeometryForDirection(
-  source: PositionedNode,
-  target: PositionedNode,
+  source: PositionedGraphEndpoint,
+  target: PositionedGraphEndpoint,
   clearance: number,
   direction: AxisDirection,
 ): EdgePortGeometry {
@@ -434,8 +454,8 @@ function edgePortGeometryForDirection(
 }
 
 function edgePortGeometry(
-  source: PositionedNode,
-  target: PositionedNode,
+  source: PositionedGraphEndpoint,
+  target: PositionedGraphEndpoint,
   clearance: number,
   flowDirection: ResolvedRoutingOptions['flowDirection'] = 'auto',
 ): EdgePortGeometry {
@@ -717,17 +737,20 @@ function pointClear(point: AnalyzerEdgePoint, obstacles: readonly InflatedObstac
   return !obstacles.some((obstacle) => containsPointStrict(obstacle, point));
 }
 
-function isEndpointObstacle(obstacle: AnalyzerEdgeObstacle, node: PositionedNode): boolean {
-  const center = nodeCenter(node);
-  return obstacle.id === node.node.id
-    || obstacle.id === `node:${node.node.id}`
-    || obstacle.id === `summary-card:${node.node.id}`
+function isEndpointObstacle(obstacle: AnalyzerEdgeObstacle, endpoint: PositionedGraphEndpoint): boolean {
+  const center = nodeCenter(endpoint);
+  const id = endpointId(endpoint);
+  return obstacle.id === id
+    || obstacle.id === `node:${id}`
+    || obstacle.id === `region:${id}`
+    || obstacle.id === `region-surface:${id}`
+    || obstacle.id === `summary-card:${id}`
     || containsPoint(obstacle, center);
 }
 
 function relevantObstacles(
-  source: PositionedNode,
-  target: PositionedNode,
+  source: PositionedGraphEndpoint,
+  target: PositionedGraphEndpoint,
   obstacles: readonly AnalyzerEdgeObstacle[],
   clearance: number,
 ): InflatedObstacle[] {
@@ -743,8 +766,8 @@ function isSoftKeepOutObstacle(obstacle: AnalyzerEdgeObstacle): boolean {
 }
 
 function relevantSoftObstacles(
-  source: PositionedNode,
-  target: PositionedNode,
+  source: PositionedGraphEndpoint,
+  target: PositionedGraphEndpoint,
   obstacles: readonly AnalyzerEdgeObstacle[],
   softKeepOut: number,
 ): InflatedObstacle[] {
@@ -1125,8 +1148,8 @@ function fallbackRoute(
 }
 
 function candidateRoute(
-  source: PositionedNode,
-  target: PositionedNode,
+  source: PositionedGraphEndpoint,
+  target: PositionedGraphEndpoint,
   obstacles: readonly InflatedObstacle[],
   options: ResolvedRoutingOptions,
 ): AnalyzerEdgePoint[] {
@@ -1251,6 +1274,25 @@ export function analyzerEdgeObstacles(layout: AnalyzerLayout): AnalyzerEdgeObsta
       kind: positionedNode.node.presentation?.role === 'summary' ? 'summary-card' as const : 'node' as const,
       priority: positionedNode.node.presentation?.role === 'summary' ? 2 : 1,
     })),
+    ...(layout.regions ?? []).map((positionedRegion) => ({
+      id: `region-surface:${positionedRegion.region.id}`,
+      x: positionedRegion.x,
+      y: positionedRegion.y,
+      width: positionedRegion.width,
+      height: positionedRegion.height,
+      kind: 'region-surface' as const,
+      hard: false,
+      priority: 0,
+    })),
+    ...(layout.regions ?? []).map((positionedRegion) => ({
+      id: `region-heading:${positionedRegion.region.id}`,
+      x: positionedRegion.x + 8,
+      y: positionedRegion.y + ANALYZER_REGION_HEADING_TOP,
+      width: Math.max(24, positionedRegion.width - 16),
+      height: positionedRegion.headingHeight,
+      kind: 'region-heading' as const,
+      priority: 3,
+    })),
     ...layout.summaryGroups.map((group) => summaryHeadingObstacle(`summary-heading:${group.id}`, group.x, group.y, group.width)),
     ...layout.bands.map((band) => summaryHeadingObstacle(`band-heading:${band.id}`, band.x, band.y, band.width)),
     ...layout.clusters.map((cluster) => labelObstacle(`cluster-label:${cluster.id}`, cluster.x, cluster.y, cluster.width, cluster.label)),
@@ -1260,7 +1302,7 @@ export function analyzerEdgeObstacles(layout: AnalyzerLayout): AnalyzerEdgeObsta
 
 interface FanoutMember {
   edge: AnalyzerRoutableEdge;
-  target: PositionedNode;
+  target: PositionedGraphEndpoint;
 }
 
 function fanoutTargetGroupBounds(members: readonly FanoutMember[]): FanoutGroupBounds | undefined {
@@ -1280,7 +1322,7 @@ function fanoutCandidatePriorityCost(priority: FanoutTrunkCandidatePriority): nu
 }
 
 function fanoutSideGaps(
-  source: PositionedNode,
+  source: PositionedGraphEndpoint,
   targetGroupBounds: FanoutGroupBounds,
 ): Record<AnalyzerFanoutDirection, number> {
   return {
@@ -1296,7 +1338,7 @@ function fanoutDirectionAxis(direction: AnalyzerFanoutDirection): 'horizontal' |
 }
 
 function fanoutCenterPreferredDirection(
-  source: PositionedNode,
+  source: PositionedGraphEndpoint,
   targetGroupBounds: FanoutGroupBounds,
   flowDirection: ResolvedRoutingOptions['flowDirection'],
 ): AnalyzerFanoutDirection {
@@ -1314,7 +1356,7 @@ function fanoutCenterPreferredDirection(
 }
 
 function fanoutDirectionSelection(
-  source: PositionedNode,
+  source: PositionedGraphEndpoint,
   targetGroupBounds: FanoutGroupBounds,
   flowDirection: ResolvedRoutingOptions['flowDirection'],
 ): {
@@ -1431,7 +1473,7 @@ function fanoutTrunkCandidates(
 }
 
 function fanoutRouteForDirection(
-  source: PositionedNode,
+  source: PositionedGraphEndpoint,
   members: readonly FanoutMember[],
   obstacles: readonly AnalyzerEdgeObstacle[],
   options: ResolvedRoutingOptions,
@@ -1631,8 +1673,8 @@ function fanoutRouteForDirection(
         : [{ x: port.end.x, y: trunk.y! }, port.end, port.targetBoundary];
       candidateDiagnosticBase.branches.push({
         edgeId: member.edge.id,
-        targetId: member.target.node.id,
-        targetLabel: member.target.node.label,
+        targetId: endpointId(member.target),
+        targetLabel: endpointLabel(member.target),
         valid: !routeOutsideBounds && !routeMonotonicityViolation && routeClear && !compactedMonotonicityViolation,
         ...(branchReason ? { reason: branchReason } : {}),
         branchPoints,
@@ -1683,7 +1725,7 @@ function fanoutRouteForDirection(
 }
 
 function fanoutRoute(
-  source: PositionedNode,
+  source: PositionedGraphEndpoint,
   members: readonly FanoutMember[],
   obstacles: readonly AnalyzerEdgeObstacle[],
   options: ResolvedRoutingOptions,
@@ -1732,7 +1774,8 @@ function fanoutRoute(
   };
 }
 
-function fanoutTargetGroupKey(target: PositionedNode): string {
+function fanoutTargetGroupKey(target: PositionedGraphEndpoint): string {
+  if ('region' in target) return `region:${target.region.id}`;
   if (target.node.presentation?.role === 'summary') return `summary:${target.node.id}`;
   if (target.node.presentation?.parentId) return `presentation:${target.node.presentation.parentId}`;
   return `cluster:${target.node.clusterId ?? target.node.type}`;
@@ -1746,8 +1789,8 @@ function canUseFanout(edge: AnalyzerRoutableEdge): boolean {
 }
 
 export function analyzerEdgeRoute(
-  source: PositionedNode,
-  target: PositionedNode,
+  source: PositionedGraphEndpoint,
+  target: PositionedGraphEndpoint,
   obstacles: readonly AnalyzerEdgeObstacle[] = [],
   options: AnalyzerEdgeRoutingOptions = {},
 ): AnalyzerEdgePoint[] | undefined {
@@ -1759,7 +1802,7 @@ export function analyzerEdgeRoute(
 
 export function analyzerEdgeRoutes(
   edges: readonly AnalyzerRoutableEdge[],
-  positionedById: ReadonlyMap<string, PositionedNode>,
+  positionedById: ReadonlyMap<string, PositionedGraphEndpoint>,
   obstacles: readonly AnalyzerEdgeObstacle[] = [],
   options: AnalyzerEdgeRoutingOptions = {},
 ): Map<string, AnalyzerEdgePoint[]> {
@@ -1793,10 +1836,10 @@ export function analyzerEdgeRoutes(
       const fanoutGroupDirection = fanout?.selectedDirection
         ?? fanout?.preferredDirection
         ?? fanoutDirectionSelection(source, targetGroupBounds, resolved.flowDirection).preferredDirection;
-      const fanoutGroupId = `fanout:${source.node.id}:${fanoutGroupDirection}:${group[0]!.edge.kind ?? 'unknown'}:${fanoutTargetGroupKey(group[0]!.target)}`;
+      const fanoutGroupId = `fanout:${endpointId(source)}:${fanoutGroupDirection}:${group[0]!.edge.kind ?? 'unknown'}:${fanoutTargetGroupKey(group[0]!.target)}`;
       const fanoutDiagnostic: AnalyzerFanoutRoutingDiagnostic = {
         fanoutGroupId,
-        sourceId: source.node.id,
+        sourceId: endpointId(source),
         edgeIds: group.map(({ edge }) => edge.id),
         targetIds: group.map(({ edge }) => edge.targetId),
         fanoutDetected: true,
@@ -1954,8 +1997,8 @@ function roundedPathPolyline(points: readonly AnalyzerEdgePoint[], radius: numbe
 }
 
 export function analyzerEdgePath(
-  source: PositionedNode,
-  target: PositionedNode,
+  source: PositionedGraphEndpoint,
+  target: PositionedGraphEndpoint,
   obstacles: readonly AnalyzerEdgeObstacle[] = [],
   options: AnalyzerEdgeRoutingOptions = {},
 ): string {
@@ -1967,7 +2010,7 @@ export function analyzerEdgePath(
 
 export function analyzerEdgePaths(
   edges: readonly AnalyzerRoutableEdge[],
-  positionedById: ReadonlyMap<string, PositionedNode>,
+  positionedById: ReadonlyMap<string, PositionedGraphEndpoint>,
   obstacles: readonly AnalyzerEdgeObstacle[] = [],
   options: AnalyzerEdgeRoutingOptions = {},
 ): Map<string, string> {
@@ -1977,8 +2020,8 @@ export function analyzerEdgePaths(
 }
 
 export function analyzerEdgePathIntersectsObstacle(
-  source: PositionedNode,
-  target: PositionedNode,
+  source: PositionedGraphEndpoint,
+  target: PositionedGraphEndpoint,
   obstacle: AnalyzerEdgeObstacle,
   clearance = DEFAULT_EDGE_CLEARANCE,
 ): boolean {

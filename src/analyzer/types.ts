@@ -24,6 +24,9 @@ export type AnalyzerEvidenceKind =
   | 'resource'
   | 'project';
 
+/** Describes how an Evidence item participates in Stack Map attribution. */
+export type AnalyzerEvidenceRole = 'declaration' | 'usage' | 'scope';
+
 export type AnalyzerDependencyType = 'dependency' | 'devDependency' | 'peerDependency' | 'optionalDependency' | 'workspaceDependency';
 
 export type AnalyzerRelationKind =
@@ -55,6 +58,10 @@ export type AnalyzerNodeType =
   | 'runtime'
   | 'resource'
   | 'dotnet-project';
+
+export type AnalyzerRegionKind = 'scope' | 'runtime' | 'subsystem' | 'module-group';
+export type AnalyzerRegionScopeKind = 'physical' | 'logical';
+export type AnalyzerRegionPortSide = 'top' | 'right' | 'bottom' | 'left';
 
 export type AnalyzerFilter =
   | 'all'
@@ -93,6 +100,10 @@ export interface AnalyzerEvidence {
   highlightRanges: SourceRange[];
   kind: AnalyzerEvidenceKind;
   detectorId: string;
+  /** Declaration, actual usage, or an explicit scope boundary signal. */
+  role?: AnalyzerEvidenceRole;
+  /** Repository-relative scope path supplied by an explicit config boundary. */
+  scopePath?: string;
   description?: string;
 }
 
@@ -273,6 +284,47 @@ export interface AnalyzerNodePresentation {
   hideWhenExpanded?: boolean;
 }
 
+export interface AnalyzerRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface AnalyzerGraphPort {
+  id: string;
+  side: AnalyzerRegionPortSide;
+}
+
+export type GraphPort = AnalyzerGraphPort;
+
+/** A selectable semantic container, kept separate from Nodes and Summaries. */
+export interface AnalyzerSemanticRegion {
+  id: string;
+  entityKind: 'region';
+  regionKind: AnalyzerRegionKind;
+  label: string;
+  subtitle?: string;
+  childIds: string[];
+  ports: AnalyzerGraphPort[];
+  selectable: boolean;
+  evidenceIds: string[];
+  factId?: string;
+  scopeKind?: AnalyzerRegionScopeKind;
+  /** Layout fills this after the region's children have been positioned. */
+  bounds?: AnalyzerRect;
+  metadata: AnalyzerMetadata;
+}
+
+export type SemanticRegion = AnalyzerSemanticRegion;
+
+/** Capability-level endpoint shape shared by Node, Region, and Summary routing. */
+export type AnalyzerSelection =
+  | { kind: 'node'; id: string }
+  | { kind: 'region'; id: string }
+  | { kind: 'edge'; id: string }
+  | { kind: 'summary'; id: string };
+
 export interface AnalyzerPresentationGroup {
   id: string;
   label: string;
@@ -329,6 +381,7 @@ export interface AnalyzerViewModel {
   nodes: AnalyzerViewNode[];
   edges: AnalyzerViewEdge[];
   clusters: AnalyzerCluster[];
+  regions?: AnalyzerSemanticRegion[];
   presentationGroups?: AnalyzerPresentationGroup[];
   stackUsages?: AnalyzerStackUsage[];
   counts?: AnalyzerViewCounts;

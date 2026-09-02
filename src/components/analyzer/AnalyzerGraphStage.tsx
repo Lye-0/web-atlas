@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { ANALYZER_DEFAULT_TRANSFORM, ANALYZER_EXTERNAL_SUMMARY_ID, ANALYZER_NODE_WIDTH, analyzerEdgeArrowMarkerId, analyzerEdgeObstacles, analyzerEdgePaths, analyzerFocusDepths, analyzerForegroundEdges, analyzerPresentationCount, analyzerPresentationCountLabel, displayedZoomLevelForNode, evidenceRangeLabel, fitAnalyzerTransform, focusAnalyzerTransform, layoutAnalyzerView, nodeMatchesSearch, preserveAnalyzerTransformOnViewportResize, presentAnalyzerView, semanticZoomLevelForScale, shouldRunAnalyzerInitialFit, shouldShowAnalyzerEvidencePreview, type AnalyzerEdgeRoutingDiagnostic, type AnalyzerFanoutRoutingDiagnostic, type AnalyzerGraphTransform, type AnalyzerViewCounts, type AnalyzerViewEdge, type AnalyzerViewModel, type PositionedNode } from '../../analyzer';
+import { ANALYZER_DEFAULT_TRANSFORM, ANALYZER_EXTERNAL_SUMMARY_ID, ANALYZER_NODE_WIDTH, analyzerEdgeArrowMarkerId, analyzerEdgeObstacles, analyzerEdgePaths, analyzerFocusDepths, analyzerForegroundEdges, analyzerPresentationCount, analyzerPresentationCountLabel, displayedZoomLevelForNode, evidenceRangeLabel, fitAnalyzerTransform, focusAnalyzerTransform, layoutAnalyzerView, nodeMatchesSearch, preserveAnalyzerTransformOnViewportResize, presentAnalyzerView, regionMatchesSearch, semanticZoomLevelForScale, shouldRunAnalyzerInitialFit, shouldShowAnalyzerEvidencePreview, type AnalyzerEdgeRoutingDiagnostic, type AnalyzerFanoutRoutingDiagnostic, type AnalyzerGraphTransform, type AnalyzerViewCounts, type AnalyzerViewEdge, type AnalyzerViewModel, type PositionedGraphEndpoint, type PositionedNode } from '../../analyzer';
 import { displayDictionaryStack, factDictionaryStackId, nodeTypeLabels } from '../../analyzer';
 import { stackPath } from '../../utils/routes';
 import { EvidencePreview } from './EvidenceCodeBlock';
@@ -8,6 +8,7 @@ import { EvidencePreview } from './EvidenceCodeBlock';
 interface AnalyzerGraphStageProps {
   view: AnalyzerViewModel;
   selectedNodeId?: string;
+  selectedRegionId?: string;
   selectedEdgeId?: string;
   filter: string;
   search: string;
@@ -17,8 +18,9 @@ interface AnalyzerGraphStageProps {
   onResetPresentation: () => void;
   sources: Record<string, string>;
   onSelectNode: (nodeId: string, focus?: boolean) => void;
+  onSelectRegion: (regionId: string, focus?: boolean) => void;
   onSelectEdge: (edgeId: string) => void;
-  focusRequest?: { nodeId: string; nonce: number };
+  focusRequest?: { entityId: string; nonce: number };
   transform: AnalyzerGraphTransform;
   hasStoredCamera: boolean;
   onTransformChange: (update: AnalyzerGraphTransform | ((current: AnalyzerGraphTransform) => AnalyzerGraphTransform)) => void;
@@ -34,7 +36,7 @@ interface PresentationCameraSnapshot {
   expandedKey: string;
   layout: GraphLayout;
   transform: GraphTransform;
-  selectedNodeId?: string;
+  selectedEntityId?: string;
 }
 
 function displayNodeType(node: AnalyzerViewModel['nodes'][number]): string {
@@ -52,16 +54,22 @@ function nodeStyle(positionedNode: PositionedNode): CSSProperties {
   return { left: positionedNode.x, top: positionedNode.y, width: ANALYZER_NODE_WIDTH, height: positionedNode.height };
 }
 
-function nodeCenter(positionedNode: PositionedNode): { x: number; y: number } {
+function endpointWidth(endpoint: PositionedGraphEndpoint): number {
+  return 'region' in endpoint ? endpoint.width : ANALYZER_NODE_WIDTH;
+}
+
+function endpointCenter(endpoint: PositionedGraphEndpoint): { x: number; y: number } {
   return {
-    x: positionedNode.x + ANALYZER_NODE_WIDTH / 2,
-    y: positionedNode.y + positionedNode.height / 2,
+    x: endpoint.x + endpointWidth(endpoint) / 2,
+    y: endpoint.y + endpoint.height / 2,
   };
 }
 
-function semanticAnchorPosition(layout: GraphLayout, view: AnalyzerViewModel, nodeId: string, visited = new Set<string>()): PositionedNode | undefined {
+function semanticAnchorPosition(layout: GraphLayout, view: AnalyzerViewModel, nodeId: string, visited = new Set<string>()): PositionedGraphEndpoint | undefined {
   const direct = layout.nodes.find((positionedNode) => positionedNode.node.id === nodeId);
   if (direct) return direct;
+  const directRegion = layout.regions?.find((positionedRegion) => positionedRegion.region.id === nodeId);
+  if (directRegion) return directRegion;
   const groupBounds = layout.summaryGroups.find((group) => group.id === nodeId)
     ?? layout.bands.find((band) => band.presentationId === nodeId);
   const summaryNode = view.nodes.find((node) => node.id === nodeId);
@@ -100,6 +108,7 @@ function evidenceHint(node: AnalyzerViewModel['nodes'][number], view: AnalyzerVi
 export function AnalyzerGraphStage({
   view,
   selectedNodeId,
+  selectedRegionId,
   selectedEdgeId,
   filter,
   search,
@@ -108,6 +117,7 @@ export function AnalyzerGraphStage({
   onClearSelection,
   onResetPresentation,
   onSelectNode,
+  onSelectRegion,
   onSelectEdge,
   sources,
   focusRequest,
@@ -139,8 +149,8 @@ export function AnalyzerGraphStage({
   }, [onTogglePresentation]);
 
   const filteredView = useMemo<AnalyzerViewModel>(() => {
-    return presentAnalyzerView(view, { expandedPresentationIds, filter, search, selectedEdgeId, selectedNodeId });
-  }, [expandedPresentationIds, filter, search, selectedEdgeId, selectedNodeId, view]);
+    return presentAnalyzerView(view, { expandedPresentationIds, filter, search, selectedEdgeId, selectedNodeId, selectedRegionId });
+  }, [expandedPresentationIds, filter, search, selectedEdgeId, selectedNodeId, selectedRegionId, view]);
   useEffect(() => {
     if (filteredView.counts) onCountsChange(filteredView.counts);
   }, [filteredView.counts, onCountsChange]);
@@ -152,7 +162,12 @@ export function AnalyzerGraphStage({
   }, [baseLayout, selectedNodeId]);
   const expandedNodeIds = useMemo(() => new Set(expandedNodeKey ? expandedNodeKey.split('\u0000') : []), [expandedNodeKey]);
   const layout = useMemo(() => layoutAnalyzerView(filteredView, expandedNodeIds), [expandedNodeIds, filteredView]);
-  const positionedById = useMemo(() => new Map(layout.nodes.map((positionedNode) => [positionedNode.node.id, positionedNode])), [layout.nodes]);
+  const positionedById = useMemo(() => {
+    const positions = new Map<string, PositionedGraphEndpoint>();
+    layout.nodes.forEach((positionedNode) => positions.set(positionedNode.node.id, positionedNode));
+    layout.regions?.forEach((positionedRegion) => positions.set(positionedRegion.region.id, positionedRegion));
+    return positions;
+  }, [layout.nodes, layout.regions]);
   const edgePositions = useMemo(() => {
     const positions = new Map(positionedById);
     filteredView.edges.forEach((edge) => {
@@ -166,6 +181,7 @@ export function AnalyzerGraphStage({
   }, [filteredView, layout, positionedById]);
   const selectedPosition = useMemo(() => {
     if (selectedNodeId) return positionedById.get(selectedNodeId) ?? semanticAnchorPosition(layout, filteredView, selectedNodeId);
+    if (selectedRegionId) return positionedById.get(selectedRegionId) ?? semanticAnchorPosition(layout, filteredView, selectedRegionId);
     const selectedEdge = selectedEdgeId ? filteredView.edges.find((edge) => edge.id === selectedEdgeId) : undefined;
     return selectedEdge
       ? positionedById.get(selectedEdge.sourceId)
@@ -173,24 +189,25 @@ export function AnalyzerGraphStage({
         ?? positionedById.get(selectedEdge.targetId)
         ?? semanticAnchorPosition(layout, filteredView, selectedEdge.targetId)
       : undefined;
-  }, [filteredView, layout, positionedById, selectedEdgeId, selectedNodeId]);
+  }, [filteredView, layout, positionedById, selectedEdgeId, selectedNodeId, selectedRegionId]);
   useLayoutEffect(() => {
     const previous = presentationCameraSnapshotRef.current;
     if (previous && previous.cameraKey === cameraKey && previous.expandedKey !== expandedPresentationKey) {
       const candidates = [
         selectedNodeId,
+        selectedRegionId,
         ...changedPresentationIds(previous.expandedKey, expandedPresentationKey),
-        previous.selectedNodeId,
+        previous.selectedEntityId,
       ].filter((nodeId): nodeId is string => Boolean(nodeId));
       const anchor = candidates
         .map((nodeId) => ({
           previous: semanticAnchorPosition(previous.layout, view, nodeId),
           current: semanticAnchorPosition(layout, view, nodeId),
         }))
-        .find((candidate): candidate is { previous: PositionedNode; current: PositionedNode } => Boolean(candidate.previous && candidate.current));
+        .find((candidate): candidate is { previous: PositionedGraphEndpoint; current: PositionedGraphEndpoint } => Boolean(candidate.previous && candidate.current));
       if (anchor) {
-        const previousCenter = nodeCenter(anchor.previous);
-        const currentCenter = nodeCenter(anchor.current);
+        const previousCenter = endpointCenter(anchor.previous);
+        const currentCenter = endpointCenter(anchor.current);
         const targetX = previous.transform.x + previousCenter.x * previous.transform.scale;
         const targetY = previous.transform.y + previousCenter.y * previous.transform.scale;
         onTransformChange((currentTransform) => {
@@ -210,10 +227,10 @@ export function AnalyzerGraphStage({
       expandedKey: expandedPresentationKey,
       layout,
       transform: { x: transform.x, y: transform.y, scale: transform.scale },
-      selectedNodeId,
+      selectedEntityId: selectedNodeId ?? selectedRegionId,
     };
-  }, [cameraKey, expandedPresentationKey, layout, onTransformChange, selectedNodeId, transform.scale, transform.x, transform.y, view]);
-  const foregroundEdges = useMemo(() => analyzerForegroundEdges(filteredView.edges, selectedEdgeId, selectedNodeId), [filteredView.edges, selectedEdgeId, selectedNodeId]);
+  }, [cameraKey, expandedPresentationKey, layout, onTransformChange, selectedNodeId, selectedRegionId, transform.scale, transform.x, transform.y, view]);
+  const foregroundEdges = useMemo(() => analyzerForegroundEdges(filteredView.edges, selectedEdgeId, selectedNodeId, selectedRegionId), [filteredView.edges, selectedEdgeId, selectedNodeId, selectedRegionId]);
   const backgroundEdges = useMemo(() => filteredView.edges.filter((edge) => !foregroundEdges.includes(edge)), [filteredView.edges, foregroundEdges]);
   const hasSelectedEdge = Boolean(selectedEdgeId && filteredView.edges.some((edge) => edge.id === selectedEdgeId));
   const edgeObstacles = useMemo(() => analyzerEdgeObstacles(layout), [layout]);
@@ -238,16 +255,28 @@ export function AnalyzerGraphStage({
   }, [edgeFlowDirection, edgeObstacles, edgePositions, filteredView.edges, layout.height, layout.width]);
   const edgePaths = edgeRoutingResult.edgePaths;
   const selectionContext = useMemo(() => {
-    const connectedNodeIds = new Set<string>();
+    const connectedEntityIds = new Set<string>();
     const contextClusterIds = new Set<string>();
     if (selectedNodeId) {
-      connectedNodeIds.add(selectedNodeId);
+      connectedEntityIds.add(selectedNodeId);
       const selectedNode = filteredView.nodes.find((node) => node.id === selectedNodeId);
       if (selectedNode?.clusterId) contextClusterIds.add(selectedNode.clusterId);
       filteredView.edges.forEach((edge) => {
         if (edge.sourceId !== selectedNodeId && edge.targetId !== selectedNodeId) return;
         const otherId = edge.sourceId === selectedNodeId ? edge.targetId : edge.sourceId;
-        connectedNodeIds.add(otherId);
+        connectedEntityIds.add(otherId);
+        const other = filteredView.nodes.find((node) => node.id === otherId);
+        if (other?.clusterId) contextClusterIds.add(other.clusterId);
+      });
+    }
+    if (selectedRegionId) {
+      connectedEntityIds.add(selectedRegionId);
+      const selectedRegion = filteredView.regions?.find((region) => region.id === selectedRegionId);
+      selectedRegion?.childIds.forEach((childId) => connectedEntityIds.add(childId));
+      filteredView.edges.forEach((edge) => {
+        if (edge.sourceId !== selectedRegionId && edge.targetId !== selectedRegionId) return;
+        const otherId = edge.sourceId === selectedRegionId ? edge.targetId : edge.sourceId;
+        connectedEntityIds.add(otherId);
         const other = filteredView.nodes.find((node) => node.id === otherId);
         if (other?.clusterId) contextClusterIds.add(other.clusterId);
       });
@@ -255,33 +284,38 @@ export function AnalyzerGraphStage({
     if (selectedEdgeId) {
       const selectedEdge = filteredView.edges.find((edge) => edge.id === selectedEdgeId);
       if (selectedEdge) {
-        [selectedEdge.sourceId, selectedEdge.targetId].forEach((nodeId) => {
-          connectedNodeIds.add(nodeId);
-          const node = filteredView.nodes.find((candidate) => candidate.id === nodeId);
+        [selectedEdge.sourceId, selectedEdge.targetId].forEach((entityId) => {
+          connectedEntityIds.add(entityId);
+          const node = filteredView.nodes.find((candidate) => candidate.id === entityId);
           if (node?.clusterId) contextClusterIds.add(node.clusterId);
         });
       }
     }
-    const contextNodeIds = new Set(connectedNodeIds);
+    const contextNodeIds = new Set(connectedEntityIds);
     filteredView.nodes.forEach((node) => {
       if (node.clusterId && contextClusterIds.has(node.clusterId)) contextNodeIds.add(node.id);
     });
-    return { connectedNodeIds, contextClusterIds, contextNodeIds };
-  }, [filteredView.edges, filteredView.nodes, selectedEdgeId, selectedNodeId]);
+    return { connectedEntityIds, contextClusterIds, contextNodeIds };
+  }, [filteredView.edges, filteredView.nodes, filteredView.regions, selectedEdgeId, selectedNodeId, selectedRegionId]);
   useEffect(() => {
-    if (!import.meta.env.DEV || (!selectedNodeId && !selectedEdgeId)) return;
+    if (!import.meta.env.DEV || (!selectedNodeId && !selectedRegionId && !selectedEdgeId)) return;
     const loggedFanoutGroups = new Set<string>();
     filteredView.edges.forEach((edge) => {
       const explicitlySelected = edge.id === selectedEdgeId;
-      const relatedToSelectedNode = Boolean(selectedNodeId && (edge.sourceId === selectedNodeId || edge.targetId === selectedNodeId));
-      if (!explicitlySelected && !relatedToSelectedNode) return;
+      const relatedToSelectedEntity = Boolean(
+        (selectedNodeId && (edge.sourceId === selectedNodeId || edge.targetId === selectedNodeId))
+        || (selectedRegionId && (edge.sourceId === selectedRegionId || edge.targetId === selectedRegionId)),
+      );
+      if (!explicitlySelected && !relatedToSelectedEntity) return;
       const routing = edgeRoutingResult.edgeDiagnostics.get(edge.id);
       const source = edgePositions.get(edge.sourceId);
       const target = edgePositions.get(edge.targetId);
       if (!routing || !source || !target) return;
 
       const isBundleEdge = edge.presentation?.displayKind === 'bundle';
-      const isSummaryEdge = source.node.presentation?.role === 'summary' || target.node.presentation?.role === 'summary';
+      const sourceNode = 'node' in source ? source.node : undefined;
+      const targetNode = 'node' in target ? target.node : undefined;
+      const isSummaryEdge = sourceNode?.presentation?.role === 'summary' || targetNode?.presentation?.role === 'summary';
       const isPresentationEdge = Boolean(edge.presentation?.displayKind || edge.presentation?.parentId || edge.presentation?.initiallyHidden);
       const isFactEdge = !isBundleEdge && !isSummaryEdge;
       const edgeCollection = isBundleEdge
@@ -320,8 +354,12 @@ export function AnalyzerGraphStage({
         edgeId: routing.edgeId,
         fromNodeId: routing.sourceId,
         toNodeId: routing.targetId,
-        fromNodeLabel: source.node.label,
-        toNodeLabel: target.node.label,
+        fromNodeLabel: sourceNode?.label,
+        toNodeLabel: targetNode?.label,
+        fromEndpointKind: 'region' in source ? 'region' : 'node',
+        toEndpointKind: 'region' in target ? 'region' : 'node',
+        fromRegionId: 'region' in source ? source.region.id : undefined,
+        toRegionId: 'region' in target ? target.region.id : undefined,
         relation: edge.label,
         relationType: routing.edgeKind,
         presentationKind: edge.presentation?.displayKind ?? (edge.presentation ? 'presentation-metadata' : 'none'),
@@ -362,7 +400,7 @@ export function AnalyzerGraphStage({
         fanoutGroupDiagnostic,
       });
     });
-  }, [edgePositions, edgeRoutingResult, filteredView.edges, foregroundEdges, selectedEdgeId, selectedNodeId]);
+  }, [edgePositions, edgeRoutingResult, filteredView.edges, foregroundEdges, selectedEdgeId, selectedNodeId, selectedRegionId]);
   const architectureFocusDepths = useMemo(() => {
     if (filteredView.view !== 'architecture' || !selectedNodeId) return new Map<string, number>();
     const degree = new Set(filteredView.edges.flatMap((edge) => {
@@ -397,7 +435,7 @@ export function AnalyzerGraphStage({
 
   useLayoutEffect(() => {
     const element = stageRef.current;
-    if (!element || layout.nodes.length === 0 || viewportSize.width <= 0 || viewportSize.height <= 0) return;
+    if (!element || layout.nodes.length === 0 && (layout.regions?.length ?? 0) === 0 || viewportSize.width <= 0 || viewportSize.height <= 0) return;
     if (cameraRef.current.key !== cameraKey) cameraRef.current = { key: cameraKey, initialized: hasStoredCamera };
     if (cameraRef.current.initialized || !shouldRunAnalyzerInitialFit(hasStoredCamera)) return;
     const applyFit = () => {
@@ -413,7 +451,7 @@ export function AnalyzerGraphStage({
   useEffect(() => {
     if (!focusRequest || focusRequest.nonce === focusNonceRef.current) return;
     const element = stageRef.current;
-    const selectedPosition = positionedById.get(focusRequest.nodeId) ?? semanticAnchorPosition(layout, filteredView, focusRequest.nodeId);
+    const selectedPosition = positionedById.get(focusRequest.entityId) ?? semanticAnchorPosition(layout, filteredView, focusRequest.entityId);
     if (!element || !selectedPosition || element.clientWidth <= 0 || element.clientHeight <= 0) return;
     focusNonceRef.current = focusRequest.nonce;
     onTransformChange((current) => focusAnalyzerTransform(selectedPosition, element.clientWidth, element.clientHeight, current.scale));
@@ -510,16 +548,22 @@ export function AnalyzerGraphStage({
     if (!source || !target || !path) return null;
     const routing = edgeRoutingResult.edgeDiagnostics.get(edge.id);
     const selected = edge.id === selectedEdgeId;
-    const connected = selectedNodeId ? edge.sourceId === selectedNodeId || edge.targetId === selectedNodeId : false;
-    const inContext = Boolean(
-      (source.node.clusterId && selectionContext.contextClusterIds.has(source.node.clusterId))
-      || (target.node.clusterId && selectionContext.contextClusterIds.has(target.node.clusterId)),
+    const connected = !selected && (
+      selectionContext.connectedEntityIds.has(edge.sourceId)
+      || selectionContext.connectedEntityIds.has(edge.targetId)
     );
-    const contextual = Boolean((selectedNodeId || selectedEdgeId) && !selected && !connected && inContext);
+    const sourceNode = 'node' in source ? source.node : undefined;
+    const targetNode = 'node' in target ? target.node : undefined;
+    const inContext = Boolean(
+      (sourceNode?.clusterId && selectionContext.contextClusterIds.has(sourceNode.clusterId))
+      || (targetNode?.clusterId && selectionContext.contextClusterIds.has(targetNode.clusterId)),
+    );
+    const hasSelection = Boolean(selectedNodeId || selectedRegionId || selectedEdgeId);
+    const contextual = Boolean(hasSelection && !selected && !connected && inContext);
     const sourceDepth = architectureFocusDepths.get(edge.sourceId);
     const targetDepth = architectureFocusDepths.get(edge.targetId);
     const focusDepth = sourceDepth === undefined || targetDepth === undefined ? undefined : Math.max(sourceDepth, targetDepth);
-    const dimmed = Boolean((selectedNodeId || selectedEdgeId) && !selected && !connected && !inContext && focusDepth === undefined);
+    const dimmed = Boolean(hasSelection && !selected && !connected && !inContext && focusDepth === undefined);
     const emphasis = focusDepth === undefined
       ? edge.presentation?.emphasis
       : focusDepth <= 1
@@ -546,7 +590,7 @@ export function AnalyzerGraphStage({
           markerEnd={`url(#${arrowMarkerId})`}
           role="button"
           tabIndex={0}
-          aria-label={`${edge.label}: ${source.node.label} to ${target.node.label}`}
+          aria-label={`${edge.label}: ${'region' in source ? source.region.label : source.node.label} to ${'region' in target ? target.region.label : target.node.label}`}
           onClick={() => onSelectEdge(edge.id)}
           onKeyDown={(event) => {
             if (event.key === 'Enter' || event.key === ' ') {
@@ -558,7 +602,7 @@ export function AnalyzerGraphStage({
           onMouseLeave={() => setHoveredEdgeId(undefined)}
         />
         {(selected || hoveredEdgeId === edge.id) && (
-          <text className="analyzer-edge-label" x={(source.x + target.x) / 2 + ANALYZER_NODE_WIDTH / 2} y={(source.y + source.height / 2 + target.y + target.height / 2) / 2 - 8}>
+          <text className="analyzer-edge-label" x={(endpointCenter(source).x + endpointCenter(target).x) / 2} y={(endpointCenter(source).y + endpointCenter(target).y) / 2 - 8}>
             {edge.label}
           </text>
         )}
@@ -596,11 +640,11 @@ export function AnalyzerGraphStage({
       {showHelp && (
         <div id="analyzer-graph-help" className="analyzer-stage-help" role="dialog" aria-label="Graph操作ヘルプ">
           <strong>Graph操作</strong>
-          <p>背景をドラッグして移動、Wheelで拡大縮小。Node / Edgeを選ぶと詳細が開き、背景クリックまたはEscで選択を解除します。</p>
+          <p>背景をドラッグして移動、Wheelで拡大縮小。Node / Region / Edgeを選ぶと詳細が開き、背景クリックまたはEscで選択を解除します。</p>
         </div>
       )}
-      {filteredView.nodes.length === 0 ? (
-        <div className="analyzer-graph-empty">現在のFilterに一致するNodeはありません。</div>
+      {filteredView.nodes.length === 0 && (filteredView.regions?.length ?? 0) === 0 ? (
+        <div className="analyzer-graph-empty">現在のFilterに一致するNodeまたはRegionはありません。</div>
       ) : (
         <div className="analyzer-graph-viewport">
           <div className={`analyzer-graph-world${hasSelectedEdge ? ' has-selected-edge' : ''}`} style={{ width: layout.width, height: layout.height, transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})` }}>
@@ -655,6 +699,33 @@ export function AnalyzerGraphStage({
                 </div>
               );
             })}
+            {(layout.regions ?? []).map((positionedRegion) => {
+              const region = positionedRegion.region;
+              const selected = region.id === selectedRegionId;
+              const searchValue = search.trim().toLowerCase();
+              const matches = !searchValue || regionMatchesSearch(region, searchValue);
+              return (
+                <section
+                  key={region.id}
+                  className={`analyzer-semantic-region${selected ? ' is-selected' : ''}${matches && searchValue ? ' is-match' : ''}`}
+                  style={{ left: positionedRegion.x, top: positionedRegion.y, width: positionedRegion.width, height: positionedRegion.height }}
+                  data-analyzer-region-id={import.meta.env.DEV ? region.id : undefined}
+                  aria-label={`${region.label} semantic region`}
+                >
+                  <button
+                    type="button"
+                    className="analyzer-semantic-region-heading"
+                    onClick={() => onSelectRegion(region.id)}
+                    aria-pressed={selected}
+                  >
+                    <span className="analyzer-semantic-region-kicker" aria-hidden="true">◇</span>
+                    <strong>{region.label}</strong>
+                    {region.subtitle && <span className="analyzer-semantic-region-subtitle">{region.subtitle}</span>}
+                    <span className="analyzer-semantic-region-count">{region.childIds.length} STACKS</span>
+                  </button>
+                </section>
+              );
+            })}
             <svg className="analyzer-edge-layer analyzer-edge-layer-base" width={layout.width} height={layout.height} viewBox={`0 0 ${layout.width} ${layout.height}`} aria-label="Graph relations">
               <defs>
                 <marker id="analyzer-edge-arrow-normal" markerWidth="9" markerHeight="9" refX="7.5" refY="4.5" orient="auto" markerUnits="userSpaceOnUse" viewBox="0 0 9 9">
@@ -687,7 +758,7 @@ export function AnalyzerGraphStage({
               if (summaryExpanded) return null;
               const nestedSummary = summary && Boolean(node.presentation?.parentId && filteredView.presentationGroups?.some((group) => group.id === node.presentation?.parentId && group.expanded));
               const nodeZoom = displayedZoomLevelForNode(zoomLevel, selected, expandedNodeIds.has(node.id));
-              const connected = selectionContext.connectedNodeIds.has(node.id) && !selected;
+              const connected = selectionContext.connectedEntityIds.has(node.id) && !selected;
               const inSelectionContext = selectionContext.contextNodeIds.has(node.id);
               const focusDepth = architectureFocusDepths.get(node.id);
               const focusClass = focusDepth === undefined
@@ -702,7 +773,7 @@ export function AnalyzerGraphStage({
               const summaryCount = summary ? analyzerPresentationCount(node) : 0;
               const summaryCountLabel = summary ? analyzerPresentationCountLabel(node) : '';
               const dictionaryStack = dictionaryStackForNode(node);
-              const dimmed = Boolean(search.trim() && !matches && !selected) || Boolean((selectedNodeId || selectedEdgeId) && !selected && !inSelectionContext && focusDepth === undefined);
+              const dimmed = Boolean(search.trim() && !matches && !selected) || Boolean((selectedNodeId || selectedRegionId || selectedEdgeId) && !selected && !inSelectionContext && focusDepth === undefined);
               return (
                 <div
                   key={node.id}

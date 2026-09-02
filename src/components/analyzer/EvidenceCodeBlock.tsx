@@ -11,6 +11,13 @@ interface CodeSegment {
   highlighted: boolean;
 }
 
+function evidenceRoleLabel(role: AnalyzerEvidence['role']): string | undefined {
+  if (role === 'usage') return 'Usage';
+  if (role === 'declaration') return 'Declaration';
+  if (role === 'scope') return 'Scope config';
+  return undefined;
+}
+
 function rangesForLine(evidence: AnalyzerEvidence, lineNumber: number, lineLength: number): Array<{ start: number; end: number }> {
   return evidence.highlightRanges
     .filter((range) => range.start.line <= lineNumber && range.end.line >= lineNumber)
@@ -65,7 +72,7 @@ export function EvidenceCodeBlock({ evidence, source, compact = false }: Evidenc
     <div className={`analyzer-evidence-block${compact ? ' analyzer-evidence-block-compact' : ''}`}>
       <div className="analyzer-evidence-file">
         <code>{evidence.filePath}</code>
-        <span>{evidence.description ?? evidence.detectorId}</span>
+        <span>{[evidenceRoleLabel(evidence.role), evidence.description ?? evidence.detectorId].filter(Boolean).join(' · ')}</span>
       </div>
       <pre aria-label={`Evidence in ${evidence.filePath}`}><code>{lines.slice(firstLine - 1, lastLine).map((line, index) => {
           const lineNumber = firstLine + index;

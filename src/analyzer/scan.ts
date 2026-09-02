@@ -1,9 +1,10 @@
 import { findCanonicalStackByPackageName, getStack } from '../data';
-import { isAnalyzerSourcePath, normalizeRelativePath } from './fileDiscovery';
+import { isAnalyzerSourcePath, isAnalyzerUsageSourcePath, normalizeRelativePath } from './fileDiscovery';
 import { makeEvidence, makeFileEvidence, maskSensitiveSource, type OffsetRange } from './evidence';
 import {
   parseDotnetProject,
   parseFirebaseConfig,
+  parseJsonc,
   parsePackageJson,
   parsePnpmWorkspace,
   parseWranglerConfig,
@@ -15,6 +16,7 @@ import type {
   AnalyzerDependencyType,
   AnalyzerFact,
   AnalyzerEvidence,
+  AnalyzerEvidenceRole,
   AnalyzerMetadata,
   AnalyzerProjectStore,
   AnalyzerRelation,
@@ -192,8 +194,12 @@ function isConfigFile(file: AnalyzerSourceFile): boolean {
   return isAnalyzerSourcePath(file.relativePath);
 }
 
+function isUsageSourceFile(file: AnalyzerSourceFile): boolean {
+  return isAnalyzerUsageSourcePath(file.relativePath);
+}
+
 async function loadSources(files: AnalyzerSourceFile[], builder: AnalyzerStoreBuilder): Promise<LoadedSource[]> {
-  const candidates = files.filter(isConfigFile).sort((a, b) => a.relativePath.localeCompare(b.relativePath));
+  const candidates = files.filter((file) => isConfigFile(file) || isUsageSourceFile(file)).sort((a, b) => a.relativePath.localeCompare(b.relativePath));
   const loaded = await Promise.all(candidates.map(async (file): Promise<LoadedSource | undefined> => {
     if (file.size > ANALYZER_MAX_CONFIG_SIZE) {
       addWarning(builder, `Skipped oversized analyzer input (${Math.round(file.size / 1024)} KB)`, file.relativePath, 'file-size-guard');
@@ -250,13 +256,24 @@ function createEvidence(
   kind: Parameters<typeof makeEvidence>[3],
   detectorId: string,
   description: string,
+  role?: AnalyzerEvidenceRole,
+  scopePath?: string,
 ): string | undefined {
   if (!range) return undefined;
-  return builder.addEvidence(makeEvidence(filePath, source, range, kind, detectorId, description));
+  return builder.addEvidence(makeEvidence(filePath, source, range, kind, detectorId, description, 2, role, scopePath));
 }
 
-function createFileEvidence(builder: AnalyzerStoreBuilder, filePath: string, source: string, kind: Parameters<typeof makeFileEvidence>[2], detectorId: string, description: string): string {
-  return builder.addEvidence(makeFileEvidence(filePath, source, kind, detectorId, description));
+function createFileEvidence(
+  builder: AnalyzerStoreBuilder,
+  filePath: string,
+  source: string,
+  kind: Parameters<typeof makeFileEvidence>[2],
+  detectorId: string,
+  description: string,
+  role?: AnalyzerEvidenceRole,
+  scopePath?: string,
+): string {
+  return builder.addEvidence(makeFileEvidence(filePath, source, kind, detectorId, description, role, scopePath));
 }
 
 function addProjectFact(builder: AnalyzerStoreBuilder, rootPackage: ParsedPackageJson | undefined, rootSource: LoadedSource | undefined, fallbackSource: LoadedSource | undefined): ProjectFact {
@@ -396,18 +413,27 @@ function technologyForPackageName(packageName: string): { id: string } | undefin
   return stack ? { id: stack.id } : undefined;
 }
 
-function addTechnologyFact(builder: AnalyzerStoreBuilder, stackId: string, packageName: string | undefined, evidenceId: string | undefined, explicit: boolean, labelOverride?: string): string {
+function addTechnologyFact(
+  builder: AnalyzerStoreBuilder,
+  stackId: string,
+  packageName: string | undefined,
+  evidenceIds: string | readonly string[] | undefined,
+  explicit: boolean,
+  labelOverride?: string,
+  sourceOverride?: string,
+): string {
   const stack = getStack(stackId);
   const technologyId = `technology:${stackId}`;
+  const normalizedEvidenceIds = evidenceIds === undefined ? [] : typeof evidenceIds === 'string' ? [evidenceIds] : [...evidenceIds];
   const fact: TechnologyFact = {
     id: technologyId,
     kind: 'technology',
     label: labelOverride ?? stack?.name ?? stackId,
-    evidenceIds: evidenceId ? [evidenceId] : [],
+    evidenceIds: normalizedEvidenceIds,
     metadata: {
       ...(stack ? { dictionaryStackId: stackId } : {}),
       ...(packageName ? { packageName } : {}),
-      source: explicit ? 'explicit config' : 'package manifest',
+      source: sourceOverride ?? (explicit ? 'explicit config' : 'package manifest'),
     },
     ...(stack ? { dictionaryStackId: stackId } : {}),
     packageNames: packageName ? [packageName] : [],
@@ -464,6 +490,174 @@ function resolveRelativePath(baseFilePath: string, include: string): string {
   return normalizeRelativePath(resolved.join('/'));
 }
 
+interface ConfigScopeBinding {
+  path: string;
+  description: string;
+}
+
+const nonApplicationScopeRoots = new Set(['script', 'scripts', 'spec', 'specs', 'test', 'tests', 'tool', 'tools']);
+
+function directoryForFilePath(filePath: string): string {
+  const normalizedPath = normalizeRelativePath(filePath);
+  const slash = normalizedPath.lastIndexOf('/');
+  return slash >= 0 ? normalizeRelativePath(normalizedPath.slice(0, slash)) : '.';
+}
+
+function pathBeforeConfiguredGlob(path: string, isFile = false): string {
+  const normalizedPath = normalizeRelativePath(path);
+  const parts = normalizedPath.split('/').filter(Boolean);
+  const wildcardIndex = parts.findIndex((part) => /[*?]/.test(part));
+  const stableParts = wildcardIndex >= 0 ? parts.slice(0, wildcardIndex) : [...parts];
+  if (isFile || (wildcardIndex < 0 && stableParts.length > 0 && /\.[^/]+$/.test(stableParts.at(-1) ?? ''))) stableParts.pop();
+  return stableParts.length > 0 ? stableParts.join('/') : '.';
+}
+
+/**
+ * Turns an explicitly configured source path into a conservative semantic
+ * boundary. `webview/src` belongs to `webview`, while a repository-root
+ * `src` config remains the useful `src` boundary.
+ */
+function configuredScopeBoundary(path: string): string | undefined {
+  const normalizedPath = normalizeRelativePath(path);
+  if (normalizedPath === '.') return '.';
+  const parts = normalizedPath.split('/').filter(Boolean);
+  if (nonApplicationScopeRoots.has(parts[0]?.toLowerCase() ?? '')) return undefined;
+  const sourceIndex = parts.findIndex((part, index) => index > 0 && /^(?:src|source)$/i.test(part));
+  const boundary = sourceIndex > 0 ? parts.slice(0, sourceIndex) : parts;
+  return boundary.length > 0 ? boundary.join('/') : '.';
+}
+
+function resolveConfiguredScopePath(baseFilePath: string, configuredPath: string, isFile = false): string | undefined {
+  const value = configuredPath.trim().replaceAll('\\', '/');
+  if (!value || value.startsWith('/') || /^[A-Za-z]:\//.test(value)) return undefined;
+  return configuredScopeBoundary(pathBeforeConfiguredGlob(resolveRelativePath(baseFilePath, value), isFile));
+}
+
+function configuredScopeBindings(loaded: LoadedSource): ConfigScopeBinding[] {
+  const lowerName = loaded.file.name.toLowerCase();
+  const directory = directoryForFilePath(loaded.file.relativePath);
+  if (lowerName.startsWith('vite.config.')) {
+    const rootMatch = /\broot\s*:\s*(['"`])([^'"`]+)\1/.exec(loaded.source);
+    // Vite resolves `root` from the project working directory rather than
+    // from the directory containing the config file. This matters for a
+    // repository-level invocation such as `vite --config webview/vite.config.ts`
+    // where `root: 'webview'` must remain `webview`, not `webview/webview`.
+    const rootPath = rootMatch ? resolveConfiguredScopePath('.', rootMatch[2] ?? '') : configuredScopeBoundary(directory);
+    return [{ path: rootPath ?? '.', description: rootMatch ? `Vite root ${rootMatch[2]}` : `Vite config boundary ${directory}` }];
+  }
+  if (!lowerName.startsWith('tsconfig') || !lowerName.endsWith('.json')) return [];
+
+  const configuredPaths: Array<{ value: string; isFile?: boolean; source: string }> = [];
+  let rootDir: string | undefined;
+  try {
+    const parsed = parseJsonc(loaded.source);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      const record = parsed as Record<string, unknown>;
+      const compilerOptions = record.compilerOptions;
+      if (compilerOptions && typeof compilerOptions === 'object' && !Array.isArray(compilerOptions)) {
+        const configuredRootDir = (compilerOptions as Record<string, unknown>).rootDir;
+        if (typeof configuredRootDir === 'string') rootDir = configuredRootDir;
+      }
+      const include = record.include;
+      if (typeof include === 'string') configuredPaths.push({ value: include, source: `TypeScript include ${include}` });
+      if (Array.isArray(include)) include.filter((value): value is string => typeof value === 'string').forEach((value) => configuredPaths.push({ value, source: `TypeScript include ${value}` }));
+      const files = record.files;
+      if (typeof files === 'string') configuredPaths.push({ value: files, isFile: true, source: `TypeScript file ${files}` });
+      if (Array.isArray(files)) files.filter((value): value is string => typeof value === 'string').forEach((value) => configuredPaths.push({ value, isFile: true, source: `TypeScript file ${value}` }));
+    }
+  } catch {
+    // A malformed config is still useful as a file-local TypeScript signal.
+  }
+
+  if (rootDir && (configuredPaths.length === 0 || rootDir !== '.')) {
+    configuredPaths.unshift({ value: rootDir, source: `TypeScript rootDir ${rootDir}` });
+  }
+
+  const paths = configuredPaths
+    .map((configured) => ({ path: resolveConfiguredScopePath(loaded.file.relativePath, configured.value, configured.isFile), description: configured.source }))
+    .filter((binding): binding is { path: string; description: string } => Boolean(binding.path));
+  if (paths.length > 0) {
+    const unique = new Map(paths.map((binding) => [binding.path, binding]));
+    return [...unique.values()];
+  }
+  // A config file inside an already-known package / solution is still
+  // Usage Evidence, but its directory alone must not create a new Region.
+  return directory === '.'
+    ? [{ path: '.', description: 'TypeScript config at repository root' }]
+    : [];
+}
+
+function addConfiguredTechnologyFact(builder: AnalyzerStoreBuilder, loaded: LoadedSource, stackId: string, description: string, labelOverride?: string): void {
+  const bindings = configuredScopeBindings(loaded);
+  if (bindings.length === 0) {
+    const evidenceId = createFileEvidence(builder, loaded.file.relativePath, loaded.source, 'technology', `${stackId}-config`, description, 'usage');
+    addTechnologyFact(builder, stackId, undefined, evidenceId, true, labelOverride, 'configuration usage');
+    return;
+  }
+  const evidenceIds = bindings.flatMap((binding, index) => {
+    const suffix = index === 0 ? '' : `:${index}`;
+    const usageEvidenceId = createFileEvidence(
+      builder,
+      loaded.file.relativePath,
+      loaded.source,
+      'technology',
+      `${stackId}-config${suffix}`,
+      `${description} · ${binding.description}`,
+      'usage',
+      binding.path,
+    );
+    const scopeEvidenceId = createFileEvidence(
+      builder,
+      loaded.file.relativePath,
+      loaded.source,
+      'technology',
+      `${stackId}-scope${suffix}`,
+      `Scope boundary · ${binding.description}`,
+      'scope',
+      binding.path,
+    );
+    return [usageEvidenceId, scopeEvidenceId];
+  });
+  addTechnologyFact(builder, stackId, undefined, evidenceIds, true, labelOverride, 'configuration usage');
+}
+
+function packageRootForImport(specifier: string): string | undefined {
+  const normalized = specifier.trim();
+  if (!normalized || normalized.startsWith('.') || normalized.startsWith('/')) return undefined;
+  const parts = normalized.split('/').filter(Boolean);
+  if (parts.length === 0) return undefined;
+  return normalized.startsWith('@') ? parts.slice(0, 2).join('/') : parts[0];
+}
+
+/**
+ * Finds only statically identifiable package imports. This deliberately does
+ * not attempt AST, call-flow, or transitive dependency analysis.
+ */
+function processSourceImports(builder: AnalyzerStoreBuilder, loaded: LoadedSource): void {
+  const importPattern = /\b(?:import\s+(?:type\s+)?(?:[^'"\n]*?\s+from\s+)?|export\s+(?:[^'"\n]*?\s+from\s+)?|require\s*\(\s*|import\s*\(\s*)['"]([^'"]+)['"]/g;
+  let match = importPattern.exec(loaded.source);
+  while (match) {
+    const specifier = match[1] ?? '';
+    const packageName = packageRootForImport(specifier);
+    const stack = packageName ? technologyForPackageName(packageName) : undefined;
+    if (packageName && stack) {
+      const specifierStart = match.index + match[0].lastIndexOf(specifier);
+      const evidenceId = createEvidence(
+        builder,
+        loaded.file.relativePath,
+        loaded.source,
+        { start: specifierStart, end: specifierStart + specifier.length },
+        'technology',
+        'source-import',
+        `Source import usage: ${specifier}`,
+        'usage',
+      );
+      addTechnologyFact(builder, stack.id, packageName, evidenceId, false, stack.id === 'firebase' ? 'Firebase' : undefined, 'source import');
+    }
+    match = importPattern.exec(loaded.source);
+  }
+}
+
 function addPackageDependencies(
   builder: AnalyzerStoreBuilder,
   parsed: ParsedPackageJson,
@@ -476,7 +670,7 @@ function addPackageDependencies(
   const declarations: PackageDependencyDeclaration[] = [];
 
   parsed.dependencies.forEach((dependency) => {
-    const evidenceId = createEvidence(builder, parsed.filePath, source, dependency.propertyRange, 'dependency', 'package-dependency', `${dependency.dependencyType}: ${dependency.packageName}`);
+    const evidenceId = createEvidence(builder, parsed.filePath, source, dependency.propertyRange, 'dependency', 'package-dependency', `${dependency.dependencyType}: ${dependency.packageName}`, 'declaration');
     declarations.push(dependencyDeclaration(dependency, parsed.filePath, evidenceId));
     const workspaceTarget = dependency.versionRange.startsWith('workspace:')
       ? [...packageStates.values()].find((candidate) => candidate.isWorkspacePackage && candidate.parsed.name === dependency.packageName)
@@ -508,18 +702,15 @@ function addPackageDependencies(
 
 function processPackageManager(builder: AnalyzerStoreBuilder, parsed: ParsedPackageJson, source: string): void {
   if (!parsed.packageManager || !parsed.packageManager.toLowerCase().startsWith('pnpm')) return;
-  const evidenceId = createEvidence(builder, parsed.filePath, source, parsed.packageManagerRange, 'technology', 'package-manager', 'pnpm packageManager declaration');
+  const evidenceId = createEvidence(builder, parsed.filePath, source, parsed.packageManagerRange, 'technology', 'package-manager', 'pnpm packageManager declaration', 'declaration');
   addTechnologyFact(builder, 'pnpm', 'pnpm', evidenceId, true);
 }
 
 function processConfigTechnology(builder: AnalyzerStoreBuilder, loaded: LoadedSource): void {
-  const lowerPath = loaded.file.relativePath.toLowerCase();
   if (loaded.file.name.toLowerCase().startsWith('vite.config.')) {
-    addTechnologyFact(builder, 'vite', undefined, createFileEvidence(builder, loaded.file.relativePath, loaded.source, 'technology', 'vite-config', 'Vite configuration file'), true);
+    addConfiguredTechnologyFact(builder, loaded, 'vite', 'Vite configuration file');
   } else if (loaded.file.name.toLowerCase().startsWith('tsconfig') && loaded.file.name.toLowerCase().endsWith('.json')) {
-    addTechnologyFact(builder, 'typescript', undefined, createFileEvidence(builder, loaded.file.relativePath, loaded.source, 'technology', 'typescript-config', 'TypeScript configuration file'), true);
-  } else if (lowerPath.endsWith('firebase.json') || lowerPath.endsWith('.firebaserc')) {
-    addTechnologyFact(builder, 'firebase', undefined, createFileEvidence(builder, loaded.file.relativePath, loaded.source, 'technology', 'firebase-config', 'Firebase configuration file'), true, 'Firebase');
+    addConfiguredTechnologyFact(builder, loaded, 'typescript', 'TypeScript configuration file');
   }
 }
 
@@ -539,8 +730,8 @@ function processWrangler(
   const packageState = findNearestPackage(loaded.file.relativePath, packageStates);
   const packageId = packageState?.packageId;
   const workerEvidenceIds = [
-    createEvidence(builder, loaded.file.relativePath, loaded.source, parsed.workerNameRange, 'runtime', 'cloudflare-worker', 'Cloudflare Worker name'),
-    createEvidence(builder, loaded.file.relativePath, loaded.source, parsed.mainRange, 'runtime', 'cloudflare-worker', 'Cloudflare Worker entrypoint'),
+    createEvidence(builder, loaded.file.relativePath, loaded.source, parsed.workerNameRange, 'runtime', 'cloudflare-worker', 'Cloudflare Worker name', 'usage'),
+    createEvidence(builder, loaded.file.relativePath, loaded.source, parsed.mainRange, 'runtime', 'cloudflare-worker', 'Cloudflare Worker entrypoint', 'usage'),
   ].filter((value): value is string => Boolean(value));
   const runtimeId = `runtime:cloudflare-workers:${loaded.file.relativePath}`;
   const runtime: RuntimeFact = {
@@ -564,7 +755,7 @@ function processWrangler(
   if (packageId) addRelation(builder, packageId, runtimeId, 'uses', workerEvidenceIds, { source: loaded.file.relativePath });
 
   parsed.d1Bindings.forEach((binding, index) => {
-    const evidenceId = createEvidence(builder, loaded.file.relativePath, loaded.source, binding.range, 'resource', 'cloudflare-d1', 'Cloudflare D1 binding');
+    const evidenceId = createEvidence(builder, loaded.file.relativePath, loaded.source, binding.range, 'resource', 'cloudflare-d1', 'Cloudflare D1 binding', 'usage');
     const bindingName = binding.binding ?? binding.databaseName ?? binding.databaseId ?? `binding-${index + 1}`;
     const resourceId = `resource:${loaded.file.relativePath}:d1:${bindingName}`;
     const resource: ResourceFact = {
@@ -590,7 +781,7 @@ function processWrangler(
   });
 
   if (parsed.b2KeyRanges.length > 0) {
-    const evidenceId = createEvidence(builder, loaded.file.relativePath, loaded.source, parsed.b2KeyRanges[0].range, 'resource', 'backblaze-b2', 'Explicit Backblaze B2 configuration key');
+    const evidenceId = createEvidence(builder, loaded.file.relativePath, loaded.source, parsed.b2KeyRanges[0].range, 'resource', 'backblaze-b2', 'Explicit Backblaze B2 configuration key', 'usage');
     const resourceId = `resource:${loaded.file.relativePath}:b2`;
     const resource: ResourceFact = {
       id: resourceId,
@@ -624,12 +815,12 @@ function processFirebase(builder: AnalyzerStoreBuilder, loaded: LoadedSource, pa
   }
   const packageState = findNearestPackage(loaded.file.relativePath, packageStates);
   const packageId = packageState?.packageId;
-  const firebaseEvidence = createFileEvidence(builder, loaded.file.relativePath, loaded.source, 'technology', 'firebase-config', 'Firebase configuration');
+  const firebaseEvidence = createFileEvidence(builder, loaded.file.relativePath, loaded.source, 'technology', 'firebase-config', 'Firebase configuration', 'usage');
   const technologyId = addTechnologyFact(builder, 'firebase', undefined, firebaseEvidence, true, 'Firebase');
   if (packageId) addRelation(builder, packageId, technologyId, 'uses', [firebaseEvidence], { source: loaded.file.relativePath });
 
   if (parsed.authEmulatorRange) {
-    const evidenceId = createEvidence(builder, loaded.file.relativePath, loaded.source, parsed.authEmulatorRange, 'resource', 'firebase-auth-emulator', 'Firebase Auth emulator configuration');
+    const evidenceId = createEvidence(builder, loaded.file.relativePath, loaded.source, parsed.authEmulatorRange, 'resource', 'firebase-auth-emulator', 'Firebase Auth emulator configuration', 'usage');
     const resourceId = `resource:${loaded.file.relativePath}:firebase-auth`;
     const resource: ResourceFact = {
       id: resourceId,
@@ -738,6 +929,7 @@ export async function scanProjectFiles(files: AnalyzerSourceFile[]): Promise<Ana
 
   loadedSources.forEach((loaded) => {
     processConfigTechnology(builder, loaded);
+    if (!isConfigFile(loaded.file)) processSourceImports(builder, loaded);
     if (loaded.file.name.toLowerCase().startsWith('wrangler.')) processWrangler(builder, loaded, packageStates);
     processFirebase(builder, loaded, packageStates);
     processDotnet(builder, loaded);

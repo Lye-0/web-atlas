@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseCommandExpression } from './commandParser';
 import { evidenceRangeLabel, makeEvidence, positionAt } from './evidence';
-import { isAnalyzerSourcePath, isExcludedPath, sourceFilesFromInput } from './fileDiscovery';
+import { isAnalyzerSourcePath, isAnalyzerUsageSourcePath, isExcludedPath, sourceFilesFromInput } from './fileDiscovery';
 import { parseDotnetProject, parsePackageJson, parsePnpmWorkspace, parseWranglerConfig } from './parsers';
 import { ANALYZER_COMMAND_COMMON_LANE_ID, projectArchitecture, projectCommand, projectDependencies, projectStackMap, projectWorkspace } from './projectors';
 import { analyzerSummarySubtitle, presentationOwnsNode, presentAnalyzerView } from './presentation';
@@ -103,6 +103,7 @@ function stackMapScopeFixture(): AnalyzerSourceFile[] {
   return [
     fixtureFile('package.json', `{
   "name": "scope-fixture",
+  "packageManager": "pnpm@9.0.0",
   "devDependencies": {
     "vitest": "^3.0.0",
     "@types/node": "^24.0.0"
@@ -125,10 +126,63 @@ function stackMapScopeFixture(): AnalyzerSourceFile[] {
   "name": "@scope/api",
   "dependencies": {
     "typescript": "^5.0.0"
+  },
+  "devDependencies": {
+    "vitest": "^3.0.0"
   }
 }`),
     fixtureFile('apps/api/tsconfig.json', '{ "compilerOptions": { "strict": true } }\n'),
     fixtureFile('packages/shared/package.json', '{ "name": "@scope/shared" }\n'),
+    fixtureFile('apps/companion/ScopeFixture.slnx', '<Solution />\n'),
+    fixtureFile('apps/companion/src/ProjectA/ProjectA.csproj', '<Project Sdk="Microsoft.NET.Sdk" />\n'),
+    fixtureFile('apps/companion/src/ProjectB/ProjectB.csproj', '<Project Sdk="Microsoft.NET.Sdk" />\n'),
+    fixtureFile('apps/companion/src/ProjectA/tsconfig.json', '{ "compilerOptions": { "strict": true } }\n'),
+    fixtureFile('apps/companion/src/ProjectB/tsconfig.json', '{ "compilerOptions": { "strict": true } }\n'),
+    fixtureFile('Standalone/Standalone.csproj', '<Project Sdk="Microsoft.NET.Sdk" />\n'),
+    fixtureFile('Standalone/tsconfig.json', '{ "compilerOptions": { "strict": true } }\n'),
+    fixtureFile('.kilo/tsconfig.json', '{ "compilerOptions": { "strict": true } }\n'),
+  ];
+}
+
+function usageAwareScopeFixture(): AnalyzerSourceFile[] {
+  return [
+    fixtureFile('package.json', `{
+  "name": "usage-scope-fixture",
+  "packageManager": "pnpm@9.0.0",
+  "dependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "vite": "^7.0.0",
+    "vitest": "^3.0.0"
+  }
+}`),
+    fixtureFile('webview/vite.config.ts', `import { defineConfig } from 'vite';
+export default defineConfig({ root: 'webview' });
+`),
+    fixtureFile('tsconfig.json', `{
+  "compilerOptions": { "rootDir": "." },
+  "include": ["src/**/*.ts"]
+}`),
+    fixtureFile('tsconfig.webview.json', `{
+  "include": ["webview/src/**/*.ts", "webview/src/**/*.tsx"]
+}`),
+    fixtureFile('src/extension.ts', 'export const extension = true;\n'),
+    fixtureFile('webview/src/App.tsx', `import React from 'react';
+import { createRoot } from 'react-dom/client';
+export const root = createRoot;
+`),
+    fixtureFile('webview/src/components/Foo.tsx', `import React from 'react';
+export const Foo = () => React.createElement('div');
+`),
+    fixtureFile('webview/src/components/Bar.tsx', `import React from 'react';
+export const Bar = () => React.createElement('div');
+`),
+    fixtureFile('tests/smoke.test.ts', `import { describe } from 'vitest';
+describe('smoke', () => undefined);
+`),
   ];
 }
 
@@ -472,7 +526,7 @@ describe('Analyzer scan and projectors', () => {
     expect(dependencies.nodes.filter((node) => node.metadata.externalLayoutMode === 'flat')).toHaveLength(0);
   });
 
-  it('projects Stack Map as Project -> Scope -> canonical Stack Usage without dependency-detail pollution', async () => {
+  it('projects Stack Map as Project -> semantic Scope Region -> canonical Stack Usage without dependency-detail pollution', async () => {
     const store = await scanProjectFiles(analyzerFixture());
     const stackMap = projectStackMap(store);
     const compatibilityProjection = projectArchitecture(store);
@@ -480,7 +534,10 @@ describe('Analyzer scan and projectors', () => {
 
     expect(stackMap.view).toBe('architecture');
     expect(compatibilityProjection.nodes.map((node) => node.type)).toEqual(stackMap.nodes.map((node) => node.type));
-    expect(stackMap.nodes.map((node) => node.type)).toEqual(expect.arrayContaining(['project', 'stack-scope', 'stack-usage']));
+    expect(stackMap.nodes.map((node) => node.type)).toEqual(expect.arrayContaining(['project', 'stack-usage']));
+    expect(stackMap.nodes.some((node) => node.type === 'stack-scope')).toBe(false);
+    expect(stackMap.regions?.length).toBeGreaterThan(0);
+    expect(stackMap.regions?.every((region) => region.entityKind === 'region' && region.regionKind === 'scope')).toBe(true);
     expect(stackMap.nodes.some((node) => node.type === 'technology' || node.type === 'external-package')).toBe(false);
     expect(stackMap.nodes.some((node) => node.label === 'mystery-lib' || node.label === '@types/node')).toBe(false);
 
@@ -490,26 +547,48 @@ describe('Analyzer scan and projectors', () => {
       metadata: { scopeLabel: 'WEB', scopePath: 'apps/web', dictionaryStackId: 'react' },
     });
     expect(usage('root', 'react')).toMatchObject({ metadata: { scopeLabel: 'PROJECT / TOOLING', scopePath: '.' } });
-    expect(usage('package:apps/web', 'vite')).toBeDefined();
+    expect(usage('package:apps/web', 'vite')).toBeUndefined();
     expect(usage('root', 'vite')).toBeDefined();
     expect(usage('services', 'cloudflare-workers')).toMatchObject({ metadata: { scopeLabel: 'PROJECT / SERVICES' } });
     expect(usage('services', 'cloudflare-d1')).toBeDefined();
     expect(usage('services', 'backblaze-b2')).toBeDefined();
     expect(usage('services', 'firebase-authentication')).toBeDefined();
 
-    const sharedScope = stackMap.nodes.find((node) => node.id === 'stack-scope:package:packages/shared');
-    expect(sharedScope).toMatchObject({ type: 'stack-scope', label: 'packages/shared', subtitle: 'SHARED' });
-    expect(stackMap.nodes.some((node) => node.type === 'stack-scope' && node.metadata.scopeLabel === 'DESKTOP')).toBe(true);
-    expect(stackMap.edges.every((edge) => stackMap.nodes.some((node) => node.id === edge.sourceId) && stackMap.nodes.some((node) => node.id === edge.targetId))).toBe(true);
-    expect(stackMap.edges.some((edge) => edge.sourceId.startsWith('stack-usage:') || edge.targetId.startsWith('technology:'))).toBe(false);
+    const sharedScope = stackMap.regions?.find((region) => region.id === 'region:scope:packages/shared');
+    expect(sharedScope).toBeUndefined();
+    expect(stackMap.regions?.some((region) => region.metadata.scopeLabel === 'DESKTOP')).toBe(false);
+    expect(stackMap.edges.every((edge) => stackMap.nodes.some((node) => node.id === edge.sourceId) || stackMap.regions?.some((region) => region.id === edge.sourceId))).toBe(true);
+    expect(stackMap.edges.every((edge) => stackMap.nodes.some((node) => node.id === edge.targetId) || stackMap.regions?.some((region) => region.id === edge.targetId))).toBe(true);
+    expect(stackMap.edges.every((edge) => edge.kind === 'contains' && edge.metadata.toEndpointKind === 'region')).toBe(true);
+    stackMap.regions?.forEach((region) => {
+      expect(region.childIds.every((childId) => stackMap.nodes.some((node) => node.id === childId))).toBe(true);
+      expect(region.ports.map((port) => port.side)).toEqual(['top', 'right', 'bottom', 'left']);
+    });
 
     const presented = presentAnalyzerView(stackMap, { expandedPresentationIds: new Set(), filter: 'all', search: '' });
     expect(presented.counts).toEqual({ visibleNodes: stackMap.nodes.length, totalNodes: stackMap.nodes.length, hiddenNodes: 0 });
     expect(presented.edges).toHaveLength(stackMap.edges.length);
     expect(presented.presentationGroups).toEqual([]);
+    const webRegion = presented.regions?.find((region) => region.metadata.scopePath === 'apps/web');
+    expect(webRegion).toBeDefined();
+    expect(webRegion?.childIds.every((childId) => presented.nodes.some((node) => node.id === childId))).toBe(true);
+    const selectedRegion = presentAnalyzerView(stackMap, { expandedPresentationIds: new Set(), filter: 'all', search: '', selectedRegionId: webRegion?.id });
+    expect(selectedRegion.regions?.map((region) => region.id)).toContain(webRegion?.id);
+    expect(selectedRegion.edges.some((edge) => edge.targetId === webRegion?.id && edge.metadata.toEndpointKind === 'region')).toBe(true);
+    const regionSearch = presentAnalyzerView(stackMap, { expandedPresentationIds: new Set(), filter: 'all', search: 'apps/web' });
+    expect(regionSearch.regions?.map((region) => region.id)).toContain(webRegion?.id);
+    expect(regionSearch.regions?.find((region) => region.id === webRegion?.id)?.childIds.length).toBe(webRegion?.childIds.length);
+    const usageSearch = presentAnalyzerView(stackMap, { expandedPresentationIds: new Set(), filter: 'all', search: 'React' });
+    expect(usageSearch.regions?.some((region) => region.childIds.some((childId) => usageSearch.nodes.some((node) => node.id === childId && node.label === 'React')))).toBe(true);
     const layout = layoutAnalyzerView(presented);
-    expect(layout.clusters.some((cluster) => cluster.label === 'WEB')).toBe(true);
-    expect(layout.clusters.some((cluster) => cluster.label === 'PROJECT / SERVICES')).toBe(true);
+    expect(layout.regions?.some((region) => region.region.label === 'WEB')).toBe(true);
+    expect(layout.regions?.some((region) => region.region.label === 'PROJECT / SERVICES')).toBe(true);
+    expect(layout.regions?.every((region) => region.region.bounds?.x === region.x && region.region.bounds?.y === region.y)).toBe(true);
+    expect(layout.regions?.every((region, index, all) => all.every((other, otherIndex) => index === otherIndex
+      || region.x + region.width <= other.x
+      || other.x + other.width <= region.x
+      || region.y + region.height <= other.y
+      || other.y + other.height <= region.y))).toBe(true);
     expect(fitAnalyzerTransform(layout, 1000, 600).scale).toBeGreaterThan(0);
   });
 
@@ -521,16 +600,70 @@ describe('Analyzer scan and projectors', () => {
     expect(usage('package:apps/web', 'typescript')).toMatchObject({ metadata: { scopeLabel: 'WEB', scopePath: 'apps/web' } });
     expect(usage('package:apps/api', 'typescript')).toMatchObject({ metadata: { scopeLabel: 'API', scopePath: 'apps/api' } });
     expect(usage('root', 'typescript')).toMatchObject({ metadata: { scopeLabel: 'PROJECT / TOOLING' } });
-    expect(typescriptUsages).toHaveLength(3);
+    expect(typescriptUsages).toHaveLength(5);
     expect(usage('root', 'vitest')).toMatchObject({ metadata: { scopeLabel: 'PROJECT / TOOLING' } });
     expect(usage('package:apps/web', 'vitest')).toBeUndefined();
-    expect(usage('package:apps/api', 'vitest')).toBeUndefined();
+    expect(usage('package:apps/api', 'vitest')).toMatchObject({ metadata: { scopeLabel: 'API', scopePath: 'apps/api' } });
+    expect(usage('root', 'pnpm')).toMatchObject({ metadata: { scopeLabel: 'PROJECT / TOOLING', scopePath: '.' } });
+    expect(stackMap.stackUsages?.filter((entry) => entry.stackId === 'pnpm').map((entry) => entry.scopeId)).toEqual(['root']);
+    expect(stackMap.regions?.some((region) => region.metadata.scopePath === '.kilo')).toBe(false);
+    expect(stackMap.regions?.some((region) => region.metadata.scopePath === 'packages/shared')).toBe(false);
+
+    const companionScope = stackMap.regions?.find((region) => region.metadata.scopePath === 'apps/companion');
+    expect(companionScope).toMatchObject({ entityKind: 'region', subtitle: 'apps/companion', metadata: { scopeKind: 'physical', scopeType: 'desktop' } });
+    const companionTypescript = stackMap.nodes.find((node) => node.type === 'stack-usage' && node.metadata.scopePath === 'apps/companion' && node.metadata.stackId === 'typescript');
+    expect(companionTypescript?.evidenceIds).toHaveLength(2);
+    const companionEvidencePaths = stackMap.evidence.filter((evidence) => companionTypescript?.evidenceIds.includes(evidence.id)).map((evidence) => evidence.filePath);
+    expect(companionEvidencePaths).toEqual(expect.arrayContaining(['apps/companion/src/ProjectA/tsconfig.json', 'apps/companion/src/ProjectB/tsconfig.json']));
+
+    const standaloneScope = stackMap.regions?.find((region) => region.metadata.scopePath === 'Standalone');
+    expect(standaloneScope).toMatchObject({ entityKind: 'region', subtitle: 'Standalone', metadata: { scopeKind: 'physical', scopeType: 'desktop' } });
     expect(stackMap.nodes.some((node) => node.label === '@types/node')).toBe(false);
 
     const stackOnly = presentAnalyzerView(stackMap, { expandedPresentationIds: new Set(), filter: 'stack-usage', search: '' });
-    expect(stackOnly.nodes.map((node) => node.type)).toEqual(expect.arrayContaining(['project', 'stack-scope', 'stack-usage']));
-    expect(stackOnly.nodes.every((node) => ['project', 'stack-scope', 'stack-usage'].includes(node.type))).toBe(true);
-    expect(stackOnly.edges.every((edge) => stackOnly.nodes.some((node) => node.id === edge.sourceId) && stackOnly.nodes.some((node) => node.id === edge.targetId))).toBe(true);
+    expect(stackOnly.nodes.map((node) => node.type)).toEqual(expect.arrayContaining(['project', 'stack-usage']));
+    expect(stackOnly.nodes.every((node) => ['project', 'stack-usage'].includes(node.type))).toBe(true);
+    expect(stackOnly.regions?.length).toBeGreaterThan(0);
+    expect(stackOnly.edges.every((edge) => stackOnly.nodes.some((node) => node.id === edge.sourceId) || stackOnly.regions?.some((region) => region.id === edge.sourceId))).toBe(true);
+    expect(stackOnly.edges.every((edge) => stackOnly.nodes.some((node) => node.id === edge.targetId) || stackOnly.regions?.some((region) => region.id === edge.targetId))).toBe(true);
+  });
+
+  it('prioritizes source/config Usage Evidence over root declarations in a single-package repository', async () => {
+    const store = await scanProjectFiles(usageAwareScopeFixture());
+    const stackMap = projectStackMap(store);
+    const usageNodes = (stackId: string) => stackMap.nodes.filter((node) => node.metadata.stackId === stackId);
+    const usageScopes = (stackId: string) => usageNodes(stackId).map((node) => node.metadata.scopePath);
+    const reactFact = store.facts.find((fact) => fact.id === 'technology:react');
+    const reactEvidence = reactFact?.evidenceIds.map((id) => store.evidence.find((candidate) => candidate.id === id)).filter((candidate): candidate is NonNullable<typeof candidate> => Boolean(candidate)) ?? [];
+
+    expect(usageScopes('react')).toEqual(['webview']);
+    expect(usageScopes('react-dom')).toEqual(['webview']);
+    expect(usageScopes('vite')).toEqual(['webview']);
+    expect(usageScopes('typescript')).toEqual(expect.arrayContaining(['src', 'webview']));
+    expect(usageScopes('typescript')).toHaveLength(2);
+    const typescriptUsageEvidence = usageNodes('typescript').map((node) => node.evidenceIds
+      .map((id) => store.evidence.find((evidence) => evidence.id === id))
+      .filter((evidence): evidence is NonNullable<typeof evidence> => Boolean(evidence)));
+    expect(typescriptUsageEvidence.every((evidence) => evidence.some((item) => item.role === 'declaration' && item.filePath === 'package.json'))).toBe(true);
+    expect(usageScopes('vitest')).toEqual(['.']);
+    expect(usageScopes('pnpm')).toEqual(['.']);
+    expect(usageNodes('react').some((node) => node.metadata.scopePath === '.')).toBe(false);
+    expect(usageNodes('vite').some((node) => node.metadata.scopePath === '.')).toBe(false);
+
+    const reactUsage = usageNodes('react').find((node) => node.metadata.scopePath === 'webview');
+    expect(reactUsage).toBeDefined();
+    expect(reactUsage?.evidenceIds.map((id) => store.evidence.find((evidence) => evidence.id === id)?.filePath)).toEqual(expect.arrayContaining([
+      'webview/src/App.tsx',
+      'webview/src/components/Foo.tsx',
+      'webview/src/components/Bar.tsx',
+    ]));
+    expect(reactEvidence.some((evidence) => evidence.role === 'usage' && evidence.detectorId === 'source-import' && evidence.filePath === 'webview/src/App.tsx')).toBe(true);
+    expect(reactEvidence.some((evidence) => evidence.role === 'declaration' && evidence.filePath === 'package.json')).toBe(true);
+    expect(store.evidence.some((evidence) => evidence.role === 'scope' && evidence.scopePath === 'webview')).toBe(true);
+    expect(store.sources['webview/src/App.tsx']).toContain('react-dom/client');
+    expect(stackMap.regions?.some((region) => region.metadata.scopePath === 'webview')).toBe(true);
+    expect(stackMap.regions?.some((region) => region.metadata.scopePath === 'src')).toBe(true);
+    expect(stackMap.regions?.some((region) => region.metadata.scopePath === 'tests')).toBe(false);
   });
 
   it('places Command Flow by execution rank and keeps concurrently branches on one stage', async () => {
@@ -705,6 +838,8 @@ describe('Analyzer presentation layout and focus emphasis', () => {
 describe('Analyzer file discovery boundaries', () => {
   it('keeps meaningful hidden files while excluding generated, dependency, and secret inputs', () => {
     expect(isAnalyzerSourcePath('.firebaserc')).toBe(true);
+    expect(isAnalyzerUsageSourcePath('src/App.tsx')).toBe(true);
+    expect(isAnalyzerUsageSourcePath('node_modules/react/index.js')).toBe(false);
     expect(isAnalyzerSourcePath('.env')).toBe(false);
     expect(isExcludedPath('node_modules/package.json')).toBe(true);
     expect(sourceFilesFromInput([

@@ -17,6 +17,7 @@ const excludedDirectories = new Set([
 ]);
 
 const sensitiveExtensions = new Set(['.pem', '.key', '.p12', '.pfx', '.jks']);
+const usageSourceExtensions = new Set(['.cjs', '.cts', '.js', '.jsx', '.mjs', '.mts', '.ts', '.tsx']);
 
 interface DirectoryEntryLike {
   kind: 'file' | 'directory';
@@ -130,4 +131,14 @@ export function isAnalyzerSourcePath(path: string): boolean {
     || name.endsWith('.slnx')
     || name.endsWith('.sln')
     || name.endsWith('.csproj');
+}
+
+/**
+ * Returns source files that may provide conservative Stack Usage Evidence.
+ * This intentionally covers module imports only; it is not a general source
+ * code or dependency graph scan.
+ */
+export function isAnalyzerUsageSourcePath(path: string): boolean {
+  if (isExcludedPath(path) || isSensitivePath(path)) return false;
+  return usageSourceExtensions.has(extensionForPath(path));
 }

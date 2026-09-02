@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { ANALYZER_DEFAULT_TRANSFORM, ANALYZER_EXTERNAL_SUMMARY_ID, analyzerViewCounts, analyzerViewLabels, presentationOwnsNode, presentAnalyzerView, projectAnalyzerView, restoreAnalyzerViewSession, useAnalyzerSession, viewNodeSearchText } from '../analyzer';
-import type { AnalyzerGraphTransform, AnalyzerProjectStore, AnalyzerViewCounts, AnalyzerViewId, AnalyzerViewModel, AnalyzerViewSession, DirectoryHandleLike } from '../analyzer';
+import { ANALYZER_DEFAULT_TRANSFORM, ANALYZER_EXTERNAL_SUMMARY_ID, analyzerViewCounts, analyzerViewLabels, presentationOwnsNode, presentAnalyzerView, projectAnalyzerView, regionMatchesSearch, restoreAnalyzerViewSession, useAnalyzerSession, viewNodeSearchText } from '../analyzer';
+import type { AnalyzerGraphTransform, AnalyzerProjectStore, AnalyzerSemanticRegion, AnalyzerViewCounts, AnalyzerViewId, AnalyzerViewModel, AnalyzerViewNode, AnalyzerViewSession, DirectoryHandleLike } from '../analyzer';
 import { AnalyzerDetailPanel } from '../components/analyzer/AnalyzerDetailPanel';
 import { AnalyzerEmptyOrbit } from '../components/analyzer/AnalyzerEmptyOrbit';
 import { AnalyzerGraphStage } from '../components/analyzer/AnalyzerGraphStage';
@@ -9,6 +9,10 @@ import { AnalyzerProjectPicker } from '../components/analyzer/AnalyzerProjectPic
 import { AnalyzerToolbar } from '../components/analyzer/AnalyzerToolbar';
 
 const viewIds = new Set<AnalyzerViewId>(['architecture', 'workspace', 'command', 'dependencies']);
+
+type AnalyzerSearchResult =
+  | { kind: 'node'; item: AnalyzerViewNode }
+  | { kind: 'region'; item: AnalyzerSemanticRegion };
 
 function viewFromPath(pathname: string): AnalyzerViewId {
   const lastSegment = pathname.split('/').filter(Boolean).at(-1);
@@ -21,24 +25,30 @@ export function AnalyzerPage() {
   const { state: session, replaceProject, setActiveView, updateView } = useAnalyzerSession();
   const store = session.store;
   const storedViewState = session.views[view];
-  const [focusRequest, setFocusRequest] = useState<{ view: AnalyzerViewId; nodeId: string; nonce: number }>();
+  const [focusRequest, setFocusRequest] = useState<{ view: AnalyzerViewId; entityId: string; nonce: number }>();
   const [reportedCounts, setReportedCounts] = useState<{ model: AnalyzerViewModel; counts: AnalyzerViewCounts }>();
 
   const model = useMemo(() => store ? projectAnalyzerView(store, view, storedViewState.entryScriptId) : undefined, [store, storedViewState.entryScriptId, view]);
   const viewState = useMemo(() => model ? restoreAnalyzerViewSession(storedViewState, model) : storedViewState, [model, storedViewState]);
-  const { selectedNodeId, selectedEdgeId, search, filter, expandedPresentationIds, entryScriptId, detailOpen } = viewState;
+  const { selectedNodeId, selectedRegionId, selectedEdgeId, search, filter, expandedPresentationIds, entryScriptId, detailOpen } = viewState;
   const scripts = useMemo(() => store?.facts.filter((fact) => fact.kind === 'package-script') ?? [], [store]);
   const effectiveEntryScriptId = entryScriptId ?? model?.entryScriptId;
-  const searchResults = useMemo(() => {
+  const searchResults = useMemo<AnalyzerSearchResult[]>(() => {
     if (!model || !search.trim()) return [];
-    return model.nodes.filter((node) => viewNodeSearchText(node).includes(search.trim().toLowerCase())).slice(0, 8);
+    const nodes: AnalyzerSearchResult[] = model.nodes
+      .filter((node) => viewNodeSearchText(node).includes(search.trim().toLowerCase()))
+      .map((item) => ({ kind: 'node', item }));
+    const regions: AnalyzerSearchResult[] = (model.regions ?? [])
+      .filter((region) => regionMatchesSearch(region, search))
+      .map((item) => ({ kind: 'region', item }));
+    return [...nodes, ...regions].slice(0, 8);
   }, [model, search]);
 
   const fallbackCounts = useMemo(() => {
     if (!model) return { visibleNodes: 0, totalNodes: 0, hiddenNodes: 0 };
-    const presented = presentAnalyzerView(model, { expandedPresentationIds, filter, search, selectedEdgeId, selectedNodeId });
+    const presented = presentAnalyzerView(model, { expandedPresentationIds, filter, search, selectedEdgeId, selectedNodeId, selectedRegionId });
     return presented.counts ?? analyzerViewCounts(model);
-  }, [expandedPresentationIds, filter, model, search, selectedEdgeId, selectedNodeId]);
+  }, [expandedPresentationIds, filter, model, search, selectedEdgeId, selectedNodeId, selectedRegionId]);
   const nodeCounts = reportedCounts && reportedCounts.model === model ? reportedCounts.counts : fallbackCounts;
 
   useEffect(() => {
@@ -57,8 +67,8 @@ export function AnalyzerPage() {
     setReportedCounts(undefined);
   };
 
-  const requestFocus = useCallback((nodeId: string) => {
-    setFocusRequest((current) => ({ view, nodeId, nonce: (current?.nonce ?? 0) + 1 }));
+  const requestFocus = useCallback((entityId: string) => {
+    setFocusRequest((current) => ({ view, entityId, nonce: (current?.nonce ?? 0) + 1 }));
   }, [view]);
 
   const updateCamera = useCallback((update: AnalyzerGraphTransform | ((current: AnalyzerGraphTransform) => AnalyzerGraphTransform)) => {
@@ -81,16 +91,21 @@ export function AnalyzerPage() {
   }, [model]);
 
   const selectNode = useCallback((nodeId: string, focus = false) => {
-    updateView(view, { selectedNodeId: nodeId, selectedEdgeId: undefined, detailOpen: true });
+    updateView(view, { selectedNodeId: nodeId, selectedRegionId: undefined, selectedEdgeId: undefined, detailOpen: true });
     if (focus) requestFocus(nodeId);
   }, [requestFocus, updateView, view]);
 
+  const selectRegion = useCallback((regionId: string, focus = false) => {
+    updateView(view, { selectedNodeId: undefined, selectedRegionId: regionId, selectedEdgeId: undefined, detailOpen: true });
+    if (focus) requestFocus(regionId);
+  }, [requestFocus, updateView, view]);
+
   const selectEdge = useCallback((edgeId: string) => {
-    updateView(view, { selectedEdgeId: edgeId, selectedNodeId: undefined, detailOpen: true });
+    updateView(view, { selectedEdgeId: edgeId, selectedNodeId: undefined, selectedRegionId: undefined, detailOpen: true });
   }, [updateView, view]);
 
   const clearSelection = useCallback(() => {
-    updateView(view, { selectedNodeId: undefined, selectedEdgeId: undefined, detailOpen: false });
+    updateView(view, { selectedNodeId: undefined, selectedRegionId: undefined, selectedEdgeId: undefined, detailOpen: false });
   }, [updateView, view]);
 
   const closeDetail = useCallback(() => {
@@ -116,7 +131,7 @@ export function AnalyzerPage() {
     updateView(view, {
       expandedPresentationIds: next,
       ...(options.select || shouldFallbackToSummary
-        ? { selectedNodeId: presentationId, selectedEdgeId: undefined, detailOpen: true }
+        ? { selectedNodeId: presentationId, selectedRegionId: undefined, selectedEdgeId: undefined, detailOpen: true }
         : {}),
     });
   }, [expandedPresentationIds, model, selectedEdgeId, selectedNodeId, updateView, view]);
@@ -150,6 +165,7 @@ export function AnalyzerPage() {
       })());
       if (selectedNodeIsDescendant || selectedEdgeTouchesDescendant) {
         update.selectedNodeId = ANALYZER_EXTERNAL_SUMMARY_ID;
+        update.selectedRegionId = undefined;
         update.selectedEdgeId = undefined;
         update.detailOpen = true;
       }
@@ -163,6 +179,7 @@ export function AnalyzerPage() {
       search: '',
       filter: 'all',
       selectedNodeId: undefined,
+      selectedRegionId: undefined,
       selectedEdgeId: undefined,
       detailOpen: false,
     });
@@ -170,10 +187,12 @@ export function AnalyzerPage() {
   }, [updateView, view]);
 
   useEffect(() => {
-    if (!search.trim() || searchResults.length !== 1 || selectedNodeId || selectedEdgeId) return;
+    if (!search.trim() || searchResults.length !== 1 || selectedNodeId || selectedRegionId || selectedEdgeId) return;
     const [result] = searchResults;
-    if (result) selectNode(result.id, true);
-  }, [search, searchResults, selectedEdgeId, selectedNodeId, selectNode]);
+    if (!result) return;
+    if (result.kind === 'region') selectRegion(result.item.id, true);
+    else selectNode(result.item.id, true);
+  }, [search, searchResults, selectedEdgeId, selectedNodeId, selectedRegionId, selectNode, selectRegion]);
 
   const activeFocusRequest = focusRequest?.view === view ? focusRequest : undefined;
 
@@ -231,11 +250,11 @@ export function AnalyzerPage() {
 
           {searchResults.length > 0 && (
             <div className="analyzer-search-results" role="listbox" aria-label="Analyzer search results">
-              {searchResults.map((node) => (
-                <button key={node.id} type="button" onClick={() => selectNode(node.id, true)}>
-                  <span>{node.type}</span>
-                  <strong>{node.label}</strong>
-                  {node.subtitle && <small>{node.subtitle}</small>}
+              {searchResults.map((result) => (
+                <button key={`${result.kind}:${result.item.id}`} type="button" onClick={() => result.kind === 'region' ? selectRegion(result.item.id, true) : selectNode(result.item.id, true)}>
+                  <span>{result.kind === 'region' ? 'REGION / SCOPE' : result.item.type}</span>
+                  <strong>{result.item.label}</strong>
+                  {result.item.subtitle && <small>{result.item.subtitle}</small>}
                 </button>
               ))}
             </div>
@@ -245,6 +264,7 @@ export function AnalyzerPage() {
             <AnalyzerGraphStage
               view={model}
               selectedNodeId={selectedNodeId}
+              selectedRegionId={selectedRegionId}
               selectedEdgeId={selectedEdgeId}
               filter={filter}
               search={search}
@@ -254,6 +274,7 @@ export function AnalyzerPage() {
               onResetPresentation={resetPresentation}
               sources={store.sources}
               onSelectNode={selectNode}
+              onSelectRegion={selectRegion}
               onSelectEdge={selectEdge}
               focusRequest={activeFocusRequest}
               transform={viewState.camera ?? ANALYZER_DEFAULT_TRANSFORM}
@@ -267,9 +288,11 @@ export function AnalyzerPage() {
                 store={store}
                 view={model}
                 selectedNodeId={selectedNodeId}
+                selectedRegionId={selectedRegionId}
                 selectedEdgeId={selectedEdgeId}
                 expandedPresentationIds={expandedPresentationIds}
                 onSelectNode={selectNode}
+                onSelectRegion={selectRegion}
                 onTogglePresentation={(presentationId) => togglePresentation(presentationId, { select: true })}
                 onClose={closeDetail}
               />

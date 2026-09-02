@@ -1,4 +1,11 @@
-import type { AnalyzerViewEdge, AnalyzerViewCounts, AnalyzerViewModel, AnalyzerViewNode, AnalyzerPresentationGroup } from './types';
+import type {
+  AnalyzerSemanticRegion,
+  AnalyzerViewEdge,
+  AnalyzerViewCounts,
+  AnalyzerViewModel,
+  AnalyzerViewNode,
+  AnalyzerPresentationGroup,
+} from './types';
 
 export interface AnalyzerPresentationOptions {
   expandedPresentationIds: ReadonlySet<string>;
@@ -6,6 +13,7 @@ export interface AnalyzerPresentationOptions {
   search: string;
   selectedEdgeId?: string;
   selectedNodeId?: string;
+  selectedRegionId?: string;
 }
 
 export function analyzerSummaryExpanded(summaryId: string, expandedPresentationIds: ReadonlySet<string>): boolean {
@@ -65,6 +73,16 @@ export function nodeMatchesSearch(node: AnalyzerViewNode, search: string): boole
   return haystack.includes(search.trim().toLowerCase());
 }
 
+export function regionMatchesSearch(region: AnalyzerSemanticRegion, search: string): boolean {
+  if (!search.trim()) return true;
+  const haystack = [
+    region.label,
+    region.subtitle,
+    ...Object.values(region.metadata).flatMap((value) => Array.isArray(value) ? value : value === undefined ? [] : [String(value)]),
+  ].join(' ').toLowerCase();
+  return haystack.includes(search.trim().toLowerCase());
+}
+
 export function analyzerViewCounts(view: AnalyzerViewModel, visibleNodes: AnalyzerViewNode[] = view.nodes): AnalyzerViewCounts {
   const totalNodes = view.nodes.filter((node) => node.presentation?.role !== 'summary').length;
   const visibleNodeCount = Math.min(totalNodes, visibleNodes.length);
@@ -78,24 +96,32 @@ export function analyzerViewCounts(view: AnalyzerViewModel, visibleNodes: Analyz
 function stackMapFilterContextIds(view: AnalyzerViewModel, filter: string): ReadonlySet<string> {
   if (view.view !== 'architecture' || filter === 'all') return new Set();
   const nodeById = new Map(view.nodes.map((node) => [node.id, node]));
+  const regionById = new Map((view.regions ?? []).map((region) => [region.id, region]));
   const contextIds = new Set<string>();
-  view.nodes
-    .filter((node) => node.type === filter)
-    .forEach((node) => {
-      let current: AnalyzerViewNode | undefined = node;
-      const visited = new Set<string>();
-      while (current && !visited.has(current.id)) {
-        contextIds.add(current.id);
-        visited.add(current.id);
-        const parentId: AnalyzerViewNode['metadata'][string] = current.metadata.stackMapParentId;
-        current = typeof parentId === 'string' ? nodeById.get(parentId) : undefined;
-      }
-    });
+  const addRegionContext = (region: AnalyzerSemanticRegion): void => {
+    contextIds.add(region.id);
+    region.childIds.forEach((childId) => contextIds.add(childId));
+    const parentId = region.metadata.stackMapParentId;
+    if (typeof parentId === 'string' && nodeById.has(parentId)) contextIds.add(parentId);
+  };
+  if (filter === 'stack-scope') {
+    (view.regions ?? []).forEach(addRegionContext);
+    return contextIds;
+  }
+  view.nodes.filter((node) => node.type === filter).forEach((node) => {
+    contextIds.add(node.id);
+    const regionId = node.metadata.stackMapRegionId;
+    if (typeof regionId === 'string') {
+      const region = regionById.get(regionId);
+      if (region) addRegionContext(region);
+    }
+  });
   return contextIds;
 }
 
 export function presentAnalyzerView(view: AnalyzerViewModel, options: AnalyzerPresentationOptions): AnalyzerViewModel {
   const nodeById = new Map(view.nodes.map((node) => [node.id, node]));
+  const regionById = new Map((view.regions ?? []).map((region) => [region.id, region]));
   const parentByChildId = new Map(view.nodes.flatMap((node) => node.presentation?.parentId
     ? [[node.id, node.presentation.parentId] as const]
     : []));
@@ -103,7 +129,10 @@ export function presentAnalyzerView(view: AnalyzerViewModel, options: AnalyzerPr
   const searchMatchedIds = new Set(hasSearch
     ? view.nodes.filter((node) => nodeMatchesSearch(node, options.search)).map((node) => node.id)
     : []);
-  const stackMapContextIds = stackMapFilterContextIds(view, options.filter);
+  const searchMatchedRegionIds = new Set(hasSearch
+    ? (view.regions ?? []).filter((region) => regionMatchesSearch(region, options.search)).map((region) => region.id)
+    : []);
+  const stackMapContextIds = new Set(stackMapFilterContextIds(view, options.filter));
 
   const selectedContextIds = new Set<string>();
   if (options.selectedNodeId) {
@@ -113,6 +142,27 @@ export function presentAnalyzerView(view: AnalyzerViewModel, options: AnalyzerPr
       if (edge.targetId === options.selectedNodeId) selectedContextIds.add(edge.sourceId);
     });
   }
+  if (options.selectedRegionId) {
+    const selectedRegion = regionById.get(options.selectedRegionId);
+    if (selectedRegion) {
+      selectedContextIds.add(selectedRegion.id);
+      selectedRegion.childIds.forEach((childId) => selectedContextIds.add(childId));
+      const parentId = selectedRegion.metadata.stackMapParentId;
+      if (typeof parentId === 'string') selectedContextIds.add(parentId);
+      view.edges.forEach((edge) => {
+        if (edge.sourceId === selectedRegion.id) selectedContextIds.add(edge.targetId);
+        if (edge.targetId === selectedRegion.id) selectedContextIds.add(edge.sourceId);
+      });
+    }
+  }
+  searchMatchedRegionIds.forEach((regionId) => {
+    const region = regionById.get(regionId);
+    if (!region) return;
+    stackMapContextIds.add(regionId);
+    region.childIds.forEach((childId) => stackMapContextIds.add(childId));
+    const parentId = region.metadata.stackMapParentId;
+    if (typeof parentId === 'string') stackMapContextIds.add(parentId);
+  });
   if (options.selectedEdgeId) {
     const selectedEdge = view.edges.find((edge) => edge.id === options.selectedEdgeId);
     if (selectedEdge) {
@@ -174,6 +224,12 @@ export function presentAnalyzerView(view: AnalyzerViewModel, options: AnalyzerPr
   const visibleNodes = view.nodes.filter((node) => presentationVisibleIds.has(node.id)
     && (options.filter === 'all' || node.type === options.filter || selectedContextIds.has(node.id) || stackMapContextIds.has(node.id)));
   const visibleIds = new Set(visibleNodes.map((node) => node.id));
+  const visibleRegionIds = new Set((view.regions ?? [])
+    .filter((region) => searchMatchedRegionIds.has(region.id)
+      || selectedContextIds.has(region.id)
+      || stackMapContextIds.has(region.id)
+      || region.childIds.some((childId) => visibleIds.has(childId)))
+    .map((region) => region.id));
   const resolvedEdges = new Map<string, AnalyzerViewEdge>();
   const presentationPathExpanded = (presentationId: string): boolean => {
     const visited = new Set<string>();
@@ -197,6 +253,7 @@ export function presentAnalyzerView(view: AnalyzerViewModel, options: AnalyzerPr
       && edge.id !== options.selectedEdgeId) return;
 
     const resolveEndpoint = (nodeId: string): string | undefined => {
+      if (visibleRegionIds.has(nodeId)) return nodeId;
       const visited = new Set<string>();
       let currentId: string | undefined = nodeId;
       while (currentId && !visited.has(currentId)) {
@@ -227,6 +284,9 @@ export function presentAnalyzerView(view: AnalyzerViewModel, options: AnalyzerPr
     clusters: view.clusters
       .map((cluster) => ({ ...cluster, nodeIds: cluster.nodeIds.filter((nodeId) => visibleIds.has(nodeId)) }))
       .filter((cluster) => cluster.nodeIds.length > 0),
+    regions: (view.regions ?? [])
+      .filter((region) => visibleRegionIds.has(region.id))
+      .map((region) => ({ ...region, childIds: region.childIds.filter((childId) => visibleIds.has(childId)) })),
     presentationGroups,
   };
 }

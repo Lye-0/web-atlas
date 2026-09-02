@@ -1,4 +1,4 @@
-import type { AnalyzerEvidence, AnalyzerEvidenceKind, SourcePosition } from './types';
+import type { AnalyzerEvidence, AnalyzerEvidenceKind, AnalyzerEvidenceRole, SourcePosition } from './types';
 
 export interface OffsetRange {
   start: number;
@@ -47,6 +47,8 @@ export function makeEvidence(
   detectorId: string,
   description?: string,
   contextPadding = 2,
+  role?: AnalyzerEvidenceRole,
+  scopePath?: string,
 ): AnalyzerEvidence {
   const starts = lineStartOffsets(source);
   const startOffset = clampOffset(range.start, source.length);
@@ -64,6 +66,8 @@ export function makeEvidence(
     highlightRanges: [{ start: startPosition, end: endPosition }],
     kind,
     detectorId,
+    ...(role ? { role } : {}),
+    ...(scopePath ? { scopePath } : {}),
     ...(description ? { description } : {}),
   };
 }
@@ -74,10 +78,12 @@ export function makeFileEvidence(
   kind: AnalyzerEvidenceKind,
   detectorId: string,
   description?: string,
+  role?: AnalyzerEvidenceRole,
+  scopePath?: string,
 ): AnalyzerEvidence {
   const firstContentOffset = source.search(/\S/);
   const start = firstContentOffset < 0 ? 0 : firstContentOffset;
-  return makeEvidence(filePath, source, { start, end: Math.min(source.length, start + 1) }, kind, detectorId, description);
+  return makeEvidence(filePath, source, { start, end: Math.min(source.length, start + 1) }, kind, detectorId, description, 2, role, scopePath);
 }
 
 /** Returns the line span occupied by the exact highlighted source ranges. */

@@ -3281,6 +3281,97 @@ summary:focus-visible {
   box-shadow: inset 0 1px 0 rgba(203, 224, 215, 0.03), 5px 8px 14px rgba(0, 0, 0, 0.08);
 }
 
+.analyzer-semantic-region {
+  position: absolute;
+  z-index: 1;
+  box-sizing: border-box;
+  overflow: visible;
+  border: 1px solid rgba(132, 177, 197, 0.3);
+  border-radius: 9px;
+  background: linear-gradient(145deg, rgba(80, 126, 144, 0.085), rgba(12, 22, 24, 0.24) 72%, rgba(12, 22, 24, 0.1));
+  color: rgba(167, 201, 211, 0.76);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.07em;
+  pointer-events: none;
+  box-shadow: inset 0 1px 0 rgba(203, 224, 215, 0.055), 10px 14px 24px rgba(0, 0, 0, 0.14);
+  text-transform: uppercase;
+  transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
+}
+
+.analyzer-semantic-region.is-selected,
+.analyzer-semantic-region.is-match {
+  border-color: rgba(172, 220, 202, 0.56);
+  background: linear-gradient(145deg, rgba(91, 143, 126, 0.11), rgba(15, 25, 23, 0.25) 72%, rgba(15, 25, 23, 0.1));
+  box-shadow: inset 0 1px 0 rgba(203, 224, 215, 0.08), 10px 14px 26px rgba(0, 0, 0, 0.2);
+}
+
+.analyzer-semantic-region-heading {
+  position: absolute;
+  top: 14px;
+  right: 12px;
+  left: 12px;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  height: 28px;
+  min-width: 0;
+  gap: 7px;
+  overflow: hidden;
+  padding: 0 4px;
+  border: 0;
+  background: rgba(12, 20, 22, 0.38);
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  letter-spacing: inherit;
+  pointer-events: auto;
+  text-align: left;
+  text-transform: inherit;
+  white-space: nowrap;
+}
+
+.analyzer-semantic-region-heading:hover,
+.analyzer-semantic-region-heading:focus-visible {
+  color: var(--text);
+  outline: 1px solid rgba(172, 220, 202, 0.42);
+  outline-offset: 1px;
+}
+
+.analyzer-semantic-region-kicker {
+  flex: 0 0 auto;
+  color: var(--accent);
+  font-size: 0.76rem;
+}
+
+.analyzer-semantic-region-heading strong {
+  min-width: 0;
+  overflow: hidden;
+  color: rgba(203, 224, 215, 0.9);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-overflow: ellipsis;
+}
+
+.analyzer-semantic-region-subtitle,
+.analyzer-semantic-region-count {
+  flex: 0 0 auto;
+  overflow: hidden;
+  color: rgba(167, 201, 211, 0.62);
+  font-size: 0.54rem;
+  text-overflow: ellipsis;
+}
+
+.analyzer-semantic-region-subtitle {
+  max-width: 34%;
+}
+
+.analyzer-semantic-region-count {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
 .analyzer-node {
   position: absolute;
   z-index: 3;

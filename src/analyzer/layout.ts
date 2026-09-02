@@ -1,5 +1,5 @@
 import { analyzerPresentationCount, analyzerPresentationCountLabel } from './presentation';
-import type { AnalyzerCluster, AnalyzerPresentationGroup, AnalyzerViewModel, AnalyzerViewNode } from './types';
+import type { AnalyzerCluster, AnalyzerPresentationGroup, AnalyzerSemanticRegion, AnalyzerViewModel, AnalyzerViewNode } from './types';
 import { ANALYZER_COMMAND_COMMON_LANE_ID, ANALYZER_EXTERNAL_SUMMARY_ID } from './projectors';
 
 export const ANALYZER_NODE_WIDTH = 244;
@@ -34,6 +34,16 @@ const SUMMARY_GROUP_HEADING_CLEARANCE = SUMMARY_GROUP_NESTED_GAP;
 const SUMMARY_GROUP_HEADING_OVERHANG = SUMMARY_GROUP_HEADER_HEIGHT + SUMMARY_GROUP_HEADING_CLEARANCE;
 const SUMMARY_GROUP_EXTERNAL_GAP = 16;
 const SUMMARY_GROUP_BOTTOM_PADDING = 20;
+const STACK_MAP_REGION_WIDTH = ANALYZER_NODE_WIDTH + 36;
+export const ANALYZER_REGION_HEADING_TOP = 14;
+export const ANALYZER_REGION_HEADING_HEIGHT = 28;
+export const ANALYZER_REGION_MEMBER_GAP = 14;
+const STACK_MAP_REGION_BOTTOM_PADDING = 18;
+const STACK_MAP_REGION_GAP_X = 34;
+const STACK_MAP_REGION_GAP_Y = 34;
+const STACK_MAP_REGION_COLUMNS = 3;
+const STACK_MAP_PROJECT_TOP = 34;
+const STACK_MAP_PROJECT_REGION_GAP = 86;
 export const ANALYZER_STRUCTURAL_HEADING_HEIGHT = 28;
 const STRUCTURAL_HEADING_HEIGHT = ANALYZER_STRUCTURAL_HEADING_HEIGHT;
 const DEPENDENCY_EXTERNAL_GROUP_HEADER = SUMMARY_GROUP_MEMBER_OFFSET;
@@ -44,6 +54,18 @@ export interface PositionedNode {
   y: number;
   height: number;
 }
+
+export interface PositionedSemanticRegion {
+  region: AnalyzerSemanticRegion;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  headingHeight: number;
+  memberGap: number;
+}
+
+export type PositionedGraphEndpoint = PositionedNode | PositionedSemanticRegion;
 
 export interface PositionedCluster {
   id: string;
@@ -99,6 +121,7 @@ export interface AnalyzerLayout {
   lanes: PositionedLane[];
   bands: PositionedBand[];
   summaryGroups: PositionedSummaryGroup[];
+  regions?: PositionedSemanticRegion[];
 }
 
 function clusterOrder(view: AnalyzerViewModel['view']): string[] {
@@ -210,6 +233,113 @@ function orderedArchitectureNodes(view: AnalyzerViewModel, nodes: AnalyzerViewNo
   return [...topLevelNodes, ...orderedGroups.flatMap((groupId) => groupedNodes.get(groupId) ?? [])];
 }
 
+interface StackMapRegionLayoutMeasure {
+  region: AnalyzerSemanticRegion;
+  children: AnalyzerViewNode[];
+  height: number;
+}
+
+function stackMapRegionMeasure(
+  view: AnalyzerViewModel,
+  region: AnalyzerSemanticRegion,
+  expandedNodeIds: ReadonlySet<string>,
+): StackMapRegionLayoutMeasure {
+  const nodeById = new Map(view.nodes.map((node) => [node.id, node]));
+  const children = region.childIds
+    .map((childId) => nodeById.get(childId))
+    .filter((node): node is AnalyzerViewNode => Boolean(node));
+  const childHeight = children.reduce((total, node) => total + architectureNodeHeight(view, node, expandedNodeIds), 0);
+  return {
+    region,
+    children,
+    height: ANALYZER_REGION_HEADING_TOP
+      + ANALYZER_REGION_HEADING_HEIGHT
+      + ANALYZER_REGION_MEMBER_GAP
+      + childHeight
+      + Math.max(0, children.length - 1) * ARCHITECTURE_NODE_GAP
+      + STACK_MAP_REGION_BOTTOM_PADDING,
+  };
+}
+
+function layoutStackMap(view: AnalyzerViewModel, expandedNodeIds: ReadonlySet<string>): AnalyzerLayout {
+  const regions = view.regions ?? [];
+  const measures = regions.map((region) => stackMapRegionMeasure(view, region, expandedNodeIds));
+  const columnCount = Math.min(STACK_MAP_REGION_COLUMNS, Math.max(1, measures.length));
+  const rowCount = Math.ceil(measures.length / columnCount);
+  const width = Math.max(
+    900,
+    SIDE_PADDING * 2 + columnCount * STACK_MAP_REGION_WIDTH + Math.max(0, columnCount - 1) * STACK_MAP_REGION_GAP_X,
+  );
+  const project = view.nodes.find((node) => node.type === 'project');
+  const positionedNodes: PositionedNode[] = [];
+  const positionedRegions: PositionedSemanticRegion[] = [];
+  const projectX = Math.max(SIDE_PADDING, (width - ANALYZER_NODE_WIDTH) / 2);
+  const projectY = STACK_MAP_PROJECT_TOP;
+  if (project) {
+    const projectHeight = architectureNodeHeight(view, project, expandedNodeIds);
+    positionedNodes.push({ node: project, x: projectX, y: projectY, height: projectHeight });
+  }
+  const projectBottom = project
+    ? projectY + architectureNodeHeight(view, project, expandedNodeIds)
+    : projectY;
+  const firstRegionY = projectBottom + STACK_MAP_PROJECT_REGION_GAP;
+  const rowHeights = Array.from({ length: rowCount }, (_, row) => Math.max(
+    ...measures.slice(row * columnCount, (row + 1) * columnCount).map((measure) => measure.height),
+    180,
+  ));
+  const rowY: number[] = [];
+  rowHeights.forEach((_, row) => {
+    rowY.push(firstRegionY + rowHeights.slice(0, row).reduce((total, previous) => total + previous + STACK_MAP_REGION_GAP_Y, 0));
+  });
+  measures.forEach((measure, index) => {
+    const column = index % columnCount;
+    const row = Math.floor(index / columnCount);
+    const x = SIDE_PADDING + column * (STACK_MAP_REGION_WIDTH + STACK_MAP_REGION_GAP_X);
+    const y = rowY[row] ?? firstRegionY;
+    const positionedRegion: PositionedSemanticRegion = {
+      region: {
+        ...measure.region,
+        bounds: { x, y, width: STACK_MAP_REGION_WIDTH, height: measure.height },
+      },
+      x,
+      y,
+      width: STACK_MAP_REGION_WIDTH,
+      height: measure.height,
+      headingHeight: ANALYZER_REGION_HEADING_HEIGHT,
+      memberGap: ANALYZER_REGION_MEMBER_GAP,
+    };
+    positionedRegions.push(positionedRegion);
+    let childY = y + ANALYZER_REGION_HEADING_TOP + ANALYZER_REGION_HEADING_HEIGHT + ANALYZER_REGION_MEMBER_GAP;
+    measure.children.forEach((node) => {
+      const height = architectureNodeHeight(view, node, expandedNodeIds);
+      positionedNodes.push({ node, x: x + 18, y: childY, height });
+      childY += height + ARCHITECTURE_NODE_GAP;
+    });
+  });
+  const projectCluster = project
+    ? [{
+        id: 'stack-map:project',
+        label: 'Project',
+        tone: 'neutral',
+        x: Math.max(0, projectX - 28),
+        y: Math.max(0, projectY - 30),
+        width: ANALYZER_NODE_WIDTH + 56,
+        height: architectureNodeHeight(view, project, expandedNodeIds) + 48,
+      }]
+    : [];
+  const regionBottom = positionedRegions.reduce((bottom, region) => Math.max(bottom, region.y + region.height), firstRegionY);
+  return {
+    width,
+    height: Math.max(420, regionBottom + 40),
+    nodes: positionedNodes,
+    clusters: projectCluster,
+    lanes: [],
+    bands: [],
+    summaryGroups: [],
+    regions: positionedRegions,
+  };
+}
+
 function layoutColumnClusters(view: AnalyzerViewModel, expandedNodeIds: ReadonlySet<string>): AnalyzerLayout {
   const positionedNodes: PositionedNode[] = [];
   const positionedClusters: PositionedCluster[] = [];
@@ -232,10 +362,11 @@ function layoutColumnClusters(view: AnalyzerViewModel, expandedNodeIds: Readonly
   });
 
   const width = Math.max(900, SIDE_PADDING * 2 + Math.max(1, positionedClusters.length) * CLUSTER_WIDTH + Math.max(0, positionedClusters.length - 1) * CLUSTER_GAP);
-  return { width, height: maxHeight, nodes: positionedNodes, clusters: positionedClusters, lanes: [], bands: [], summaryGroups: [] };
+  return { width, height: maxHeight, nodes: positionedNodes, clusters: positionedClusters, lanes: [], bands: [], summaryGroups: [], regions: [] };
 }
 
 function layoutArchitecture(view: AnalyzerViewModel, expandedNodeIds: ReadonlySet<string>): AnalyzerLayout {
+  if ((view.regions?.length ?? 0) > 0) return layoutStackMap(view, expandedNodeIds);
   const clusters = clusterEntries(view);
   const columnCount = Math.min(4, Math.max(1, clusters.length));
   const clusterNodes = clusters.map((cluster) => orderedArchitectureNodes(view, nodesForCluster(view, cluster)));
@@ -264,7 +395,7 @@ function layoutArchitecture(view: AnalyzerViewModel, expandedNodeIds: ReadonlySe
 
   const width = Math.max(900, SIDE_PADDING * 2 + columnCount * CLUSTER_WIDTH + Math.max(0, columnCount - 1) * CLUSTER_GAP);
   const height = Math.max(420, (rowY.at(-1) ?? 20) + (rowHeights.at(-1) ?? 420) + 40);
-  return { width, height, nodes: positionedNodes, clusters: positionedClusters, lanes: [], bands: [], summaryGroups: [] };
+  return { width, height, nodes: positionedNodes, clusters: positionedClusters, lanes: [], bands: [], summaryGroups: [], regions: [] };
 }
 
 function metadataNumber(node: AnalyzerViewNode, key: string): number | undefined {
@@ -369,6 +500,7 @@ function commandFlowLayout(view: AnalyzerViewModel, expandedNodeIds: ReadonlySet
     lanes: normalizedLanes,
     bands: [],
     summaryGroups: [],
+    regions: [],
   };
 }
 
@@ -552,7 +684,7 @@ function dependencyFlowLayout(view: AnalyzerViewModel, expandedNodeIds: Readonly
     maxHeight = Math.max(maxHeight, height + 40);
   });
 
-  return { width: Math.max(900, x - CLUSTER_GAP + SIDE_PADDING), height: maxHeight, nodes: positionedNodes, clusters: positionedClusters, lanes: [], bands: positionedBands, summaryGroups: [] };
+  return { width: Math.max(900, x - CLUSTER_GAP + SIDE_PADDING), height: maxHeight, nodes: positionedNodes, clusters: positionedClusters, lanes: [], bands: positionedBands, summaryGroups: [], regions: [] };
 }
 
 function presentationParentMap(view: AnalyzerViewModel): Map<string, string> {
@@ -822,6 +954,7 @@ function resolveSummaryHeadingCollisions(view: AnalyzerViewModel, layout: Analyz
     lanes: [...layout.lanes],
     bands: [...layout.bands],
     summaryGroups: [],
+    regions: [...(layout.regions ?? [])],
   };
   const groupsById = new Map((view.presentationGroups ?? []).map((group) => [group.id, group]));
   const expandedGroups = (view.presentationGroups ?? [])
@@ -899,9 +1032,20 @@ function finalizeAnalyzerLayout(view: AnalyzerViewModel, layout: AnalyzerLayout)
       height: band.y + band.height + regionOffset - y,
     };
   });
+  const regions = (resolvedLayout.regions ?? []).map((region) => ({
+    ...region,
+    y: region.y + regionOffset,
+    region: {
+      ...region.region,
+      ...(region.region.bounds ? {
+        bounds: { ...region.region.bounds, y: region.region.bounds.y + regionOffset },
+      } : {}),
+    },
+  }));
   const allBounds = [
     ...summaryGroups.map((group) => ({ right: group.x + group.width, bottom: group.y + group.height })),
     ...bands.map((band) => ({ right: band.x + band.width, bottom: band.y + band.height })),
+    ...regions.map((region) => ({ right: region.x + region.width, bottom: region.y + region.height })),
   ];
   const positionedBottoms = [
     ...resolvedLayout.nodes.map((positionedNode) => positionedNode.y + positionedNode.height),
@@ -909,6 +1053,7 @@ function finalizeAnalyzerLayout(view: AnalyzerViewModel, layout: AnalyzerLayout)
     ...resolvedLayout.lanes.map((lane) => lane.y + lane.height),
     ...bands.map((band) => band.y + band.height),
     ...summaryGroups.map((group) => group.y + group.height),
+    ...(resolvedLayout.regions?.map((region) => region.y + region.height) ?? []),
   ];
   return {
     ...resolvedLayout,
@@ -917,6 +1062,7 @@ function finalizeAnalyzerLayout(view: AnalyzerViewModel, layout: AnalyzerLayout)
     lanes: shiftY(resolvedLayout.lanes),
     bands,
     summaryGroups,
+    regions,
     width: Math.max(resolvedLayout.width, ...allBounds.map((bounds) => bounds.right + SIDE_PADDING)),
     height: Math.max(resolvedLayout.height + regionOffset, ...positionedBottoms.map((bottom) => bottom + regionOffset + SIDE_PADDING), ...allBounds.map((bounds) => bounds.bottom + SIDE_PADDING)),
   };

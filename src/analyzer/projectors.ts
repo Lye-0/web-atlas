@@ -7,10 +7,13 @@ import {
   relationLabels,
   scriptIdFor,
   type AnalyzerCluster,
+  type AnalyzerEvidence,
+  type AnalyzerEvidenceRole,
   type AnalyzerFact,
   type AnalyzerNodeType,
   type AnalyzerProjectStore,
   type AnalyzerRelation,
+  type AnalyzerSemanticRegion,
   type AnalyzerStackUsage,
   type AnalyzerViewEdge,
   type AnalyzerViewModel,
@@ -122,11 +125,20 @@ function edgesForRelations(
 }
 
 type StackMapScopeKind = 'root' | 'services' | 'application' | 'workspace' | 'package' | 'desktop';
+type StackMapScopeSource = 'root' | 'services' | 'package' | 'workspace' | 'runtime' | 'config' | 'solution' | 'standalone';
+
+interface StackMapScopeCandidate {
+  id: string;
+  path: string;
+  kind: StackMapScopeKind;
+  label: string;
+  source: StackMapScopeSource;
+  factId?: string;
+  evidenceIds: string[];
+}
 
 interface StackMapScopeRecord {
   id: string;
-  nodeId: string;
-  clusterId: string;
   label: string;
   path: string;
   kind: StackMapScopeKind;
@@ -148,12 +160,37 @@ interface StackMapUsageRecord extends AnalyzerStackUsage {
   sourceFactKinds: Set<string>;
 }
 
-function stackMapScopeNodeId(scopeId: string): string {
-  return `stack-scope:${scopeId}`;
+export function stackMapScopeRegionId(scopeId: string, scopePath?: string): string {
+  const normalizedPath = normalizeScopePath(scopePath ?? scopeId.replace(/^package:/, ''));
+  return `region:scope:${normalizedPath === '.' ? scopeId : normalizedPath}`;
 }
 
-function stackMapScopeClusterId(scopeId: string): string {
-  return `stack-map:scope:${scopeId}`;
+function normalizeScopePath(path: string): string {
+  const normalized = path.replaceAll('\\', '/').replace(/^\.\/+/, '').replace(/\/+/g, '/');
+  const parts = normalized.split('/').filter((part) => part && part !== '.');
+  return parts.length > 0 ? parts.join('/') : '.';
+}
+
+function scopeDirectory(filePath: string): string {
+  const normalized = normalizeScopePath(filePath);
+  if (normalized === '.') return '.';
+  const slash = normalized.lastIndexOf('/');
+  return slash >= 0 ? normalizeScopePath(normalized.slice(0, slash)) : '.';
+}
+
+function scopePathAncestors(path: string): string[] {
+  const ancestors: string[] = [];
+  let current = normalizeScopePath(path);
+  while (current !== '.') {
+    ancestors.push(current);
+    const slash = current.lastIndexOf('/');
+    current = slash >= 0 ? normalizeScopePath(current.slice(0, slash)) : '.';
+  }
+  return ancestors;
+}
+
+function isHiddenScopePath(path: string): boolean {
+  return normalizeScopePath(path).split('/').some((segment) => segment.startsWith('.'));
 }
 
 function humanizeScopeSegment(segment: string): string {
@@ -161,22 +198,25 @@ function humanizeScopeSegment(segment: string): string {
 }
 
 function packageScopeKind(packagePath: string): StackMapScopeKind {
-  if (packagePath.startsWith('apps/')) return 'application';
-  if (packagePath.startsWith('packages/')) return 'workspace';
+  const normalizedPath = normalizeScopePath(packagePath);
+  if (normalizedPath.startsWith('apps/')) return 'application';
+  if (normalizedPath.startsWith('packages/')) return 'workspace';
   return 'package';
 }
 
 function packageScopeLabel(packagePath: string): string {
-  const segments = packagePath.split('/').filter(Boolean);
-  return humanizeScopeSegment(segments.at(-1) ?? packagePath);
+  const normalizedPath = normalizeScopePath(packagePath);
+  const segments = normalizedPath.split('/').filter(Boolean);
+  return humanizeScopeSegment(segments.at(-1) ?? normalizedPath);
 }
 
 function packageScopeId(packagePath: string): string {
-  return packagePath === '.' ? 'root' : `package:${packagePath}`;
+  const normalizedPath = normalizeScopePath(packagePath);
+  return normalizedPath === '.' ? 'root' : `package:${normalizedPath}`;
 }
 
 function serviceConfigPath(filePath: string): boolean {
-  const name = filePath.split('/').at(-1)?.toLowerCase();
+  const name = normalizeScopePath(filePath).split('/').at(-1)?.toLowerCase();
   return name === 'wrangler.json'
     || name === 'wrangler.jsonc'
     || name === 'wrangler.toml'
@@ -185,14 +225,138 @@ function serviceConfigPath(filePath: string): boolean {
 }
 
 function pathBelongsToPackage(filePath: string, packagePath: string): boolean {
-  if (packagePath === '.') return true;
-  return filePath === packagePath || filePath.startsWith(`${packagePath}/`);
+  const normalizedFilePath = normalizeScopePath(filePath);
+  const normalizedPackagePath = normalizeScopePath(packagePath);
+  if (normalizedPackagePath === '.') return true;
+  return normalizedFilePath === normalizedPackagePath || normalizedFilePath.startsWith(`${normalizedPackagePath}/`);
 }
 
-function nearestPackageScope(filePath: string, packages: StackMapPackageRecord[]): StackMapPackageRecord | undefined {
-  return [...packages]
-    .filter((candidate) => pathBelongsToPackage(filePath, candidate.packagePath))
-    .sort((first, second) => second.packagePath.length - first.packagePath.length)[0];
+function scopeGlobToRegExp(pattern: string): RegExp {
+  const normalized = normalizeScopePath(pattern.replace(/^!/, ''));
+  let expression = '^';
+  for (let index = 0; index < normalized.length; index += 1) {
+    const character = normalized[index];
+    if (character === '*' && normalized[index + 1] === '*') {
+      expression += '.*';
+      index += 1;
+    } else if (character === '*') expression += '[^/]*';
+    else if (character === '?') expression += '[^/]';
+    else expression += character.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+  return new RegExp(`${expression}$`);
+}
+
+function scopeGlobMatches(path: string, pattern: string): boolean {
+  return scopeGlobToRegExp(pattern).test(normalizeScopePath(path));
+}
+
+function workspacePatternRootForPath(directory: string, patterns: readonly string[]): string | undefined {
+  const normalizedDirectory = normalizeScopePath(directory);
+  if (normalizedDirectory === '.' || isHiddenScopePath(normalizedDirectory)) return undefined;
+  const ancestors = scopePathAncestors(normalizedDirectory);
+  const positivePatterns = patterns.filter((pattern) => !pattern.trim().startsWith('!'));
+  const negativePatterns = patterns
+    .filter((pattern) => pattern.trim().startsWith('!'))
+    .map((pattern) => pattern.trim().slice(1));
+  const candidates = positivePatterns.flatMap((pattern) => {
+    const normalizedPattern = normalizeScopePath(pattern);
+    const patternSegments = normalizedPattern.split('/').filter(Boolean);
+    const wildcardIndex = patternSegments.findIndex((segment) => /[*?]/.test(segment));
+    const expectedDepth = wildcardIndex >= 0 ? wildcardIndex + 1 : patternSegments.length;
+    return ancestors
+      .filter((candidate) => scopeGlobMatches(candidate, normalizedPattern))
+      .map((candidate) => ({
+        path: candidate,
+        distance: Math.abs(candidate.split('/').length - expectedDepth),
+        pattern: normalizedPattern,
+      }));
+  }).filter((candidate) => !negativePatterns.some((pattern) => scopeGlobMatches(candidate.path, pattern) || scopeGlobMatches(normalizedDirectory, pattern)));
+  return candidates.sort((first, second) => first.distance - second.distance || second.path.length - first.path.length || first.pattern.localeCompare(second.pattern))[0]?.path;
+}
+
+function scopeCandidateId(path: string, source: StackMapScopeSource, kind: StackMapScopeKind): string {
+  const normalizedPath = normalizeScopePath(path);
+  if (normalizedPath === '.') return source === 'services' ? 'services' : 'root';
+  if (source === 'package') return packageScopeId(normalizedPath);
+  return kind === 'desktop' ? `desktop:${normalizedPath}` : `application:${normalizedPath}`;
+}
+
+function makeScopeCandidate(
+  path: string,
+  kind: StackMapScopeKind,
+  source: StackMapScopeSource,
+  factId?: string,
+  evidenceIds: readonly string[] = [],
+): StackMapScopeCandidate {
+  const normalizedPath = normalizeScopePath(path);
+  return {
+    id: scopeCandidateId(normalizedPath, source, kind),
+    path: normalizedPath,
+    kind,
+    label: kind === 'desktop' ? 'DESKTOP' : normalizedPath === '.' ? source === 'services' ? 'PROJECT / SERVICES' : 'PROJECT / TOOLING' : packageScopeLabel(normalizedPath),
+    source,
+    ...(factId ? { factId } : {}),
+    evidenceIds: [...new Set(evidenceIds)],
+  };
+}
+
+const stackMapScopeSourceRank: Record<StackMapScopeSource, number> = {
+  root: 6,
+  services: 6,
+  package: 5,
+  solution: 4,
+  config: 3,
+  runtime: 3,
+  workspace: 2,
+  standalone: 1,
+};
+
+function addScopeCandidate(candidates: Map<string, StackMapScopeCandidate>, candidate: StackMapScopeCandidate): void {
+  if (candidate.path !== '.' && isHiddenScopePath(candidate.path)) return;
+  const existing = candidates.get(candidate.path);
+  if (!existing) {
+    candidates.set(candidate.path, candidate);
+    return;
+  }
+  const preferred = stackMapScopeSourceRank[candidate.source] > stackMapScopeSourceRank[existing.source] ? candidate : existing;
+  const isDesktop = existing.kind === 'desktop' || candidate.kind === 'desktop';
+  const hasPackageRoot = existing.source === 'package' || candidate.source === 'package';
+  const kind = isDesktop ? 'desktop' : preferred.kind;
+  const source = hasPackageRoot ? 'package' : preferred.source;
+  const factId = existing.source === 'package'
+    ? existing.factId ?? candidate.factId
+    : candidate.source === 'package'
+      ? candidate.factId ?? existing.factId
+      : existing.factId ?? candidate.factId;
+  candidates.set(candidate.path, {
+    ...preferred,
+    id: hasPackageRoot ? packageScopeId(candidate.path) : scopeCandidateId(candidate.path, source, kind),
+    kind,
+    label: kind === 'desktop' ? 'DESKTOP' : preferred.label,
+    source,
+    ...(factId ? { factId } : {}),
+    evidenceIds: [...new Set([...existing.evidenceIds, ...candidate.evidenceIds])],
+  });
+}
+
+function nearestKnownScope(filePath: string, candidates: Map<string, StackMapScopeCandidate>): StackMapScopeCandidate | undefined {
+  return [...candidates.values()]
+    .filter((candidate) => pathBelongsToPackage(filePath, candidate.path))
+    .sort((first, second) => second.path.length - first.path.length || stackMapScopeSourceRank[second.source] - stackMapScopeSourceRank[first.source])[0];
+}
+
+function scopeMarkerKind(filePath: string): 'package' | 'runtime' | 'dotnet' | undefined {
+  const normalizedPath = normalizeScopePath(filePath);
+  const name = normalizedPath.split('/').at(-1)?.toLowerCase() ?? '';
+  if (name === 'package.json') return 'package';
+  if (serviceConfigPath(normalizedPath)) return 'runtime';
+  if (name.endsWith('.csproj') || name.endsWith('.sln') || name.endsWith('.slnx')) return 'dotnet';
+  return undefined;
+}
+
+function isDotnetProjectPath(path: string): boolean {
+  const name = normalizeScopePath(path).split('/').at(-1)?.toLowerCase() ?? '';
+  return name.endsWith('.csproj') || name.endsWith('.sln') || name.endsWith('.slnx');
 }
 
 function canonicalStackForFact(fact: AnalyzerFact): ReturnType<typeof getStack> {
@@ -202,6 +366,14 @@ function canonicalStackForFact(fact: AnalyzerFact): ReturnType<typeof getStack> 
       ? fact.metadata.dictionaryStackId
       : undefined;
   return stackId ? getStack(stackId) : undefined;
+}
+
+function inferredEvidenceRole(fact: AnalyzerFact, evidence: AnalyzerEvidence): AnalyzerEvidenceRole {
+  if (evidence.role) return evidence.role;
+  if (evidence.detectorId === 'package-dependency' || evidence.detectorId === 'package-manager') return 'declaration';
+  if (evidence.detectorId === 'source-import' || evidence.detectorId.includes('config') || fact.kind === 'runtime' || fact.kind === 'resource') return 'usage';
+  if (fact.kind === 'technology' && fact.explicit) return 'usage';
+  return 'declaration';
 }
 
 function stackUsageRole(fact: AnalyzerFact): string | undefined {
@@ -216,107 +388,158 @@ function buildStackMap(store: AnalyzerProjectStore): AnalyzerViewModel {
   const rootWorkspacePackage = store.facts.find((fact): fact is WorkspacePackageFact => fact.kind === 'workspace-package' && fact.isRoot);
   const rootManifest = store.facts.find((fact): fact is PackageManifestFact => fact.kind === 'package-manifest' && fact.packagePath === '.');
   const rootPackage = rootWorkspacePackage ?? rootManifest;
+  const workspacePatterns = [...new Set(store.facts.flatMap((fact) => {
+    if (fact.kind === 'workspace-config') return fact.patterns;
+    if (fact.kind === 'workspace-pattern') return [fact.pattern];
+    return [];
+  }))];
+  const markerRank: Record<'package' | 'runtime' | 'dotnet', number> = { package: 3, dotnet: 2, runtime: 1 };
+  const markerDirectories = new Map<string, 'package' | 'runtime' | 'dotnet'>();
+  const addMarkerDirectory = (directory: string, kind: 'package' | 'runtime' | 'dotnet'): void => {
+    const normalizedDirectory = normalizeScopePath(directory);
+    const existing = markerDirectories.get(normalizedDirectory);
+    if (!existing || markerRank[kind] > markerRank[existing]) markerDirectories.set(normalizedDirectory, kind);
+  };
+  store.files.forEach((file) => {
+    const kind = scopeMarkerKind(file.relativePath);
+    if (kind) addMarkerDirectory(scopeDirectory(file.relativePath), kind);
+  });
+  store.facts.forEach((fact) => {
+    if (fact.kind === 'workspace-package' || fact.kind === 'package-manifest') {
+      addMarkerDirectory(fact.packagePath, 'package');
+    } else if (fact.kind === 'dotnet-project') {
+      addMarkerDirectory(scopeDirectory(fact.projectPath), 'dotnet');
+    } else if (fact.kind === 'runtime') {
+      addMarkerDirectory(scopeDirectory(fact.configPath ?? fact.filePath ?? ''), 'runtime');
+    }
+  });
+  const patternRootPaths = new Set<string>();
+  markerDirectories.forEach((_, directory) => {
+    const root = workspacePatternRootForPath(directory, workspacePatterns);
+    if (root) patternRootPaths.add(root);
+  });
   const packageRecords = new Map<string, StackMapPackageRecord>();
+  const knownPackagePaths = new Set<string>();
+  const addPackageRecord = (packagePath: string, factId: string, evidenceIds: readonly string[], preferFactId: boolean): void => {
+    const normalizedPath = normalizeScopePath(packagePath);
+    if (normalizedPath !== '.' && isHiddenScopePath(normalizedPath)) return;
+    const existing = packageRecords.get(normalizedPath);
+    packageRecords.set(normalizedPath, {
+      packagePath: normalizedPath,
+      factId: preferFactId ? factId : existing?.factId ?? factId,
+      isRoot: normalizedPath === '.',
+      evidenceIds: [...new Set([...(existing?.evidenceIds ?? []), ...evidenceIds])],
+    });
+    knownPackagePaths.add(normalizedPath);
+  };
   store.facts
-    .filter((fact): fact is WorkspacePackageFact | PackageManifestFact => fact.kind === 'workspace-package' || fact.kind === 'package-manifest')
+    .filter((fact): fact is WorkspacePackageFact => fact.kind === 'workspace-package')
+    .forEach((fact) => addPackageRecord(fact.packagePath, fact.id, fact.evidenceIds, true));
+  store.facts
+    .filter((fact): fact is PackageManifestFact => fact.kind === 'package-manifest')
     .forEach((fact) => {
-      const existing = packageRecords.get(fact.packagePath);
-      packageRecords.set(fact.packagePath, {
-        packagePath: fact.packagePath,
-        factId: fact.kind === 'workspace-package' ? fact.id : existing?.factId ?? fact.id,
-        isRoot: fact.packagePath === '.',
-        evidenceIds: [...new Set([...(existing?.evidenceIds ?? []), ...fact.evidenceIds])],
-      });
+      const normalizedPath = normalizeScopePath(fact.packagePath);
+      if (normalizedPath === '.' || patternRootPaths.has(normalizedPath) || knownPackagePaths.has(normalizedPath)) {
+        addPackageRecord(normalizedPath, fact.id, fact.evidenceIds, false);
+      }
     });
   const packages = [...packageRecords.values()];
   const desktopFacts = store.facts.filter((fact): fact is Extract<AnalyzerFact, { kind: 'dotnet-project' }> => fact.kind === 'dotnet-project');
+  const scopeCandidates = new Map<string, StackMapScopeCandidate>();
+  packages.filter((fact) => !fact.isRoot).forEach((fact) => {
+    addScopeCandidate(scopeCandidates, makeScopeCandidate(
+      fact.packagePath,
+      packageScopeKind(fact.packagePath),
+      'package',
+      fact.factId,
+      fact.evidenceIds,
+    ));
+  });
+  patternRootPaths.forEach((root) => {
+    if (!packageRecords.has(root)) addScopeCandidate(scopeCandidates, makeScopeCandidate(root, packageScopeKind(root), 'workspace'));
+  });
+  markerDirectories.forEach((kind, directory) => {
+    if (kind === 'runtime' && directory !== '.') addScopeCandidate(scopeCandidates, makeScopeCandidate(directory, 'application', 'runtime'));
+  });
+  store.evidence
+    .filter((evidence) => evidence.role === 'scope' && typeof evidence.scopePath === 'string')
+    .forEach((evidence) => {
+      const scopePath = normalizeScopePath(evidence.scopePath ?? '.');
+      if (scopePath !== '.') addScopeCandidate(scopeCandidates, makeScopeCandidate(scopePath, 'application', 'config', undefined, [evidence.id]));
+    });
+  desktopFacts
+    .filter((fact) => isDotnetProjectPath(fact.projectPath) && /\.(?:sln|slnx)$/i.test(fact.projectPath))
+    .forEach((fact) => {
+      const solutionRoot = scopeDirectory(fact.projectPath);
+      if (solutionRoot !== '.') addScopeCandidate(scopeCandidates, makeScopeCandidate(solutionRoot, 'desktop', 'solution', fact.id, fact.evidenceIds));
+    });
+  desktopFacts.forEach((fact) => {
+    const projectDirectory = scopeDirectory(fact.projectPath);
+    const knownScope = nearestKnownScope(projectDirectory, scopeCandidates);
+    if (knownScope) {
+      addScopeCandidate(scopeCandidates, makeScopeCandidate(knownScope.path, 'desktop', 'solution', knownScope.factId ?? fact.id, fact.evidenceIds));
+    } else if (projectDirectory !== '.') {
+      addScopeCandidate(scopeCandidates, makeScopeCandidate(projectDirectory, 'desktop', 'standalone', fact.id, fact.evidenceIds));
+    }
+  });
   const scopes = new Map<string, StackMapScopeRecord>();
 
-  const ensureScope = (scope: Omit<StackMapScopeRecord, 'nodeId' | 'clusterId' | 'evidenceIds' | 'usageIds'>, evidenceIds: readonly string[] = []): StackMapScopeRecord => {
-    const existing = scopes.get(scope.id);
+  const ensureScope = (candidate: StackMapScopeCandidate, evidenceIds: readonly string[] = []): StackMapScopeRecord => {
+    const existing = scopes.get(candidate.id);
     if (existing) {
-      evidenceIds.forEach((evidenceId) => existing.evidenceIds.add(evidenceId));
-      if (!existing.factId && scope.factId) existing.factId = scope.factId;
+      [...candidate.evidenceIds, ...evidenceIds].forEach((evidenceId) => existing.evidenceIds.add(evidenceId));
+      if (!existing.factId && candidate.factId) existing.factId = candidate.factId;
       return existing;
     }
     const created: StackMapScopeRecord = {
-      ...scope,
-      nodeId: stackMapScopeNodeId(scope.id),
-      clusterId: stackMapScopeClusterId(scope.id),
-      evidenceIds: new Set(evidenceIds),
+      id: candidate.id,
+      label: candidate.label,
+      path: candidate.path,
+      kind: candidate.kind,
+      ...(candidate.factId ? { factId: candidate.factId } : {}),
+      evidenceIds: new Set([...candidate.evidenceIds, ...evidenceIds]),
       usageIds: new Set(),
     };
-    scopes.set(scope.id, created);
+    scopes.set(candidate.id, created);
     return created;
   };
 
-  if (projectFact || rootPackage) {
-    ensureScope({
-      id: 'root',
-      label: 'PROJECT / TOOLING',
-      path: '.',
-      kind: 'root',
-      ...(rootPackage?.id ?? projectFact?.id ? { factId: rootPackage?.id ?? projectFact?.id } : {}),
-    }, [...new Set([...(projectFact?.evidenceIds ?? []), ...(rootPackage?.evidenceIds ?? [])])]);
-  }
-  packages.filter((fact) => !fact.isRoot).forEach((fact) => {
-    const kind = packageScopeKind(fact.packagePath);
-    ensureScope({
-      id: packageScopeId(fact.packagePath),
-      label: packageScopeLabel(fact.packagePath),
-      path: fact.packagePath,
-      kind,
-      factId: fact.factId,
-    }, fact.evidenceIds);
-  });
-  desktopFacts.forEach((fact) => {
-    ensureScope({
-      id: `dotnet:${fact.id}`,
-      label: 'DESKTOP',
-      path: fact.projectPath,
-      kind: 'desktop',
-      factId: fact.id,
-    }, fact.evidenceIds);
-  });
+  const rootCandidate = projectFact || rootPackage
+    ? makeScopeCandidate(
+      '.',
+      'root',
+      'root',
+      rootPackage?.id ?? projectFact?.id,
+      [...new Set([...(projectFact?.evidenceIds ?? []), ...(rootPackage?.evidenceIds ?? [])])],
+    )
+    : undefined;
+  const servicesCandidate = rootCandidate
+    ? makeScopeCandidate('.', 'services', 'services', projectFact?.id, projectFact?.evidenceIds ?? [])
+    : undefined;
 
   const evidenceById = new Map(store.evidence.map((evidence) => [evidence.id, evidence]));
   const usageById = new Map<string, StackMapUsageRecord>();
-  const serviceScope = () => ensureScope({
-    id: 'services',
-    label: 'PROJECT / SERVICES',
-    path: '.',
-    kind: 'services',
-    ...(projectFact ? { factId: projectFact.id } : {}),
-  }, projectFact?.evidenceIds ?? []);
-  const scopeForEvidence = (filePath: string): StackMapScopeRecord => {
-    const desktopFact = desktopFacts.find((fact) => fact.projectPath === filePath);
-    if (desktopFact) {
-      return ensureScope({
-        id: `dotnet:${desktopFact.id}`,
-        label: 'DESKTOP',
-        path: desktopFact.projectPath,
-        kind: 'desktop',
-        factId: desktopFact.id,
-      }, desktopFact.evidenceIds);
-    }
-    const packageFact = nearestPackageScope(filePath, packages);
-    if (packageFact && !packageFact.isRoot) {
-      return ensureScope({
-        id: packageScopeId(packageFact.packagePath),
-        label: packageScopeLabel(packageFact.packagePath),
-        path: packageFact.packagePath,
-        kind: packageScopeKind(packageFact.packagePath),
-        factId: packageFact.factId,
-      }, packageFact.evidenceIds);
-    }
-    if (serviceConfigPath(filePath)) return serviceScope();
-    return ensureScope({
-      id: 'root',
-      label: 'PROJECT / TOOLING',
-      path: '.',
-      kind: 'root',
-      ...(rootPackage?.id ?? projectFact?.id ? { factId: rootPackage?.id ?? projectFact?.id } : {}),
-    }, [...new Set([...(projectFact?.evidenceIds ?? []), ...(rootPackage?.evidenceIds ?? [])])]);
+  const serviceScope = () => servicesCandidate ? ensureScope(servicesCandidate) : undefined;
+  const rootScope = () => rootCandidate ? ensureScope(rootCandidate) : undefined;
+  const scopeForEvidence = (item: AnalyzerEvidence): StackMapScopeRecord | undefined => {
+    const explicitScope = item.scopePath ? nearestKnownScope(item.scopePath, scopeCandidates) : undefined;
+    if (explicitScope) return ensureScope(explicitScope);
+    const knownScope = nearestKnownScope(item.filePath, scopeCandidates);
+    if (knownScope) return ensureScope(knownScope);
+    if (serviceConfigPath(item.filePath)) return serviceScope();
+    return rootScope();
+  };
+
+  const groupEvidenceByScope = (items: AnalyzerEvidence[]): Map<string, { scope: StackMapScopeRecord; evidenceIds: Set<string> }> => {
+    const grouped = new Map<string, { scope: StackMapScopeRecord; evidenceIds: Set<string> }>();
+    items.forEach((item) => {
+      const scope = scopeForEvidence(item);
+      if (!scope) return;
+      const entry = grouped.get(scope.id) ?? { scope, evidenceIds: new Set<string>() };
+      entry.evidenceIds.add(item.id);
+      grouped.set(scope.id, entry);
+    });
+    return grouped;
   };
 
   store.facts.forEach((fact) => {
@@ -326,13 +549,40 @@ function buildStackMap(store: AnalyzerProjectStore): AnalyzerViewModel {
       .map((evidenceId) => evidenceById.get(evidenceId))
       .filter((candidate): candidate is NonNullable<typeof candidate> => Boolean(candidate));
     if (evidence.length === 0) return;
-    const evidenceByScope = new Map<string, { scope: StackMapScopeRecord; evidenceIds: Set<string> }>();
-    evidence.forEach((item) => {
-      const scope = scopeForEvidence(item.filePath);
-      const entry = evidenceByScope.get(scope.id) ?? { scope, evidenceIds: new Set<string>() };
-      entry.evidenceIds.add(item.id);
-      evidenceByScope.set(scope.id, entry);
+    const classifiedEvidence = evidence.map((item) => ({ item, role: inferredEvidenceRole(fact, item) }));
+    const usageEvidence = classifiedEvidence.filter((candidate) => candidate.role === 'usage').map((candidate) => candidate.item);
+    const declarationEvidence = classifiedEvidence.filter((candidate) => candidate.role === 'declaration').map((candidate) => candidate.item);
+    const scopeEvidence = classifiedEvidence.filter((candidate) => candidate.role === 'scope').map((candidate) => candidate.item);
+    const evidenceByScope = groupEvidenceByScope(usageEvidence);
+    const hasUsageEvidence = evidenceByScope.size > 0;
+    if (!hasUsageEvidence) {
+      groupEvidenceByScope(declarationEvidence).forEach((entry, scopeId) => {
+        evidenceByScope.set(scopeId, entry);
+      });
+    }
+    if (evidenceByScope.size === 0) return;
+
+    if (hasUsageEvidence) {
+      // Keep declarations visible without allowing their owning package to
+      // create an incorrect duplicate Usage at the repository root. Prefer
+      // the declaration's matching Usage scope. When there is no matching
+      // Usage scope (for example, a repository-root declaration supporting
+      // several internal scopes), share the same Evidence ID across those
+      // existing Usage records instead of creating a declaration-only root
+      // Usage.
+      declarationEvidence.forEach((item) => {
+        const declarationScope = scopeForEvidence(item);
+        const target = declarationScope ? evidenceByScope.get(declarationScope.id) : undefined;
+        if (target) target.evidenceIds.add(item.id);
+        else evidenceByScope.forEach((entry) => entry.evidenceIds.add(item.id));
+      });
+    }
+    scopeEvidence.forEach((item) => {
+      const scope = scopeForEvidence(item);
+      if (!scope) return;
+      evidenceByScope.get(scope.id)?.evidenceIds.add(item.id);
     });
+
     evidenceByScope.forEach(({ scope, evidenceIds }) => {
       const usageId = `stack-usage:${scope.id}:${stack.id}`;
       const usage = usageById.get(usageId) ?? {
@@ -357,30 +607,11 @@ function buildStackMap(store: AnalyzerProjectStore): AnalyzerViewModel {
     });
   });
 
-  const orderedScopes = [...scopes.values()].sort((first, second) => {
+  const orderedScopes = [...scopes.values()].filter((scope) => scope.usageIds.size > 0).sort((first, second) => {
     const rank: Record<StackMapScopeKind, number> = { root: 0, application: 1, workspace: 2, package: 3, desktop: 4, services: 5 };
     return rank[first.kind] - rank[second.kind] || first.path.localeCompare(second.path) || first.id.localeCompare(second.id);
   });
   const projectNode = projectFact ? nodeForFact(projectFact, 'stack-map:project') : undefined;
-  const scopeNodes = orderedScopes.map((scope): AnalyzerViewNode => ({
-    id: scope.nodeId,
-    ...(scope.factId ? { factId: scope.factId } : {}),
-    type: 'stack-scope',
-    label: scope.kind === 'root' ? 'Project Root' : scope.kind === 'services' ? 'Project Services' : scope.path,
-    subtitle: scope.label,
-    clusterId: scope.clusterId,
-    evidenceIds: [...scope.evidenceIds],
-    metadata: {
-      displayRole: 'SCOPE',
-      stackMapScope: true,
-      scopeId: scope.id,
-      scopeLabel: scope.label,
-      scopePath: scope.path,
-      scopeKind: scope.kind,
-      usageCount: scope.usageIds.size,
-      ...(projectNode ? { stackMapParentId: projectNode.id } : {}),
-    },
-  }));
   const usageRecords = orderedScopes.flatMap((scope) => [...scope.usageIds]
     .map((usageId) => usageById.get(usageId))
     .filter((usage): usage is StackMapUsageRecord => Boolean(usage))
@@ -391,7 +622,6 @@ function buildStackMap(store: AnalyzerProjectStore): AnalyzerViewModel {
     type: 'stack-usage',
     label: usage.stackName,
     subtitle: usage.categoryLabel,
-    clusterId: stackMapScopeClusterId(usage.scopeId),
     evidenceIds: usage.evidenceIds,
     metadata: {
       displayRole: 'STACK',
@@ -403,51 +633,73 @@ function buildStackMap(store: AnalyzerProjectStore): AnalyzerViewModel {
       scopeId: usage.scopeId,
       scopeLabel: scopes.get(usage.scopeId)?.label ?? usage.scopeId,
       scopePath: scopes.get(usage.scopeId)?.path ?? '.',
-      stackMapParentId: stackMapScopeNodeId(usage.scopeId),
+      stackMapRegionId: stackMapScopeRegionId(usage.scopeId, scopes.get(usage.scopeId)?.path),
       sourceFactIds: usage.sourceFactIds,
       sourceFactKinds: [...usage.sourceFactKinds],
       roles: usage.roles,
     },
   }));
-  const nodes = [...(projectNode ? [projectNode] : []), ...scopeNodes, ...usageNodes];
+  const regions: AnalyzerSemanticRegion[] = orderedScopes.map((scope) => {
+    const id = stackMapScopeRegionId(scope.id, scope.path);
+    const scopeKind = scope.kind === 'root' || scope.kind === 'services' ? 'logical' : 'physical';
+    return {
+      id,
+      entityKind: 'region',
+      regionKind: 'scope',
+      label: scope.label,
+      ...(scope.path !== '.' ? { subtitle: scope.path } : {}),
+      childIds: [...scope.usageIds]
+        .map((usageId) => usageById.get(usageId)?.id)
+        .filter((usageId): usageId is string => Boolean(usageId)),
+      ports: (['top', 'right', 'bottom', 'left'] as const).map((side) => ({ id: `${id}:${side}`, side })),
+      selectable: true,
+      evidenceIds: [...scope.evidenceIds],
+      ...(scope.factId ? { factId: scope.factId } : {}),
+      scopeKind,
+      metadata: {
+        displayRole: 'REGION',
+        regionKind: 'scope',
+        scopeId: scope.id,
+        scopeLabel: scope.label,
+        scopePath: scope.path,
+        scopeType: scope.kind,
+        scopeKind,
+        usageCount: scope.usageIds.size,
+        ...(projectNode ? { stackMapParentId: projectNode.id } : {}),
+      },
+    };
+  });
+  const nodes = [...(projectNode ? [projectNode] : []), ...usageNodes];
   const edges: AnalyzerViewEdge[] = [];
   if (projectNode) {
     orderedScopes.forEach((scope) => {
+      const regionId = stackMapScopeRegionId(scope.id, scope.path);
       edges.push({
-        id: `view-edge:stack-map:contains:${scope.id}`,
+        id: `view-edge:stack-map:contains:${regionId}`,
         sourceId: projectNode.id,
-        targetId: scope.nodeId,
+        targetId: regionId,
         kind: 'contains',
         label: relationLabels.contains,
         evidenceIds: [...scope.evidenceIds],
-        metadata: { presentation: 'stack-map', scopeId: scope.id },
+        metadata: {
+          presentation: 'stack-map',
+          scopeId: scope.id,
+          regionId,
+          fromEndpointKind: 'node',
+          toEndpointKind: 'region',
+        },
       });
     });
   }
-  usageRecords.forEach((usage) => {
-    edges.push({
-      id: `view-edge:stack-map:uses:${usage.id}`,
-      sourceId: stackMapScopeNodeId(usage.scopeId),
-      targetId: usage.id,
-      kind: 'uses',
-      label: relationLabels.uses,
-      evidenceIds: usage.evidenceIds,
-      metadata: { presentation: 'stack-map', scopeId: usage.scopeId, stackId: usage.stackId },
-    });
-  });
   const clusterDefinitions: ReadonlyArray<readonly [string, string, AnalyzerCluster['tone']]> = [
     ...(projectNode ? [['stack-map:project', 'Project', 'neutral'] as const] : []),
-    ...orderedScopes.map((scope) => [
-      scope.clusterId,
-      scope.label,
-      scope.kind === 'application' ? 'accent' : scope.kind === 'desktop' ? 'violet' : scope.kind === 'services' ? 'cool' : 'neutral',
-    ] as const),
   ];
   return {
     view: 'architecture',
     nodes,
     edges,
     clusters: clusterDefinitions.map(([id, label, tone]) => cluster(id, label, tone, nodes)).filter((entry) => entry.nodeIds.length > 0),
+    regions,
     stackUsages: usageRecords.map(({ id, stackId, scopeId, evidenceIds, sourceFactIds, roles }) => ({
       id,
       stackId,

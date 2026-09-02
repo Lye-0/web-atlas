@@ -94,6 +94,61 @@ describe('Analyzer session store', () => {
     expect(restored.filter).toBe('stack-usage');
   });
 
+  it('restores Region selection and migrates a legacy Scope Node selection', () => {
+    const view: AnalyzerViewModel = {
+      ...viewModel(),
+      view: 'architecture',
+      nodes: [
+        { id: 'stack-map:project', type: 'project', label: 'Project', evidenceIds: [], metadata: {} },
+        { id: 'stack-usage:package:apps/web:react', type: 'stack-usage', label: 'React', evidenceIds: [], metadata: { stackMapRegionId: 'region:scope:apps/web' } },
+      ],
+      edges: [{ id: 'edge:region', sourceId: 'stack-map:project', targetId: 'region:scope:apps/web', kind: 'contains', label: 'contains', evidenceIds: [], metadata: {} }],
+      regions: [{
+        id: 'region:scope:apps/web',
+        entityKind: 'region',
+        regionKind: 'scope',
+        label: 'WEB',
+        subtitle: 'apps/web',
+        childIds: ['stack-usage:package:apps/web:react'],
+        ports: [
+          { id: 'top', side: 'top' },
+          { id: 'right', side: 'right' },
+          { id: 'bottom', side: 'bottom' },
+          { id: 'left', side: 'left' },
+        ],
+        selectable: true,
+        evidenceIds: [],
+        scopeKind: 'physical',
+        metadata: { scopeId: 'package:apps/web', scopePath: 'apps/web', scopeKind: 'physical' },
+      }],
+    };
+
+    const migrated = restoreAnalyzerViewSession({
+      ...createInitialAnalyzerSessionState().views.architecture,
+      selectedNodeId: 'stack-scope:package:apps/web',
+      detailOpen: true,
+    }, view);
+    expect(migrated.selectedNodeId).toBeUndefined();
+    expect(migrated.selectedRegionId).toBe('region:scope:apps/web');
+    expect(migrated.selectedEdgeId).toBeUndefined();
+    expect(migrated.detailOpen).toBe(true);
+
+    const restored = restoreAnalyzerViewSession({
+      ...migrated,
+      selectedNodeId: undefined,
+      selectedRegionId: 'region:scope:apps/web',
+    }, view);
+    expect(restored.selectedRegionId).toBe('region:scope:apps/web');
+
+    const oldScopePrefix = restoreAnalyzerViewSession({
+      ...createInitialAnalyzerSessionState().views.architecture,
+      selectedNodeId: 'scope:apps/web',
+      detailOpen: true,
+    }, view);
+    expect(oldScopePrefix.selectedNodeId).toBeUndefined();
+    expect(oldScopePrefix.selectedRegionId).toBe('region:scope:apps/web');
+  });
+
   it('keeps the selected folder handle alongside the analysis result', () => {
     const folderHandle: DirectoryHandleLike = {
       kind: 'directory',

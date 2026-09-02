@@ -1,4 +1,4 @@
-import type { AnalyzerLayout, PositionedNode } from './layout';
+import type { AnalyzerLayout, PositionedGraphEndpoint } from './layout';
 import { ANALYZER_NODE_WIDTH } from './layout';
 
 export interface AnalyzerGraphTransform {
@@ -29,6 +29,10 @@ export interface AnalyzerViewportSize {
 
 const ANALYZER_VIEWPORT_SAFE_INSET = 36;
 
+function positionedEndpointWidth(endpoint: PositionedGraphEndpoint): number {
+  return 'region' in endpoint ? endpoint.width : ANALYZER_NODE_WIDTH;
+}
+
 export function fitAnalyzerTransform(layout: AnalyzerLayout, width: number, height: number, padding: AnalyzerFitPadding = ANALYZER_FIT_PADDING): AnalyzerGraphTransform {
   if (width <= 0 || height <= 0 || layout.width <= 0 || layout.height <= 0) return ANALYZER_DEFAULT_TRANSFORM;
 
@@ -43,7 +47,7 @@ export function fitAnalyzerTransform(layout: AnalyzerLayout, width: number, heig
 }
 
 export function focusAnalyzerTransform(
-  positionedNode: PositionedNode,
+  positionedNode: PositionedGraphEndpoint,
   width: number,
   height: number,
   currentScale: number,
@@ -51,7 +55,7 @@ export function focusAnalyzerTransform(
   const scale = Math.max(0.82, Math.min(1.4, currentScale));
   return {
     scale,
-    x: width / 2 - (positionedNode.x + ANALYZER_NODE_WIDTH / 2) * scale,
+    x: width / 2 - (positionedNode.x + positionedEndpointWidth(positionedNode) / 2) * scale,
     y: height / 2 - (positionedNode.y + positionedNode.height / 2) * scale,
   };
 }
@@ -60,7 +64,7 @@ export function preserveAnalyzerTransformOnViewportResize(
   current: AnalyzerGraphTransform,
   previousViewport: AnalyzerViewportSize,
   nextViewport: AnalyzerViewportSize,
-  selectedPosition?: PositionedNode,
+  selectedPosition?: PositionedGraphEndpoint,
 ): AnalyzerGraphTransform {
   const deltaY = (nextViewport.height - previousViewport.height) / 2;
   if (nextViewport.width === previousViewport.width && deltaY === 0) return current;
@@ -68,7 +72,7 @@ export function preserveAnalyzerTransformOnViewportResize(
   let deltaX = (nextViewport.width - previousViewport.width) / 2;
   if (selectedPosition) {
     const selectedLeft = current.x + selectedPosition.x * current.scale;
-    const selectedRight = current.x + (selectedPosition.x + ANALYZER_NODE_WIDTH) * current.scale;
+    const selectedRight = current.x + (selectedPosition.x + positionedEndpointWidth(selectedPosition)) * current.scale;
     const minimum = ANALYZER_VIEWPORT_SAFE_INSET;
     const maximum = Math.max(minimum, nextViewport.width - ANALYZER_VIEWPORT_SAFE_INSET);
     deltaX = selectedRight > maximum

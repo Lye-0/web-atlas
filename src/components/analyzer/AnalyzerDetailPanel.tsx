@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { analyzerSummaryExpanded, analyzerSummarySubtitle, displayDictionaryStack, factDictionaryStackId, factForNode, nodeTypeLabels, relationLabelForNode } from '../../analyzer';
-import type { AnalyzerProjectStore, AnalyzerViewEdge, AnalyzerViewModel, AnalyzerViewNode } from '../../analyzer';
+import type { AnalyzerProjectStore, AnalyzerSemanticRegion, AnalyzerViewEdge, AnalyzerViewModel, AnalyzerViewNode } from '../../analyzer';
 import { stackPath } from '../../utils/routes';
 import { EvidenceCodeBlock } from './EvidenceCodeBlock';
 
@@ -8,9 +8,11 @@ interface AnalyzerDetailPanelProps {
   store: AnalyzerProjectStore;
   view: AnalyzerViewModel;
   selectedNodeId?: string;
+  selectedRegionId?: string;
   selectedEdgeId?: string;
   expandedPresentationIds: ReadonlySet<string>;
   onSelectNode: (nodeId: string, focus?: boolean) => void;
+  onSelectRegion?: (regionId: string, focus?: boolean) => void;
   onTogglePresentation: (presentationId: string) => void;
   onClose: () => void;
 }
@@ -29,7 +31,7 @@ function EvidenceList({ evidenceIds, view, store }: { evidenceIds: string[]; vie
   return <div className="analyzer-evidence-list">{evidence.map((item) => <EvidenceCodeBlock key={item.id} evidence={item} source={store.sources[item.filePath]} />)}</div>;
 }
 
-function RelationList({ nodeId, view, onSelectNode }: { nodeId: string; view: AnalyzerViewModel; onSelectNode: (nodeId: string, focus?: boolean) => void }) {
+function RelationList({ nodeId, view, onSelectNode, onSelectRegion }: { nodeId: string; view: AnalyzerViewModel; onSelectNode: (nodeId: string, focus?: boolean) => void; onSelectRegion?: (regionId: string, focus?: boolean) => void }) {
   const relations = view.edges.filter((edge) => edge.sourceId === nodeId || edge.targetId === nodeId);
   if (relations.length === 0) return <p className="analyzer-muted-copy">このViewで表示している直接関係はありません。</p>;
   return (
@@ -37,12 +39,13 @@ function RelationList({ nodeId, view, onSelectNode }: { nodeId: string; view: An
       {relations.map((relation) => {
         const targetId = relation.sourceId === nodeId ? relation.targetId : relation.sourceId;
         const target = view.nodes.find((node) => node.id === targetId);
-        if (!target) return null;
+        const targetRegion = view.regions?.find((region) => region.id === targetId);
+        if (!target && !targetRegion) return null;
         return (
           <li key={relation.id}>
-            <button type="button" onClick={() => onSelectNode(target.id, true)}>
+            <button type="button" onClick={() => targetRegion ? onSelectRegion?.(targetRegion.id, true) : target && onSelectNode(target.id, true)}>
               <span>{relationLabelForNode(relation, nodeId)}</span>
-              <strong>{target.label}</strong>
+              <strong>{target?.label ?? targetRegion?.label}</strong>
             </button>
           </li>
         );
@@ -96,6 +99,96 @@ function metadataString(node: AnalyzerViewNode, key: string): string | undefined
   return typeof value === 'string' && value.length > 0 ? value : undefined;
 }
 
+function RegionChildren({ region, view, onSelectNode }: { region: AnalyzerSemanticRegion; view: AnalyzerViewModel; onSelectNode: (nodeId: string, focus?: boolean) => void }) {
+  const childNodes = region.childIds
+    .map((childId) => view.nodes.find((candidate) => candidate.id === childId))
+    .filter((candidate): candidate is AnalyzerViewNode => Boolean(candidate));
+  if (childNodes.length === 0) return <p className="analyzer-muted-copy">このRegionに表示するStack Nodeはありません。</p>;
+  return (
+    <ul className="analyzer-presentation-list analyzer-region-children-list">
+      {childNodes.map((child) => (
+        <li key={child.id}>
+          <button type="button" onClick={() => onSelectNode(child.id, true)}>
+            <span>{displayNodeType(child)}</span>
+            <strong>{child.label}</strong>
+            {child.subtitle && <small>{child.subtitle}</small>}
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function RegionRelationList({ region, view, onSelectNode, onSelectRegion }: { region: AnalyzerSemanticRegion; view: AnalyzerViewModel; onSelectNode: (nodeId: string, focus?: boolean) => void; onSelectRegion?: (regionId: string, focus?: boolean) => void }) {
+  const relations = view.edges.filter((edge) => edge.sourceId === region.id || edge.targetId === region.id);
+  if (relations.length === 0) return <p className="analyzer-muted-copy">このViewで表示している直接関係はありません。</p>;
+  return (
+    <ul className="analyzer-relation-list">
+      {relations.map((relation) => {
+        const targetId = relation.sourceId === region.id ? relation.targetId : relation.sourceId;
+        const target = view.nodes.find((node) => node.id === targetId);
+        const targetRegion = view.regions?.find((candidate) => candidate.id === targetId);
+        if (!target && !targetRegion) return null;
+        return (
+          <li key={relation.id}>
+            <button type="button" onClick={() => targetRegion ? onSelectRegion?.(targetRegion.id, true) : target && onSelectNode(target.id, true)}>
+              <span>{relationLabelForNode(relation, region.id)}</span>
+              <strong>{target?.label ?? targetRegion?.label}</strong>
+            </button>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function RegionDetails({ region, view, store, onSelectNode, onSelectRegion }: { region: AnalyzerSemanticRegion; view: AnalyzerViewModel; store: AnalyzerProjectStore; onSelectNode: (nodeId: string, focus?: boolean) => void; onSelectRegion?: (regionId: string, focus?: boolean) => void }) {
+  const scopePath = typeof region.metadata.scopePath === 'string' ? region.metadata.scopePath : region.subtitle ?? '.';
+  const scopeKind = typeof region.metadata.scopeKind === 'string' ? region.metadata.scopeKind : region.scopeKind ?? 'physical';
+  const scopeType = typeof region.metadata.scopeType === 'string' ? region.metadata.scopeType : 'scope';
+  return (
+    <>
+      <div className="analyzer-detail-heading">
+        <div className="analyzer-detail-heading-top">
+          <span className="analyzer-node-type">REGION / SCOPE</span>
+          <button type="button" className="analyzer-focus-selected" onClick={() => onSelectRegion?.(region.id, true)}>Focus Selected</button>
+        </div>
+        <h2>{region.label}</h2>
+        {region.subtitle && <p>{region.subtitle}</p>}
+      </div>
+      <section className="analyzer-detail-section">
+        <h3>Overview</h3>
+        <p>Stack Map上の意味的なScope Regionです。個々のStack Nodeを内部に含み、Region境界のPortを介してProjectと接続します。</p>
+      </section>
+      <section className="analyzer-detail-section">
+        <h3>Scope Region</h3>
+        <dl className="analyzer-metadata-list analyzer-stack-usage-list">
+          <div><dt>Kind</dt><dd>{scopeKind}</dd></div>
+          <div><dt>Scope type</dt><dd>{scopeType}</dd></div>
+          <div><dt>Path</dt><dd>{scopePath}</dd></div>
+          <div><dt>Stacks</dt><dd>{region.childIds.length}</dd></div>
+        </dl>
+      </section>
+      <section className="analyzer-detail-section">
+        <h3>Contained Stack Nodes</h3>
+        <RegionChildren region={region} view={view} onSelectNode={onSelectNode} />
+      </section>
+      <section className="analyzer-detail-section">
+        <h3>Evidence</h3>
+        <EvidenceList evidenceIds={region.evidenceIds} view={view} store={store} />
+      </section>
+      <section className="analyzer-detail-section">
+        <h3>Relations</h3>
+        <RegionRelationList region={region} view={view} onSelectNode={onSelectNode} onSelectRegion={onSelectRegion} />
+      </section>
+      <section className="analyzer-detail-section">
+        <h3>Metadata</h3>
+        <MetadataList metadata={region.metadata} />
+      </section>
+    </>
+  );
+}
+
 function metadataStrings(node: AnalyzerViewNode, key: string): string[] {
   const value = node.metadata[key];
   return Array.isArray(value) ? value : value === undefined ? [] : [String(value)];
@@ -110,7 +203,11 @@ function detectionReason(node: AnalyzerViewNode, fact: ReturnType<typeof factFor
   if (node.metadata.stackUsage === true) {
     const scopeLabel = metadataString(node, 'scopeLabel') ?? 'Project Root / Tooling';
     const scopePath = metadataString(node, 'scopePath');
-    return `${scopeLabel}${scopePath ? `（${scopePath}）` : ''}で使用されているDictionaryのCanonical Stackです。`;
+    const evidenceRoles = [...new Set(node.evidenceIds
+      .map((evidenceId) => view.evidence.find((evidence) => evidence.id === evidenceId)?.role)
+      .filter((role): role is NonNullable<typeof role> => Boolean(role)))];
+    const roleHint = evidenceRoles.length > 0 ? ` Evidence: ${evidenceRoles.join(' / ')}。` : '';
+    return `${scopeLabel}${scopePath ? `（${scopePath}）` : ''}で使用されているDictionaryのCanonical Stackです。${roleHint}`;
   }
 
   if (node.metadata.stackMapScope === true) {
@@ -163,7 +260,7 @@ function detectionReason(node: AnalyzerViewNode, fact: ReturnType<typeof factFor
   }
 }
 
-function NodeDetails({ node, view, store, expandedPresentationIds, onSelectNode, onTogglePresentation }: { node: AnalyzerViewNode; view: AnalyzerViewModel; store: AnalyzerProjectStore; expandedPresentationIds: ReadonlySet<string>; onSelectNode: (nodeId: string, focus?: boolean) => void; onTogglePresentation: (presentationId: string) => void }) {
+function NodeDetails({ node, view, store, expandedPresentationIds, onSelectNode, onSelectRegion, onTogglePresentation }: { node: AnalyzerViewNode; view: AnalyzerViewModel; store: AnalyzerProjectStore; expandedPresentationIds: ReadonlySet<string>; onSelectNode: (nodeId: string, focus?: boolean) => void; onSelectRegion?: (regionId: string, focus?: boolean) => void; onTogglePresentation: (presentationId: string) => void }) {
   const fact = factForNode(store, node);
   const dictionary = displayDictionaryStack(factDictionaryStackId(fact ?? node));
   const stackUsage = node.metadata.stackUsage === true;
@@ -239,7 +336,7 @@ function NodeDetails({ node, view, store, expandedPresentationIds, onSelectNode,
       )}
       <section className="analyzer-detail-section">
         <h3>Relations</h3>
-        <RelationList nodeId={node.id} view={view} onSelectNode={onSelectNode} />
+      <RelationList nodeId={node.id} view={view} onSelectNode={onSelectNode} onSelectRegion={onSelectRegion} />
       </section>
       <section className="analyzer-detail-section">
         <h3>Metadata</h3>
@@ -249,9 +346,11 @@ function NodeDetails({ node, view, store, expandedPresentationIds, onSelectNode,
   );
 }
 
-function EdgeDetails({ edge, view, store, onSelectNode }: { edge: AnalyzerViewEdge; view: AnalyzerViewModel; store: AnalyzerProjectStore; onSelectNode: (nodeId: string, focus?: boolean) => void }) {
+function EdgeDetails({ edge, view, store, onSelectNode, onSelectRegion }: { edge: AnalyzerViewEdge; view: AnalyzerViewModel; store: AnalyzerProjectStore; onSelectNode: (nodeId: string, focus?: boolean) => void; onSelectRegion?: (regionId: string, focus?: boolean) => void }) {
   const source = view.nodes.find((node) => node.id === edge.sourceId);
   const target = view.nodes.find((node) => node.id === edge.targetId);
+  const sourceRegion = view.regions?.find((region) => region.id === edge.sourceId);
+  const targetRegion = view.regions?.find((region) => region.id === edge.targetId);
   return (
     <>
       <div className="analyzer-detail-heading">
@@ -266,7 +365,9 @@ function EdgeDetails({ edge, view, store, onSelectNode }: { edge: AnalyzerViewEd
         <p className="analyzer-edge-summary">{source?.label ?? edge.sourceId} <span aria-hidden="true">→</span> {target?.label ?? edge.targetId}</p>
         <div className="analyzer-edge-actions">
           {source && <button type="button" onClick={() => onSelectNode(source.id, true)}>Sourceを見る</button>}
+          {sourceRegion && <button type="button" onClick={() => onSelectRegion?.(sourceRegion.id, true)}>Sourceを見る</button>}
           {target && <button type="button" onClick={() => onSelectNode(target.id, true)}>Targetを見る</button>}
+          {targetRegion && <button type="button" onClick={() => onSelectRegion?.(targetRegion.id, true)}>Targetを見る</button>}
         </div>
       </section>
       <section className="analyzer-detail-section">
@@ -281,18 +382,19 @@ function EdgeDetails({ edge, view, store, onSelectNode }: { edge: AnalyzerViewEd
   );
 }
 
-export function AnalyzerDetailPanel({ store, view, selectedNodeId, selectedEdgeId, expandedPresentationIds, onSelectNode, onTogglePresentation, onClose }: AnalyzerDetailPanelProps) {
+export function AnalyzerDetailPanel({ store, view, selectedNodeId, selectedRegionId, selectedEdgeId, expandedPresentationIds, onSelectNode, onSelectRegion, onTogglePresentation, onClose }: AnalyzerDetailPanelProps) {
   const node = selectedNodeId ? view.nodes.find((candidate) => candidate.id === selectedNodeId) : undefined;
+  const region = selectedRegionId ? view.regions?.find((candidate) => candidate.id === selectedRegionId) : undefined;
   const edge = selectedEdgeId ? view.edges.find((candidate) => candidate.id === selectedEdgeId) : undefined;
   return (
     <aside className="analyzer-detail-panel" aria-label="Analyzer detail panel">
-      {!node && !edge ? (
+      {!node && !region && !edge ? (
         <div className="analyzer-detail-empty">
           <div className="analyzer-detail-heading-top">
             <span className="analyzer-panel-kicker">Selection</span>
             <button type="button" className="analyzer-detail-close" onClick={onClose} aria-label="Close detail panel">Close</button>
           </div>
-          <h2>NodeまたはEdgeを選択</h2>
+          <h2>Node、RegionまたはEdgeを選択</h2>
           <p>Graph上の要素を選ぶと、検出理由・直接Evidence・関係・metadataを表示します。</p>
         </div>
       ) : node ? (
@@ -300,14 +402,21 @@ export function AnalyzerDetailPanel({ store, view, selectedNodeId, selectedEdgeI
           <div className="analyzer-detail-panel-close-row">
             <button type="button" className="analyzer-detail-close" onClick={onClose} aria-label="Close detail panel">Close</button>
           </div>
-          <NodeDetails node={node} view={view} store={store} expandedPresentationIds={expandedPresentationIds} onSelectNode={onSelectNode} onTogglePresentation={onTogglePresentation} />
+          <NodeDetails node={node} view={view} store={store} expandedPresentationIds={expandedPresentationIds} onSelectNode={onSelectNode} onSelectRegion={onSelectRegion} onTogglePresentation={onTogglePresentation} />
+        </>
+      ) : region ? (
+        <>
+          <div className="analyzer-detail-panel-close-row">
+            <button type="button" className="analyzer-detail-close" onClick={onClose} aria-label="Close detail panel">Close</button>
+          </div>
+          <RegionDetails region={region} view={view} store={store} onSelectNode={onSelectNode} onSelectRegion={onSelectRegion} />
         </>
       ) : edge ? (
         <>
           <div className="analyzer-detail-panel-close-row">
             <button type="button" className="analyzer-detail-close" onClick={onClose} aria-label="Close detail panel">Close</button>
           </div>
-          <EdgeDetails edge={edge} view={view} store={store} onSelectNode={onSelectNode} />
+          <EdgeDetails edge={edge} view={view} store={store} onSelectNode={onSelectNode} onSelectRegion={onSelectRegion} />
         </>
       ) : null}
     </aside>

@@ -1,9 +1,10 @@
 import type { AnalyzerGraphTransform } from './camera';
 import type { DirectoryHandleLike } from './fileDiscovery';
-import type { AnalyzerFilter, AnalyzerProjectStore, AnalyzerViewId, AnalyzerViewModel } from './types';
+import type { AnalyzerFilter, AnalyzerProjectStore, AnalyzerSemanticRegion, AnalyzerViewId, AnalyzerViewModel } from './types';
 
 export interface AnalyzerViewSession {
   selectedNodeId?: string;
+  selectedRegionId?: string;
   selectedEdgeId?: string;
   search: string;
   filter: AnalyzerFilter;
@@ -60,6 +61,30 @@ function normalizedFilterForView(filter: AnalyzerFilter, view: AnalyzerViewModel
   return filter;
 }
 
+function regionForLegacyScopeSelection(
+  selectedNodeId: string | undefined,
+  regions: readonly AnalyzerSemanticRegion[],
+): AnalyzerSemanticRegion | undefined {
+  if (!selectedNodeId) return undefined;
+  const legacyScopeId = selectedNodeId.startsWith('stack-scope:')
+    ? selectedNodeId.slice('stack-scope:'.length)
+    : selectedNodeId.startsWith('scope:')
+      ? selectedNodeId.slice('scope:'.length)
+      : undefined;
+  const legacyScopePath = legacyScopeId?.replace(/^package:/, '');
+  const legacyFactId = legacyScopeId?.startsWith('dotnet:')
+    ? legacyScopeId.slice('dotnet:'.length)
+    : undefined;
+  return regions.find((region) => {
+    const scopeId = region.metadata.scopeId;
+    const scopePath = region.metadata.scopePath;
+    return region.id === selectedNodeId
+      || (legacyFactId !== undefined && region.factId === legacyFactId)
+      || (typeof scopeId === 'string' && (scopeId === legacyScopeId || scopeId === selectedNodeId))
+      || (typeof scopePath === 'string' && (scopePath === legacyScopePath || scopePath === selectedNodeId));
+  });
+}
+
 /**
  * Reconnects serializable session IDs to the freshly projected view model.
  * The session keeps IDs, never graph objects, so route remounts can safely
@@ -67,6 +92,8 @@ function normalizedFilterForView(filter: AnalyzerFilter, view: AnalyzerViewModel
  */
 export function restoreAnalyzerViewSession(session: AnalyzerViewSession, view: AnalyzerViewModel): AnalyzerViewSession {
   const nodeIds = new Set(view.nodes.map((node) => node.id));
+  const regions = view.regions ?? [];
+  const regionIds = new Set(regions.map((region) => region.id));
   const edgeIds = new Set(view.edges.map((edge) => edge.id));
   const presentationIds = new Set([
     ...(view.presentationGroups?.map((group) => group.id) ?? []),
@@ -75,7 +102,12 @@ export function restoreAnalyzerViewSession(session: AnalyzerViewSession, view: A
   const selectedNodeId = session.selectedNodeId && nodeIds.has(session.selectedNodeId)
     ? session.selectedNodeId
     : undefined;
-  const selectedEdgeId = selectedNodeId
+  const selectedRegionId = selectedNodeId
+    ? undefined
+    : session.selectedRegionId && regionIds.has(session.selectedRegionId)
+      ? session.selectedRegionId
+      : regionForLegacyScopeSelection(session.selectedNodeId, regions)?.id;
+  const selectedEdgeId = selectedNodeId || selectedRegionId
     ? undefined
     : session.selectedEdgeId && edgeIds.has(session.selectedEdgeId)
       ? session.selectedEdgeId
@@ -87,10 +119,11 @@ export function restoreAnalyzerViewSession(session: AnalyzerViewSession, view: A
       ? view.entryScriptId
       : session.entryScriptId;
   const filter = normalizedFilterForView(session.filter, view.view);
-  const detailOpen = session.detailOpen && Boolean(selectedNodeId || selectedEdgeId);
+  const detailOpen = session.detailOpen && Boolean(selectedNodeId || selectedRegionId || selectedEdgeId);
 
   if (
     selectedNodeId === session.selectedNodeId
+    && selectedRegionId === session.selectedRegionId
     && selectedEdgeId === session.selectedEdgeId
     && sameStringSet(expandedPresentationIds, session.expandedPresentationIds)
     && filter === session.filter
@@ -101,6 +134,7 @@ export function restoreAnalyzerViewSession(session: AnalyzerViewSession, view: A
   return {
     ...session,
     selectedNodeId,
+    selectedRegionId,
     selectedEdgeId,
     expandedPresentationIds,
     filter,

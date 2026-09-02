@@ -15,9 +15,12 @@ export function analyzerForegroundEdges(
   edges: readonly AnalyzerViewEdge[],
   selectedEdgeId?: string,
   selectedNodeId?: string,
+  selectedRegionId?: string,
 ): AnalyzerViewEdge[] {
   const foreground = edges.filter((edge) => edge.id === selectedEdgeId || Boolean(
-    selectedNodeId && (edge.sourceId === selectedNodeId || edge.targetId === selectedNodeId),
+    (selectedNodeId || selectedRegionId)
+      && ((selectedNodeId && (edge.sourceId === selectedNodeId || edge.targetId === selectedNodeId))
+        || (selectedRegionId && (edge.sourceId === selectedRegionId || edge.targetId === selectedRegionId))),
   ));
   if (!selectedEdgeId) return foreground;
 
