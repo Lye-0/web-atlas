@@ -11,6 +11,7 @@ export const analyzerRoutes = {
   workspace: '/analyzer/workspace',
   command: '/analyzer/command',
   dependencies: '/analyzer/dependencies',
+  'module-dependency': '/analyzer/module-dependency',
 } as const;
 
 export const categoryPath = (categoryId: string) => `${dictionaryRoutes.categories}/${encodeURIComponent(categoryId)}`;

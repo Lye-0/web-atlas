@@ -13,6 +13,7 @@ export const analyzerRelationInverseLabels: Record<AnalyzerRelationKind, string>
   starts: 'started-by',
   'runs-in': 'hosts',
   'expands-to': 'expanded-by',
+  imports: 'imported-by',
 };
 
 export function relationLabelForNode(edge: Pick<AnalyzerViewEdge, 'sourceId' | 'targetId' | 'kind' | 'label'>, nodeId: string): string {

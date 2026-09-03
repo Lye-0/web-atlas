@@ -22,6 +22,7 @@ describe('dictionary routes', () => {
       workspace: '/analyzer/workspace',
       command: '/analyzer/command',
       dependencies: '/analyzer/dependencies',
+      'module-dependency': '/analyzer/module-dependency',
     });
   });
 });

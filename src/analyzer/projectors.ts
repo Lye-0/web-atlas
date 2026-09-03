@@ -22,6 +22,8 @@ import {
   type AnalyzerViewNode,
   type AnalyzerWarning,
   type CommandFact,
+  type ModuleDirectoryFact,
+  type ModuleFact,
   type PackageManifestFact,
   type PackageScriptFact,
   type WorkspacePackageFact,
@@ -45,7 +47,14 @@ function nodeSubtitle(fact: AnalyzerFact): string | undefined {
 }
 
 function nodeForFact(fact: AnalyzerFact, clusterId: string | undefined, typeOverride?: AnalyzerNodeType): AnalyzerViewNode {
-  const type: AnalyzerNodeType = typeOverride ?? (fact.kind === 'package-manifest' ? 'application' : fact.kind);
+  const inferredType: AnalyzerNodeType = fact.kind === 'package-manifest'
+    ? 'application'
+    : fact.kind === 'module'
+      ? 'module'
+      : fact.kind === 'module-dependency' || fact.kind === 'module-directory'
+        ? 'project'
+        : fact.kind;
+  const type: AnalyzerNodeType = typeOverride ?? inferredType;
   return {
     id: fact.id,
     factId: fact.id,
@@ -1371,10 +1380,321 @@ export function projectDependencies(store: AnalyzerProjectStore): AnalyzerViewMo
   };
 }
 
+interface ModuleDirectoryPresentation {
+  id: string;
+  packageId?: string;
+  path: string;
+  factIds: string[];
+  terminal: ModuleDirectoryFact;
+  parentId?: string;
+  childIds: string[];
+}
+
+function modulePackageRegionId(packageId?: string): string {
+  return `module-region:package:${packageId ?? 'project:root'}`;
+}
+
+function moduleDirectoryRegionId(factId: string): string {
+  return `module-region:directory:${factId}`;
+}
+
+function moduleRegionPorts(id: string): AnalyzerSemanticRegion['ports'] {
+  return (['top', 'right', 'bottom', 'left'] as const).map((side) => ({ id: `${id}:${side}`, side }));
+}
+
+/**
+ * Projects source modules independently from Package Dependency. Directories
+ * remain Semantic Regions; only source files become graph Nodes and only
+ * `imports` relations become graph Edges.
+ */
+export function projectModuleDependency(store: AnalyzerProjectStore): AnalyzerViewModel {
+  const moduleFacts = store.facts
+    .filter((fact): fact is ModuleFact => fact.kind === 'module')
+    .sort((first, second) => first.path.localeCompare(second.path) || first.id.localeCompare(second.id));
+  const directoryFacts = store.facts
+    .filter((fact): fact is ModuleDirectoryFact => fact.kind === 'module-directory')
+    .sort((first, second) => first.path.localeCompare(second.path) || first.id.localeCompare(second.id));
+  const moduleIds = new Set(moduleFacts.map((fact) => fact.id));
+  const importRelations = store.relations
+    .filter((relation) => relation.kind === 'imports' && moduleIds.has(relation.sourceId) && moduleIds.has(relation.targetId))
+    .sort((first, second) => first.id.localeCompare(second.id));
+
+  const packageById = new Map<string, { id: string; path: string; label: string; factId?: string; moduleIds: string[] }>();
+  moduleFacts.forEach((fact) => {
+    const packageId = fact.packageId;
+    const key = packageId ?? 'project:root';
+    const existing = packageById.get(key) ?? {
+      id: packageId ?? 'project:root',
+      path: fact.packagePath ?? '.',
+      label: fact.packageName ?? fact.packagePath ?? 'Project',
+      moduleIds: [],
+    };
+    existing.moduleIds.push(fact.id);
+    if (!existing.factId && packageId) existing.factId = packageId;
+    packageById.set(key, existing);
+  });
+  if (packageById.size === 0) {
+    const project = store.facts.find((fact) => fact.kind === 'project');
+    packageById.set('project:root', {
+      id: 'project:root',
+      path: '.',
+      label: project?.label ?? 'Project',
+      ...(project ? { factId: project.id } : {}),
+      moduleIds: [],
+    });
+  }
+
+  const directoriesByPackage = new Map<string, ModuleDirectoryFact[]>();
+  directoryFacts.forEach((fact) => {
+    const key = fact.packageId ?? 'project:root';
+    const entries = directoriesByPackage.get(key) ?? [];
+    entries.push(fact);
+    directoriesByPackage.set(key, entries);
+  });
+
+  const directoryGroupsByPackage = new Map<string, ModuleDirectoryPresentation[]>();
+  const groupByFactId = new Map<string, ModuleDirectoryPresentation>();
+  const groupByModuleId = new Map<string, ModuleDirectoryPresentation>();
+  directoriesByPackage.forEach((facts, packageKey) => {
+    const factById = new Map(facts.map((fact) => [fact.id, fact]));
+    const childFactsById = new Map<string, ModuleDirectoryFact[]>();
+    facts.forEach((fact) => {
+      if (!fact.parentDirectoryId || !factById.has(fact.parentDirectoryId)) return;
+      const children = childFactsById.get(fact.parentDirectoryId) ?? [];
+      children.push(fact);
+      childFactsById.set(fact.parentDirectoryId, children);
+    });
+    childFactsById.forEach((children) => children.sort((first, second) => first.path.localeCompare(second.path)));
+    const starts = facts.filter((fact) => {
+      const parent = fact.parentDirectoryId ? factById.get(fact.parentDirectoryId) : undefined;
+      const siblings = parent ? childFactsById.get(parent.id) ?? [] : [];
+      return !parent || parent.moduleIds.length > 0 || siblings.length !== 1;
+    });
+    const groups: ModuleDirectoryPresentation[] = [];
+    starts.forEach((start) => {
+      const factIds = [start.id];
+      let terminal = start;
+      while (terminal.moduleIds.length === 0) {
+        const children = childFactsById.get(terminal.id) ?? [];
+        if (children.length !== 1) break;
+        terminal = children[0]!;
+        factIds.push(terminal.id);
+      }
+      const id = moduleDirectoryRegionId(terminal.id);
+      const group: ModuleDirectoryPresentation = {
+        id,
+        ...(terminal.packageId ? { packageId: terminal.packageId } : {}),
+        path: terminal.path,
+        factIds,
+        terminal,
+        childIds: [],
+      };
+      groups.push(group);
+      factIds.forEach((factId) => groupByFactId.set(factId, group));
+    });
+    const sortedGroups = groups.sort((first, second) => first.path.localeCompare(second.path) || first.id.localeCompare(second.id));
+    sortedGroups.forEach((group) => {
+      const parentFactId = group.terminal.parentDirectoryId;
+      const parentGroup = parentFactId ? groupByFactId.get(parentFactId) : undefined;
+      if (parentGroup && parentGroup.id !== group.id) {
+        group.parentId = parentGroup.id;
+        parentGroup.childIds.push(group.id);
+      }
+      group.terminal.moduleIds.forEach((moduleId) => groupByModuleId.set(moduleId, group));
+    });
+    directoryGroupsByPackage.set(packageKey, sortedGroups);
+  });
+
+  const regions: AnalyzerSemanticRegion[] = [];
+  const packageRegionByKey = new Map<string, AnalyzerSemanticRegion>();
+  const directoryRegionByGroupId = new Map<string, AnalyzerSemanticRegion>();
+  [...packageById.entries()]
+    .sort(([, first], [, second]) => first.path.localeCompare(second.path) || first.label.localeCompare(second.label))
+    .forEach(([packageKey, packageRecord]) => {
+      const packageRegionId = modulePackageRegionId(packageRecord.id);
+      const groups = directoryGroupsByPackage.get(packageKey) ?? [];
+      const topGroups = groups.filter((group) => !group.parentId).sort((first, second) => first.path.localeCompare(second.path));
+      const packagePath = packageRecord.path;
+      const directModules = moduleFacts
+        .filter((fact) => packageRecord.moduleIds.includes(fact.id))
+        .filter((fact) => (fact.directoryPath ?? '.') === packagePath)
+        .map((fact) => fact.id)
+        .sort();
+      const packageRegion: AnalyzerSemanticRegion = {
+        id: packageRegionId,
+        entityKind: 'region',
+        regionKind: 'workspace-package',
+        label: packageRecord.label,
+        ...(packagePath !== '.' ? { subtitle: packagePath } : {}),
+        childIds: directModules,
+        childRegionIds: topGroups.map((group) => group.id),
+        ports: moduleRegionPorts(packageRegionId),
+        selectable: true,
+        evidenceIds: packageRecord.factId
+          ? store.facts.find((fact) => fact.id === packageRecord.factId)?.evidenceIds ?? []
+          : [],
+        ...(packageRecord.factId ? { factId: packageRecord.factId } : {}),
+        depth: 0,
+        metadata: {
+          displayRole: 'PACKAGE / AREA',
+          regionKind: 'workspace-package',
+          packageId: packageRecord.id,
+          packagePath,
+          moduleCount: packageRecord.moduleIds.length,
+          directoryCount: groups.length,
+        },
+      };
+      packageRegionByKey.set(packageKey, packageRegion);
+      regions.push(packageRegion);
+      groups.forEach((group) => {
+        const parentId = group.parentId ?? packageRegionId;
+        const region: AnalyzerSemanticRegion = {
+          id: group.id,
+          entityKind: 'region',
+          regionKind: 'directory',
+          label: group.path.split('/').at(-1) ?? group.path,
+          subtitle: group.path,
+          childIds: [...group.terminal.moduleIds].sort(),
+          childRegionIds: [...group.childIds].sort(),
+          ports: moduleRegionPorts(group.id),
+          selectable: true,
+          evidenceIds: [],
+          factId: group.terminal.id,
+          parentRegionId: parentId,
+          depth: (regions.find((candidate) => candidate.id === parentId)?.depth ?? 0) + 1,
+          metadata: {
+            displayRole: 'DIRECTORY',
+            regionKind: 'directory',
+            directoryPath: group.path,
+            packageId: packageRecord.id,
+            compressedPaths: group.factIds.map((factId) => factByDirectoryId(directoryFacts, factId)?.path ?? group.path),
+            moduleCount: directoryModuleCount(group, groupByFactId),
+          },
+        };
+        directoryRegionByGroupId.set(group.id, region);
+        regions.push(region);
+      });
+    });
+
+  const incoming = new Map<string, number>();
+  const outgoing = new Map<string, number>();
+  importRelations.forEach((relation) => {
+    outgoing.set(relation.sourceId, (outgoing.get(relation.sourceId) ?? 0) + 1);
+    incoming.set(relation.targetId, (incoming.get(relation.targetId) ?? 0) + 1);
+  });
+  const moduleNodes: AnalyzerViewNode[] = moduleFacts.map((fact) => {
+    const packageKey = fact.packageId ?? 'project:root';
+    const packageRecord = packageById.get(packageKey);
+    const directoryGroup = groupByModuleId.get(fact.id);
+    const regionPath = [
+      modulePackageRegionId(packageRecord?.id ?? fact.packageId),
+      ...regionAncestors(directoryGroup, groupByFactId, directoryRegionByGroupId),
+    ];
+    return {
+      id: fact.id,
+      factId: fact.id,
+      type: 'module',
+      label: fact.label,
+      subtitle: fact.extension || fact.language,
+      clusterId: 'module-dependency:modules',
+      evidenceIds: fact.evidenceIds,
+      metadata: {
+        ...fact.metadata,
+        factKind: 'module',
+        displayRole: 'MODULE',
+        modulePath: fact.path,
+        directoryPath: fact.directoryPath,
+        language: fact.language,
+        extension: fact.extension,
+        ...(fact.packageName ? { packageName: fact.packageName } : {}),
+        ...(fact.packagePath ? { packagePath: fact.packagePath } : {}),
+        incomingCount: incoming.get(fact.id) ?? 0,
+        outgoingCount: outgoing.get(fact.id) ?? 0,
+        regionPath,
+        unresolvedImports: fact.unresolvedImports.map((reference) => reference.specifier),
+        unresolvedImportDetails: fact.unresolvedImports.map((reference) => `${reference.kind} · ${reference.specifier}${reference.reason ? ` · ${reference.reason}` : ''}`),
+        fileIcon: moduleFileIcon(fact.extension),
+      },
+    };
+  });
+  const edges = importRelations.map((relation) => relationEdge(relation, 'imports', relationLabels.imports));
+  const cluster = {
+    id: 'module-dependency:modules',
+    label: 'Modules',
+    tone: 'neutral' as const,
+    nodeIds: moduleNodes.map((node) => node.id),
+  };
+  return {
+    view: 'module-dependency',
+    nodes: moduleNodes,
+    edges,
+    clusters: moduleNodes.length > 0 ? [cluster] : [],
+    regions,
+    evidence: store.evidence,
+    warnings: baseWarnings(store, 'module-dependency'),
+  };
+}
+
+/** Plural alias used by callers that name the view after its edge collection. */
+export const projectModuleDependencies = projectModuleDependency;
+
+function factByDirectoryId(facts: readonly ModuleDirectoryFact[], id: string): ModuleDirectoryFact | undefined {
+  return facts.find((fact) => fact.id === id);
+}
+
+function directoryModuleCount(group: ModuleDirectoryPresentation, groupByFactId: Map<string, ModuleDirectoryPresentation>): number {
+  const groupsById = new Map<string, ModuleDirectoryPresentation>();
+  groupByFactId.forEach((candidate) => groupsById.set(candidate.id, candidate));
+  const count = (current: ModuleDirectoryPresentation, visited = new Set<string>()): Set<string> => {
+    if (visited.has(current.id)) return new Set();
+    const nextVisited = new Set(visited);
+    nextVisited.add(current.id);
+    const moduleIds = new Set(current.terminal.moduleIds);
+    current.childIds.forEach((childId) => {
+      const child = groupsById.get(childId);
+      count(child ?? current, nextVisited).forEach((moduleId) => moduleIds.add(moduleId));
+    });
+    return moduleIds;
+  };
+  return count(group).size;
+}
+
+function regionAncestors(
+  group: ModuleDirectoryPresentation | undefined,
+  groupByFactId: Map<string, ModuleDirectoryPresentation>,
+  regionByGroupId: Map<string, AnalyzerSemanticRegion>,
+): string[] {
+  const ancestors: string[] = [];
+  let current = group;
+  const visited = new Set<string>();
+  while (current && !visited.has(current.id)) {
+    visited.add(current.id);
+    ancestors.unshift(current.id);
+    const parentFactId = current.terminal.parentDirectoryId;
+    current = parentFactId ? groupByFactId.get(parentFactId) : undefined;
+  }
+  return ancestors.filter((id) => regionByGroupId.has(id));
+}
+
+function moduleFileIcon(extension: string): string {
+  const icons: Record<string, string> = {
+    '.ts': 'TS',
+    '.tsx': 'TSX',
+    '.js': 'JS',
+    '.jsx': 'JSX',
+    '.mjs': 'MJS',
+    '.cjs': 'CJS',
+    '.mts': 'MTS',
+    '.cts': 'CTS',
+  };
+  return icons[extension.toLowerCase()] ?? 'FILE';
+}
+
 export function projectAnalyzerView(store: AnalyzerProjectStore, view: AnalyzerViewModel['view'], entryScriptId?: string): AnalyzerViewModel {
   if (view === 'architecture') return projectArchitecture(store);
   if (view === 'workspace') return projectWorkspace(store);
   if (view === 'command') return projectCommand(store, entryScriptId);
+  if (view === 'module-dependency') return projectModuleDependency(store);
   return projectDependencies(store);
 }
 

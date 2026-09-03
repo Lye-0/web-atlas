@@ -29,7 +29,7 @@ export type AnalyzerSessionAction =
   | { type: 'setActiveView'; view: AnalyzerViewId }
   | { type: 'updateView'; view: AnalyzerViewId; update: AnalyzerViewSessionUpdate };
 
-export const analyzerViewIds: AnalyzerViewId[] = ['architecture', 'workspace', 'command', 'dependencies'];
+export const analyzerViewIds: AnalyzerViewId[] = ['architecture', 'workspace', 'command', 'dependencies', 'module-dependency'];
 
 export function createInitialAnalyzerViewSession(): AnalyzerViewSession {
   return {
@@ -98,6 +98,7 @@ export function restoreAnalyzerViewSession(session: AnalyzerViewSession, view: A
   const presentationIds = new Set([
     ...(view.presentationGroups?.map((group) => group.id) ?? []),
     ...view.nodes.filter((node) => node.presentation?.role === 'summary').map((node) => node.id),
+    ...(view.view === 'module-dependency' ? (view.regions?.map((region) => region.id) ?? []) : []),
   ]);
   const selectedNodeId = session.selectedNodeId && nodeIds.has(session.selectedNodeId)
     ? session.selectedNodeId

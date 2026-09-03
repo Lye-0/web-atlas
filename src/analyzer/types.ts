@@ -1,4 +1,4 @@
-export type AnalyzerViewId = 'architecture' | 'workspace' | 'command' | 'dependencies';
+export type AnalyzerViewId = 'architecture' | 'workspace' | 'command' | 'dependencies' | 'module-dependency';
 
 export type AnalyzerFactKind =
   | 'project'
@@ -12,7 +12,10 @@ export type AnalyzerFactKind =
   | 'technology'
   | 'runtime'
   | 'resource'
-  | 'dotnet-project';
+  | 'dotnet-project'
+  | 'module'
+  | 'module-dependency'
+  | 'module-directory';
 
 export type AnalyzerEvidenceKind =
   | 'manifest'
@@ -22,7 +25,8 @@ export type AnalyzerEvidenceKind =
   | 'technology'
   | 'runtime'
   | 'resource'
-  | 'project';
+  | 'project'
+  | 'module';
 
 /** Describes how an Evidence item participates in Stack Map attribution. */
 export type AnalyzerEvidenceRole = 'declaration' | 'usage' | 'scope';
@@ -31,6 +35,17 @@ export type AnalyzerEvidenceRole = 'declaration' | 'usage' | 'scope';
 export type AnalyzerScopeEvidenceStrength = 'structural' | 'explicit-boundary' | 'usage-only';
 
 export type AnalyzerDependencyType = 'dependency' | 'devDependency' | 'peerDependency' | 'optionalDependency' | 'workspaceDependency';
+
+export type AnalyzerModuleDependencyKind = 'import' | 'import-type' | 're-export' | 'dynamic-import' | 'require';
+
+export interface AnalyzerModuleImportReference {
+  kind: AnalyzerModuleDependencyKind;
+  specifier: string;
+  start: number;
+  end: number;
+  resolvedPath?: string;
+  reason?: 'computed' | 'unresolved' | 'external' | 'ambiguous';
+}
 
 export type AnalyzerRelationKind =
   | 'contains'
@@ -44,7 +59,8 @@ export type AnalyzerRelationKind =
   | 'executes'
   | 'starts'
   | 'runs-in'
-  | 'expands-to';
+  | 'expands-to'
+  | 'imports';
 
 export type AnalyzerNodeType =
   | 'project'
@@ -60,9 +76,10 @@ export type AnalyzerNodeType =
   | 'technology'
   | 'runtime'
   | 'resource'
-  | 'dotnet-project';
+  | 'dotnet-project'
+  | 'module';
 
-export type AnalyzerRegionKind = 'scope' | 'runtime' | 'subsystem' | 'module-group';
+export type AnalyzerRegionKind = 'scope' | 'runtime' | 'subsystem' | 'module-group' | 'workspace-package' | 'directory';
 export type AnalyzerRegionScopeKind = 'physical' | 'logical';
 export type AnalyzerRegionPortSide = 'top' | 'right' | 'bottom' | 'left';
 
@@ -80,7 +97,8 @@ export type AnalyzerFilter =
   | 'runtime'
   | 'resource'
   | 'dotnet-project'
-  | 'external-package';
+  | 'external-package'
+  | 'module';
 
 export type AnalyzerMetadataValue = string | number | boolean | string[] | undefined;
 export type AnalyzerMetadata = Record<string, AnalyzerMetadataValue>;
@@ -237,6 +255,43 @@ export interface DotnetProjectFact extends AnalyzerFactBase {
   projectReferences: string[];
 }
 
+export interface ModuleFact extends AnalyzerFactBase {
+  kind: 'module';
+  path: string;
+  directoryId: string;
+  directoryPath: string;
+  packageId?: string;
+  packagePath?: string;
+  packageName?: string;
+  language: string;
+  extension: string;
+  imports: AnalyzerModuleImportReference[];
+  unresolvedImports: AnalyzerModuleImportReference[];
+}
+
+export interface ModuleDependencyFact extends AnalyzerFactBase {
+  kind: 'module-dependency';
+  fromModuleId: string;
+  toModuleId: string;
+  dependencyKind: AnalyzerModuleDependencyKind;
+  specifier: string;
+  sourcePath: string;
+  targetPath: string;
+}
+
+export interface ModuleDirectoryFact extends AnalyzerFactBase {
+  kind: 'module-directory';
+  path: string;
+  packageId?: string;
+  parentDirectoryId?: string;
+  childDirectoryIds: string[];
+  moduleIds: string[];
+  depth: number;
+}
+
+/** Descriptive alias for consumers that call source files Source Modules. */
+export type SourceModuleFact = ModuleFact;
+
 export type AnalyzerFact =
   | ProjectFact
   | WorkspaceConfigFact
@@ -249,7 +304,10 @@ export type AnalyzerFact =
   | TechnologyFact
   | RuntimeFact
   | ResourceFact
-  | DotnetProjectFact;
+  | DotnetProjectFact
+  | ModuleFact
+  | ModuleDependencyFact
+  | ModuleDirectoryFact;
 
 export interface AnalyzerRelation {
   id: string;
@@ -406,6 +464,7 @@ export const analyzerViewLabels: Record<AnalyzerViewId, string> = {
   workspace: 'Workspace Flow',
   command: 'Command Flow',
   dependencies: 'Package Dependency',
+  'module-dependency': 'Module Dependency',
 };
 
 export const relationLabels: Record<AnalyzerRelationKind, string> = {
@@ -421,6 +480,7 @@ export const relationLabels: Record<AnalyzerRelationKind, string> = {
   starts: 'starts',
   'runs-in': 'runs-in',
   'expands-to': 'expands-to',
+  imports: 'imports',
 };
 
 export const nodeTypeLabels: Record<AnalyzerNodeType, string> = {
@@ -438,6 +498,7 @@ export const nodeTypeLabels: Record<AnalyzerNodeType, string> = {
   runtime: 'Runtime / Platform',
   resource: 'Resource',
   'dotnet-project': '.NET Application',
+  module: 'Module',
 };
 
 export function packageIdForPath(packagePath: string): string {

@@ -39,6 +39,10 @@ function filterOptions(view: AnalyzerViewId): Array<{ value: AnalyzerFilter; lab
     { value: 'technology', label: 'Technology' },
     { value: 'runtime', label: 'Runtime / Platform' },
   ];
+  if (view === 'module-dependency') return [
+    { value: 'all', label: 'すべてのModule' },
+    { value: 'module', label: 'Modules' },
+  ];
   return [
     { value: 'all', label: 'すべてのNode' },
     { value: 'workspace-package', label: 'Workspace Packages' },

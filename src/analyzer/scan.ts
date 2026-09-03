@@ -1,6 +1,7 @@
 import { findCanonicalStackByPackageName, getStack } from '../data';
 import { isAnalyzerSourcePath, isAnalyzerUsageSourcePath, normalizeRelativePath } from './fileDiscovery';
 import { makeEvidence, makeFileEvidence, maskSensitiveSource, type OffsetRange } from './evidence';
+import { moduleDirectoryId, moduleIdForPath, resolveModuleGraph } from './moduleResolver';
 import {
   parseDotnetProject,
   parseFirebaseConfig,
@@ -28,6 +29,9 @@ import type {
   PackageDependencyDeclaration,
   PackageManifestFact,
   PackageScriptFact,
+  ModuleDependencyFact,
+  ModuleDirectoryFact,
+  ModuleFact,
   ProjectFact,
   ResourceFact,
   RuntimeFact,
@@ -682,6 +686,194 @@ function processSourceImports(builder: AnalyzerStoreBuilder, loaded: LoadedSourc
   }
 }
 
+function moduleDirectoryPaths(packagePath: string, directoryPath: string): string[] {
+  const normalizedPackagePath = normalizeRelativePath(packagePath);
+  const normalizedDirectoryPath = normalizeRelativePath(directoryPath);
+  if (normalizedDirectoryPath === '.' || normalizedDirectoryPath === normalizedPackagePath) return [];
+  const parts = normalizedDirectoryPath.split('/').filter(Boolean);
+  const packageParts = normalizedPackagePath === '.' ? [] : normalizedPackagePath.split('/').filter(Boolean);
+  if (packageParts.length > 0 && packageParts.some((part, index) => parts[index] !== part)) return [];
+  const paths: string[] = [];
+  for (let length = packageParts.length + 1; length <= parts.length; length += 1) {
+    paths.push(parts.slice(0, length).join('/'));
+  }
+  return paths;
+}
+
+function addModuleGraphFacts(
+  builder: AnalyzerStoreBuilder,
+  loadedSources: readonly LoadedSource[],
+  packageStates: Map<string, PackageState>,
+): void {
+  const usageSources = loadedSources
+    .filter((entry) => isUsageSourceFile(entry.file))
+    .map((entry) => ({ relativePath: entry.file.relativePath, source: entry.source }));
+  if (usageSources.length === 0) return;
+
+  const graph = resolveModuleGraph(
+    usageSources,
+    [...packageStates.values()].map((state) => ({
+      ...state.parsed,
+      packageId: state.packageId,
+      isWorkspacePackage: state.isWorkspacePackage,
+    })),
+    loadedSources.map((entry) => ({ relativePath: entry.file.relativePath, source: entry.source })),
+  );
+  const sourceByPath = new Map(usageSources.map((source) => [normalizeRelativePath(source.relativePath), source.source]));
+  const moduleByPath = new Map(graph.modules.map((module) => [module.path, module]));
+  const moduleFacts = new Map<string, ModuleFact>();
+
+  graph.modules.forEach((module) => {
+    const packageState = module.package;
+    const fileSource = sourceByPath.get(module.path) ?? '';
+    const fileEvidenceId = createFileEvidence(
+      builder,
+      module.path,
+      fileSource,
+      'module',
+      'module-file',
+      'Source file module',
+      'usage',
+    );
+    const evidenceIds = [fileEvidenceId];
+    const imports = module.imports.map((reference) => {
+      const evidenceId = createEvidence(
+        builder,
+        module.path,
+        fileSource,
+        { start: reference.start, end: reference.end },
+        'module',
+        'module-import',
+        `${reference.kind}: ${reference.specifier}`,
+        'usage',
+      );
+      if (evidenceId) evidenceIds.push(evidenceId);
+      return reference;
+    });
+    const unresolvedImports = imports.filter((reference) => !reference.resolvedPath);
+    const fact: ModuleFact = {
+      id: moduleIdForPath(module.path),
+      kind: 'module',
+      label: module.path.split('/').at(-1) ?? module.path,
+      filePath: module.path,
+      evidenceIds: [...new Set(evidenceIds)],
+      metadata: {
+        path: module.path,
+        directoryId: moduleDirectoryId(packageState?.packageId, module.directoryPath),
+        directoryPath: module.directoryPath,
+        extension: module.extension,
+        language: module.language,
+        ...(packageState ? { packageId: packageState.packageId, packagePath: packageState.packagePath, packageName: packageState.name ?? packageState.packagePath } : {}),
+        unresolvedImportCount: unresolvedImports.length,
+      },
+      path: module.path,
+      directoryId: moduleDirectoryId(packageState?.packageId, module.directoryPath),
+      directoryPath: module.directoryPath,
+      ...(packageState ? {
+        packageId: packageState.packageId,
+        packagePath: packageState.packagePath,
+        packageName: packageState.name ?? packageState.packagePath,
+      } : {}),
+      language: module.language,
+      extension: module.extension,
+      imports,
+      unresolvedImports,
+    };
+    builder.addFact(fact);
+    moduleFacts.set(fact.id, fact);
+  });
+
+  graph.modules.forEach((module) => {
+    const fromId = moduleIdForPath(module.path);
+    const sourceFact = moduleFacts.get(fromId);
+    if (!sourceFact) return;
+    module.imports.forEach((reference) => {
+      if (!reference.resolvedPath || !moduleByPath.has(reference.resolvedPath)) return;
+      const targetId = moduleIdForPath(reference.resolvedPath);
+      const importEvidenceId = `evidence:module-import:${module.path}:${reference.start}:${reference.end}`;
+      const dependencyEvidenceIds = sourceFact.evidenceIds.includes(importEvidenceId) ? [importEvidenceId] : [];
+      const dependencyId = `module-dependency:${fromId}:${reference.start}:${targetId}`;
+      const dependencyFact: ModuleDependencyFact = {
+        id: dependencyId,
+        kind: 'module-dependency',
+        label: `${module.path} → ${reference.resolvedPath}`,
+        filePath: module.path,
+        evidenceIds: dependencyEvidenceIds,
+        metadata: {
+          fromModuleId: fromId,
+          toModuleId: targetId,
+          kind: reference.kind,
+          specifier: reference.specifier,
+          resolvedPath: reference.resolvedPath,
+        },
+        fromModuleId: fromId,
+        toModuleId: targetId,
+        dependencyKind: reference.kind,
+        specifier: reference.specifier,
+        sourcePath: module.path,
+        targetPath: reference.resolvedPath,
+      };
+      builder.addFact(dependencyFact);
+      addRelation(
+        builder,
+        fromId,
+        targetId,
+        'imports',
+        dependencyEvidenceIds,
+        {
+          moduleDependencyFactId: dependencyId,
+          dependencyKind: reference.kind,
+          specifier: reference.specifier,
+          sourcePath: module.path,
+          targetPath: reference.resolvedPath,
+        },
+        String(reference.start),
+      );
+    });
+  });
+
+  const directoryRecords = new Map<string, { packageId?: string; path: string; moduleIds: string[]; parentPath?: string; depth: number }>();
+  graph.modules.forEach((module) => {
+    const packagePath = module.package?.packagePath ?? '.';
+    const packageId = module.package?.packageId;
+    moduleDirectoryPaths(packagePath, module.directoryPath).forEach((path) => {
+      const packagePrefix = packagePath === '.' ? [] : packagePath.split('/');
+      const depth = Math.max(0, path.split('/').length - packagePrefix.length - 1);
+      const parentPath = path.split('/').slice(0, -1).join('/') || undefined;
+      const key = `${packageId ?? 'project:root'}:${path}`;
+      const record = directoryRecords.get(key) ?? { path, moduleIds: [], ...(packageId ? { packageId } : {}), ...(parentPath ? { parentPath } : {}), depth };
+      if (module.directoryPath === path) record.moduleIds.push(moduleIdForPath(module.path));
+      directoryRecords.set(key, record);
+    });
+  });
+  directoryRecords.forEach((record) => {
+    const id = moduleDirectoryId(record.packageId, record.path);
+    const childRecords = [...directoryRecords.values()]
+      .filter((candidate) => candidate.packageId === record.packageId && candidate.parentPath === record.path)
+      .sort((first, second) => first.path.localeCompare(second.path));
+    const fact: ModuleDirectoryFact = {
+      id,
+      kind: 'module-directory',
+      label: record.path.split('/').at(-1) ?? record.path,
+      evidenceIds: [],
+      metadata: {
+        path: record.path,
+        depth: record.depth,
+        moduleCount: record.moduleIds.length,
+        childCount: childRecords.length,
+        ...(record.packageId ? { packageId: record.packageId } : {}),
+      },
+      path: record.path,
+      ...(record.packageId ? { packageId: record.packageId } : {}),
+      ...(record.parentPath ? { parentDirectoryId: moduleDirectoryId(record.packageId, record.parentPath) } : {}),
+      childDirectoryIds: childRecords.map((child) => moduleDirectoryId(child.packageId, child.path)),
+      moduleIds: [...new Set(record.moduleIds)].sort(),
+      depth: record.depth,
+    };
+    builder.addFact(fact);
+  });
+}
+
 function addPackageDependencies(
   builder: AnalyzerStoreBuilder,
   parsed: ParsedPackageJson,
@@ -952,6 +1144,8 @@ export async function scanProjectFiles(files: AnalyzerSourceFile[]): Promise<Ana
   });
 
   parsedPackages.forEach((parsed) => addPackageDependencies(builder, parsed, byPath.get(parsed.filePath)?.source ?? '', packageStates));
+
+  addModuleGraphFacts(builder, loadedSources, packageStates);
 
   loadedSources.forEach((loaded) => {
     processConfigTechnology(builder, loaded);

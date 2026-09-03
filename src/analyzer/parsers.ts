@@ -30,6 +30,11 @@ export interface ParsedPackageJson {
   nameRange?: OffsetRange;
   packageManager?: string;
   packageManagerRange?: OffsetRange;
+  main?: string;
+  module?: string;
+  types?: string;
+  typings?: string;
+  exports?: Record<string, string>;
   scripts: ParsedScript[];
   dependencies: ParsedPackageDependency[];
 }
@@ -221,6 +226,37 @@ function asString(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
 
+function exportTarget(value: unknown): string | undefined {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) return value.map(exportTarget).find((entry): entry is string => Boolean(entry));
+  const record = asRecord(value);
+  if (!record) return undefined;
+  for (const key of ['import', 'require', 'default', 'types']) {
+    const target = exportTarget(record[key]);
+    if (target) return target;
+  }
+  return undefined;
+}
+
+function parsePackageExports(value: unknown): Record<string, string> | undefined {
+  if (typeof value === 'string' || Array.isArray(value)) {
+    const target = exportTarget(value);
+    return target ? { '.': target } : undefined;
+  }
+  const record = asRecord(value);
+  if (!record) return undefined;
+  const entries = Object.keys(record).some((key) => key.startsWith('.'))
+    ? Object.entries(record)
+    : [['.', value] as const];
+  const exports = Object.fromEntries(entries
+    .map(([key, entry]) => {
+      const target = exportTarget(entry);
+      return target ? [key, target] as const : undefined;
+    })
+    .filter((entry): entry is readonly [string, string] => Boolean(entry)));
+  return Object.keys(exports).length > 0 ? exports : undefined;
+}
+
 function findValueEnd(source: string, valueStart: number): { valueEnd: number; contentStart: number } {
   const first = source[valueStart];
   if (first === '"') {
@@ -289,6 +325,11 @@ export function parsePackageJson(filePath: string, source: string): ParsedPackag
   const packagePath = normalizeRelativePath(filePath.replace(/\/package\.json$/i, '').replace(/^package\.json$/i, ''));
   const name = asString(data.name);
   const packageManager = asString(data.packageManager);
+  const main = asString(data.main);
+  const module = asString(data.module);
+  const types = asString(data.types);
+  const typings = asString(data.typings);
+  const exports = parsePackageExports(data.exports);
   const nameProperty = findJsonPropertyValueRange(source, 'name');
   const packageManagerProperty = findJsonPropertyValueRange(source, 'packageManager');
   const scriptsObject = asRecord(data.scripts);
@@ -332,6 +373,11 @@ export function parsePackageJson(filePath: string, source: string): ParsedPackag
     ...(nameProperty ? { nameRange: { start: nameProperty.start, end: nameProperty.end } } : {}),
     ...(packageManager ? { packageManager } : {}),
     ...(packageManagerProperty ? { packageManagerRange: { start: packageManagerProperty.start, end: packageManagerProperty.end } } : {}),
+    ...(main ? { main } : {}),
+    ...(module ? { module } : {}),
+    ...(types ? { types } : {}),
+    ...(typings ? { typings } : {}),
+    ...(exports ? { exports } : {}),
     scripts,
     dependencies,
   };

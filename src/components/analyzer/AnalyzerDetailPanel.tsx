@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { analyzerRegionParentId, analyzerSummaryExpanded, analyzerSummarySubtitle, displayDictionaryStack, factDictionaryStackId, factForNode, nodeTypeLabels, relationLabelForNode } from '../../analyzer';
+import { analyzerRegionParentId, analyzerSummaryExpanded, analyzerSummarySubtitle, displayDictionaryStack, factDictionaryStackId, factForNode, moduleIdForPath, nodeTypeLabels, relationLabelForNode } from '../../analyzer';
 import type { AnalyzerProjectStore, AnalyzerSemanticRegion, AnalyzerViewEdge, AnalyzerViewModel, AnalyzerViewNode } from '../../analyzer';
 import { stackPath } from '../../utils/routes';
 import { EvidenceCodeBlock } from './EvidenceCodeBlock';
@@ -143,6 +143,17 @@ function RegionRelationList({ region, view, onSelectNode, onSelectRegion }: { re
 }
 
 function RegionDetails({ region, view, store, onSelectNode, onSelectRegion }: { region: AnalyzerSemanticRegion; view: AnalyzerViewModel; store: AnalyzerProjectStore; onSelectNode: (nodeId: string, focus?: boolean) => void; onSelectRegion?: (regionId: string, focus?: boolean) => void }) {
+  if (region.regionKind === 'directory' || region.regionKind === 'workspace-package') {
+    return (
+      <ModuleRegionDetails
+        region={region}
+        view={view}
+        store={store}
+        onSelectNode={onSelectNode}
+        onSelectRegion={onSelectRegion}
+      />
+    );
+  }
   const scopePath = typeof region.metadata.scopePath === 'string' ? region.metadata.scopePath : region.subtitle ?? '.';
   const scopeKind = typeof region.metadata.scopeKind === 'string' ? region.metadata.scopeKind : region.scopeKind ?? 'physical';
   const scopeType = typeof region.metadata.scopeType === 'string' ? region.metadata.scopeType : 'scope';
@@ -187,6 +198,98 @@ function RegionDetails({ region, view, store, onSelectNode, onSelectRegion }: { 
       <section className="analyzer-detail-section">
         <h3>Relations</h3>
         <RegionRelationList region={region} view={view} onSelectNode={onSelectNode} onSelectRegion={onSelectRegion} />
+      </section>
+      <section className="analyzer-detail-section">
+        <h3>Metadata</h3>
+        <MetadataList metadata={region.metadata} />
+      </section>
+    </>
+  );
+}
+
+function ModuleRegionDetails({ region, view, store, onSelectNode, onSelectRegion }: { region: AnalyzerSemanticRegion; view: AnalyzerViewModel; store: AnalyzerProjectStore; onSelectNode: (nodeId: string, focus?: boolean) => void; onSelectRegion?: (regionId: string, focus?: boolean) => void }) {
+  const descendants: AnalyzerSemanticRegion[] = [];
+  const directDescendants = (view.regions ?? []).filter((candidate) => candidate.parentRegionId === region.id);
+  const pending = [region.id];
+  while (pending.length > 0) {
+    const parentId = pending.shift();
+    if (!parentId) continue;
+    const children = (view.regions ?? []).filter((candidate) => candidate.parentRegionId === parentId);
+    descendants.push(...children);
+    pending.push(...children.map((child) => child.id));
+  }
+  const moduleIds = new Set([region, ...descendants].flatMap((candidate) => candidate.childIds));
+  const containedModules = view.nodes.filter((node) => moduleIds.has(node.id) && node.type === 'module');
+  const internal = view.edges.filter((edge) => moduleIds.has(edge.sourceId) && moduleIds.has(edge.targetId));
+  const outgoing = view.edges.filter((edge) => moduleIds.has(edge.sourceId) && !moduleIds.has(edge.targetId));
+  const incoming = view.edges.filter((edge) => !moduleIds.has(edge.sourceId) && moduleIds.has(edge.targetId));
+  const boundaryTargets = [...new Map(outgoing.map((edge) => [edge.targetId, edge])).values()];
+  const boundarySources = [...new Map(incoming.map((edge) => [edge.sourceId, edge])).values()];
+  const path = typeof region.metadata.directoryPath === 'string' ? region.metadata.directoryPath : region.subtitle ?? '.';
+  return (
+    <>
+      <div className="analyzer-detail-heading">
+        <div className="analyzer-detail-heading-top">
+          <span className="analyzer-node-type">{region.regionKind === 'directory' ? 'DIRECTORY' : 'PACKAGE / AREA'}</span>
+          <button type="button" className="analyzer-focus-selected" onClick={() => onSelectRegion?.(region.id, true)}>Focus Selected</button>
+        </div>
+        <h2>{region.label}</h2>
+        <p>{path}</p>
+      </div>
+      <section className="analyzer-detail-section">
+        <h3>Overview</h3>
+        <p>{region.regionKind === 'directory' ? 'Filesystem directory rendered as a selectable Semantic Region. Directory hierarchy is containment, not a dependency edge.' : 'Workspace package or project area containing source modules and directory Regions.'}</p>
+      </section>
+      <section className="analyzer-detail-section">
+        <h3>Module Map</h3>
+        <dl className="analyzer-metadata-list analyzer-stack-usage-list">
+          <div><dt>Path</dt><dd>{path}</dd></div>
+          <div><dt>Modules</dt><dd>{region.metadata.moduleCount ?? containedModules.length}</dd></div>
+          <div><dt>Subdirectories</dt><dd>{region.metadata.directoryCount ?? directDescendants.length}</dd></div>
+          <div><dt>Internal dependencies</dt><dd>{internal.length}</dd></div>
+          <div><dt>Outgoing dependencies</dt><dd>{outgoing.length}</dd></div>
+          <div><dt>Incoming dependencies</dt><dd>{incoming.length}</dd></div>
+        </dl>
+      </section>
+      {(boundaryTargets.length > 0 || boundarySources.length > 0) && (
+        <section className="analyzer-detail-section">
+          <h3>Boundary Dependencies</h3>
+          {boundaryTargets.length > 0 && (
+            <>
+              <p>Outgoing To</p>
+              <ul className="analyzer-relation-list">{boundaryTargets.slice(0, 24).map((edge) => {
+                const target = view.nodes.find((node) => node.id === edge.targetId);
+                return target ? <li key={`out:${target.id}`}><button type="button" onClick={() => onSelectNode(target.id, true)}><span>→</span><strong>{target.label}</strong></button></li> : null;
+              })}</ul>
+            </>
+          )}
+          {boundarySources.length > 0 && (
+            <>
+              <p>Incoming From</p>
+              <ul className="analyzer-relation-list">{boundarySources.slice(0, 24).map((edge) => {
+                const source = view.nodes.find((node) => node.id === edge.sourceId);
+                return source ? <li key={`in:${source.id}`}><button type="button" onClick={() => onSelectNode(source.id, true)}><span>←</span><strong>{source.label}</strong></button></li> : null;
+              })}</ul>
+            </>
+          )}
+        </section>
+      )}
+      <section className="analyzer-detail-section">
+        <h3>Contained Modules</h3>
+        {containedModules.length === 0
+          ? <p className="analyzer-muted-copy">このRegionに直接含まれるModuleはありません。</p>
+          : <ul className="analyzer-presentation-list analyzer-region-children-list">{containedModules.map((node) => (
+            <li key={node.id}>
+              <button type="button" onClick={() => onSelectNode(node.id, true)}>
+                <span>{node.subtitle ?? 'Module'}</span>
+                <strong>{node.label}</strong>
+              </button>
+            </li>
+          ))}</ul>}
+      </section>
+      <section className="analyzer-detail-section">
+        <h3>Evidence</h3>
+        <EvidenceList evidenceIds={region.evidenceIds} view={view} store={store} />
       </section>
       <section className="analyzer-detail-section">
         <h3>Metadata</h3>
@@ -262,6 +365,12 @@ function detectionReason(node: AnalyzerViewNode, fact: ReturnType<typeof factFor
       return `${fact.projectPath}の.csproj propertyから${fact.useWpf ? '.NET / WPF Application' : '.NET Application'}を検出しました。`;
     case 'command':
       return `package scriptのcommand fragment「${fact.command}」として展開しました。`;
+    case 'module':
+      return `${fact.path}を${fact.language}のSource Moduleとして検出しました。静的なlocal module importだけをDependency Edgeへ投影します。`;
+    case 'module-dependency':
+      return `${fact.sourcePath}から${fact.targetPath}への${fact.dependencyKind}を検出しました。`;
+    case 'module-directory':
+      return `${fact.path}をFilesystem hierarchyのDirectory Factとして検出しました。`;
     default:
       return `${nodeTypeLabels[node.type] ?? node.type}として検出しました。`;
   }
@@ -269,6 +378,7 @@ function detectionReason(node: AnalyzerViewNode, fact: ReturnType<typeof factFor
 
 function NodeDetails({ node, view, store, expandedPresentationIds, onSelectNode, onSelectRegion, onTogglePresentation }: { node: AnalyzerViewNode; view: AnalyzerViewModel; store: AnalyzerProjectStore; expandedPresentationIds: ReadonlySet<string>; onSelectNode: (nodeId: string, focus?: boolean) => void; onSelectRegion?: (regionId: string, focus?: boolean) => void; onTogglePresentation: (presentationId: string) => void }) {
   const fact = factForNode(store, node);
+  const moduleFact = fact?.kind === 'module' ? fact : undefined;
   const dictionary = displayDictionaryStack(factDictionaryStackId(fact ?? node));
   const stackUsage = node.metadata.stackUsage === true;
   const usageScopeLabel = metadataString(node, 'scopeLabel') ?? 'Project Root / Tooling';
@@ -319,6 +429,51 @@ function NodeDetails({ node, view, store, expandedPresentationIds, onSelectNode,
             {usageRoles.length > 0 && <div><dt>Role</dt><dd>{usageRoles.join(', ')}</dd></div>}
             {usageEvidenceFiles.length > 0 && <div><dt>Evidence files</dt><dd>{usageEvidenceFiles.join(', ')}</dd></div>}
           </dl>
+        </section>
+      )}
+      {node.type === 'module' && (
+        <section className="analyzer-detail-section">
+          <h3>Module</h3>
+          <dl className="analyzer-metadata-list analyzer-stack-usage-list">
+            <div><dt>Path</dt><dd>{metadataString(node, 'modulePath') ?? node.label}</dd></div>
+            <div><dt>Language</dt><dd>{metadataString(node, 'language') ?? node.subtitle ?? 'Unknown'}</dd></div>
+            <div><dt>Package</dt><dd>{metadataString(node, 'packageName') ?? metadataString(node, 'packagePath') ?? 'Project'}</dd></div>
+            <div><dt>Directory</dt><dd>{metadataString(node, 'directoryPath') ?? '.'}</dd></div>
+            <div><dt>Outgoing</dt><dd>{node.metadata.outgoingCount ?? 0}</dd></div>
+            <div><dt>Incoming</dt><dd>{node.metadata.incomingCount ?? 0}</dd></div>
+          </dl>
+          {metadataStrings(node, 'unresolvedImportDetails').length > 0 && (
+            <>
+              <h3>Unresolved Imports</h3>
+              <ul className="analyzer-detail-bullet-list">{metadataStrings(node, 'unresolvedImportDetails').map((specifier) => <li key={specifier}>{specifier}</li>)}</ul>
+            </>
+          )}
+          {moduleFact && moduleFact.imports.length > 0 && (
+            <>
+              <h3>Imports</h3>
+              <ul className="analyzer-relation-list">{moduleFact.imports.slice(0, 40).map((reference) => {
+                const targetId = reference.resolvedPath ? moduleIdForPath(reference.resolvedPath) : undefined;
+                const target = targetId ? view.nodes.find((candidate) => candidate.id === targetId) : undefined;
+                const edge = targetId
+                  ? view.edges.find((candidate) => candidate.sourceId === node.id && candidate.targetId === targetId && candidate.metadata.specifier === reference.specifier)
+                  : undefined;
+                const evidence = view.evidence.find((candidate) => candidate.id === `evidence:module-import:${moduleFact.path}:${reference.start}:${reference.end}`);
+                return (
+                  <li key={`${reference.kind}:${reference.start}:${reference.specifier}`}>
+                    {target ? (
+                      <button type="button" onClick={() => onSelectNode(target.id, true)}>
+                        <span>{reference.kind}</span>
+                        <strong>{target.label} · {reference.specifier}{evidence ? ` · ${evidence.filePath}:${evidence.contextStartLine}` : ''}</strong>
+                      </button>
+                    ) : (
+                      <div className="analyzer-detail-import-row"><span>{reference.kind}</span><strong>{reference.specifier}</strong></div>
+                    )}
+                    {edge && <small className="analyzer-detail-import-resolved">resolved</small>}
+                  </li>
+                );
+              })}</ul>
+            </>
+          )}
         </section>
       )}
       {summary ? (
@@ -381,12 +536,27 @@ function EdgeDetails({ edge, view, store, onSelectNode, onSelectRegion }: { edge
         <h3>Evidence</h3>
         <EvidenceList evidenceIds={edge.evidenceIds} view={view} store={store} />
       </section>
+      {edge.kind === 'imports' && (
+        <section className="analyzer-detail-section">
+          <h3>Module Dependency</h3>
+          <dl className="analyzer-metadata-list analyzer-stack-usage-list">
+            <div><dt>Kind</dt><dd>{metadataStringFromEdge(edge, 'dependencyKind') ?? edge.kind}</dd></div>
+            <div><dt>Specifier</dt><dd>{metadataStringFromEdge(edge, 'specifier') ?? '—'}</dd></div>
+            <div><dt>Resolved To</dt><dd>{metadataStringFromEdge(edge, 'targetPath') ?? target?.subtitle ?? target?.label ?? edge.targetId}</dd></div>
+          </dl>
+        </section>
+      )}
       <section className="analyzer-detail-section">
         <h3>Metadata</h3>
         <MetadataList metadata={edge.metadata} />
       </section>
     </>
   );
+}
+
+function metadataStringFromEdge(edge: AnalyzerViewEdge, key: string): string | undefined {
+  const value = edge.metadata[key];
+  return typeof value === 'string' ? value : undefined;
 }
 
 export function AnalyzerDetailPanel({ store, view, selectedNodeId, selectedRegionId, selectedEdgeId, expandedPresentationIds, onSelectNode, onSelectRegion, onTogglePresentation, onClose }: AnalyzerDetailPanelProps) {
