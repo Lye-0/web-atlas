@@ -798,10 +798,118 @@ describe('Analyzer same-source fan-out', () => {
     const edges = [edge('edge:a-b', 'source-a', 'target-b'), edge('edge:a-c', 'source-a', 'target-c')];
     const routes = analyzerEdgeRoutes(edges, positionedById, nodes.map(nodeObstacle), { flowDirection: 'horizontal' });
     const farRoute = routes.get('edge:a-c') ?? [];
+    const nearRoute = routes.get('edge:a-b') ?? [];
 
     expect(analyzerEdgeRouteIntersectsObstacle(farRoute, nodeObstacle(middleTarget))).toBe(false);
     expect(farRoute.every((point, index) => index === 0 || point.x >= farRoute[index - 1]!.x)).toBe(true);
     expect([...routes.keys()]).toEqual(['edge:a-b', 'edge:a-c']);
+    expect(nearRoute.slice(0, 2)).not.toEqual(farRoute.slice(0, 2));
+  });
+
+  it('does not send a farther-column dependency through a nearer same-row node', () => {
+    const source = positionedNode('package:root', 20, 82);
+    source.node.type = 'workspace-package';
+    source.node.clusterId = 'dependencies:packages';
+    const nearer = [
+      positionedNode('technology:react', 360, 82),
+      positionedNode('technology:react-dom', 360, 212),
+      positionedNode('technology:typescript', 360, 342),
+      positionedNode('technology:vite', 360, 472),
+    ].map((node) => {
+      node.node.type = 'technology';
+      node.node.clusterId = 'dependencies:technology';
+      return node;
+    });
+    const farther = positionedNode('technology:vitest', 360 + ANALYZER_NODE_WIDTH + 24, 82);
+    farther.node.type = 'technology';
+    farther.node.clusterId = 'dependencies:technology';
+    const nodes = [source, ...nearer, farther];
+    const positionedById = new Map(nodes.map((node) => [node.node.id, node]));
+    const edges = [...nearer, farther].map((target) => edge(`edge:${target.node.id}`, 'package:root', target.node.id));
+    const routes = analyzerEdgeRoutes(edges, positionedById, nodes.map(nodeObstacle), { flowDirection: 'horizontal' });
+    const reactRoute = routes.get('edge:technology:react') ?? [];
+    const vitestRoute = routes.get('edge:technology:vitest') ?? [];
+    const reactDomRoute = routes.get('edge:technology:react-dom') ?? [];
+
+    expect(analyzerEdgeRouteIntersectsObstacle(vitestRoute, nodeObstacle(nearer[0]!))).toBe(false);
+    nearer.forEach((node) => {
+      expect(analyzerEdgeRouteIntersectsObstacle(vitestRoute, nodeObstacle(node))).toBe(false);
+    });
+    expect(reactRoute[0]).toEqual(reactDomRoute[0]);
+    expect(vitestRoute.some((point, index) => {
+      if (index === 0) return false;
+      const previous = vitestRoute[index - 1]!;
+      return previous.x <= nearer[0]!.x + ANALYZER_NODE_WIDTH
+        && point.x >= nearer[0]!.x + ANALYZER_NODE_WIDTH
+        && Math.abs(previous.y - (nearer[0]!.y + nearer[0]!.height / 2)) < 1
+        && Math.abs(point.y - (nearer[0]!.y + nearer[0]!.height / 2)) < 1;
+    })).toBe(false);
+  });
+
+  it('keeps workspace-package and technology columns from chaining through a mid-column node', () => {
+    const api = positionedNode('package:api', 20, 82);
+    api.node.type = 'workspace-package';
+    api.node.clusterId = 'dependencies:packages';
+    const shared = positionedNode('package:shared', 20 + ANALYZER_NODE_WIDTH + 24, 82);
+    shared.node.type = 'workspace-package';
+    shared.node.clusterId = 'dependencies:packages';
+    const drizzle = positionedNode('technology:drizzle', 640, 82);
+    drizzle.node.type = 'technology';
+    drizzle.node.clusterId = 'dependencies:technology';
+    const typescript = positionedNode('technology:typescript', 640, 212);
+    typescript.node.type = 'technology';
+    typescript.node.clusterId = 'dependencies:technology';
+    const nodes = [api, shared, drizzle, typescript];
+    const positionedById = new Map(nodes.map((node) => [node.node.id, node]));
+    const edges = [
+      edge('edge:api-shared', 'package:api', 'package:shared'),
+      edge('edge:api-drizzle', 'package:api', 'technology:drizzle'),
+      edge('edge:api-typescript', 'package:api', 'technology:typescript'),
+    ];
+    const routes = analyzerEdgeRoutes(edges, positionedById, nodes.map(nodeObstacle), { flowDirection: 'horizontal' });
+    const drizzleRoute = routes.get('edge:api-drizzle') ?? [];
+    const typescriptRoute = routes.get('edge:api-typescript') ?? [];
+
+    expect(analyzerEdgeRouteIntersectsObstacle(drizzleRoute, nodeObstacle(shared))).toBe(false);
+    expect(analyzerEdgeRouteIntersectsObstacle(typescriptRoute, nodeObstacle(shared))).toBe(false);
+    expect(analyzerEdgeRouteIntersectsObstacle(typescriptRoute, nodeObstacle(drizzle))).toBe(false);
+    expect(drizzleRoute[0]).toEqual(typescriptRoute[0]);
+  });
+
+  it('routes to a collapsed External Summary without crossing technology nodes', () => {
+    const source = positionedNode('package:root', 20, 200);
+    source.node.type = 'workspace-package';
+    source.node.clusterId = 'dependencies:packages';
+    const technology = positionedNode('technology:vite', 360, 200);
+    technology.node.type = 'technology';
+    technology.node.clusterId = 'dependencies:technology';
+    const summary = positionedNode('dependencies:external:summary', 700, 200);
+    summary.node.type = 'external-package';
+    summary.node.clusterId = 'dependencies:external';
+    summary.node.presentation = { role: 'summary', childNodeIds: ['external-package:left-pad'] };
+    const nodes = [source, technology, summary];
+    const positionedById = new Map(nodes.map((node) => [node.node.id, node]));
+    const collapsed = analyzerEdgeRoutes(
+      [edge('edge:root-summary', 'package:root', 'dependencies:external:summary')],
+      positionedById,
+      nodes.map(nodeObstacle),
+      { flowDirection: 'horizontal' },
+    ).get('edge:root-summary') ?? [];
+    const expandedExternal = positionedNode('external-package:left-pad', 700, 200);
+    expandedExternal.node.type = 'external-package';
+    expandedExternal.node.clusterId = 'dependencies:external';
+    const expandedNodes = [source, technology, expandedExternal];
+    const expanded = analyzerEdgeRoutes(
+      [edge('edge:root-external', 'package:root', 'external-package:left-pad')],
+      new Map(expandedNodes.map((node) => [node.node.id, node])),
+      expandedNodes.map(nodeObstacle),
+      { flowDirection: 'horizontal' },
+    ).get('edge:root-external') ?? [];
+
+    expect(collapsed.length).toBeGreaterThan(1);
+    expect(expanded.length).toBeGreaterThan(1);
+    expect(analyzerEdgeRouteIntersectsObstacle(collapsed, nodeObstacle(technology))).toBe(false);
+    expect(analyzerEdgeRouteIntersectsObstacle(expanded, nodeObstacle(technology))).toBe(false);
   });
 
   it('keeps separate target groups on separate shared trunks', () => {

@@ -1263,6 +1263,15 @@ function orthogonalCandidateRoutes(
   return candidates;
 }
 
+function routeHardOverlapLength(
+  points: readonly AnalyzerEdgePoint[],
+  obstacles: readonly InflatedObstacle[],
+): number {
+  return points.slice(1).reduce((total, point, index) => (
+    total + obstacles.reduce((sum, obstacle) => sum + segmentOverlapLength(points[index]!, point, obstacle), 0)
+  ), 0);
+}
+
 function fallbackRoute(
   start: AnalyzerEdgePoint,
   end: AnalyzerEdgePoint,
@@ -1277,11 +1286,16 @@ function fallbackRoute(
   const maximumX = options.bounds ? options.bounds.x + options.bounds.width : Math.max(start.x, end.x, ...visibilityObstacles.map((obstacle) => obstacle.right)) + VISIBILITY_ESCAPE_MARGIN;
   const minimumY = options.bounds ? options.bounds.y : Math.min(start.y, end.y, ...visibilityObstacles.map((obstacle) => obstacle.y)) - VISIBILITY_ESCAPE_MARGIN;
   const maximumY = options.bounds ? options.bounds.y + options.bounds.height : Math.max(start.y, end.y, ...visibilityObstacles.map((obstacle) => obstacle.bottom)) + VISIBILITY_ESCAPE_MARGIN;
+  const obstacleEscapes = visibilityObstacles.flatMap((obstacle) => [
+    [start, { x: start.x, y: obstacle.y - FANOUT_CORRIDOR_MARGIN }, { x: end.x, y: obstacle.y - FANOUT_CORRIDOR_MARGIN }, end],
+    [start, { x: start.x, y: obstacle.bottom + FANOUT_CORRIDOR_MARGIN }, { x: end.x, y: obstacle.bottom + FANOUT_CORRIDOR_MARGIN }, end],
+  ]);
   const escapeCandidates = [
     [start, { x: minimumX, y: start.y }, { x: minimumX, y: end.y }, end],
     [start, { x: maximumX, y: start.y }, { x: maximumX, y: end.y }, end],
     [start, { x: start.x, y: minimumY }, { x: end.x, y: minimumY }, end],
     [start, { x: start.x, y: maximumY }, { x: end.x, y: maximumY }, end],
+    ...obstacleEscapes,
   ];
   const allCandidates = [...monotonicCandidates, ...relaxedCandidates, ...escapeCandidates];
   const best = (candidates: readonly AnalyzerEdgePoint[][]): AnalyzerEdgePoint[] | undefined => candidates
@@ -1290,7 +1304,12 @@ function fallbackRoute(
   return best(monotonicCandidates)
     ?? best(relaxedCandidates)
     ?? best(escapeCandidates)
-    ?? allCandidates.find((candidate) => routeWithinBounds(candidate, options.bounds))
+    ?? [...allCandidates]
+      .filter((candidate) => routeWithinBounds(candidate, options.bounds))
+      .sort((first, second) => (
+        routeHardOverlapLength(first, obstacles) - routeHardOverlapLength(second, obstacles)
+        || routeCost(first, obstacles, options) - routeCost(second, obstacles, options)
+      ))[0]
     ?? allCandidates[0]
     ?? [start, end];
 }
@@ -2009,12 +2028,45 @@ function fanoutRoute(
   };
 }
 
-function fanoutTargetGroupKey(source: PositionedGraphEndpoint, target: PositionedGraphEndpoint): string {
+function fanoutColumnKey(endpoint: PositionedGraphEndpoint): string {
+  return String(Math.round(endpoint.x));
+}
+
+function fanoutTargetGroupKey(
+  source: PositionedGraphEndpoint,
+  target: PositionedGraphEndpoint,
+  flowDirection: ResolvedRoutingOptions['flowDirection'] = 'auto',
+): string {
   if (isProjectRegionFanoutPair(source, target)) return 'project-region';
   if ('region' in target) return `region:${target.region.id}`;
-  if (target.node.presentation?.role === 'summary') return `summary:${target.node.id}`;
-  if (target.node.presentation?.parentId) return `presentation:${target.node.presentation.parentId}`;
-  return `cluster:${target.node.clusterId ?? target.node.type}`;
+  const columnKey = flowDirection === 'horizontal' ? `:${fanoutColumnKey(target)}` : '';
+  if (target.node.presentation?.role === 'summary') return `summary:${target.node.id}${columnKey}`;
+  if (target.node.presentation?.parentId) return `presentation:${target.node.presentation.parentId}${columnKey}`;
+  return `cluster:${target.node.clusterId ?? target.node.type}${columnKey}`;
+}
+
+function interveningNodeBounds(
+  source: PositionedGraphEndpoint,
+  target: PositionedGraphEndpoint,
+  positionedById: ReadonlyMap<string, PositionedGraphEndpoint>,
+): AnalyzerEdgeBounds[] {
+  const sourceId = endpointId(source);
+  const targetId = endpointId(target);
+  const gapLeft = Math.min(nodeRight(source), target.x);
+  const gapRight = Math.max(nodeRight(source), target.x);
+  if (gapRight - gapLeft <= EPSILON) return [];
+  return [...positionedById.values()].flatMap((endpoint) => {
+    if ('region' in endpoint) return [];
+    const id = endpointId(endpoint);
+    if (id === sourceId || id === targetId) return [];
+    if (nodeRight(endpoint) <= gapLeft + EPSILON || endpoint.x >= gapRight - EPSILON) return [];
+    return [{
+      x: endpoint.x,
+      y: endpoint.y,
+      width: endpointWidth(endpoint),
+      height: endpoint.height,
+    }];
+  });
 }
 
 function canUseFanout(edge: AnalyzerRoutableEdge): boolean {
@@ -2052,7 +2104,7 @@ export function analyzerEdgeRoutes(
       const source = positionedById.get(edge.sourceId);
       const target = positionedById.get(edge.targetId);
       if (!source || !target) return;
-      const targetGroupKey = fanoutTargetGroupKey(source, target);
+      const targetGroupKey = fanoutTargetGroupKey(source, target, resolved.flowDirection);
       const key = [
         edge.sourceId,
         edge.kind ?? 'unknown',
@@ -2073,7 +2125,7 @@ export function analyzerEdgeRoutes(
         ?? fanout?.preferredDirection
         ?? fanoutDirectionSelection(source, targetGroupBounds, resolved.flowDirection).preferredDirection;
       const projectRegionFanout = isProjectRegionFanoutGroup(source, group);
-      const fanoutGroupId = `fanout:${endpointId(source)}:${fanoutGroupDirection}:${group[0]!.edge.kind ?? 'unknown'}:${fanoutTargetGroupKey(source, group[0]!.target)}`;
+      const fanoutGroupId = `fanout:${endpointId(source)}:${fanoutGroupDirection}:${group[0]!.edge.kind ?? 'unknown'}:${fanoutTargetGroupKey(source, group[0]!.target, resolved.flowDirection)}`;
       const selectedPorts = fanout?.selectedDirection
         ? group.map(({ edge: groupEdge }) => ({
             edgeId: groupEdge.id,
@@ -2122,7 +2174,7 @@ export function analyzerEdgeRoutes(
     const source = positionedById.get(edge.sourceId);
     const target = positionedById.get(edge.targetId);
     if (!source || !target) return;
-    const siblingRegions = isProjectRegionFanoutPair(source, target)
+    const regionSiblings = isProjectRegionFanoutPair(source, target)
       ? [...positionedById.values()]
         .filter((endpoint) => isTopLevelRegionEndpoint(endpoint) && endpointId(endpoint) !== endpointId(target))
         .map((endpoint) => ({
@@ -2132,6 +2184,7 @@ export function analyzerEdgeRoutes(
           height: endpoint.height,
         }))
       : [];
+    const siblingRegions = [...regionSiblings, ...interveningNodeBounds(source, target, positionedById)];
     const route = analyzerEdgeRoute(source, target, obstacles, {
       ...options,
       existingRoutes: [...resolved.existingRoutes, ...routes.values()],

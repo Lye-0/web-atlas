@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { ANALYZER_DEFAULT_TRANSFORM, ANALYZER_EXTERNAL_SUMMARY_ID, ANALYZER_NODE_WIDTH, analyzerEdgeArrowMarkerId, analyzerEdgeObstacles, analyzerEdgePaths, analyzerFocusDepths, analyzerForegroundEdges, analyzerPresentationCount, analyzerPresentationCountLabel, displayedZoomLevelForNode, evidenceRangeLabel, fitAnalyzerTransform, focusAnalyzerTransform, layoutAnalyzerView, nodeMatchesSearch, preserveAnalyzerTransformOnViewportResize, presentAnalyzerView, regionMatchesSearch, semanticZoomLevelForScale, shouldRunAnalyzerInitialFit, shouldShowAnalyzerEvidencePreview, type AnalyzerEdgeRoutingDiagnostic, type AnalyzerFanoutRoutingDiagnostic, type AnalyzerGraphTransform, type AnalyzerViewCounts, type AnalyzerViewEdge, type AnalyzerViewModel, type PositionedGraphEndpoint, type PositionedNode } from '../../analyzer';
+import { ANALYZER_DEFAULT_TRANSFORM, ANALYZER_EXTERNAL_SUMMARY_ID, ANALYZER_NODE_WIDTH, analyzerEdgeArrowMarkerId, analyzerEdgeObstacles, analyzerEdgePaths, analyzerEdgeRelatedToSelection, analyzerFocusDepths, analyzerForegroundEdges, analyzerPresentationCount, analyzerPresentationCountLabel, displayedZoomLevelForNode, evidenceRangeLabel, fitAnalyzerTransform, focusAnalyzerTransform, layoutAnalyzerView, nodeMatchesSearch, preserveAnalyzerTransformOnViewportResize, presentAnalyzerView, regionMatchesSearch, semanticZoomLevelForScale, shouldRunAnalyzerInitialFit, shouldShowAnalyzerEvidencePreview, type AnalyzerEdgeRoutingDiagnostic, type AnalyzerFanoutRoutingDiagnostic, type AnalyzerGraphTransform, type AnalyzerViewCounts, type AnalyzerViewEdge, type AnalyzerViewModel, type PositionedGraphEndpoint, type PositionedNode } from '../../analyzer';
 import { analyzerRegionContextEntityIds, analyzerStackCountLabel, displayDictionaryStack, factDictionaryStackId, nodeTypeLabels } from '../../analyzer';
 import { stackPath } from '../../utils/routes';
 import { EvidencePreview } from './EvidenceCodeBlock';
@@ -556,10 +556,7 @@ export function AnalyzerGraphStage({
     if (!source || !target || !path) return null;
     const routing = edgeRoutingResult.edgeDiagnostics.get(edge.id);
     const selected = edge.id === selectedEdgeId;
-    const connected = !selected && (
-      selectionContext.connectedEntityIds.has(edge.sourceId)
-      || selectionContext.connectedEntityIds.has(edge.targetId)
-    );
+    const connected = !selected && analyzerEdgeRelatedToSelection(edge, undefined, selectedNodeId, selectedRegionId);
     const sourceNode = 'node' in source ? source.node : undefined;
     const targetNode = 'node' in target ? target.node : undefined;
     const inContext = Boolean(

@@ -7,6 +7,19 @@ export interface AnalyzerEdgeArrowState {
   focusDepth?: number;
 }
 
+/** True when the edge is the selected edge or is incident to the selected node / region. */
+export function analyzerEdgeRelatedToSelection(
+  edge: Pick<AnalyzerViewEdge, 'id' | 'sourceId' | 'targetId'>,
+  selectedEdgeId?: string,
+  selectedNodeId?: string,
+  selectedRegionId?: string,
+): boolean {
+  if (selectedEdgeId && edge.id === selectedEdgeId) return true;
+  if (selectedNodeId && (edge.sourceId === selectedNodeId || edge.targetId === selectedNodeId)) return true;
+  if (selectedRegionId && (edge.sourceId === selectedRegionId || edge.targetId === selectedRegionId)) return true;
+  return false;
+}
+
 /**
  * Returns the edges that belong to the foreground layer, keeping a selected
  * edge after all other foreground edges so shared routes cannot cover it.
@@ -17,11 +30,7 @@ export function analyzerForegroundEdges(
   selectedNodeId?: string,
   selectedRegionId?: string,
 ): AnalyzerViewEdge[] {
-  const foreground = edges.filter((edge) => edge.id === selectedEdgeId || Boolean(
-    (selectedNodeId || selectedRegionId)
-      && ((selectedNodeId && (edge.sourceId === selectedNodeId || edge.targetId === selectedNodeId))
-        || (selectedRegionId && (edge.sourceId === selectedRegionId || edge.targetId === selectedRegionId))),
-  ));
+  const foreground = edges.filter((edge) => analyzerEdgeRelatedToSelection(edge, selectedEdgeId, selectedNodeId, selectedRegionId));
   if (!selectedEdgeId) return foreground;
 
   const selectedIndex = foreground.findIndex((edge) => edge.id === selectedEdgeId);
