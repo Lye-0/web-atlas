@@ -1,6 +1,7 @@
 import { getCategory, getStack } from '../data';
 import { makeEvidence, type OffsetRange } from './evidence';
 import { parseCommandExpression, type CommandFragment } from './commandParser';
+import { commandTerminalTarget } from './commandTargets';
 import {
   analyzerViewLabels,
   nodeTypeLabels,
@@ -796,7 +797,15 @@ export function projectWorkspace(store: AnalyzerProjectStore): AnalyzerViewModel
             : 'workspace:packages';
       return nodeForFact(fact, clusterId);
     });
-  const edges = edgesForRelations(store, nodes, (relation) => ['uses-config', 'declares', 'matches'].includes(relation.kind));
+  const rootPackageIds = new Set(
+    store.facts
+      .filter((fact): fact is WorkspacePackageFact => fact.kind === 'workspace-package' && fact.isRoot)
+      .map((fact) => fact.id),
+  );
+  const edges = edgesForRelations(store, nodes, (relation) => {
+    if (['uses-config', 'declares', 'matches'].includes(relation.kind)) return true;
+    return relation.kind === 'contains' && relation.sourceId === 'project:root' && rootPackageIds.has(relation.targetId);
+  });
   const warnings = baseWarnings(store, 'workspace');
   if (!store.facts.some((fact) => fact.kind === 'workspace-config')) {
     warnings.push({ id: 'workspace:no-config', message: 'No pnpm-workspace.yaml was detected', severity: 'warning', detectorId: 'workspace' });
@@ -870,6 +879,41 @@ function commandLaneMetadata(context: CommandExecutionContext): AnalyzerViewNode
     : {};
 }
 
+function nearestPackageIdForPath(filePath: string, packages: readonly WorkspacePackageFact[]): string | undefined {
+  return packages
+    .filter((candidate) => pathBelongsToPackage(filePath, candidate.packagePath))
+    .sort((first, second) => second.packagePath.length - first.packagePath.length || first.packagePath.localeCompare(second.packagePath))[0]?.id;
+}
+
+function commandTerminalEvidenceIds(
+  store: AnalyzerProjectStore,
+  fact: AnalyzerFact,
+  script: PackageScriptFact,
+  relationEvidenceIds: readonly string[],
+  packages: readonly WorkspacePackageFact[],
+  evidenceById: Map<string, AnalyzerEvidence>,
+): string[] {
+  const lookup = (evidenceId: string) => evidenceById.get(evidenceId) ?? store.evidence.find((candidate) => candidate.id === evidenceId);
+  const relationIds = [...new Set(relationEvidenceIds.filter((evidenceId) => lookup(evidenceId)))];
+  const localFactIds = fact.evidenceIds.filter((evidenceId) => {
+    const evidence = lookup(evidenceId);
+    return evidence ? nearestPackageIdForPath(evidence.filePath, packages) === script.packageId : false;
+  });
+  const preferred = [...new Set([...relationIds, ...localFactIds])];
+  return preferred.length > 0 ? preferred : [...fact.evidenceIds];
+}
+
+function mergeCommandViewEvidenceIds(
+  current: AnalyzerViewNode | undefined,
+  factNode: AnalyzerViewNode,
+  scopedEvidenceIds?: readonly string[],
+): string[] {
+  const scoped = scopedEvidenceIds && scopedEvidenceIds.length > 0 ? [...scopedEvidenceIds] : undefined;
+  if (!current) return scoped ?? factNode.evidenceIds;
+  if (!scoped) return current.evidenceIds;
+  return [...new Set([...current.evidenceIds, ...scoped])];
+}
+
 function commandBranchLabel(fragment: CommandFragment, index: number): string {
   const value = fragment.packageSelector?.replace(/^@[^/]+\//, '') ?? fragment.scriptName ?? fragment.toolName ?? `Branch ${index + 1}`;
   return value.toUpperCase();
@@ -896,6 +940,7 @@ function commandNode(
       ...(fragment.operator ? { operator: fragment.operator } : {}),
       ...(fragment.packageSelector ? { packageSelector: fragment.packageSelector } : {}),
       ...(fragment.scriptName ? { scriptName: fragment.scriptName } : {}),
+      ...(fragment.toolName ? { toolName: fragment.toolName } : {}),
       executionRank,
       executionDepth,
       branchPath,
@@ -914,18 +959,6 @@ function addViewEdge(edges: Map<string, AnalyzerViewEdge>, edge: AnalyzerViewEdg
   edges.set(edge.id, edge);
 }
 
-function terminalTechnologyId(fragment: CommandFragment, store: AnalyzerProjectStore, sourceScript: PackageScriptFact): string | undefined {
-  const tool = fragment.toolName?.toLowerCase();
-  if (!tool) return undefined;
-  const tech = store.facts.find((fact) => fact.kind === 'technology' && fact.packageNames.some((name) => name.toLowerCase() === tool));
-  if (tech) return tech.id;
-  if (tool === 'wrangler') {
-    return store.facts.find((fact) => fact.kind === 'runtime' && fact.packageId === sourceScript.packageId && fact.runtimeType === 'cloudflare-workers')?.id;
-  }
-  if (tool === 'firebase') return store.facts.find((fact) => fact.kind === 'technology' && fact.id === 'technology:firebase')?.id;
-  return undefined;
-}
-
 export function projectCommand(store: AnalyzerProjectStore, requestedEntryScriptId?: string): AnalyzerViewModel {
   const allScripts = scriptFacts(store);
   const packages = packageFacts(store);
@@ -941,17 +974,29 @@ export function projectCommand(store: AnalyzerProjectStore, requestedEntryScript
   const visited = new Set<string>();
   const active = new Set<string>();
 
-  const addFactNode = (fact: AnalyzerFact, clusterId: string, typeOverride?: AnalyzerNodeType, context?: CommandExecutionContext) => {
+  const addFactNode = (
+    fact: AnalyzerFact,
+    clusterId: string,
+    typeOverride?: AnalyzerNodeType,
+    context?: CommandExecutionContext,
+    scopedEvidenceIds?: readonly string[],
+  ) => {
     const nextNode = nodeForFact(fact, clusterId, typeOverride);
+    const evidenceIds = mergeCommandViewEvidenceIds(nodes.get(fact.id), nextNode, scopedEvidenceIds);
     if (!context) {
-      nodes.set(fact.id, nextNode);
+      nodes.set(fact.id, { ...nextNode, evidenceIds });
       return;
     }
     const currentNode = nodes.get(fact.id);
     const currentRank = currentNode?.metadata.executionRank;
-    if (typeof currentRank === 'number' && currentRank <= context.executionRank) return;
+    if (currentNode && typeof currentRank === 'number' && currentRank <= context.executionRank) {
+      nodes.set(fact.id, { ...currentNode, evidenceIds });
+      return;
+    }
+    const baseNode = currentNode ?? nextNode;
     nodes.set(fact.id, {
-      ...(currentNode ?? nextNode),
+      ...baseNode,
+      evidenceIds,
       metadata: {
         ...(currentNode?.metadata ?? nextNode.metadata),
         executionRank: context.executionRank,
@@ -1038,23 +1083,23 @@ export function projectCommand(store: AnalyzerProjectStore, requestedEntryScript
       addCommandWarning(warnings, `Unknown command fragment retained: ${fragment.text}`, script);
       return;
     }
-    const terminalId = terminalTechnologyId(fragment, store, script);
-    if (terminalId) {
-      const terminalFact = store.facts.find((fact) => fact.id === terminalId);
+    const terminal = commandTerminalTarget(fragment, store, script);
+    if (terminal) {
+      const terminalFact = store.facts.find((fact) => fact.id === terminal.factId);
       if (terminalFact) {
         addFactNode(terminalFact, 'command:commands', undefined, {
           executionRank: context.executionRank + 1,
           executionDepth: context.executionDepth + 1,
           branchPath: context.branchPath,
           ...commandLaneMetadata(context),
-        });
+        }, commandTerminalEvidenceIds(store, terminalFact, script, evidenceIds, packages, generatedEvidence));
       }
       addViewEdge(edges, {
-        id: `view-edge:${commandId}:${terminalId}:starts`,
+        id: `view-edge:${commandId}:${terminal.factId}:${terminal.kind}`,
         sourceId: commandId,
-        targetId: terminalId,
-        kind: 'starts',
-        label: relationLabels.starts,
+        targetId: terminal.factId,
+        kind: terminal.kind,
+        label: relationLabels[terminal.kind],
         evidenceIds,
         metadata: { terminal: true, executionRank: context.executionRank + 1, branchPath: context.branchPath },
       });

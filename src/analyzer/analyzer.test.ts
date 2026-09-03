@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { parseCommandExpression } from './commandParser';
+import { commandInvocation, parseCommandExpression } from './commandParser';
+import { COMMAND_EXECUTABLE_STACK_IDS } from './commandTargets';
 import { evidenceRangeLabel, makeEvidence, positionAt } from './evidence';
 import { isAnalyzerSourcePath, isAnalyzerUsageSourcePath, isExcludedPath, sourceFilesFromInput } from './fileDiscovery';
 import { parseDotnetProject, parsePackageJson, parsePnpmWorkspace, parseWranglerConfig } from './parsers';
@@ -8,6 +9,7 @@ import { analyzerSummarySubtitle, presentationOwnsNode, presentAnalyzerView } fr
 import { scanProjectFiles } from './scan';
 import { packageIdForPath, scriptIdFor, type AnalyzerProjectStore, type AnalyzerSourceFile, type AnalyzerViewModel } from './types';
 import { ANALYZER_NEAR_NODE_HEIGHT, ANALYZER_NODE_HEIGHT, layoutAnalyzerView, type PositionedGraphEndpoint } from './layout';
+import { getStack } from '../data';
 import { analyzerEdgeObstacles, analyzerEdgeRoutes, type AnalyzerFanoutRoutingDiagnostic } from './edgeRouting';
 import { ANALYZER_FIT_PADDING, fitAnalyzerTransform, focusAnalyzerTransform, preserveAnalyzerTransformOnViewportResize, shouldRunAnalyzerInitialFit } from './camera';
 import { analyzerRelationInverseLabels, relationLabelForNode } from './relations';
@@ -142,6 +144,98 @@ function stackMapScopeFixture(): AnalyzerSourceFile[] {
     fixtureFile('Standalone/Standalone.csproj', '<Project Sdk="Microsoft.NET.Sdk" />\n'),
     fixtureFile('Standalone/tsconfig.json', '{ "compilerOptions": { "strict": true } }\n'),
     fixtureFile('.kilo/tsconfig.json', '{ "compilerOptions": { "strict": true } }\n'),
+  ];
+}
+
+function vehicleManagementWorkspaceFixture(): AnalyzerSourceFile[] {
+  return [
+    fixtureFile('package.json', '{ "name": "vehicle-management", "packageManager": "pnpm@9.0.0" }\n'),
+    fixtureFile('pnpm-workspace.yaml', 'packages:\n  - "apps/*"\n  - "packages/*"\n  - "tools/*"\n'),
+    fixtureFile('apps/api/package.json', '{ "name": "api" }\n'),
+    fixtureFile('apps/web/package.json', '{ "name": "web" }\n'),
+    fixtureFile('packages/database/package.json', '{ "name": "database" }\n'),
+    fixtureFile('packages/shared/package.json', '{ "name": "shared" }\n'),
+  ];
+}
+
+function gitLinesWorkspaceFixture(): AnalyzerSourceFile[] {
+  return [
+    fixtureFile('package.json', '{ "name": "git-lines", "packageManager": "pnpm@9.0.0" }\n'),
+    fixtureFile('pnpm-workspace.yaml', 'packages: []\n'),
+  ];
+}
+
+function commandEvidenceLocalityFixture(): AnalyzerSourceFile[] {
+  return [
+    fixtureFile('package.json', JSON.stringify({ name: 'locality-root', packageManager: 'pnpm@9.0.0' })),
+    fixtureFile('pnpm-workspace.yaml', 'packages:\n  - "apps/*"\n'),
+    fixtureFile('apps/api/package.json', JSON.stringify({
+      name: 'api',
+      scripts: { build: 'tsc -b', test: 'vitest' },
+      devDependencies: {
+        typescript: '^5.0.0',
+        vitest: '^3.0.0',
+        wrangler: '^4.0.0',
+        'drizzle-kit': '^0.31.0',
+      },
+    }, null, 2)),
+    fixtureFile('apps/web/package.json', JSON.stringify({
+      name: 'web',
+      scripts: {
+        'build:production': 'tsc -b && vite build',
+        test: 'vitest',
+        'db:generate': 'drizzle-kit generate',
+        'dev:worker': 'wrangler dev',
+        'db:migrate': 'wrangler d1 migrations apply DB --local',
+      },
+      devDependencies: {
+        typescript: '^5.0.0',
+        vite: '^7.0.0',
+        vitest: '^3.0.0',
+        'drizzle-kit': '^0.31.0',
+        wrangler: '^4.0.0',
+      },
+    }, null, 2)),
+    fixtureFile('apps/api/wrangler.jsonc', '{ "name": "api-worker", "main": "src/index.ts" }\n'),
+    fixtureFile('apps/web/wrangler.jsonc', `{
+  "name": "web-worker",
+  "main": "src/index.ts",
+  "d1_databases": [{ "binding": "DB", "database_name": "web", "database_id": "id" }]
+}`),
+  ];
+}
+
+function commandSemanticFixture(): AnalyzerSourceFile[] {
+  const manifest = JSON.stringify({
+    name: 'command-semantics',
+    packageManager: 'pnpm@9.12.0',
+    scripts: {
+      check: 'pnpm run lint && pnpm run test && pnpm run build',
+      lint: 'eslint .',
+      test: 'vitest',
+      build: 'vite build && tsc -b',
+      'db:generate': 'drizzle-kit generate',
+      'dev:worker': 'wrangler dev',
+      'db:migrate': 'wrangler d1 migrations apply DB --local --env development',
+      types: 'wrangler types',
+      dev: 'concurrently "pnpm run dev:worker" "pnpm run test"',
+    },
+    devDependencies: {
+      vite: '^7.0.0',
+      vitest: '^3.0.0',
+      typescript: '^5.0.0',
+      'drizzle-kit': '^0.31.0',
+      wrangler: '^4.0.0',
+    },
+  }, null, 2);
+  return [
+    fixtureFile('package.json', manifest),
+    fixtureFile('pnpm-workspace.yaml', 'packages:\n  - "apps/*"\n'),
+    fixtureFile('wrangler.jsonc', `{
+  "name": "worker",
+  "main": "src/index.ts",
+  "d1_databases": [{ "binding": "DB", "database_name": "atlas", "database_id": "id" }]
+}`),
   ];
 }
 
@@ -290,6 +384,18 @@ describe('Analyzer command parsing', () => {
     expect(fragments[2].children[0].scriptName).toBe('api');
     expect(fragments[2].children[1].toolName).toBe('vite');
     expect(parseCommandExpression('pnpm exec vite')[0]).toMatchObject({ kind: 'pnpm-exec', toolName: 'vite' });
+    expect(parseCommandExpression('vitest')[0]).toMatchObject({ kind: 'cli', toolName: 'vitest' });
+    expect(parseCommandExpression('drizzle-kit generate')[0]).toMatchObject({ kind: 'cli', toolName: 'drizzle-kit' });
+    expect(parseCommandExpression('npx vite')[0]).toMatchObject({ kind: 'cli', toolName: 'vite' });
+    expect(commandInvocation(parseCommandExpression('wrangler d1 migrations apply DB')[0])).toMatchObject({
+      executable: 'wrangler',
+      subcommand: 'd1',
+    });
+    expect(commandInvocation(parseCommandExpression('pnpm exec wrangler d1 migrations apply DB')[0])).toMatchObject({
+      executable: 'wrangler',
+      subcommand: 'd1',
+    });
+    expect(Object.values(COMMAND_EXECUTABLE_STACK_IDS).every((stackId) => getStack(stackId))).toBe(true);
   });
 });
 
@@ -439,8 +545,11 @@ describe('Analyzer scan and projectors', () => {
     const command = projectCommand(store);
 
     expect(workspace.nodes.map((node) => node.type)).not.toContain('external-package');
-    expect(workspace.edges.every((edge) => ['uses-config', 'declares', 'matches'].includes(edge.kind))).toBe(true);
-    expect(workspace.edges.some((edge) => edge.kind === 'contains')).toBe(false);
+    expect(workspace.edges.every((edge) => ['uses-config', 'declares', 'matches', 'contains'].includes(edge.kind))).toBe(true);
+    expect(workspace.edges.filter((edge) => edge.kind === 'contains')).toEqual([
+      expect.objectContaining({ sourceId: 'project:root', targetId: 'package:.', kind: 'contains', label: 'contains' }),
+    ]);
+    expect(workspace.edges.some((edge) => edge.kind === 'contains' && edge.targetId !== 'package:.')).toBe(false);
     expect(dependencies.nodes.map((node) => node.id)).toEqual(expect.arrayContaining(['package:.', 'package:apps/web', 'technology:react', 'external-package:mystery-lib']));
     expect(dependencies.nodes.map((node) => node.id)).toContain('dependencies:external:summary');
     expect(dependencies.nodes.map((node) => node.id)).not.toContain('technology:pnpm');
@@ -454,6 +563,59 @@ describe('Analyzer scan and projectors', () => {
     expect(command.edges.some((edge) => edge.kind === 'runs-in')).toBe(false);
     expect(command.nodes.some((node) => node.id === 'package:apps/web')).toBe(false);
     expect(command.evidence.length).toBeGreaterThan(store.evidence.length);
+  });
+
+  it('connects the Root Package to Project and keeps pattern matches on member packages', async () => {
+    const store = await scanProjectFiles(vehicleManagementWorkspaceFixture());
+    const workspace = projectWorkspace(store);
+    const rootPackage = workspace.nodes.find((node) => node.id === 'package:.');
+    const patternMatches = (pattern: string) => workspace.edges
+      .filter((edge) => edge.kind === 'matches' && edge.sourceId.startsWith(`workspace-pattern:${pattern}:`))
+      .map((edge) => edge.targetId)
+      .sort();
+    const packages = workspace.nodes.filter((node) => node.type === 'workspace-package');
+
+    expect(rootPackage).toMatchObject({ type: 'workspace-package', metadata: { displayRole: 'ROOT PACKAGE' } });
+    expect(workspace.edges).toEqual(expect.arrayContaining([
+      expect.objectContaining({ sourceId: 'project:root', targetId: 'package:.', kind: 'contains' }),
+      expect.objectContaining({ sourceId: 'project:root', targetId: 'workspace:pnpm', kind: 'uses-config' }),
+    ]));
+    expect(workspace.edges.some((edge) => edge.kind === 'matches' && edge.targetId === 'package:.')).toBe(false);
+    expect(workspace.edges.some((edge) => edge.kind === 'contains' && edge.sourceId === 'project:root' && edge.targetId !== 'package:.')).toBe(false);
+    expect(patternMatches('apps/*')).toEqual(['package:apps/api', 'package:apps/web']);
+    expect(patternMatches('packages/*')).toEqual(['package:packages/database', 'package:packages/shared']);
+    expect(patternMatches('tools/*')).toEqual([]);
+    expect(workspace.nodes.some((node) => node.type === 'workspace-pattern' && node.label === 'tools/*')).toBe(true);
+    expect(packages.map((node) => node.id).sort()).toEqual([
+      'package:.',
+      'package:apps/api',
+      'package:apps/web',
+      'package:packages/database',
+      'package:packages/shared',
+    ]);
+    expect(relationLabelForNode({
+      sourceId: 'project:root',
+      targetId: 'package:.',
+      kind: 'contains',
+      label: 'contains',
+    }, 'package:.')).toBe('contained-by');
+  });
+
+  it('keeps a single-package repository as Project, Root Package, and Workspace Config', async () => {
+    const store = await scanProjectFiles(gitLinesWorkspaceFixture());
+    const workspace = projectWorkspace(store);
+    const packageNodes = workspace.nodes.filter((node) => node.type === 'workspace-package');
+
+    expect(workspace.nodes.map((node) => node.type).sort()).toEqual(['project', 'workspace-config', 'workspace-package'].sort());
+    expect(workspace.nodes.some((node) => node.type === 'workspace-pattern')).toBe(false);
+    expect(packageNodes).toHaveLength(1);
+    expect(packageNodes[0]).toMatchObject({ id: 'package:.', metadata: { displayRole: 'ROOT PACKAGE' } });
+    expect(workspace.edges).toEqual(expect.arrayContaining([
+      expect.objectContaining({ sourceId: 'project:root', targetId: 'package:.', kind: 'contains' }),
+      expect.objectContaining({ sourceId: 'project:root', targetId: 'workspace:pnpm', kind: 'uses-config' }),
+    ]));
+    expect(workspace.edges.some((edge) => edge.kind === 'matches')).toBe(false);
+    expect(workspace.edges.filter((edge) => edge.kind === 'contains')).toHaveLength(1);
   });
 
   it('flattens a single-source External Summary without changing the underlying dependency facts', async () => {
@@ -864,7 +1026,7 @@ describe('Analyzer scan and projectors', () => {
     expect(rootScript.y).toBe(concurrently.y);
     expect(layout.lanes.some((lane) => lane.label.startsWith('COMMON · '))).toBe(true);
     command.edges
-      .filter((edge) => ['expands-to', 'resolves-to', 'starts'].includes(edge.kind))
+      .filter((edge) => ['expands-to', 'resolves-to', 'starts', 'uses'].includes(edge.kind))
       .forEach((edge) => {
         const source = layout.nodes.find((candidate) => candidate.node.id === edge.sourceId);
         const target = layout.nodes.find((candidate) => candidate.node.id === edge.targetId);
@@ -885,7 +1047,7 @@ describe('Analyzer scan and projectors', () => {
     expect(branchSummaries).toHaveLength(2);
     expect(webBranch).toBeDefined();
     expect(collapsed.nodes.some((node) => node.label === 'pnpm exec vite')).toBe(false);
-    expect(collapsed.counts).toEqual({ visibleNodes: 5, totalNodes: 10, hiddenNodes: 5 });
+    expect(collapsed.counts).toEqual({ visibleNodes: 5, totalNodes: 11, hiddenNodes: 6 });
     expect(layoutAnalyzerView(collapsed).lanes).toHaveLength(3);
     expect(expanded.nodes.some((node) => node.label === 'pnpm exec vite')).toBe(true);
     expect(expanded.nodes.some((node) => node.id === webBranch?.id)).toBe(false);
@@ -916,6 +1078,135 @@ describe('Analyzer scan and projectors', () => {
     expect(command.entryScriptId).toBe(cycleId);
     expect(command.edges.some((edge) => edge.kind === 'resolves-to' && edge.targetId === cycleId)).toBe(true);
     expect(command.warnings.some((warning) => warning.message.includes('Command cycle detected'))).toBe(true);
+  });
+
+  it('resolves Wrangler subcommands and explicit CLI stack terminals without changing && / concurrently presentation', async () => {
+    const store = await scanProjectFiles(commandSemanticFixture());
+    const root = packageIdForPath('.');
+    const commandFor = (scriptName: string) => projectCommand(store, scriptIdFor(root, scriptName));
+    const terminalFrom = (view: AnalyzerViewModel, commandLabel: string) => {
+      const commandNode = view.nodes.find((node) => node.type === 'command' && node.label === commandLabel);
+      expect(commandNode).toBeDefined();
+      return view.edges.filter((edge) => edge.sourceId === commandNode!.id && edge.metadata.terminal === true);
+    };
+
+    const worker = commandFor('dev:worker');
+    expect(terminalFrom(worker, 'wrangler dev')).toEqual([
+      expect.objectContaining({ targetId: 'runtime:cloudflare-workers:wrangler.jsonc', kind: 'starts' }),
+    ]);
+
+    const migrate = commandFor('db:migrate');
+    const d1Terminals = terminalFrom(migrate, 'wrangler d1 migrations apply DB --local --env development');
+    expect(d1Terminals).toEqual([
+      expect.objectContaining({ targetId: 'resource:wrangler.jsonc:d1:DB', kind: 'uses' }),
+    ]);
+    expect(d1Terminals.some((edge) => edge.kind === 'starts' && edge.targetId === 'runtime:cloudflare-workers:wrangler.jsonc')).toBe(false);
+    expect(migrate.edges.some((edge) => (
+      edge.kind === 'starts'
+      && edge.targetId === 'runtime:cloudflare-workers:wrangler.jsonc'
+    ))).toBe(false);
+
+    const types = commandFor('types');
+    expect(terminalFrom(types, 'wrangler types')).toEqual([
+      expect.objectContaining({ targetId: 'runtime:cloudflare-workers:wrangler.jsonc', kind: 'uses' }),
+    ]);
+
+    const build = commandFor('build');
+    expect(terminalFrom(build, 'vite build')).toEqual([
+      expect.objectContaining({ targetId: 'technology:vite', kind: 'starts' }),
+    ]);
+    expect(terminalFrom(build, 'tsc -b')).toEqual([
+      expect.objectContaining({ targetId: 'technology:typescript', kind: 'uses' }),
+    ]);
+    expect(build.edges.filter((edge) => edge.sourceId === scriptIdFor(root, 'build') && edge.kind === 'expands-to')).toEqual([
+      expect.objectContaining({ metadata: expect.not.objectContaining({ operator: '&&' }) }),
+      expect.objectContaining({ metadata: expect.objectContaining({ operator: '&&' }) }),
+    ]);
+    expect(build.edges.some((edge) => edge.sourceId.startsWith('user-command:') && edge.targetId === 'technology:vite')).toBe(false);
+
+    const testView = commandFor('test');
+    expect(terminalFrom(testView, 'vitest')).toEqual([
+      expect.objectContaining({ targetId: 'technology:vitest', kind: 'starts' }),
+    ]);
+
+    const generate = commandFor('db:generate');
+    expect(terminalFrom(generate, 'drizzle-kit generate')).toEqual([
+      expect.objectContaining({ targetId: 'technology:drizzle-orm', kind: 'uses' }),
+    ]);
+
+    const check = commandFor('check');
+    const checkFanout = check.edges.filter((edge) => edge.sourceId === scriptIdFor(root, 'check') && edge.kind === 'expands-to');
+    expect(checkFanout).toHaveLength(3);
+    expect(checkFanout.map((edge) => edge.metadata.operator)).toEqual([undefined, '&&', '&&']);
+    expect(check.edges.some((edge) => edge.sourceId === scriptIdFor(root, 'check') && edge.targetId === 'technology:vite')).toBe(false);
+
+    const entry = commandFor('dev');
+    const concurrently = entry.nodes.find((node) => node.metadata.commandType === 'concurrently');
+    expect(concurrently).toBeDefined();
+    const parallel = entry.edges.filter((edge) => edge.sourceId === concurrently!.id && edge.kind === 'starts' && edge.metadata.parallel === true);
+    expect(parallel).toHaveLength(2);
+    expect(parallel.every((edge) => edge.metadata.operator !== '&&')).toBe(true);
+    expect(entry.nodes.some((node) => node.metadata.commandType === 'branch-summary')).toBe(true);
+  });
+
+  it('shows Command Flow technology evidence from the current command package, not a sibling scope', async () => {
+    const store = await scanProjectFiles(commandEvidenceLocalityFixture());
+    const web = packageIdForPath('apps/web');
+    const commandFor = (scriptName: string) => projectCommand(store, scriptIdFor(web, scriptName));
+    const evidenceForNode = (view: AnalyzerViewModel, nodeId: string) => {
+      const node = view.nodes.find((candidate) => candidate.id === nodeId);
+      expect(node).toBeDefined();
+      return node!.evidenceIds
+        .map((evidenceId) => view.evidence.find((candidate) => candidate.id === evidenceId))
+        .filter((candidate): candidate is NonNullable<typeof candidate> => Boolean(candidate));
+    };
+    const representativePath = (view: AnalyzerViewModel, nodeId: string) => evidenceForNode(view, nodeId)[0]?.filePath;
+    const terminalTarget = (view: AnalyzerViewModel, commandLabel: string) => {
+      const commandNode = view.nodes.find((node) => node.type === 'command' && node.label === commandLabel);
+      expect(commandNode).toBeDefined();
+      return view.edges.find((edge) => edge.sourceId === commandNode!.id && edge.metadata.terminal === true);
+    };
+
+    const production = commandFor('build:production');
+    const typescriptEvidence = evidenceForNode(production, 'technology:typescript');
+    const viteEvidence = evidenceForNode(production, 'technology:vite');
+    expect(terminalTarget(production, 'tsc -b')).toMatchObject({ targetId: 'technology:typescript', kind: 'uses' });
+    expect(terminalTarget(production, 'vite build')).toMatchObject({ targetId: 'technology:vite', kind: 'starts' });
+    expect(representativePath(production, 'technology:typescript')).toBe('apps/web/package.json');
+    expect(representativePath(production, 'technology:vite')).toBe('apps/web/package.json');
+    expect(typescriptEvidence.every((evidence) => evidence.filePath.startsWith('apps/web'))).toBe(true);
+    expect(viteEvidence.every((evidence) => evidence.filePath.startsWith('apps/web'))).toBe(true);
+    expect(typescriptEvidence.some((evidence) => evidence.filePath === 'apps/api/package.json')).toBe(false);
+
+    const testView = commandFor('test');
+    expect(terminalTarget(testView, 'vitest')).toMatchObject({ targetId: 'technology:vitest', kind: 'starts' });
+    expect(representativePath(testView, 'technology:vitest')).toBe('apps/web/package.json');
+    expect(evidenceForNode(testView, 'technology:vitest').every((evidence) => evidence.filePath.startsWith('apps/web'))).toBe(true);
+
+    const generate = commandFor('db:generate');
+    expect(terminalTarget(generate, 'drizzle-kit generate')).toMatchObject({ targetId: 'technology:drizzle-orm', kind: 'uses' });
+    expect(representativePath(generate, 'technology:drizzle-orm')).toBe('apps/web/package.json');
+    expect(evidenceForNode(generate, 'technology:drizzle-orm').every((evidence) => evidence.filePath.startsWith('apps/web'))).toBe(true);
+
+    const worker = commandFor('dev:worker');
+    expect(terminalTarget(worker, 'wrangler dev')).toMatchObject({
+      targetId: 'runtime:cloudflare-workers:apps/web/wrangler.jsonc',
+      kind: 'starts',
+    });
+    expect(representativePath(worker, 'runtime:cloudflare-workers:apps/web/wrangler.jsonc')).toBe('apps/web/package.json');
+    expect(evidenceForNode(worker, 'runtime:cloudflare-workers:apps/web/wrangler.jsonc').every((evidence) => evidence.filePath.startsWith('apps/web'))).toBe(true);
+
+    const migrate = commandFor('db:migrate');
+    expect(terminalTarget(migrate, 'wrangler d1 migrations apply DB --local')).toMatchObject({
+      targetId: 'resource:apps/web/wrangler.jsonc:d1:DB',
+      kind: 'uses',
+    });
+    expect(representativePath(migrate, 'resource:apps/web/wrangler.jsonc:d1:DB')).toBe('apps/web/package.json');
+    expect(evidenceForNode(migrate, 'resource:apps/web/wrangler.jsonc:d1:DB').every((evidence) => evidence.filePath.startsWith('apps/web'))).toBe(true);
+
+    const stackMap = projectStackMap(store);
+    expect(stackMap.nodes.some((node) => node.type === 'stack-usage' && node.metadata.stackId === 'typescript' && node.metadata.scopePath === 'apps/api')).toBe(true);
+    expect(stackMap.nodes.some((node) => node.type === 'stack-usage' && node.metadata.stackId === 'typescript' && node.metadata.scopePath === 'apps/web')).toBe(true);
   });
 });
 

@@ -4,6 +4,7 @@ export * from './evidence';
 export * from './fileDiscovery';
 export * from './parsers';
 export * from './commandParser';
+export * from './commandTargets';
 export * from './scan';
 export * from './projectors';
 export * from './layout';

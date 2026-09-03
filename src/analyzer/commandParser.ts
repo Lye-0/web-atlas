@@ -197,7 +197,28 @@ function classifyRange(source: string, start: number, end: number, operator?: Sh
     }
   }
 
-  const knownCliNames = new Set(['vite', 'wrangler', 'firebase', 'node', 'npm', 'npx', 'yarn', 'tsc', 'eslint', 'prettier', 'biome', 'dotnet']);
+  const knownCliNames = new Set([
+    'vite',
+    'vitest',
+    'wrangler',
+    'firebase',
+    'node',
+    'npm',
+    'npx',
+    'yarn',
+    'tsc',
+    'eslint',
+    'prettier',
+    'biome',
+    'dotnet',
+    'drizzle-kit',
+  ]);
+  if (first === 'npx') {
+    const toolToken = tokens.find((token, index) => index > 0 && !token.value.startsWith('-'));
+    if (toolToken) {
+      return { text, start: range.start, end: range.end, kind: 'cli', toolName: toolToken.value, children, ...(operator ? { operator } : {}) };
+    }
+  }
   if (knownCliNames.has(first)) {
     return { text, start: range.start, end: range.end, kind: 'cli', toolName: tokens[0].value, children, ...(operator ? { operator } : {}) };
   }
@@ -208,4 +229,26 @@ export function parseCommandExpression(command: string): CommandFragment[] {
   return splitShellOperators(command)
     .map((segment) => classifyRange(command, segment.start, segment.end, segment.operator))
     .filter((fragment) => fragment.text.length > 0);
+}
+
+function isFlagToken(value: string): boolean {
+  return value.startsWith('-');
+}
+
+/** Resolves the CLI executable already classified on a fragment, plus the first non-flag subcommand. */
+export function commandInvocation(fragment: CommandFragment): { executable: string; subcommand?: string; positionalArgs: string[] } | undefined {
+  if (fragment.kind !== 'cli' && fragment.kind !== 'pnpm-exec') return undefined;
+  const executable = fragment.toolName?.toLowerCase();
+  if (!executable) return undefined;
+  const tokens = tokenize(fragment.text, 0, fragment.text.length);
+  const executableIndex = tokens.findIndex((token) => token.value.toLowerCase() === executable);
+  const afterExecutable = (executableIndex >= 0 ? tokens.slice(executableIndex + 1) : tokens.slice(1))
+    .map((token) => token.value)
+    .filter((value) => !isFlagToken(value));
+  const subcommand = afterExecutable[0]?.toLowerCase();
+  return {
+    executable,
+    ...(subcommand ? { subcommand } : {}),
+    positionalArgs: afterExecutable,
+  };
 }
