@@ -7,17 +7,20 @@ import {
   aggregateSpatialEdges,
   spatialEdgeAltitude,
   spatialEdgeClass,
+  spatialModuleBlockDimensions,
   spatialLabelScreenScale,
   spatialModuleShouldRender,
   spatialModuleBudget,
   spatialEdgeEmptyReason,
   spatialRegionBorderStyle,
   spatialRegionFillOpacity,
+  spatialRegionDepthElevation,
+  spatialModuleElevation,
   spatialSelectionKind,
   spatialUsesRegionAggregation,
   spatialLocalEdgeBudget,
 } from './spatialPresentation';
-import { routeSpatialEdge, spatialRouteXyExcursion } from './spatialRouting';
+import { routeSpatialEdge, spatialRouteIntersectsObstacle, spatialRouteXyExcursion } from './spatialRouting';
 import { collectSpatialEdges } from './spatialGraph';
 import type { AnalyzerSemanticRegion, AnalyzerViewEdge, AnalyzerViewModel, AnalyzerViewNode } from './types';
 import type { PositionedNode, PositionedSemanticRegion } from './layout';
@@ -48,6 +51,23 @@ describe('module dependency spatial presentation', () => {
     expect(spatialRegionBorderStyle(true, 'directory').className).toBe('region-border-selected');
     expect(spatialRegionBorderStyle(false, 'workspace-package').className).toBe('region-border');
     expect(spatialRegionBorderStyle(true, 'directory').opacity).toBeLessThan(0.6);
+  });
+
+  it('keeps the package-to-edge depth hierarchy and preserves Far module existence', () => {
+    expect(spatialRegionDepthElevation('workspace-package', 0)).toBeLessThan(spatialRegionDepthElevation('directory', 1));
+    expect(spatialRegionDepthElevation('directory', 1)).toBeLessThan(spatialRegionDepthElevation('directory', 2));
+    expect(spatialRegionDepthElevation('directory', 2)).toBeLessThan(spatialModuleElevation(2));
+    expect(spatialEdgeAltitude('local')).toBeGreaterThan(spatialModuleElevation(0));
+    expect(spatialEdgeAltitude('cross-directory')).toBeGreaterThan(spatialEdgeAltitude('local'));
+    expect(spatialEdgeAltitude('cross-package')).toBeGreaterThan(spatialEdgeAltitude('cross-directory'));
+
+    const far = spatialModuleBlockDimensions('far', 36);
+    const near = spatialModuleBlockDimensions('near', 36);
+    expect(far.width).toBeLessThan(near.width);
+    expect(far.height).toBeLessThan(near.height);
+    expect(far.depth).toBeGreaterThan(0);
+    expect(far.zOffset).toBeGreaterThan(0);
+    expect(near.zOffset).toBeLessThan(0);
   });
 
   it('keeps explicit selection visible at every zoom level without conflating collapse', () => {
@@ -118,7 +138,19 @@ describe('module dependency spatial presentation', () => {
     const end = { x: 575, y: 98 };
     expect(route.edgeClass).toBe('local');
     expect(spatialRouteXyExcursion(route.points, start, end)).toBeLessThan(1);
-    expect(Math.max(...route.points.map((point) => point.z))).toBeCloseTo(18);
+    expect(Math.max(...route.points.map((point) => point.z))).toBeGreaterThan(18);
+  });
+
+  it('routes a spatial dependency around an intervening visible module card', () => {
+    const source = { id: 'module:a', x: 0, y: 80, width: 150, height: 36, regionId: 'directory:a', packageId: 'package:a', elevation: 18 };
+    const target = { id: 'module:c', x: 500, y: 80, width: 150, height: 36, regionId: 'directory:a', packageId: 'package:a', elevation: 18 };
+    const blocker = { id: 'module:b', x: 250, y: 80, width: 150, height: 36 };
+    const route = routeSpatialEdge(source, target, [blocker]);
+
+    expect(route.points.length).toBeGreaterThan(2);
+    expect(spatialRouteIntersectsObstacle(route.points, blocker)).toBe(false);
+    expect(route.points[0]).toMatchObject({ x: source.x + source.width, y: source.y + source.height / 2, z: source.elevation });
+    expect(route.points.at(-1)).toMatchObject({ x: target.x, y: target.y + target.height / 2, z: target.elevation });
   });
 });
 
@@ -361,5 +393,32 @@ describe('module dependency spatial selection', () => {
     const directoryALocal = local.filter((item) => item.sourceId === 'module:a' || item.targetId === 'module:a' || item.sourceId.startsWith('module:local-') || item.targetId.startsWith('module:local-'));
     expect(directoryALocal.length).toBeLessThanOrEqual(spatialLocalEdgeBudget('medium'));
     expect(edges.some((item) => item.sourceId === 'module:a' && item.targetId === 'module:c')).toBe(false);
+  });
+
+  it('does not keep an exact module edge when one endpoint leaves the candidate set', () => {
+    const edges = collectSpatialEdges(
+      view,
+      visibleNodes.filter((positioned) => positioned.node.id !== 'module:c'),
+      visibleRegions,
+      regionById,
+      expanded,
+      'near',
+    );
+    expect(edges.some((item) => item.sourceId === 'module:a' && item.targetId === 'module:c')).toBe(false);
+    expect(edges.some((item) => item.sourceId === 'directory:a' && item.targetId === 'directory:b' && item.aggregated)).toBe(true);
+  });
+
+  it('preserves duplicate exact facts as a counted aggregate line', () => {
+    const duplicated: AnalyzerViewModel = {
+      ...view,
+      edges: [edge('duplicate-1', 'module:a', 'module:b'), edge('duplicate-2', 'module:a', 'module:b')],
+    };
+    const relation = collectSpatialEdges(duplicated, visibleNodes, visibleRegions, regionById, expanded, 'near')
+      .find((item) => item.sourceId === 'module:a' && item.targetId === 'module:b');
+    expect(relation).toEqual(expect.objectContaining({
+      aggregated: true,
+      count: 2,
+      edgeIds: ['duplicate-1', 'duplicate-2'],
+    }));
   });
 });

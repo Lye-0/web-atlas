@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { ANALYZER_SPATIAL_TILT_DEGREES, ANALYZER_SPATIAL_YAW_DEGREES, spatialModuleElevation } from './spatialPresentation';
-import { fitSpatialProjectedBounds, computeSpatialWorldBounds, spatialCameraModel } from './spatialCoordinates';
+import {
+  assignSpatialBoundaryPorts,
+  computeSpatialWorldBounds,
+  fitSpatialProjectedBounds,
+  projectSpatialPoint,
+  spatialCameraModel,
+  spatialPortIsOnBoundary,
+} from './spatialCoordinates';
 import {
   PROJECTED_EDGE_ALIGNMENT_EPSILON,
-  applySpatialStubLayout,
   assignProjectedPerimeterPorts,
   buildProjectedGraphEdge,
   extraAltitudeForEdgeClass,
@@ -11,16 +17,24 @@ import {
   projectedArrowPolygon,
   projectedModuleNode,
   projectedPathIsOpen,
+  projectedPathWithinViewport,
   projectedPortOnRect,
   keepProjectedRectInViewport,
+  projectedRectFullyInViewport,
   spatialVisibleProjectedEdgeCount,
   projectedRectFromAnchor,
   projectedRouteExcursion,
   sameProjectedGeometry,
 } from './spatialProjectedGraph';
+import { spatialRouteIntersectsObstacle } from './spatialRouting';
 
 function camera(panX = 0, panY = 0, scale = 1, tilt = 12) {
   return spatialCameraModel({ x: panX, y: panY, scale }, 800, 600, tilt);
+}
+
+function fittedCamera(points: readonly { x: number; y: number; z: number }[], tilt = 12) {
+  const transform = fitSpatialProjectedBounds(points, 800, 600);
+  return spatialCameraModel(transform, 800, 600, tilt, ANALYZER_SPATIAL_YAW_DEGREES, computeSpatialWorldBounds(points));
 }
 
 function moduleEdge(options: {
@@ -84,6 +98,153 @@ describe('projected graph layer', () => {
       expect(source.anchorX).toBeCloseTo(source.cardBounds.x + source.cardBounds.width / 2);
       expect(source.anchorY).toBeCloseTo(source.cardBounds.y + source.cardBounds.height / 2);
     });
+    const visibleView = fittedCamera([
+      { x: 5, y: 72, z: spatialModuleElevation() },
+      { x: 155, y: 108, z: spatialModuleElevation() },
+      { x: 345, y: 72, z: spatialModuleElevation() },
+      { x: 495, y: 108, z: spatialModuleElevation() },
+    ]);
+    expect(moduleEdge({ camera: visibleView }).edge.visible).toBe(true);
+  });
+
+  it('keeps Three world routes aligned with the projected card perimeter terminals', () => {
+    const view = camera(18, 24, 1.1, 14);
+    const sourceWorld = { x: 80, y: 90, width: 150, height: 36, z: spatialModuleElevation() };
+    const targetWorld = { x: 420, y: 180, width: 150, height: 36, z: spatialModuleElevation() };
+    const source = projectedModuleNode('module:a', { x: sourceWorld.x + 75, y: sourceWorld.y + 18, z: sourceWorld.z }, view);
+    const target = projectedModuleNode('module:b', { x: targetWorld.x + 75, y: targetWorld.y + 18, z: targetWorld.z }, view);
+    const ports = assignProjectedPerimeterPorts([{ id: 'world:a-b', source: source.cardBounds, target: target.cardBounds }]).get('world:a-b')!;
+    const edge = buildProjectedGraphEdge({
+      id: 'world:a-b',
+      sourceId: 'module:a',
+      targetId: 'module:b',
+      sourceRegionId: 'directory:a',
+      targetRegionId: 'directory:b',
+      sourceBounds: source.cardBounds,
+      targetBounds: target.cardBounds,
+      sourceZ: sourceWorld.z,
+      targetZ: targetWorld.z,
+      sourcePackageId: 'package:a',
+      targetPackageId: 'package:b',
+      aggregated: false,
+      selected: false,
+      connected: false,
+      dimmed: false,
+      count: 1,
+      camera: view,
+      ports,
+      worldSourceRect: sourceWorld,
+      worldTargetRect: targetWorld,
+      zoomLevel: 'near',
+    });
+    expect(edge.worldPoints.length).toBeGreaterThan(2);
+    expect(edge.points[0]?.x).toBeCloseTo(ports.start.x, 6);
+    expect(edge.points[0]?.y).toBeCloseTo(ports.start.y, 6);
+    expect(edge.points.at(-1)?.x).toBeCloseTo(ports.end.x, 6);
+    expect(edge.points.at(-1)?.y).toBeCloseTo(ports.end.y, 6);
+    expect(projectedPortOnRect(edge.points[0]!, source.cardBounds)).toBe(true);
+    expect(projectedPortOnRect(edge.points.at(-1)!, target.cardBounds)).toBe(true);
+  });
+
+  it('uses canonical world boundary terminals for projected region aggregate routes', () => {
+    const sourceWorld = { x: 40, y: 80, width: 200, height: 160, z: 8 };
+    const targetWorld = { x: 380, y: 120, width: 180, height: 140, z: 8 };
+    const worldPoints = [
+      { x: sourceWorld.x, y: sourceWorld.y, z: sourceWorld.z },
+      { x: sourceWorld.x + sourceWorld.width, y: sourceWorld.y + sourceWorld.height, z: sourceWorld.z },
+      { x: targetWorld.x, y: targetWorld.y, z: targetWorld.z },
+      { x: targetWorld.x + targetWorld.width, y: targetWorld.y + targetWorld.height, z: targetWorld.z },
+    ];
+    const fitted = fitSpatialProjectedBounds(worldPoints, 800, 600);
+    const view = spatialCameraModel(
+      fitted,
+      800,
+      600,
+      ANALYZER_SPATIAL_TILT_DEGREES,
+      ANALYZER_SPATIAL_YAW_DEGREES,
+      computeSpatialWorldBounds(worldPoints),
+    );
+    const sourceBounds = projectWorldRect(sourceWorld, view);
+    const targetBounds = projectWorldRect(targetWorld, view);
+    const worldPorts = assignSpatialBoundaryPorts([{ id: 'region-route', source: sourceWorld, target: targetWorld }]).get('region-route')!;
+    const edge = buildProjectedGraphEdge({
+      id: 'region-route',
+      sourceId: 'directory:source',
+      targetId: 'directory:target',
+      sourceRegionId: 'directory:source',
+      targetRegionId: 'directory:target',
+      sourceBounds,
+      targetBounds,
+      sourceZ: sourceWorld.z,
+      targetZ: targetWorld.z,
+      sourcePackageId: 'package:a',
+      targetPackageId: 'package:b',
+      aggregated: true,
+      selected: false,
+      connected: false,
+      dimmed: false,
+      count: 2,
+      camera: view,
+      ports: {
+        start: projectSpatialPoint(worldPorts.start, view),
+        end: projectSpatialPoint(worldPorts.end, view),
+      },
+      worldSourceRect: sourceWorld,
+      worldTargetRect: targetWorld,
+      worldSourcePort: worldPorts.start,
+      worldTargetPort: worldPorts.end,
+      caption: 'source → target · 2',
+    });
+    expect(spatialPortIsOnBoundary(edge.worldPoints[0]!, sourceWorld)).toBe(true);
+    expect(spatialPortIsOnBoundary(edge.worldPoints.at(-1)!, targetWorld)).toBe(true);
+    expect(edge.points[0]?.x).toBeCloseTo(projectSpatialPoint(worldPorts.start, view).x, 6);
+    expect(edge.points.at(-1)?.y).toBeCloseTo(projectSpatialPoint(worldPorts.end, view).y, 6);
+  });
+
+  it('keeps an occlusion-free Three route when a visible card sits between the endpoints', () => {
+    const sourceWorld = { x: 80, y: 90, width: 150, height: 36, z: spatialModuleElevation() };
+    const targetWorld = { x: 520, y: 90, width: 150, height: 36, z: spatialModuleElevation() };
+    const blocker = { id: 'module:blocker', x: 300, y: 90, width: 150, height: 36 };
+    const view = fittedCamera([
+      { x: sourceWorld.x, y: sourceWorld.y, z: sourceWorld.z },
+      { x: sourceWorld.x + sourceWorld.width, y: sourceWorld.y + sourceWorld.height, z: sourceWorld.z },
+      { x: targetWorld.x, y: targetWorld.y, z: targetWorld.z },
+      { x: targetWorld.x + targetWorld.width, y: targetWorld.y + targetWorld.height, z: targetWorld.z },
+      { x: blocker.x - 14, y: blocker.y - 14, z: sourceWorld.z },
+      { x: blocker.x + blocker.width + 14, y: blocker.y - 14, z: sourceWorld.z },
+    ], 14);
+    const source = projectedModuleNode('module:a', { x: sourceWorld.x + 75, y: sourceWorld.y + 18, z: sourceWorld.z }, view);
+    const target = projectedModuleNode('module:b', { x: targetWorld.x + 75, y: targetWorld.y + 18, z: targetWorld.z }, view);
+    const ports = assignProjectedPerimeterPorts([{ id: 'occlusion-free', source: source.cardBounds, target: target.cardBounds }]).get('occlusion-free');
+    const edge = buildProjectedGraphEdge({
+      id: 'occlusion-free',
+      sourceId: 'module:a',
+      targetId: 'module:b',
+      sourceRegionId: 'directory:a',
+      targetRegionId: 'directory:a',
+      sourceBounds: source.cardBounds,
+      targetBounds: target.cardBounds,
+      sourceZ: sourceWorld.z,
+      targetZ: targetWorld.z,
+      sourcePackageId: 'package:a',
+      targetPackageId: 'package:a',
+      aggregated: false,
+      selected: false,
+      connected: false,
+      dimmed: false,
+      count: 1,
+      camera: view,
+      ports: ports!,
+      worldSourceRect: sourceWorld,
+      worldTargetRect: targetWorld,
+      obstacles: [blocker],
+      zoomLevel: 'near',
+    });
+
+    expect(edge.visible).toBe(true);
+    expect(spatialRouteIntersectsObstacle(edge.worldPoints, blocker)).toBe(false);
+    expect(projectedPortOnRect(edge.points[0]!, source.cardBounds)).toBe(true);
+    expect(projectedPortOnRect(edge.points.at(-1)!, target.cardBounds)).toBe(true);
   });
 
   it('keeps selected edge geometry identical to the unselected base path', () => {
@@ -138,8 +299,9 @@ describe('projected graph layer', () => {
       count: 4,
       camera: view,
       ports: ports!,
+      caption: 'directory:a → directory:b · 4',
     });
-    expect(edge.pill).toEqual(edge.points[Math.floor(edge.points.length / 2)]);
+    expect(edge.labelAnchor).toEqual(edge.points[Math.floor(edge.points.length / 2)]);
     expect(edge.visible).toBe(true);
   });
 
@@ -216,9 +378,7 @@ describe('projected graph layer', () => {
       count: 6,
       camera: view,
       ports: ports!,
-      homeId: 'directory:home',
     });
-    expect(edge.compact).toBe(false);
     expect(edge.points.length).toBe(2);
     expect(edge.points[0]?.x).toBeCloseTo(home.x + home.width);
     expect(edge.points.at(-1)?.x).toBeCloseTo(away.x);
@@ -233,45 +393,13 @@ describe('projected graph layer', () => {
     expect(kept.x).toBeGreaterThanOrEqual(8);
   });
 
-  it('keeps an offscreen selected relation connected to the visible endpoint', () => {
+  it('hides a selected relation when its source card is outside the viewport', () => {
     const view = camera();
     const source = { x: -240, y: 80, width: 150, height: 36 };
     const target = { x: 220, y: 80, width: 150, height: 36 };
-    const ports = assignProjectedPerimeterPorts([{ id: 'offscreen', source, target }]).get('offscreen');
+    const ports = assignProjectedPerimeterPorts([{ id: 'hidden-source', source, target }]).get('hidden-source');
     const edge = buildProjectedGraphEdge({
-      id: 'offscreen',
-      sourceId: 'module:a',
-      targetId: 'module:b',
-      sourceRegionId: 'directory:a',
-      targetRegionId: 'directory:a',
-      sourceBounds: source,
-      targetBounds: target,
-      sourceZ: 16,
-      targetZ: 16,
-      aggregated: false,
-      selected: false,
-      connected: true,
-      dimmed: false,
-      count: 1,
-      camera: view,
-      ports: ports!,
-      homeId: 'module:a',
-      sourceAnchor: { x: source.x + 75, y: source.y + 18 },
-      targetAnchor: { x: target.x + 75, y: target.y + 18 },
-    });
-    expect(edge.continuation).toBe(true);
-    expect(edge.visible).toBe(true);
-    expect(Math.hypot((edge.points.at(-1)?.x ?? 0) - (edge.points[0]?.x ?? 0), (edge.points.at(-1)?.y ?? 0) - (edge.points[0]?.y ?? 0))).toBeGreaterThan(250);
-    expect(spatialVisibleProjectedEdgeCount([edge])).toBe(1);
-  });
-
-  it('points a source-offscreen continuation toward the visible target', () => {
-    const view = camera();
-    const source = { x: -240, y: 80, width: 150, height: 36 };
-    const target = { x: 220, y: 80, width: 150, height: 36 };
-    const ports = assignProjectedPerimeterPorts([{ id: 'off-a', source, target }]).get('off-a');
-    const edge = buildProjectedGraphEdge({
-      id: 'off-a',
+      id: 'hidden-source',
       sourceId: 'module:a',
       targetId: 'module:b',
       sourceRegionId: 'directory:a',
@@ -287,27 +415,20 @@ describe('projected graph layer', () => {
       count: 1,
       camera: view,
       ports: ports!,
-      sourceAnchor: { x: source.x + 75, y: source.y + 18 },
-      targetAnchor: { x: target.x + 75, y: target.y + 18 },
     });
-    const start = edge.points[0]!;
-    const end = edge.points.at(-1)!;
-    expect(edge.continuationKind).toBe('source-offscreen');
-    expect(end.x).toBeCloseTo(ports!.end.x, 4);
-    expect(end.y).toBeCloseTo(ports!.end.y, 4);
-    expect(start.x).toBeLessThan(end.x);
-    expect(edge.arrow.angle).toBeGreaterThan(-0.4);
-    expect(edge.arrow.angle).toBeLessThan(0.4);
-    expect(edge.path.includes(' Z')).toBe(false);
+    expect(projectedRectFullyInViewport(source, view)).toBe(false);
+    expect(projectedRectFullyInViewport(target, view)).toBe(true);
+    expect(edge.visible).toBe(false);
+    expect(spatialVisibleProjectedEdgeCount([edge])).toBe(0);
   });
 
-  it('points a target-offscreen continuation toward the missing target', () => {
+  it('hides a selected relation when its target card is outside the viewport', () => {
     const view = camera();
     const source = { x: 220, y: 80, width: 150, height: 36 };
     const target = { x: 920, y: 80, width: 150, height: 36 };
-    const ports = assignProjectedPerimeterPorts([{ id: 'off-b', source, target }]).get('off-b');
+    const ports = assignProjectedPerimeterPorts([{ id: 'hidden-target', source, target }]).get('hidden-target');
     const edge = buildProjectedGraphEdge({
-      id: 'off-b',
+      id: 'hidden-target',
       sourceId: 'module:a',
       targetId: 'module:b',
       sourceRegionId: 'directory:a',
@@ -323,60 +444,25 @@ describe('projected graph layer', () => {
       count: 1,
       camera: view,
       ports: ports!,
-      sourceAnchor: { x: source.x + 75, y: source.y + 18 },
-      targetAnchor: { x: target.x + 75, y: target.y + 18 },
     });
-    const start = edge.points[0]!;
-    const end = edge.points.at(-1)!;
-    expect(edge.continuationKind).toBe('target-offscreen');
-    expect(start.x).toBeCloseTo(ports!.start.x, 4);
-    expect(end.x).toBeGreaterThan(start.x);
-    expect(edge.arrow.angle).toBeGreaterThan(-0.4);
-    expect(edge.arrow.angle).toBeLessThan(0.4);
-  });
-
-  it('culls a path fragment when both semantic endpoints are outside the viewport', () => {
-    const view = camera();
-    const source = { x: -520, y: 80, width: 150, height: 36 };
-    const target = { x: 1120, y: 80, width: 150, height: 36 };
-    const ports = assignProjectedPerimeterPorts([{ id: 'orphaned', source, target }]).get('orphaned');
-    const edge = buildProjectedGraphEdge({
-      id: 'orphaned',
-      sourceId: 'module:a',
-      targetId: 'module:b',
-      sourceRegionId: 'directory:a',
-      targetRegionId: 'directory:b',
-      sourceBounds: source,
-      targetBounds: target,
-      sourceZ: spatialModuleElevation(),
-      targetZ: spatialModuleElevation(),
-      aggregated: false,
-      selected: true,
-      connected: true,
-      dimmed: false,
-      count: 1,
-      camera: view,
-      ports: ports!,
-    });
-    expect(edge.continuation).toBe(false);
+    expect(projectedRectFullyInViewport(source, view)).toBe(true);
+    expect(projectedRectFullyInViewport(target, view)).toBe(false);
     expect(edge.visible).toBe(false);
   });
 
-  it('keeps multiple aggregate relations as separate complete paths', () => {
+  it('hides an aggregate when either semantic Region is outside the viewport', () => {
     const view = camera();
-    const home = { x: 4, y: 180, width: 160, height: 140 };
-    const awayLeft = { x: -420, y: 180, width: 160, height: 140 };
-    const awayLeftTwo = { x: -480, y: 80, width: 160, height: 140 };
-    const portsA = assignProjectedPerimeterPorts([{ id: 'stub-a', source: home, target: awayLeft }]).get('stub-a')!;
-    const portsB = assignProjectedPerimeterPorts([{ id: 'stub-b', source: home, target: awayLeftTwo }]).get('stub-b')!;
-    const first = buildProjectedGraphEdge({
-      id: 'stub-a',
+    const home = { x: 40, y: 180, width: 160, height: 140 };
+    const away = { x: 790, y: 180, width: 160, height: 140 };
+    const ports = assignProjectedPerimeterPorts([{ id: 'hidden-region', source: home, target: away }]).get('hidden-region')!;
+    const edge = buildProjectedGraphEdge({
+      id: 'hidden-region',
       sourceId: 'directory:home',
       targetId: 'directory:away',
       sourceRegionId: 'directory:home',
       targetRegionId: 'directory:away',
       sourceBounds: home,
-      targetBounds: awayLeft,
+      targetBounds: away,
       sourceZ: 8,
       targetZ: 8,
       aggregated: true,
@@ -385,44 +471,17 @@ describe('projected graph layer', () => {
       dimmed: false,
       count: 16,
       camera: view,
-      ports: portsA,
-      homeId: 'directory:home',
+      ports,
     });
-    const second = buildProjectedGraphEdge({
-      id: 'stub-b',
-      sourceId: 'directory:home',
-      targetId: 'directory:away-two',
-      sourceRegionId: 'directory:home',
-      targetRegionId: 'directory:away-two',
-      sourceBounds: home,
-      targetBounds: awayLeftTwo,
-      sourceZ: 8,
-      targetZ: 8,
-      aggregated: true,
-      selected: false,
-      connected: true,
-      dimmed: false,
-      count: 4,
-      camera: view,
-      ports: portsB,
-      homeId: 'directory:home',
-    });
-    expect(first.compact).toBe(false);
-    const laidOut = applySpatialStubLayout([first, second], view, {
-      homeId: 'directory:home',
-      homeBounds: home,
-      counterpartBounds: (edge) => edge.id === 'stub-a' ? awayLeft : awayLeftTwo,
-      pillSize: () => ({ width: 140, height: 18 }),
-    });
-    laidOut.forEach((edge) => expect(edge.compact).toBe(false));
-    const [a, b] = laidOut;
-    expect(a?.path).not.toBe(b?.path);
+    expect(projectedRectFullyInViewport(home, view)).toBe(true);
+    expect(projectedRectFullyInViewport(away, view)).toBe(false);
+    expect(edge.visible).toBe(false);
   });
 
-  it('keeps a barely offscreen aggregate connected instead of replacing it with a stub', () => {
+  it('keeps a visible aggregate as one complete boundary-to-boundary path', () => {
     const view = camera();
-    const home = { x: 420, y: 200, width: 160, height: 120 };
-    const away = { x: 790, y: 200, width: 180, height: 120 };
+    const home = { x: 80, y: 80, width: 140, height: 100 };
+    const away = { x: 240, y: 90, width: 140, height: 100 };
     const ports = assignProjectedPerimeterPorts([{ id: 'near-off', source: home, target: away }]).get('near-off')!;
     const edge = buildProjectedGraphEdge({
       id: 'near-off',
@@ -441,43 +500,14 @@ describe('projected graph layer', () => {
       count: 22,
       camera: view,
       ports,
-      homeId: 'directory:home',
+      caption: 'directory:home → directory:away · 22',
     });
-    expect(edge.compact).toBe(false);
     expect(edge.visible).toBe(true);
-    expect(Math.hypot((edge.points.at(-1)?.x ?? 0) - (edge.points[0]?.x ?? 0), (edge.points.at(-1)?.y ?? 0) - (edge.points[0]?.y ?? 0))).toBeGreaterThan(80);
-  });
-
-  it('never draws a full aggregate and a stub for the same relation', () => {
-    const view = camera();
-    const home = { x: 80, y: 80, width: 140, height: 100 };
-    const away = { x: 240, y: 90, width: 140, height: 100 };
-    const ports = assignProjectedPerimeterPorts([{ id: 'full', source: home, target: away }]).get('full')!;
-    const edge = buildProjectedGraphEdge({
-      id: 'full',
-      sourceId: 'directory:home',
-      targetId: 'directory:away',
-      sourceRegionId: 'directory:home',
-      targetRegionId: 'directory:away',
-      sourceBounds: home,
-      targetBounds: away,
-      sourceZ: 8,
-      targetZ: 8,
-      aggregated: true,
-      selected: false,
-      connected: true,
-      dimmed: false,
-      count: 3,
-      camera: view,
-      ports,
-      homeId: 'directory:home',
-    });
-    expect(edge.compact).toBe(false);
-    expect(edge.continuation).toBe(false);
     expect(edge.points.length).toBe(2);
+    expect(projectedPathWithinViewport(edge.points, view)).toBe(true);
   });
 
-  it('hides unlabeled compact stubs from the readable relation count', () => {
+  it('hides an unlabeled aggregate from the readable relation count', () => {
     const view = camera();
     const home = { x: 40, y: 40, width: 180, height: 140 };
     const away = { x: 520, y: 40, width: 180, height: 140 };
@@ -499,7 +529,6 @@ describe('projected graph layer', () => {
       count: 3,
       camera: view,
       ports,
-      homeId: 'directory:home',
       caption: '',
     });
     expect(edge.readable).toBe(false);
@@ -507,7 +536,7 @@ describe('projected graph layer', () => {
     expect(spatialVisibleProjectedEdgeCount([edge])).toBe(0);
   });
 
-  it('keeps incoming compact stubs arriving at the selected target', () => {
+  it('keeps aggregate arrow direction from source Region to target Region', () => {
     const view = camera();
     const source = { x: 40, y: 80, width: 160, height: 40 };
     const target = { x: 360, y: 80, width: 160, height: 40 };
@@ -529,8 +558,7 @@ describe('projected graph layer', () => {
       count: 10,
       camera: view,
       ports,
-      homeId: 'module:sink',
-      caption: '← routes · 10',
+      caption: 'directory:away → module:sink · 10',
     });
     const start = edge.points[0]!;
     const end = edge.points.at(-1)!;

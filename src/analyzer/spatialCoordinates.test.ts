@@ -14,7 +14,6 @@ import {
   projectSpatialPoint,
   regionRectCorners,
   resolveSpatialOverlayCollision,
-  spatialAggregatePillVisible,
   spatialCameraModel,
   spatialCameraPose,
   spatialHeadingFitPoints,
@@ -23,6 +22,7 @@ import {
   spatialPortIsOnBoundary,
   spatialProjectedOccupancy,
   spatialRegionBoundaryPort,
+  spatialScreenPointToWorldAtElevation,
   assignSpatialBoundaryPorts,
   computeSpatialWorldBounds,
   type SpatialWorldPoint,
@@ -77,6 +77,16 @@ describe('spatial world / screen coordinates', () => {
     expect(ys.size).toBeGreaterThan(2);
   });
 
+  it('unprojects a screen terminal back onto the requested world elevation', () => {
+    const view = camera(24, -18, 1.1);
+    const world = { x: 180, y: 120, z: spatialModuleElevation(1) };
+    const screen = projectSpatialPoint(world, view);
+    const restored = spatialScreenPointToWorldAtElevation(screen, world.z, view);
+    expect(restored.x).toBeCloseTo(world.x, 5);
+    expect(restored.y).toBeCloseTo(world.y, 5);
+    expect(restored.z).toBeCloseTo(world.z, 5);
+  });
+
   it('fits Far package heading footprints into the viewport inset', () => {
     const plane = regionRectCorners({ x: 0, y: 40, width: 220, height: 140, z: 2 });
     const headings = spatialHeadingFitPoints(
@@ -105,15 +115,15 @@ describe('spatial world / screen coordinates', () => {
     expect(visibility.get('directory')).toBe('hide');
   });
 
-  it('hides Far directory headings that cover a package name without moving the package', () => {
+  it('hides Far directory headings and relation labels that cover a package name', () => {
     const visibility = resolveSpatialOverlayCollision([
       { id: 'package', kind: 'package-heading', screen: { x: 40, y: 20, width: 180, height: 22 } },
       { id: 'directory', kind: 'major-directory-heading', screen: { x: 48, y: 18, width: 90, height: 22 } },
-      { id: 'pill', kind: 'aggregate-pill', screen: { x: 50, y: 16, width: 110, height: 18 } },
+      { id: 'label', kind: 'relation-label', screen: { x: 50, y: 16, width: 110, height: 18 } },
     ]);
     expect(visibility.get('package')).toBe('show');
     expect(visibility.get('directory')).toBe('hide');
-    expect(visibility.get('pill')).toBe('hide');
+    expect(visibility.get('label')).toBe('hide');
   });
 
   it('places region aggregate endpoints on region boundaries instead of child modules', () => {
@@ -140,7 +150,7 @@ describe('spatial world / screen coordinates', () => {
 
   it('hides lower-priority overlay items without moving module cards off their anchors', () => {
     const visibility = resolveSpatialOverlayCollision([
-      { id: 'pill', kind: 'aggregate-pill', screen: { x: 40, y: 40, width: 120, height: 18 } },
+      { id: 'label', kind: 'relation-label', screen: { x: 40, y: 40, width: 120, height: 18 } },
       { id: 'module', kind: 'module-card', screen: { x: 48, y: 36, width: 150, height: 36 } },
       { id: 'selected', kind: 'selected-module', screen: { x: 40, y: 30, width: 150, height: 36 } },
       { id: 'package', kind: 'package-heading', screen: { x: 36, y: 8, width: 160, height: 22 } },
@@ -149,21 +159,21 @@ describe('spatial world / screen coordinates', () => {
     expect(visibility.get('selected')).toBe('show');
     expect(visibility.get('package')).toBe('hide');
     expect(visibility.get('module')).toBe('hide');
-    expect(visibility.get('pill')).toBe('hide');
+    expect(visibility.get('label')).toBe('hide');
     expect(visibility.get('minor')).toBe('hide');
     const selectedCenter = { x: 40 + 75, y: 30 + 18 };
     expect(overlayAnchorDrift({ x: 40, y: 30 }, { width: 150, height: 36 }, selectedCenter)).toBeCloseTo(0);
   });
 
-  it('keeps selected neighbours visible ahead of ordinary cards and pills', () => {
+  it('keeps selected neighbours visible ahead of ordinary cards and relation labels', () => {
     const visibility = resolveSpatialOverlayCollision([
       { id: 'neighbour', kind: 'neighbour-module', screen: { x: 40, y: 36, width: 150, height: 36 } },
       { id: 'module', kind: 'module-card', screen: { x: 42, y: 38, width: 150, height: 36 } },
-      { id: 'pill', kind: 'aggregate-pill', screen: { x: 48, y: 40, width: 120, height: 18 } },
+      { id: 'label', kind: 'relation-label', screen: { x: 48, y: 40, width: 120, height: 18 } },
     ]);
     expect(visibility.get('neighbour')).toBe('show');
     expect(visibility.get('module')).toBe('hide');
-    expect(visibility.get('pill')).toBe('hide');
+    expect(visibility.get('label')).toBe('hide');
   });
 
   it('fits projected visible bounds and ignores a distant elevated arc apex', () => {
@@ -182,13 +192,6 @@ describe('spatial world / screen coordinates', () => {
     ], 1000, 700);
     expect(Math.abs(withArc.scale - fitted.scale)).toBeLessThan(0.08);
     expect(fitted.scale).toBeGreaterThan(0.5);
-  });
-
-  it('keeps Far aggregate pills and hides them in Medium unless selected or connected', () => {
-    expect(spatialAggregatePillVisible('far', { aggregated: true, selected: false, connected: false })).toBe(true);
-    expect(spatialAggregatePillVisible('medium', { aggregated: true, selected: false, connected: false })).toBe(false);
-    expect(spatialAggregatePillVisible('near', { aggregated: true, selected: true, connected: false })).toBe(true);
-    expect(spatialAggregatePillVisible('near', { aggregated: false, selected: true, connected: true })).toBe(false);
   });
 
   it('maps layout x/y-down/z-up to Three x/up/depth without looking at the origin', () => {

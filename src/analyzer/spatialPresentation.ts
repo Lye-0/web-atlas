@@ -52,6 +52,28 @@ export function spatialModuleElevation(regionDepth = 0): number {
   return ANALYZER_SPATIAL_MODULE_ELEVATION + Math.min(8, Math.max(0, regionDepth) * 0.6);
 }
 
+export interface SpatialModuleBlockDimensions {
+  width: number;
+  height: number;
+  depth: number;
+  zOffset: number;
+}
+
+export function spatialModuleBlockDimensions(
+  zoomLevel: AnalyzerSpatialZoomLevel,
+  nodeHeight: number,
+): SpatialModuleBlockDimensions {
+  const far = zoomLevel === 'far';
+  return {
+    // Far keeps module existence as a small tile; nearer levels use a
+    // slightly inset foundation directly beneath the HTML card.
+    width: far ? 12 : ANALYZER_MODULE_NODE_WIDTH * 0.88,
+    height: far ? 8 : Math.max(8, nodeHeight * 0.88),
+    depth: far ? 1.2 : 0.8,
+    zOffset: far ? 0.55 : -0.45,
+  };
+}
+
 export function spatialRegionBorderStyle(
   selected: boolean,
   regionKind: AnalyzerRegionKind,

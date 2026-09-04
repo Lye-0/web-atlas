@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { shortestUniqueRegionLabels, shortestUniqueSuffixes, spatialContinuationCaption, spatialPackageHeadingCount, spatialStubCaption, regionDisplayLabel, truncateDistinctFilename } from './spatialLabels';
+import { shortestUniqueRegionLabels, shortestUniqueSuffixes, spatialAggregateCaption, spatialPackageHeadingCount, regionDisplayLabel, truncateDistinctFilename } from './spatialLabels';
 import type { AnalyzerSemanticRegion } from './types';
 
 function region(id: string, regionKind: AnalyzerSemanticRegion['regionKind'], label: string, extra: AnalyzerSemanticRegion['metadata'] = {}): AnalyzerSemanticRegion {
@@ -65,17 +65,13 @@ describe('shortest unique display labels', () => {
     expect(spatialPackageHeadingCount('near', 1)).toBe('· 1 module');
   });
 
-  it('labels offscreen continuations with explicit dependency direction', () => {
-    expect(spatialContinuationCaption({
-      kind: 'source-offscreen',
-      sourceLabel: 'resource-limits.test.ts',
-      targetLabel: 'http.ts',
-    })).toBe('resource-limits.test.ts →');
-    expect(spatialContinuationCaption({
-      kind: 'target-offscreen',
-      sourceLabel: 'source.ts',
-      targetLabel: 'target.ts',
-    })).toBe('→ target.ts');
+  it('labels a visible aggregate as a complete source-to-target relation', () => {
+    expect(spatialAggregateCaption({
+      sourceLabel: 'api',
+      targetLabel: 'database',
+      count: 22,
+    })).toBe('api → database · 22');
+    expect(spatialAggregateCaption({ sourceLabel: '', targetLabel: 'database', count: 2 })).toBeUndefined();
   });
 
   it('preserves unique filename suffixes instead of identical prefixes', () => {
@@ -83,16 +79,12 @@ describe('shortest unique display labels', () => {
     expect(new Set(labels).size).toBe(3);
   });
 
-  it('omits the selected region from stub captions', () => {
-    const caption = spatialStubCaption({
-      hostId: 'directory:database-src',
-      sourceId: 'directory:api-src',
-      targetId: 'directory:database-src',
+  it('keeps both endpoints in aggregate captions', () => {
+    const caption = spatialAggregateCaption({
       sourceLabel: 'api / src',
       targetLabel: 'database / src',
       count: 4,
     });
-    expect(caption).toBe('← api / src · 4');
-    expect(caption).not.toContain('database / src');
+    expect(caption).toBe('api / src → database / src · 4');
   });
 });

@@ -5,7 +5,6 @@ import {
   ANALYZER_SPATIAL_CAMERA_SCHEMA,
   ANALYZER_SPATIAL_TILT_DEGREES,
   ANALYZER_SPATIAL_YAW_DEGREES,
-  type AnalyzerSpatialZoomLevel,
 } from './spatialPresentation';
 
 /**
@@ -54,6 +53,7 @@ export interface SpatialWorldRect {
 }
 
 export type SpatialOverlayKind =
+  | 'hud'
   | 'selected-module'
   | 'neighbour-module'
   | 'hovered-module'
@@ -62,11 +62,10 @@ export type SpatialOverlayKind =
   | 'selected-region-heading'
   | 'module-card'
   | 'major-directory-heading'
-  | 'aggregate-pill'
   | 'relation-label'
   | 'minor-heading';
 
-export type SpatialOverlayVisibility = 'show' | 'compact' | 'hide';
+export type SpatialOverlayVisibility = 'show' | 'hide';
 
 export interface SpatialOverlayItem {
   id: string;
@@ -77,6 +76,7 @@ export interface SpatialOverlayItem {
 }
 
 export const SPATIAL_OVERLAY_PRIORITY: Record<SpatialOverlayKind, number> = {
+  hud: 120,
   'selected-module': 100,
   'neighbour-module': 95,
   'hovered-module': 90,
@@ -86,7 +86,6 @@ export const SPATIAL_OVERLAY_PRIORITY: Record<SpatialOverlayKind, number> = {
   'major-directory-heading': 58,
   'module-card': 50,
   'relation-label': 44,
-  'aggregate-pill': 35,
   'minor-heading': 34,
 };
 
@@ -347,6 +346,30 @@ export function projectSpatialPoint(point: SpatialWorldPoint, model: SpatialCame
   );
 }
 
+/**
+ * Unproject a screen point onto the layout plane at a specific elevation.
+ * This is used only for short visual terminal segments so the Three route
+ * and the HTML card perimeter share the exact same screen endpoint.
+ */
+export function spatialScreenPointToWorldAtElevation(
+  screen: SpatialScreenPoint,
+  elevation: number,
+  model: SpatialCameraModel,
+): SpatialWorldPoint {
+  const pose = spatialCameraPose(model);
+  const axes = cameraAxes(pose.eye, pose.target);
+  const width = Math.max(1, model.viewportWidth);
+  const height = Math.max(1, model.viewportHeight);
+  const ndcX = (screen.x / width) * 2 - 1;
+  const ndcY = 1 - (screen.y / height) * 2;
+  const viewX = (ndcX * (pose.right - pose.left) + pose.right + pose.left) / 2;
+  const viewY = (ndcY * (pose.top - pose.bottom) + pose.top + pose.bottom) / 2;
+  const base = addVec(pose.eye, addVec(scaleVec(axes.x, viewX), scaleVec(axes.y, viewY)));
+  const depth = (elevation - base.y) / (axes.z.y || 1);
+  const point = addVec(base, scaleVec(axes.z, depth));
+  return { x: point.x, y: point.z, z: point.y };
+}
+
 export function focusSpatialCamera(
   anchor: SpatialWorldPoint,
   transform: AnalyzerGraphTransform,
@@ -583,16 +606,6 @@ function rectsOverlap(
     && first.y + first.height + padding > second.y;
 }
 
-function compactOverlayRect(item: SpatialOverlayItem): { x: number; y: number; width: number; height: number } {
-  if (item.kind === 'aggregate-pill' || item.kind === 'relation-label') {
-    return { ...item.screen, width: Math.min(item.screen.width, 42) };
-  }
-  if (item.kind.endsWith('heading') || item.kind.includes('heading')) {
-    return { ...item.screen, width: Math.min(item.screen.width, 88) };
-  }
-  return item.screen;
-}
-
 export function resolveSpatialOverlayCollision(
   items: readonly SpatialOverlayItem[],
 ): Map<string, SpatialOverlayVisibility> {
@@ -601,22 +614,16 @@ export function resolveSpatialOverlayCollision(
   const kept: { id: string; screen: SpatialOverlayItem['screen'] }[] = [];
   const visibility = new Map<string, SpatialOverlayVisibility>();
   ordered.forEach((item) => {
-    const locked = item.locked ?? (item.kind === 'selected-module'
+    const locked = item.locked ?? (
+      item.kind === 'selected-module'
       || item.kind === 'neighbour-module'
       || item.kind === 'hovered-module'
       || item.kind === 'selected-region-heading'
-      || item.kind === 'relation-label');
+    );
     const blocked = () => kept.some((candidate) => candidate.id !== item.id && rectsOverlap(candidate.screen, item.screen));
     if (!blocked()) {
       kept.push({ id: item.id, screen: item.screen });
       visibility.set(item.id, 'show');
-      return;
-    }
-    const compactScreen = compactOverlayRect(item);
-    const compactBlocked = kept.some((candidate) => candidate.id !== item.id && rectsOverlap(candidate.screen, compactScreen));
-    if (!compactBlocked && (item.kind === 'aggregate-pill' || item.kind.includes('heading'))) {
-      kept.push({ id: item.id, screen: compactScreen });
-      visibility.set(item.id, 'compact');
       return;
     }
     if (locked) {
@@ -696,15 +703,4 @@ export function spatialProjectedOccupancy(
   const maxY = Math.max(...screens.map((point) => point.y));
   const area = Math.max(0, maxX - minX) * Math.max(0, maxY - minY);
   return area / (viewportWidth * viewportHeight);
-}
-
-export function spatialAggregatePillVisible(
-  zoomLevel: AnalyzerSpatialZoomLevel,
-  edge: { aggregated: boolean; selected: boolean; connected: boolean; compact?: boolean; continuation?: boolean },
-  hovered = false,
-): boolean {
-  if (edge.continuation || edge.compact) return true;
-  if (!edge.aggregated) return false;
-  if (zoomLevel === 'far') return true;
-  return edge.selected || edge.connected || hovered;
 }

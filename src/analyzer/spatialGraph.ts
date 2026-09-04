@@ -126,7 +126,7 @@ function addGroupedEdge(
     existing.connected ||= connected;
     existing.edge = selected ? edge : existing.edge;
     existing.dimmed &&= !selected && !connected;
-    existing.aggregated ||= aggregated;
+    existing.aggregated ||= aggregated || existing.count > 1;
     existing.importance = Math.max(existing.importance, importance);
     return;
   }
@@ -222,7 +222,8 @@ export function collectSpatialEdges(
     const keepExactIncident = selectedIncident
       && counterpartVisible
       && (!directionalGroup || counterpartGroupSize <= ANALYZER_SPATIAL_EXACT_COUNTERPART_LIMIT);
-    const preserveExactModule = (keepExactIncident || explicitlySelected)
+    const preserveExactModule = zoomLevel !== 'far'
+      && (keepExactIncident || explicitlySelected)
       && effectiveSelectionKind !== 'directory'
       && effectiveSelectionKind !== 'package';
     const sameDirectory = nodeDirectoryId(sourceNode, regionById) === nodeDirectoryId(targetNode, regionById);
@@ -294,9 +295,11 @@ export function collectSpatialEdges(
   const budgetedLocal = [...localByDirectory.values()].flatMap((group) => group
     .sort((first, second) => second.count - first.count || first.id.localeCompare(second.id))
     .slice(0, localBudget));
-  const remaining = Math.max(0, spatialEdgeBudget(zoomLevel) - budgetedLocal.length);
+  const edgeBudget = spatialEdgeBudget(zoomLevel);
   const budgetedAggregates = aggregates
     .sort((first, second) => second.importance - first.importance || second.count - first.count || first.id.localeCompare(second.id))
-    .slice(0, remaining);
-  return [...budgetedLocal, ...budgetedAggregates].sort((first, second) => first.id.localeCompare(second.id));
+    .slice(0, edgeBudget);
+  const remainingLocalBudget = Math.max(0, edgeBudget - budgetedAggregates.length);
+  const globallyBudgetedLocal = budgetedLocal.slice(0, remainingLocalBudget);
+  return [...globallyBudgetedLocal, ...budgetedAggregates].sort((first, second) => first.id.localeCompare(second.id));
 }

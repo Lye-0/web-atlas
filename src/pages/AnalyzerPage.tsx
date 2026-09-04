@@ -52,8 +52,7 @@ export function AnalyzerPage() {
     if (!model) return { visibleNodes: 0, totalNodes: 0, hiddenNodes: 0 };
     if (view === 'module-dependency') {
       const totalNodes = model.nodes.filter((node) => node.type === 'module').length;
-      const visibleNodes = totalNodes;
-      return { visibleNodes, totalNodes, hiddenNodes: Math.max(0, totalNodes - visibleNodes) };
+      return { visibleNodes: 0, totalNodes, hiddenNodes: totalNodes };
     }
     const presented = presentAnalyzerView(model, { expandedPresentationIds, filter, search, selectedEdgeId, selectedNodeId, selectedRegionId });
     return presented.counts ?? analyzerViewCounts(model);

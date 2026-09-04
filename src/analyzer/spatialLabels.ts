@@ -75,6 +75,17 @@ export function spatialPackageHeadingCount(zoomLevel: 'far' | 'medium' | 'near',
   return `· ${moduleCount} ${spatialCountNoun(moduleCount, 'module', 'modules')}`;
 }
 
+export function spatialRegionHeadingWidth(
+  label: string,
+  countText = '',
+  scale = 1,
+  includeToggle = true,
+): number {
+  const chrome = includeToggle ? 50 : 36;
+  const textWidth = (label.length + countText.length) * 6.6;
+  return Math.min(360, Math.max(80, (chrome + textWidth) * scale));
+}
+
 export function truncateDistinctFilename(name: string, siblings: readonly string[], maxChars: number): string {
   if (name.length <= maxChars) return name;
   const unique = shortestUniqueSuffixes(siblings.length > 0 ? siblings : [name]);
@@ -86,41 +97,11 @@ export function truncateDistinctFilename(name: string, siblings: readonly string
   return `${name.slice(0, head)}…${name.slice(-keep)}`;
 }
 
-export type SpatialContinuationKind = 'source-offscreen' | 'target-offscreen';
-
-export function spatialContinuationCaption(options: {
-  kind: SpatialContinuationKind;
-  sourceLabel: string;
-  targetLabel: string;
-  count?: number;
-}): string {
-  const suffix = options.count && options.count > 1 ? ` · ${options.count}` : '';
-  if (options.kind === 'source-offscreen') return `${options.sourceLabel} →${suffix}`;
-  return `→ ${options.targetLabel}${suffix}`;
-}
-
-export function spatialStubCaption(options: {
-  hostId?: string;
-  sourceId: string;
-  targetId: string;
+export function spatialAggregateCaption(options: {
   sourceLabel: string;
   targetLabel: string;
   count: number;
-  continuationKind?: SpatialContinuationKind;
 }): string | undefined {
-  if (options.continuationKind) {
-    return spatialContinuationCaption({
-      kind: options.continuationKind,
-      sourceLabel: options.sourceLabel,
-      targetLabel: options.targetLabel,
-      count: options.count,
-    });
-  }
-  if (options.hostId) {
-    const incoming = options.hostId === options.targetId;
-    const other = incoming ? options.sourceLabel : options.targetLabel;
-    return `${incoming ? '←' : '→'} ${other} · ${options.count}`;
-  }
-  if (options.sourceLabel && options.targetLabel) return `${options.sourceLabel} → ${options.targetLabel} · ${options.count}`;
-  return undefined;
+  if (!options.sourceLabel || !options.targetLabel || options.count < 1) return undefined;
+  return `${options.sourceLabel} → ${options.targetLabel} · ${options.count}`;
 }

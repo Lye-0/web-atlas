@@ -1,6 +1,7 @@
 import { analyzerPresentationCount, analyzerPresentationCountLabel } from './presentation';
 import type { AnalyzerCluster, AnalyzerPresentationGroup, AnalyzerSemanticRegion, AnalyzerViewModel, AnalyzerViewNode } from './types';
 import { ANALYZER_COMMAND_COMMON_LANE_ID, ANALYZER_EXTERNAL_SUMMARY_ID } from './projectors';
+import { spatialRegionHeadingWidth } from './spatialLabels';
 
 export const ANALYZER_NODE_WIDTH = 244;
 export const ANALYZER_NODE_HEIGHT = 106;
@@ -55,13 +56,13 @@ const DEPENDENCY_EXTERNAL_GROUP_HEADER = SUMMARY_GROUP_MEMBER_OFFSET;
 
 export const ANALYZER_MODULE_NODE_WIDTH = 150;
 export const ANALYZER_MODULE_NODE_HEIGHT = 36;
-export const ANALYZER_MODULE_NODE_GAP = 8;
+export const ANALYZER_MODULE_NODE_GAP = 16;
 export const ANALYZER_MODULE_REGION_GAP = 16;
 export const ANALYZER_MODULE_PACKAGE_GAP = 28;
 export const ANALYZER_MODULE_REGION_INSET = 14;
 export const ANALYZER_MODULE_REGION_HEADING = 30;
-const ANALYZER_MODULE_COLLAPSED_WIDTH = 196;
-const ANALYZER_MODULE_COLLAPSED_HEIGHT = 78;
+const ANALYZER_MODULE_COLLAPSED_WIDTH = ANALYZER_MODULE_NODE_WIDTH + ANALYZER_MODULE_REGION_INSET * 2;
+const ANALYZER_MODULE_COLLAPSED_HEIGHT = ANALYZER_MODULE_REGION_HEADING + ANALYZER_MODULE_REGION_INSET * 2;
 const ANALYZER_MODULE_OWN_COLUMNS = 4;
 const ANALYZER_MODULE_CHILD_COLUMNS = 3;
 const ANALYZER_MODULE_PACKAGE_COLUMNS = 3;
@@ -840,13 +841,22 @@ function moduleRegionMeasure(
   const contentHeight = ownHeight
     + (ownHeight > 0 && childHeight > 0 ? ANALYZER_MODULE_REGION_GAP : 0)
     + childHeight;
-  const headingWidth = 74 + region.label.length * 7.2;
+  const moduleCount = typeof region.metadata.moduleCount === 'number'
+    ? region.metadata.moduleCount
+    : region.childIds.length;
+  const countText = region.regionKind === 'workspace-package'
+    ? `· ${moduleCount}`
+    : `· ${moduleCount} modules`;
+  const headingWidth = spatialRegionHeadingWidth(region.label, countText, 1, region.regionKind !== 'workspace-package');
   return {
     region,
     children,
     ownNodes,
     width: Math.max(ANALYZER_MODULE_COLLAPSED_WIDTH, headingWidth, contentWidth + ANALYZER_MODULE_REGION_INSET * 2),
-    height: Math.max(ANALYZER_MODULE_COLLAPSED_HEIGHT, ANALYZER_MODULE_REGION_HEADING + contentHeight + ANALYZER_MODULE_REGION_INSET),
+    height: Math.max(
+      ANALYZER_MODULE_COLLAPSED_HEIGHT,
+      ANALYZER_MODULE_REGION_HEADING + ANALYZER_MODULE_REGION_INSET * 2 + contentHeight,
+    ),
   };
 }
 
@@ -911,7 +921,7 @@ function layoutModuleDependency(view: AnalyzerViewModel, expandedRegionIds: Read
       memberGap: ANALYZER_MODULE_REGION_INSET,
     });
     const contentX = x + ANALYZER_MODULE_REGION_INSET;
-    let contentY = y + ANALYZER_MODULE_REGION_HEADING;
+    let contentY = y + ANALYZER_MODULE_REGION_HEADING + ANALYZER_MODULE_REGION_INSET;
     const columnsForNodes = Math.min(ANALYZER_MODULE_OWN_COLUMNS, Math.max(1, measure.ownNodes.length));
     measure.ownNodes.forEach((node, index) => {
       const column = index % columnsForNodes;
@@ -924,8 +934,9 @@ function layoutModuleDependency(view: AnalyzerViewModel, expandedRegionIds: Read
       });
     });
     if (measure.ownNodes.length > 0) {
-      contentY += Math.ceil(measure.ownNodes.length / columnsForNodes) * (ANALYZER_MODULE_NODE_HEIGHT + ANALYZER_MODULE_NODE_GAP);
-      if (measure.children.length > 0) contentY += ANALYZER_MODULE_REGION_GAP - ANALYZER_MODULE_NODE_GAP;
+      const ownRows = Math.ceil(measure.ownNodes.length / columnsForNodes);
+      contentY += ownRows * ANALYZER_MODULE_NODE_HEIGHT + Math.max(0, ownRows - 1) * ANALYZER_MODULE_NODE_GAP;
+      if (measure.children.length > 0) contentY += ANALYZER_MODULE_REGION_GAP;
     }
     const childColumns = Math.min(ANALYZER_MODULE_CHILD_COLUMNS, Math.max(1, measure.children.length));
     const childWidths = Array.from({ length: childColumns }, (_, column) => Math.max(

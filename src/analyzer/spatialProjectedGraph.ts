@@ -1,24 +1,20 @@
 import { ANALYZER_MODULE_NODE_HEIGHT, ANALYZER_MODULE_NODE_WIDTH } from './layout';
 import {
   projectSpatialPoint,
-  spatialPointInViewport,
+  spatialScreenPointToWorldAtElevation,
   type SpatialCameraModel,
   type SpatialScreenPoint,
   type SpatialWorldPoint,
   type SpatialWorldRect,
 } from './spatialCoordinates';
-import type { SpatialContinuationKind } from './spatialLabels';
-import { routeSpatialEdge, type SpatialRouteEndpoint } from './spatialRouting';
+import { routeSpatialEdge, type SpatialRouteEndpoint, type SpatialRouteObstacle } from './spatialRouting';
 import {
-  ANALYZER_SPATIAL_FULL_AGGREGATE_DISTANCE,
   spatialEdgeAltitude,
   spatialEdgeClass,
   type AnalyzerSpatialEdgeClass,
 } from './spatialPresentation';
 
-export const ANALYZER_SPATIAL_FULL_PORT_INSET = 28;
-export const ANALYZER_SPATIAL_FULL_PATH_VISIBLE_RATIO = 0.62;
-export const ANALYZER_SPATIAL_STUB_VIEWPORT_MARGIN = 8;
+export const ANALYZER_SPATIAL_LABEL_VIEWPORT_MARGIN = 8;
 
 export const PROJECTED_EDGE_ALIGNMENT_EPSILON = 1.5;
 export const PROJECTED_ARROW_SIZE = 6;
@@ -50,16 +46,12 @@ export interface ProjectedGraphEdge {
   sourceId: string;
   targetId: string;
   aggregated: boolean;
-  compact: boolean;
-  continuation: boolean;
-  continuationKind?: SpatialContinuationKind;
-  stubHostId?: string;
   edgeClass: AnalyzerSpatialEdgeClass;
   worldPoints: SpatialWorldPoint[];
   points: SpatialScreenPoint[];
   path: string;
   arrow: { x: number; y: number; angle: number };
-  pill: SpatialScreenPoint;
+  labelAnchor: SpatialScreenPoint;
   selected: boolean;
   connected: boolean;
   dimmed: boolean;
@@ -238,58 +230,6 @@ export function projectedArcPoints(
   });
 }
 
-export function compactProjectedStub(start: SpatialScreenPoint, end: SpatialScreenPoint, length = 52): SpatialScreenPoint[] {
-  const dx = end.x - start.x;
-  const dy = end.y - start.y;
-  const distance = Math.hypot(dx, dy) || 1;
-  const scale = Math.min(length, distance) / distance;
-  return [start, { x: start.x + dx * scale, y: start.y + dy * scale }];
-}
-
-export function compactDirectedStub(
-  sourcePort: SpatialScreenPoint,
-  targetPort: SpatialScreenPoint,
-  kind: SpatialContinuationKind,
-  length = 48,
-): SpatialScreenPoint[] {
-  const dx = targetPort.x - sourcePort.x;
-  const dy = targetPort.y - sourcePort.y;
-  const distance = Math.hypot(dx, dy) || 1;
-  const ux = dx / distance;
-  const uy = dy / distance;
-  const span = Math.min(length, distance);
-  if (kind === 'source-offscreen') {
-    return [
-      { x: targetPort.x - ux * span, y: targetPort.y - uy * span },
-      targetPort,
-    ];
-  }
-  return [
-    sourcePort,
-    { x: sourcePort.x + ux * span, y: sourcePort.y + uy * span },
-  ];
-}
-
-export function spatialPointComfortablyInViewport(
-  screen: SpatialScreenPoint,
-  camera: SpatialCameraModel,
-  inset = ANALYZER_SPATIAL_FULL_PORT_INSET,
-): boolean {
-  return screen.x >= inset
-    && screen.y >= inset
-    && screen.x <= camera.viewportWidth - inset
-    && screen.y <= camera.viewportHeight - inset;
-}
-
-export function projectedPathVisibleRatio(
-  points: readonly SpatialScreenPoint[],
-  camera: SpatialCameraModel,
-  inset = 12,
-): number {
-  if (points.length === 0) return 0;
-  return points.filter((point) => spatialPointComfortablyInViewport(point, camera, inset)).length / points.length;
-}
-
 function sampleProjectedQuadratic(
   start: SpatialScreenPoint,
   end: SpatialScreenPoint,
@@ -305,51 +245,33 @@ function sampleProjectedQuadratic(
   });
 }
 
-function projectedRectOverlapRatio(rect: ProjectedRect, camera: SpatialCameraModel, inset = 12): number {
-  const viewX = inset;
-  const viewY = inset;
-  const viewRight = camera.viewportWidth - inset;
-  const viewBottom = camera.viewportHeight - inset;
-  const overlapW = Math.max(0, Math.min(rect.x + rect.width, viewRight) - Math.max(rect.x, viewX));
-  const overlapH = Math.max(0, Math.min(rect.y + rect.height, viewBottom) - Math.max(rect.y, viewY));
-  const area = Math.max(1, rect.width * rect.height);
-  return (overlapW * overlapH) / area;
+export function projectedRectFullyInViewport(
+  rect: ProjectedRect,
+  camera: Pick<SpatialCameraModel, 'viewportWidth' | 'viewportHeight'>,
+  margin = 0,
+): boolean {
+  return rect.x >= margin
+    && rect.y >= margin
+    && rect.x + rect.width <= camera.viewportWidth - margin
+    && rect.y + rect.height <= camera.viewportHeight - margin;
 }
 
-export function shouldDrawFullAggregateEdge(options: {
-  start: SpatialScreenPoint;
-  end: SpatialScreenPoint;
-  camera: SpatialCameraModel;
-  extraZ: number;
-  worldStart?: SpatialWorldPoint;
-  worldEnd?: SpatialWorldPoint;
-  selected?: boolean;
-  hovered?: boolean;
-}): boolean {
-  if (!spatialPointComfortablyInViewport(options.start, options.camera)
-    || !spatialPointComfortablyInViewport(options.end, options.camera)) {
-    return false;
-  }
-  const control = projectedQuadraticControl(
-    options.start,
-    options.end,
-    options.extraZ,
-    options.camera,
-    options.worldStart,
-    options.worldEnd,
-  );
-  const samples = sampleProjectedQuadratic(options.start, options.end, control);
-  const ratio = projectedPathVisibleRatio(samples, options.camera);
-  const overlap = projectedRectOverlapRatio(projectedAabb(samples), options.camera);
-  if (ratio < ANALYZER_SPATIAL_FULL_PATH_VISIBLE_RATIO || overlap < 0.55) return false;
-  const chord = Math.hypot(options.end.x - options.start.x, options.end.y - options.start.y);
-  if (options.selected || options.hovered) return chord < ANALYZER_SPATIAL_FULL_AGGREGATE_DISTANCE * 2.2;
-  return chord <= ANALYZER_SPATIAL_FULL_AGGREGATE_DISTANCE;
+export function projectedPathWithinViewport(
+  points: readonly SpatialScreenPoint[],
+  camera: Pick<SpatialCameraModel, 'viewportWidth' | 'viewportHeight'>,
+  margin = 0,
+): boolean {
+  return points.length >= 2 && points.every((point) => (
+    point.x >= margin
+    && point.y >= margin
+    && point.x <= camera.viewportWidth - margin
+    && point.y <= camera.viewportHeight - margin
+  ));
 }
 
-export function estimateStubPillSize(caption: string): { width: number; height: number } {
+export function estimateRelationLabelSize(caption: string, scale = 1): { width: number; height: number } {
   return {
-    width: Math.min(280, Math.max(92, 30 + caption.length * 6.8)),
+    width: Math.min(280, Math.max(92, 30 + caption.length * 6.8)) * scale,
     height: 18,
   };
 }
@@ -402,48 +324,6 @@ export function projectedPathIsOpen(path: string): boolean {
   return Boolean(path) && !/\sZ\s*$/i.test(path.trim());
 }
 
-function segmentsIntersectViewport(
-  start: SpatialScreenPoint,
-  end: SpatialScreenPoint,
-  camera: Pick<SpatialCameraModel, 'viewportWidth' | 'viewportHeight'>,
-): boolean {
-  const left = 0;
-  const top = 0;
-  const right = camera.viewportWidth;
-  const bottom = camera.viewportHeight;
-  const dx = end.x - start.x;
-  const dy = end.y - start.y;
-  let t0 = 0;
-  let t1 = 1;
-  const clip = (p: number, q: number): boolean => {
-    if (Math.abs(p) < 1e-9) return q >= 0;
-    const ratio = q / p;
-    if (p < 0) {
-      if (ratio > t1) return false;
-      if (ratio > t0) t0 = ratio;
-    } else {
-      if (ratio < t0) return false;
-      if (ratio < t1) t1 = ratio;
-    }
-    return true;
-  };
-  return clip(-dx, start.x - left)
-    && clip(dx, right - start.x)
-    && clip(-dy, start.y - top)
-    && clip(dy, bottom - start.y);
-}
-
-export function projectedPathIntersectsViewport(
-  points: readonly SpatialScreenPoint[],
-  camera: Pick<SpatialCameraModel, 'viewportWidth' | 'viewportHeight'>,
-): boolean {
-  return points.some((point) => spatialPointInViewport(point, camera, 0))
-    || points.slice(1).some((point, index) => {
-      const previous = points[index];
-      return previous ? segmentsIntersectViewport(previous, point, camera) : false;
-    });
-}
-
 export function projectedArrow(points: readonly SpatialScreenPoint[], control?: SpatialScreenPoint): { x: number; y: number; angle: number } {
   const tip = points.at(-1) ?? { x: 0, y: 0 };
   const previous = control ?? points.at(-2) ?? tip;
@@ -481,7 +361,7 @@ export function projectedArrowPolygon(arrow: { x: number; y: number; angle: numb
 export function keepProjectedRectInViewport(
   rect: ProjectedRect,
   camera: Pick<SpatialCameraModel, 'viewportWidth' | 'viewportHeight'>,
-  margin = ANALYZER_SPATIAL_STUB_VIEWPORT_MARGIN,
+  margin = ANALYZER_SPATIAL_LABEL_VIEWPORT_MARGIN,
 ): ProjectedRect {
   const maxX = Math.max(margin, camera.viewportWidth - rect.width - margin);
   const maxY = Math.max(margin, camera.viewportHeight - rect.height - margin);
@@ -490,168 +370,6 @@ export function keepProjectedRectInViewport(
     x: Math.min(maxX, Math.max(margin, rect.x)),
     y: Math.min(maxY, Math.max(margin, rect.y)),
   };
-}
-
-function stubOutward(side: 'left' | 'right' | 'top' | 'bottom'): SpatialScreenPoint {
-  if (side === 'left') return { x: -1, y: 0 };
-  if (side === 'right') return { x: 1, y: 0 };
-  if (side === 'top') return { x: 0, y: -1 };
-  return { x: 0, y: 1 };
-}
-
-function stubSidesFromPreferred(preferred: 'left' | 'right' | 'top' | 'bottom'): Array<'left' | 'right' | 'top' | 'bottom'> {
-  const opposite = oppositeSide(preferred);
-  const rest = (['left', 'right', 'top', 'bottom'] as const).filter((side) => side !== preferred && side !== opposite);
-  return [preferred, opposite, ...rest];
-}
-
-function stubPointsOnSide(
-  home: ProjectedRect,
-  side: 'left' | 'right' | 'top' | 'bottom',
-  slotIndex: number,
-  slotCount: number,
-  length = 36,
-): SpatialScreenPoint[] {
-  const origin = pointOnProjectedSide(home, side, slotIndex, slotCount);
-  const direction = stubOutward(side);
-  return [origin, { x: origin.x + direction.x * length, y: origin.y + direction.y * length }];
-}
-
-function stubPillRect(
-  points: readonly SpatialScreenPoint[],
-  side: 'left' | 'right' | 'top' | 'bottom',
-  size: { width: number; height: number },
-): ProjectedRect {
-  const tip = points.at(-1) ?? { x: 0, y: 0 };
-  if (side === 'left') return { x: tip.x - size.width - 4, y: tip.y - size.height / 2, width: size.width, height: size.height };
-  if (side === 'right') return { x: tip.x + 4, y: tip.y - size.height / 2, width: size.width, height: size.height };
-  if (side === 'top') return { x: tip.x - size.width / 2, y: tip.y - size.height - 4, width: size.width, height: size.height };
-  return { x: tip.x - size.width / 2, y: tip.y + 4, width: size.width, height: size.height };
-}
-
-function stubRectInViewport(
-  rect: ProjectedRect,
-  camera: Pick<SpatialCameraModel, 'viewportWidth' | 'viewportHeight'>,
-  margin = ANALYZER_SPATIAL_STUB_VIEWPORT_MARGIN,
-): boolean {
-  return rect.x >= margin
-    && rect.y >= margin
-    && rect.x + rect.width <= camera.viewportWidth - margin
-    && rect.y + rect.height <= camera.viewportHeight - margin;
-}
-
-function withStubGeometry(
-  edge: ProjectedGraphEdge,
-  points: SpatialScreenPoint[],
-  pill: ProjectedRect,
-): ProjectedGraphEdge {
-  return {
-    ...edge,
-    points,
-    path: projectedPathD(points),
-    arrow: projectedArrow(points),
-    pill: { x: pill.x + pill.width / 2, y: pill.y + pill.height / 2 },
-  };
-}
-
-function translatePoints(points: SpatialScreenPoint[], dx: number, dy: number): SpatialScreenPoint[] {
-  return points.map((point) => ({ x: point.x + dx, y: point.y + dy }));
-}
-
-function stubUnionRect(points: readonly SpatialScreenPoint[], pill: ProjectedRect): ProjectedRect {
-  return projectedAabb([
-    ...points,
-    { x: pill.x, y: pill.y },
-    { x: pill.x + pill.width, y: pill.y + pill.height },
-  ]);
-}
-
-function clampStubAssembly(
-  points: SpatialScreenPoint[],
-  pill: ProjectedRect,
-  camera: SpatialCameraModel,
-): { points: SpatialScreenPoint[]; pill: ProjectedRect } {
-  const union = stubUnionRect(points, pill);
-  const kept = keepProjectedRectInViewport(union, camera);
-  const dx = kept.x - union.x;
-  const dy = kept.y - union.y;
-  return {
-    points: translatePoints(points, dx, dy),
-    pill: { ...pill, x: pill.x + dx, y: pill.y + dy },
-  };
-}
-
-export function applySpatialStubLayout(
-  edges: readonly ProjectedGraphEdge[],
-  camera: SpatialCameraModel,
-  options: {
-    homeId?: string;
-    homeBounds?: ProjectedRect;
-    counterpartBounds: (edge: ProjectedGraphEdge) => ProjectedRect | undefined;
-    pillSize: (edge: ProjectedGraphEdge) => { width: number; height: number };
-  },
-): ProjectedGraphEdge[] {
-  const laidOut = new Map<string, ProjectedGraphEdge>();
-  const compact = edges.filter((edge) => edge.compact && options.homeId && edge.stubHostId === options.homeId);
-  const continuation = edges.filter((edge) => edge.continuation);
-
-  continuation.forEach((edge) => {
-    const size = options.pillSize(edge);
-    const tip = edge.continuationKind === 'source-offscreen' ? edge.points.at(-1) : edge.points.at(-1);
-    const visible = edge.continuationKind === 'source-offscreen' ? edge.points.at(-1) : edge.points[0];
-    if (!visible || !tip) return;
-    const pill = {
-      x: tip.x - size.width / 2,
-      y: tip.y - size.height - 6,
-      width: size.width,
-      height: size.height,
-    };
-    const clamped = clampStubAssembly(edge.points, pill, camera);
-    laidOut.set(edge.id, withStubGeometry(edge, clamped.points, clamped.pill));
-  });
-
-  if (options.homeId && options.homeBounds) {
-    const home = options.homeBounds;
-    const homeCenter = projectedRectCenter(home);
-    const assigned = compact.map((edge) => {
-      const counterpart = options.counterpartBounds(edge);
-      const other = counterpart ? projectedRectCenter(counterpart) : edge.points.at(-1) ?? homeCenter;
-      const preferred = dominantSide(other.x - homeCenter.x, other.y - homeCenter.y);
-      const size = options.pillSize(edge);
-      const incoming = edge.stubHostId === edge.targetId;
-      const side = stubSidesFromPreferred(preferred).find((candidate) => {
-        const points = stubPointsOnSide(home, candidate, 0, 1);
-        const pill = stubPillRect(points, candidate, size);
-        return stubRectInViewport(stubUnionRect(points, pill), camera);
-      }) ?? oppositeSide(preferred);
-      if (!stubRectInViewport(stubUnionRect(stubPointsOnSide(home, side, 0, 1), stubPillRect(stubPointsOnSide(home, side, 0, 1), side, size)), camera)) {
-        const retry = stubSidesFromPreferred(side).find((candidate) => {
-          const points = stubPointsOnSide(home, candidate, 0, 1);
-          return stubRectInViewport(stubUnionRect(points, stubPillRect(points, candidate, size)), camera);
-        });
-        return { edge, side: retry ?? side, size, incoming };
-      }
-      return { edge, side, size, incoming };
-    });
-    const bySide = new Map<'left' | 'right' | 'top' | 'bottom', typeof assigned>();
-    assigned.forEach((item) => {
-      const group = bySide.get(item.side) ?? [];
-      group.push(item);
-      bySide.set(item.side, group);
-    });
-    bySide.forEach((group, side) => {
-      const ordered = [...group].sort((first, second) => first.edge.id.localeCompare(second.edge.id));
-      ordered.forEach((item, index) => {
-        const points = stubPointsOnSide(home, side, index, ordered.length);
-        const directed = item.incoming ? [...points].reverse() : points;
-        const pill = stubPillRect(points, side, item.size);
-        const clamped = clampStubAssembly(directed, pill, camera);
-        laidOut.set(item.edge.id, withStubGeometry(item.edge, clamped.points, clamped.pill));
-      });
-    });
-  }
-
-  return edges.map((edge) => laidOut.get(edge.id) ?? edge);
 }
 
 export function buildProjectedGraphEdge(options: {
@@ -676,10 +394,9 @@ export function buildProjectedGraphEdge(options: {
   ports: { start: SpatialScreenPoint; end: SpatialScreenPoint };
   worldStart?: SpatialWorldPoint;
   worldEnd?: SpatialWorldPoint;
-  hovered?: boolean;
-  homeId?: string;
-  sourceAnchor?: SpatialScreenPoint;
-  targetAnchor?: SpatialScreenPoint;
+  worldSourcePort?: SpatialWorldPoint;
+  worldTargetPort?: SpatialWorldPoint;
+  obstacles?: readonly SpatialRouteObstacle[];
   zoomLevel?: 'far' | 'medium' | 'near';
   caption?: string;
   worldSourceRect?: SpatialWorldRect;
@@ -692,49 +409,43 @@ export function buildProjectedGraphEdge(options: {
     options.targetRegionId,
   );
   const extraZ = extraAltitudeForEdgeClass(edgeClass, options.sourceZ, options.targetZ, options.zoomLevel);
-  const sourceAnchor = options.sourceAnchor ?? projectedRectCenter(options.sourceBounds);
-  const targetAnchor = options.targetAnchor ?? projectedRectCenter(options.targetBounds);
-  const sourceIn = spatialPointInViewport(sourceAnchor, options.camera);
-  const targetIn = spatialPointInViewport(targetAnchor, options.camera);
-  const sourceVisible = sourceIn || projectedRectOverlapRatio(options.sourceBounds, options.camera, 0) > 0;
-  const targetVisible = targetIn || projectedRectOverlapRatio(options.targetBounds, options.camera, 0) > 0;
-  const start = options.aggregated
-    ? options.ports.start
-    : options.ports.start;
-  const end = options.aggregated
-    ? options.ports.end
-    : options.ports.end;
-  const continuationKind: SpatialContinuationKind | undefined = !options.aggregated
-    && (options.selected || options.connected)
-    && sourceVisible !== targetVisible
-    ? (sourceVisible ? 'target-offscreen' : 'source-offscreen')
-    : undefined;
-  const continuation = !options.aggregated
-    && (options.selected || options.connected)
-    && sourceVisible !== targetVisible;
+  const start = options.ports.start;
+  const end = options.ports.end;
   let worldPoints: SpatialWorldPoint[] = [];
   if (options.worldSourceRect && options.worldTargetRect) {
+    const sourceTerminal = options.worldSourcePort
+      ?? spatialScreenPointToWorldAtElevation(start, options.sourceZ, options.camera);
+    const targetTerminal = options.worldTargetPort
+      ?? spatialScreenPointToWorldAtElevation(end, options.targetZ, options.camera);
     const sourceEndpoint: SpatialRouteEndpoint = {
       id: options.sourceId,
-      x: options.worldSourceRect.x,
-      y: options.worldSourceRect.y,
-      width: options.worldSourceRect.width,
-      height: options.worldSourceRect.height,
+      x: sourceTerminal.x,
+      y: sourceTerminal.y,
+      width: 0,
+      height: 0,
       regionId: options.sourceRegionId,
       packageId: options.sourcePackageId,
       elevation: options.sourceZ,
     };
     const targetEndpoint: SpatialRouteEndpoint = {
       id: options.targetId,
-      x: options.worldTargetRect.x,
-      y: options.worldTargetRect.y,
-      width: options.worldTargetRect.width,
-      height: options.worldTargetRect.height,
+      x: targetTerminal.x,
+      y: targetTerminal.y,
+      width: 0,
+      height: 0,
       regionId: options.targetRegionId,
       packageId: options.targetPackageId,
       elevation: options.targetZ,
     };
-    worldPoints = routeSpatialEdge(sourceEndpoint, targetEndpoint, [], options.zoomLevel ?? 'near').points;
+    const obstacles = options.obstacles?.filter((obstacle) => (
+      obstacle.id !== options.sourceId && obstacle.id !== options.targetId
+    )) ?? [];
+    worldPoints = routeSpatialEdge(
+      sourceEndpoint,
+      targetEndpoint,
+      obstacles,
+      options.zoomLevel ?? 'near',
+    ).points;
   }
   const points = worldPoints.length > 1
     ? worldPoints.map((point) => projectSpatialPoint(point, options.camera))
@@ -742,38 +453,33 @@ export function buildProjectedGraphEdge(options: {
   const control = worldPoints.length > 1
     ? undefined
     : projectedQuadraticControl(start, end, extraZ, options.camera, options.worldStart, options.worldEnd);
-  // Compact/stub geometry is intentionally no longer used for ordinary
-  // relations.  A relation remains a source-to-target path and is clipped by
-  // the viewport naturally; continuationKind is label metadata only.
-  const compact = false;
-  const stubHostId = continuationKind
-    ? (continuationKind === 'source-offscreen' ? options.targetId : options.sourceId)
-    : undefined;
   const caption = options.caption;
-  const needsCaption = continuation || options.aggregated;
-  const readable = caption === undefined || !needsCaption || caption.length > 0;
-  // A path crossing the viewport with both endpoints outside is an
-  // unanchored fragment, not a trustworthy relation.  Keep it culled until
-  // at least one semantic endpoint or its card/region bounds are visible.
+  const readable = !options.aggregated || Boolean(caption);
+  const sourceVisible = projectedRectFullyInViewport(options.sourceBounds, options.camera);
+  const targetVisible = projectedRectFullyInViewport(options.targetBounds, options.camera);
+  const pathSamples = control
+    ? sampleProjectedQuadratic(points[0]!, points.at(-1)!, control)
+    : points;
+  // An Edge is a complete visual relation only when both semantic endpoints
+  // and every projected path sample are inside the viewport.  This prevents
+  // continuation fragments and screen-edge shortcuts from being mistaken for
+  // visible relations.
   const visible = readable
-    && (sourceVisible || targetVisible)
-    && projectedPathIntersectsViewport(points, options.camera);
+    && sourceVisible
+    && targetVisible
+    && projectedPathWithinViewport(pathSamples, options.camera);
   return {
     id: options.id,
     edgeIds: [...(options.edgeIds ?? [options.id])],
     sourceId: options.sourceId,
     targetId: options.targetId,
     aggregated: options.aggregated,
-    compact,
-    continuation,
-    continuationKind,
-    stubHostId,
     edgeClass,
     worldPoints,
     points,
     path: projectedPathD(points, control),
     arrow: projectedArrow(points, control),
-    pill: projectedPathMidpoint(points),
+    labelAnchor: projectedPathMidpoint(points),
     selected: options.selected,
     connected: options.connected,
     dimmed: options.dimmed,

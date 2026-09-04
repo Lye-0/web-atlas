@@ -3078,7 +3078,7 @@ summary:focus-visible {
 
 .analyzer-spatial-project-heading {
   position: absolute;
-  top: 12px;
+  top: 48px;
   left: 12px;
   z-index: 6;
   padding: 2px 8px;
@@ -3121,20 +3121,15 @@ summary:focus-visible {
 }
 
 .analyzer-spatial-edge-count.is-counterpart em {
-  max-width: none;
-  overflow: visible;
-  text-overflow: clip;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: 0.88em;
 }
 
 .analyzer-spatial-edge-count strong {
   color: var(--accent-strong);
   font-weight: 700;
-}
-
-.analyzer-spatial-edge-count.is-compact {
-  min-width: 18px;
-  padding-inline: 7px;
 }
 
 .analyzer-spatial-region.is-package {
@@ -3156,7 +3151,7 @@ summary:focus-visible {
   z-index: 4;
   display: flex;
   align-items: center;
-  max-width: none;
+  max-width: min(360px, calc(100% - 16px));
   gap: 7px;
   min-height: 22px;
   padding: 2px 5px;
@@ -3179,8 +3174,8 @@ summary:focus-visible {
 }
 
 .analyzer-spatial-region-heading.is-major strong {
-  overflow: visible;
-  text-overflow: clip;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .analyzer-spatial-region-heading.is-selected {
@@ -3209,8 +3204,8 @@ summary:focus-visible {
 }
 
 .analyzer-spatial-region-heading strong {
-  overflow: visible;
-  text-overflow: clip;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
