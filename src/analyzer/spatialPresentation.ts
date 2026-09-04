@@ -1,16 +1,29 @@
+import { ANALYZER_MODULE_NODE_WIDTH } from './layout';
 import type { AnalyzerRegionKind } from './types';
 
 export type AnalyzerSpatialZoomLevel = 'far' | 'medium' | 'near';
 export type AnalyzerSpatialEdgeClass = 'local' | 'cross-directory' | 'cross-package';
+export type AnalyzerSpatialSelectionKind = 'none' | 'module' | 'directory' | 'package' | 'edge';
 
-/** The renderer keeps a small amount of depth so the map remains an atlas, not a block sculpture. */
-export const ANALYZER_SPATIAL_TILT_DEGREES = 24;
+/** Pitch from vertical: enough depth to read planes, shallow enough to keep the map readable. */
+export const ANALYZER_SPATIAL_TILT_DEGREES = 17;
+export const ANALYZER_SPATIAL_YAW_DEGREES = 4;
+/** Fallback only; live distance is derived from world bounds. */
+export const ANALYZER_SPATIAL_CAMERA_DISTANCE = 1600;
+export const ANALYZER_SPATIAL_CAMERA_SCHEMA = 2;
 export const ANALYZER_SPATIAL_INITIAL_SCALE = 0.5;
-export const ANALYZER_SPATIAL_REGION_ELEVATION = 4;
-export const ANALYZER_SPATIAL_MODULE_ELEVATION = 18;
-export const ANALYZER_SPATIAL_LOCAL_EDGE_ALTITUDE = 25;
-export const ANALYZER_SPATIAL_DIRECTORY_EDGE_ALTITUDE = 38;
-export const ANALYZER_SPATIAL_PACKAGE_EDGE_ALTITUDE = 54;
+export const ANALYZER_SPATIAL_INCIDENT_EDGE_THRESHOLD = 8;
+export const ANALYZER_SPATIAL_DIRECTIONAL_GROUP_THRESHOLD = 8;
+export const ANALYZER_SPATIAL_EXACT_COUNTERPART_LIMIT = 2;
+export const ANALYZER_SPATIAL_FULL_AGGREGATE_DISTANCE = 280;
+export const ANALYZER_SPATIAL_MODULE_CARD_WIDTH_NEAR = ANALYZER_MODULE_NODE_WIDTH;
+export const ANALYZER_SPATIAL_REGION_ELEVATION = 8;
+export const ANALYZER_SPATIAL_MODULE_ELEVATION = 16;
+export const ANALYZER_SPATIAL_LOCAL_EDGE_ALTITUDE = 22;
+export const ANALYZER_SPATIAL_DIRECTORY_EDGE_ALTITUDE = 32;
+export const ANALYZER_SPATIAL_PACKAGE_EDGE_ALTITUDE = 44;
+export const ANALYZER_SPATIAL_PLANE_THICKNESS = 0.16;
+export const ANALYZER_SPATIAL_MAX_XY_DETOUR = 64;
 
 export function spatialModuleBudget(zoomLevel: AnalyzerSpatialZoomLevel): number {
   if (zoomLevel === 'far') return 0;
@@ -19,18 +32,50 @@ export function spatialModuleBudget(zoomLevel: AnalyzerSpatialZoomLevel): number
 }
 
 export function spatialEdgeBudget(zoomLevel: AnalyzerSpatialZoomLevel): number {
-  if (zoomLevel === 'far') return 120;
-  if (zoomLevel === 'medium') return 420;
-  return 1200;
+  if (zoomLevel === 'far') return 10;
+  if (zoomLevel === 'medium') return 14;
+  return 18;
+}
+
+export function spatialLocalEdgeBudget(zoomLevel: AnalyzerSpatialZoomLevel): number {
+  if (zoomLevel === 'far') return 0;
+  if (zoomLevel === 'medium') return 2;
+  return 4;
 }
 
 export function spatialRegionDepthElevation(regionKind: AnalyzerRegionKind, depth = 0): number {
   if (regionKind === 'workspace-package') return 2;
-  return ANALYZER_SPATIAL_REGION_ELEVATION + Math.min(12, Math.max(0, depth) * 1.5);
+  return ANALYZER_SPATIAL_REGION_ELEVATION + Math.min(12, Math.max(0, depth) * 2.4);
 }
 
 export function spatialModuleElevation(regionDepth = 0): number {
-  return ANALYZER_SPATIAL_MODULE_ELEVATION + Math.min(10, Math.max(0, regionDepth) * 0.75);
+  return ANALYZER_SPATIAL_MODULE_ELEVATION + Math.min(8, Math.max(0, regionDepth) * 0.6);
+}
+
+export function spatialRegionBorderStyle(
+  selected: boolean,
+  regionKind: AnalyzerRegionKind,
+  depth = 0,
+): { color: string; opacity: number; className: 'region-border' | 'region-border-selected' } {
+  if (selected) return { color: '#4f8f96', opacity: 0.48, className: 'region-border-selected' };
+  if (regionKind === 'workspace-package') return { color: '#6d958c', opacity: 0.72, className: 'region-border' };
+  if (depth > 1) return { color: '#2f4a46', opacity: 0.28, className: 'region-border' };
+  return { color: '#3d5c56', opacity: 0.5, className: 'region-border' };
+}
+export function spatialRegionFillOpacity(regionKind: AnalyzerRegionKind, depth = 0): number {
+  if (regionKind === 'workspace-package') return 0.18;
+  return Math.max(0.04, 0.1 - Math.max(0, depth) * 0.02);
+}
+
+export function spatialReadableUiTransform(elevation: number): string {
+  return `translateZ(${elevation}px) rotateX(${-ANALYZER_SPATIAL_TILT_DEGREES}deg)`;
+}
+
+export function spatialLabelScreenScale(scale: number): number {
+  // Screen-facing labels should remain readable, but must not grow as the
+  // world is zoomed out.  The old inverse scale made Far headings dominate
+  // the map and collide with one another.
+  return Math.min(1.08, Math.max(0.78, 0.72 + Math.max(0.25, Math.min(1.8, scale)) * 0.3));
 }
 
 export function spatialEdgeClass(
@@ -44,10 +89,32 @@ export function spatialEdgeClass(
   return 'local';
 }
 
-export function spatialEdgeAltitude(edgeClass: AnalyzerSpatialEdgeClass): number {
-  if (edgeClass === 'cross-package') return ANALYZER_SPATIAL_PACKAGE_EDGE_ALTITUDE;
-  if (edgeClass === 'cross-directory') return ANALYZER_SPATIAL_DIRECTORY_EDGE_ALTITUDE;
-  return ANALYZER_SPATIAL_LOCAL_EDGE_ALTITUDE;
+export function spatialEdgeAltitude(edgeClass: AnalyzerSpatialEdgeClass, zoomLevel?: AnalyzerSpatialZoomLevel): number {
+  const farScale = zoomLevel === 'far' ? 0.38 : 1;
+  if (edgeClass === 'cross-package') return ANALYZER_SPATIAL_PACKAGE_EDGE_ALTITUDE * farScale;
+  if (edgeClass === 'cross-directory') return ANALYZER_SPATIAL_DIRECTORY_EDGE_ALTITUDE * farScale;
+  return ANALYZER_SPATIAL_LOCAL_EDGE_ALTITUDE * farScale;
+}
+
+export function spatialModuleCardWidth(zoomLevel: AnalyzerSpatialZoomLevel): number {
+  if (zoomLevel === 'near') return ANALYZER_SPATIAL_MODULE_CARD_WIDTH_NEAR;
+  return ANALYZER_MODULE_NODE_WIDTH;
+}
+
+export function spatialEdgeEmptyReason(options: {
+  factCount: number;
+  renderedCount: number;
+  candidateCount?: number;
+}): 'none' | 'no-dependency' | 'density-budget' {
+  if (options.renderedCount > 0) return 'none';
+  if (options.factCount === 0 || options.candidateCount === 0) return 'no-dependency';
+  return 'density-budget';
+}
+
+export function spatialEdgeImportance(edgeClass: AnalyzerSpatialEdgeClass): number {
+  if (edgeClass === 'cross-package') return 3;
+  if (edgeClass === 'cross-directory') return 2;
+  return 1;
 }
 
 export function spatialModuleShouldRender({
@@ -63,8 +130,47 @@ export function spatialModuleShouldRender({
   matched?: boolean;
   selectedEdgeEndpoint?: boolean;
 }): boolean {
+  if (zoomLevel === 'far') return false;
   if (selected || matched || selectedEdgeEndpoint) return true;
-  return zoomLevel !== 'far' && hierarchyVisible;
+  return hierarchyVisible;
+}
+
+export function spatialSelectionKind({
+  selectedNodeId,
+  selectedRegionKind,
+  selectedEdgeId,
+}: {
+  selectedNodeId?: string;
+  selectedRegionKind?: AnalyzerRegionKind;
+  selectedEdgeId?: string;
+}): AnalyzerSpatialSelectionKind {
+  if (selectedEdgeId) return 'edge';
+  if (selectedNodeId) return 'module';
+  if (selectedRegionKind === 'workspace-package') return 'package';
+  if (selectedRegionKind === 'directory') return 'directory';
+  return 'none';
+}
+
+export function spatialUsesRegionAggregation(
+  zoomLevel: AnalyzerSpatialZoomLevel,
+  selectionKind: AnalyzerSpatialSelectionKind,
+): boolean {
+  return zoomLevel === 'far' || selectionKind === 'directory' || selectionKind === 'package';
+}
+
+export function spatialShowsLocalModuleEdges(
+  zoomLevel: AnalyzerSpatialZoomLevel,
+  selectionKind: AnalyzerSpatialSelectionKind,
+): boolean {
+  return zoomLevel !== 'far' && selectionKind !== 'directory' && selectionKind !== 'package';
+}
+
+export function spatialNodeBelongsToRegion(
+  regionPath: readonly string[] | undefined,
+  regionId: string | undefined,
+): boolean {
+  if (!regionId || !regionPath) return false;
+  return regionPath.includes(regionId);
 }
 
 export interface SpatialEdgeAggregation {

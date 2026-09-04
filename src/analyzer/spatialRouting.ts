@@ -35,54 +35,63 @@ export interface SpatialRoute {
   points: SpatialRoutePoint[];
 }
 
+export function spatialRouteEndpointFromAnchor(
+  anchor: { x: number; y: number; z: number },
+  meta: { id?: string; regionId: string; packageId?: string },
+): SpatialRouteEndpoint {
+  return {
+    id: meta.id,
+    x: anchor.x,
+    y: anchor.y,
+    width: 0,
+    height: 0,
+    regionId: meta.regionId,
+    packageId: meta.packageId,
+    elevation: anchor.z,
+  };
+}
+
 function endpointCenter(endpoint: SpatialRouteEndpoint): { x: number; y: number } {
   return { x: endpoint.x + endpoint.width / 2, y: endpoint.y + endpoint.height / 2 };
 }
 
-function segmentHitsObstacle(
-  start: { x: number; y: number },
-  end: { x: number; y: number },
-  obstacle: SpatialRouteObstacle,
-): boolean {
-  const padding = 8;
-  const left = obstacle.x - padding;
-  const right = obstacle.x + obstacle.width + padding;
-  const top = obstacle.y - padding;
-  const bottom = obstacle.y + obstacle.height + padding;
-  if (start.x === end.x) {
-    return start.x > left && start.x < right
-      && Math.max(Math.min(start.y, end.y), top) < Math.min(Math.max(start.y, end.y), bottom);
+function boundaryPoint(
+  endpoint: SpatialRouteEndpoint,
+  toward: { x: number; y: number },
+): { x: number; y: number } {
+  const center = endpointCenter(endpoint);
+  if (endpoint.width <= 0 || endpoint.height <= 0) return center;
+  const dx = toward.x - center.x;
+  const dy = toward.y - center.y;
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    return {
+      x: dx >= 0 ? endpoint.x + endpoint.width : endpoint.x,
+      y: Math.min(endpoint.y + endpoint.height, Math.max(endpoint.y, center.y + dy * (endpoint.width / 2) / Math.max(Math.abs(dx), 1))),
+    };
   }
-  if (start.y === end.y) {
-    return start.y > top && start.y < bottom
-      && Math.max(Math.min(start.x, end.x), left) < Math.min(Math.max(start.x, end.x), right);
-  }
-  return false;
+  return {
+    x: Math.min(endpoint.x + endpoint.width, Math.max(endpoint.x, center.x + dx * (endpoint.height / 2) / Math.max(Math.abs(dy), 1))),
+    y: dy >= 0 ? endpoint.y + endpoint.height : endpoint.y,
+  };
 }
 
-function routeLength(points: readonly { x: number; y: number }[]): number {
+function xyDistance(start: { x: number; y: number }, end: { x: number; y: number }): number {
+  return Math.abs(end.x - start.x) + Math.abs(end.y - start.y);
+}
+
+export function spatialRouteXyLength(points: readonly { x: number; y: number }[]): number {
   return points.slice(1).reduce((total, point, index) => {
     const previous = points[index];
-    return total + (previous ? Math.abs(point.x - previous.x) + Math.abs(point.y - previous.y) : 0);
+    return total + (previous ? xyDistance(previous, point) : 0);
   }, 0);
 }
 
-function routeAvoidsObstacles(
+export function spatialRouteXyExcursion(
   points: readonly { x: number; y: number }[],
-  obstacles: readonly SpatialRouteObstacle[],
-  endpointIds: ReadonlySet<string>,
-): boolean {
-  return points.slice(1).every((point, index) => {
-    const previous = points[index];
-    if (!previous) return true;
-    return obstacles
-      .filter((obstacle) => !obstacle.id || !endpointIds.has(obstacle.id))
-      .every((obstacle) => !segmentHitsObstacle(previous, point, obstacle));
-  });
-}
-
-function simplifyRoute(points: readonly { x: number; y: number }[]): { x: number; y: number }[] {
-  return points.filter((point, index) => index === 0 || point.x !== points[index - 1]?.x || point.y !== points[index - 1]?.y);
+  start: { x: number; y: number },
+  end: { x: number; y: number },
+): number {
+  return Math.max(0, spatialRouteXyLength(points) - xyDistance(start, end));
 }
 
 function bezierPoint(
@@ -102,76 +111,32 @@ function bezierPoint(
   };
 }
 
-function routeForClass(
-  points: readonly { x: number; y: number }[],
-  edgeClass: AnalyzerSpatialEdgeClass,
-  source: SpatialRouteEndpoint,
-  target: SpatialRouteEndpoint,
-): SpatialRoutePoint[] {
-  const sourceZ = source.elevation ?? spatialModuleElevation();
-  const targetZ = target.elevation ?? spatialModuleElevation();
-  if (edgeClass === 'local') {
-    return points.map((point) => ({ ...point, z: Math.max(sourceZ, targetZ) + 5 }));
-  }
-  const [start, ...rest] = points;
-  const end = rest.at(-1);
-  if (!start || !end) return [];
-  const controlStart = rest[0] ?? end;
-  const controlEnd = rest.at(-2) ?? start;
-  const altitude = spatialEdgeAltitude(edgeClass);
-  return Array.from({ length: 17 }, (_, index) => bezierPoint(
-    { ...start, z: sourceZ + 3 },
-    controlStart,
-    controlEnd,
-    { ...end, z: targetZ + 3 },
-    index / 16,
-    altitude,
-  ));
-}
-
 /**
- * Routes module/region endpoints in XY only long enough to find a clear
- * corridor, then lifts cross-region paths into a deterministic 3D arc.
+ * World-space routing stays on the source-target XY chord.
+ * Cross-region edges raise in Z; the Projected Graph Layer turns that elevation into a screen arc.
  */
 export function routeSpatialEdge(
   source: SpatialRouteEndpoint,
   target: SpatialRouteEndpoint,
-  obstacles: readonly SpatialRouteObstacle[] = [],
+  _obstacles: readonly SpatialRouteObstacle[] = [],
+  zoomLevel: 'far' | 'medium' | 'near' = 'near',
 ): SpatialRoute {
-  const sourceCenter = endpointCenter(source);
   const targetCenter = endpointCenter(target);
-  const horizontalDirection = targetCenter.x >= sourceCenter.x ? 1 : -1;
-  const start = {
-    x: sourceCenter.x + horizontalDirection * source.width / 2,
-    y: sourceCenter.y,
-  };
-  const end = {
-    x: targetCenter.x - horizontalDirection * target.width / 2,
-    y: targetCenter.y,
-  };
-  const obstacleLeft = Math.min(start.x, end.x, ...obstacles.map((obstacle) => obstacle.x));
-  const obstacleRight = Math.max(start.x, end.x, ...obstacles.map((obstacle) => obstacle.x + obstacle.width));
-  const obstacleTop = Math.min(start.y, end.y, ...obstacles.map((obstacle) => obstacle.y));
-  const obstacleBottom = Math.max(start.y, end.y, ...obstacles.map((obstacle) => obstacle.y + obstacle.height));
-  const midX = (start.x + end.x) / 2;
-  const xRoutes = [midX, obstacleLeft - 28, obstacleRight + 28].map((x) => [
-    start,
-    { x, y: start.y },
-    { x, y: end.y },
-    end,
-  ]);
-  const yRoutes = [obstacleTop - 28, obstacleBottom + 28].map((y) => [
-    start,
-    { x: start.x, y },
-    { x: end.x, y },
-    end,
-  ]);
-  const endpointIds = new Set<string>([source.id, target.id].filter((id): id is string => Boolean(id)));
-  const selectedRoute = [...xRoutes, ...yRoutes]
-    .map(simplifyRoute)
-    .filter((route) => routeAvoidsObstacles(route, obstacles, endpointIds))
-    .sort((first, second) => routeLength(first) + first.length * 8 - (routeLength(second) + second.length * 8))[0]
-    ?? [start, { x: midX, y: start.y }, { x: midX, y: end.y }, end];
+  const sourceCenter = endpointCenter(source);
+  const start = boundaryPoint(source, targetCenter);
+  const end = boundaryPoint(target, sourceCenter);
   const edgeClass = spatialEdgeClass(source.packageId, target.packageId, source.regionId, target.regionId);
-  return { edgeClass, points: routeForClass(selectedRoute, edgeClass, source, target) };
+  const control = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
+  const sourceAltitude = source.elevation ?? spatialModuleElevation();
+  const targetAltitude = target.elevation ?? spatialModuleElevation();
+  const altitude = spatialEdgeAltitude(edgeClass, zoomLevel);
+  const points = Array.from({ length: 17 }, (_, index) => bezierPoint(
+    { ...start, z: sourceAltitude },
+    control,
+    control,
+    { ...end, z: targetAltitude },
+    index / 16,
+    edgeClass === 'local' ? Math.max(sourceAltitude, targetAltitude) : altitude,
+  ));
+  return { edgeClass, points };
 }

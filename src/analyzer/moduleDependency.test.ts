@@ -40,7 +40,7 @@ describe('Module Dependency view', () => {
     expect(view.nodes.map((node) => node.id)).toContain(moduleIdForPath('src/a.ts'));
     expect(view.edges.every((edge) => edge.kind === 'imports')).toBe(true);
     expect(view.regions?.some((region) => region.regionKind === 'directory')).toBe(true);
-    expect(view.regions?.some((region) => Array.isArray(region.metadata.compressedPaths))).toBe(true);
+    expect(view.projectLabel).toBe('fixture');
   });
 
   it('resolves a local workspace package entry without creating external module nodes', async () => {
@@ -61,7 +61,7 @@ describe('Module Dependency view', () => {
     expect(layoutAnalyzerView(view)).toEqual(layoutAnalyzerView(view));
   });
 
-  it('packs a dense directory into a compact far map and restores modules when expanded', async () => {
+  it('keeps a dense directory laid out for the overview and for explicit expansion', async () => {
     const denseFiles = Array.from({ length: 240 }, (_, index) => file(
       `src/dense/module-${String(index).padStart(3, '0')}.ts`,
       '',
@@ -73,12 +73,12 @@ describe('Module Dependency view', () => {
     const view = projectModuleDependency(store);
     const denseRegion = view.regions?.find((region) => region.metadata.directoryPath === 'src/dense');
     expect(denseRegion).toBeDefined();
-    const collapsed = layoutAnalyzerView(view);
+    const overview = layoutAnalyzerView(view);
     const expanded = layoutAnalyzerView(view, new Set([denseRegion!.id]));
-    expect(collapsed.nodes).toHaveLength(0);
-    expect(collapsed.width).toBeLessThan(1000);
+    expect(overview.nodes).toHaveLength(240);
     expect(expanded.nodes).toHaveLength(240);
-    expect(expanded.width).toBeGreaterThan(collapsed.width);
+    expect(overview.width).toBeGreaterThan(0);
+    expect(expanded.width).toBeGreaterThan(0);
     expect(layoutAnalyzerView(view, new Set([denseRegion!.id]))).toEqual(expanded);
   });
 });

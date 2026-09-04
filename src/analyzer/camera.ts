@@ -5,6 +5,8 @@ export interface AnalyzerGraphTransform {
   x: number;
   y: number;
   scale: number;
+  /** Module Dependency spatial camera schema. Absent on Views 1–4 and legacy spatial cameras. */
+  schema?: number;
 }
 
 export const ANALYZER_DEFAULT_TRANSFORM: AnalyzerGraphTransform = { x: 24, y: 24, scale: 0.7 };

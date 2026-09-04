@@ -1632,6 +1632,7 @@ export function projectModuleDependency(store: AnalyzerProjectStore): AnalyzerVi
     regions,
     evidence: store.evidence,
     warnings: baseWarnings(store, 'module-dependency'),
+    projectLabel: store.facts.find((fact) => fact.kind === 'project')?.label,
   };
 }
 

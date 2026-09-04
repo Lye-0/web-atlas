@@ -57,6 +57,7 @@ export const ANALYZER_MODULE_NODE_WIDTH = 150;
 export const ANALYZER_MODULE_NODE_HEIGHT = 36;
 export const ANALYZER_MODULE_NODE_GAP = 8;
 export const ANALYZER_MODULE_REGION_GAP = 16;
+export const ANALYZER_MODULE_PACKAGE_GAP = 28;
 export const ANALYZER_MODULE_REGION_INSET = 14;
 export const ANALYZER_MODULE_REGION_HEADING = 30;
 const ANALYZER_MODULE_COLLAPSED_WIDTH = 196;
@@ -839,11 +840,12 @@ function moduleRegionMeasure(
   const contentHeight = ownHeight
     + (ownHeight > 0 && childHeight > 0 ? ANALYZER_MODULE_REGION_GAP : 0)
     + childHeight;
+  const headingWidth = 74 + region.label.length * 7.2;
   return {
     region,
     children,
     ownNodes,
-    width: Math.max(ANALYZER_MODULE_COLLAPSED_WIDTH, contentWidth + ANALYZER_MODULE_REGION_INSET * 2),
+    width: Math.max(ANALYZER_MODULE_COLLAPSED_WIDTH, headingWidth, contentWidth + ANALYZER_MODULE_REGION_INSET * 2),
     height: Math.max(ANALYZER_MODULE_COLLAPSED_HEIGHT, ANALYZER_MODULE_REGION_HEADING + contentHeight + ANALYZER_MODULE_REGION_INSET),
   };
 }
@@ -851,10 +853,41 @@ function moduleRegionMeasure(
 function layoutModuleDependency(view: AnalyzerViewModel, expandedRegionIds: ReadonlySet<string>): AnalyzerLayout {
   const nodeById = new Map(view.nodes.map((node) => [node.id, node]));
   const regionById = new Map((view.regions ?? []).map((region) => [region.id, region]));
+  // An empty expansion set is the initial overview state, not an empty
+  // canvas.  Lay out the complete hierarchy once; explicit toggles still
+  // replace this default with the user's collapsed/expanded set.
+  const effectiveExpandedRegionIds = expandedRegionIds.size > 0
+    ? expandedRegionIds
+    : new Set((view.regions ?? [])
+      .filter((region) => region.regionKind === 'directory')
+      .map((region) => region.id));
   const packageRegions = (view.regions ?? [])
     .filter((region) => region.regionKind === 'workspace-package' || !region.parentRegionId)
     .sort((first, second) => first.id.localeCompare(second.id));
-  const measures = packageRegions.map((region) => moduleRegionMeasure(view, region, regionById, nodeById, expandedRegionIds));
+  if (packageRegions.length === 0) {
+    const modules = view.nodes
+      .filter((node) => node.type === 'module')
+      .sort((first, second) => first.label.localeCompare(second.label) || first.id.localeCompare(second.id));
+    const columns = Math.min(ANALYZER_MODULE_PACKAGE_COLUMNS, Math.max(1, modules.length));
+    const rows = modules.length === 0 ? 0 : Math.ceil(modules.length / columns);
+    const positionedNodes = modules.map((node, index) => ({
+      node,
+      x: SIDE_PADDING + (index % columns) * (ANALYZER_MODULE_NODE_WIDTH + ANALYZER_MODULE_NODE_GAP),
+      y: 24 + Math.floor(index / columns) * (ANALYZER_MODULE_NODE_HEIGHT + ANALYZER_MODULE_NODE_GAP),
+      height: ANALYZER_MODULE_NODE_HEIGHT,
+    }));
+    return {
+      width: Math.max(640, SIDE_PADDING * 2 + columns * ANALYZER_MODULE_NODE_WIDTH + Math.max(0, columns - 1) * ANALYZER_MODULE_NODE_GAP),
+      height: Math.max(160, 48 + rows * ANALYZER_MODULE_NODE_HEIGHT + Math.max(0, rows - 1) * ANALYZER_MODULE_NODE_GAP),
+      nodes: positionedNodes,
+      clusters: [],
+      lanes: [],
+      bands: [],
+      summaryGroups: [],
+      regions: [],
+    };
+  }
+  const measures = packageRegions.map((region) => moduleRegionMeasure(view, region, regionById, nodeById, effectiveExpandedRegionIds));
   const columns = Math.min(ANALYZER_MODULE_PACKAGE_COLUMNS, Math.max(1, measures.length));
   const columnWidths = Array.from({ length: columns }, (_, column) => Math.max(
     ANALYZER_MODULE_COLLAPSED_WIDTH,
@@ -916,8 +949,8 @@ function layoutModuleDependency(view: AnalyzerViewModel, expandedRegionIds: Read
   measures.forEach((measure, index) => {
     const column = index % columns;
     const row = Math.floor(index / columns);
-    const x = SIDE_PADDING + columnWidths.slice(0, column).reduce((total, value) => total + value + ANALYZER_MODULE_REGION_GAP, 0);
-    const y = 24 + rowHeights.slice(0, row).reduce((total, value) => total + value + ANALYZER_MODULE_REGION_GAP, 0);
+    const x = SIDE_PADDING + columnWidths.slice(0, column).reduce((total, value) => total + value + ANALYZER_MODULE_PACKAGE_GAP, 0);
+    const y = 24 + rowHeights.slice(0, row).reduce((total, value) => total + value + ANALYZER_MODULE_PACKAGE_GAP, 0);
     place(measure, x, y);
   });
   const right = Math.max(640, ...positionedRegions.map((region) => region.x + region.width + SIDE_PADDING), SIDE_PADDING * 2);

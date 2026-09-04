@@ -457,6 +457,7 @@ export interface AnalyzerViewModel {
   evidence: AnalyzerEvidence[];
   warnings: AnalyzerWarning[];
   entryScriptId?: string;
+  projectLabel?: string;
 }
 
 export const analyzerViewLabels: Record<AnalyzerViewId, string> = {

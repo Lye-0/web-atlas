@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { ANALYZER_DEFAULT_TRANSFORM, ANALYZER_EXTERNAL_SUMMARY_ID, analyzerViewCounts, analyzerViewLabels, presentationOwnsNode, presentAnalyzerView, projectAnalyzerView, regionMatchesSearch, restoreAnalyzerViewSession, useAnalyzerSession, viewNodeSearchText } from '../analyzer';
+import { ANALYZER_DEFAULT_TRANSFORM, ANALYZER_EXTERNAL_SUMMARY_ID, analyzerViewCounts, analyzerViewLabels, isCompatibleSpatialCameraTransform, presentationOwnsNode, presentAnalyzerView, projectAnalyzerView, regionMatchesSearch, restoreAnalyzerViewSession, useAnalyzerSession, viewNodeSearchText } from '../analyzer';
 import type { AnalyzerGraphTransform, AnalyzerProjectStore, AnalyzerSemanticRegion, AnalyzerViewCounts, AnalyzerViewId, AnalyzerViewModel, AnalyzerViewNode, AnalyzerViewSession, DirectoryHandleLike } from '../analyzer';
 import { AnalyzerDetailPanel } from '../components/analyzer/AnalyzerDetailPanel';
 import { AnalyzerEmptyOrbit } from '../components/analyzer/AnalyzerEmptyOrbit';
@@ -52,7 +52,7 @@ export function AnalyzerPage() {
     if (!model) return { visibleNodes: 0, totalNodes: 0, hiddenNodes: 0 };
     if (view === 'module-dependency') {
       const totalNodes = model.nodes.filter((node) => node.type === 'module').length;
-      const visibleNodes = selectedNodeId || selectedEdgeId || search.trim() ? Math.min(totalNodes, 1) : 0;
+      const visibleNodes = totalNodes;
       return { visibleNodes, totalNodes, hiddenNodes: Math.max(0, totalNodes - visibleNodes) };
     }
     const presented = presentAnalyzerView(model, { expandedPresentationIds, filter, search, selectedEdgeId, selectedNodeId, selectedRegionId });
@@ -102,6 +102,9 @@ export function AnalyzerPage() {
   const selectNode = useCallback((nodeId: string, focus = false) => {
     const node = model?.nodes.find((candidate) => candidate.id === nodeId);
     const expanded = new Set(expandedPresentationIds);
+    if (view === 'module-dependency' && expanded.size === 0) {
+      model?.regions?.filter((region) => region.regionKind === 'directory').forEach((region) => expanded.add(region.id));
+    }
     if (view === 'module-dependency' && node) {
       const regionPath = node.metadata.regionPath;
       if (Array.isArray(regionPath)) regionPath.forEach((regionId) => expanded.add(regionId));
@@ -119,6 +122,9 @@ export function AnalyzerPage() {
   const selectRegion = useCallback((regionId: string, focus = false) => {
     const expanded = new Set(expandedPresentationIds);
     if (view === 'module-dependency') {
+      if (expanded.size === 0) {
+        model?.regions?.filter((region) => region.regionKind === 'directory').forEach((region) => expanded.add(region.id));
+      }
       const regionById = new Map((model?.regions ?? []).map((region) => [region.id, region]));
       const visited = new Set<string>();
       let current = regionById.get(regionId);
@@ -141,6 +147,9 @@ export function AnalyzerPage() {
   const selectEdge = useCallback((edgeId: string) => {
     const expanded = new Set(expandedPresentationIds);
     if (view === 'module-dependency') {
+      if (expanded.size === 0) {
+        model?.regions?.filter((region) => region.regionKind === 'directory').forEach((region) => expanded.add(region.id));
+      }
       const edge = model?.edges.find((candidate) => candidate.id === edgeId);
       const regionById = new Map((model?.regions ?? []).map((region) => [region.id, region]));
       [edge?.sourceId, edge?.targetId].forEach((nodeId) => {
@@ -337,7 +346,7 @@ export function AnalyzerPage() {
                   onSelectEdge={selectEdge}
                   focusRequest={activeFocusRequest}
                   transform={viewState.camera ?? ANALYZER_DEFAULT_TRANSFORM}
-                  hasStoredCamera={Boolean(viewState.camera)}
+                  hasStoredCamera={isCompatibleSpatialCameraTransform(viewState.camera)}
                   onTransformChange={updateCamera}
                   cameraResetKey={session.scanVersion}
                   onCountsChange={reportCounts}
