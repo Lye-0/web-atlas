@@ -15,6 +15,8 @@ import {
 } from './spatialPresentation';
 
 export const ANALYZER_SPATIAL_LABEL_VIEWPORT_MARGIN = 8;
+export const EDGE_VISIBILITY_INSET = 8;
+export const FAR_PACKAGE_EDGE_VISIBILITY_INSET = 2;
 
 export const PROJECTED_EDGE_ALIGNMENT_EPSILON = 1.5;
 export const PROJECTED_ARROW_SIZE = 6;
@@ -57,6 +59,8 @@ export interface ProjectedGraphEdge {
   dimmed: boolean;
   count: number;
   caption?: string;
+  description?: string;
+  direction?: 'imports' | 'imported-by' | 'internal';
   readable: boolean;
   visible: boolean;
 }
@@ -188,9 +192,28 @@ export function assignProjectedPerimeterPorts(
     sides.set(edge.id, pair);
     const sourceKey = `${edge.source.x}:${edge.source.y}:${pair.sourceSide}`;
     const targetKey = `${edge.target.x}:${edge.target.y}:${pair.targetSide}`;
-    sourceSlots.set(sourceKey, [...(sourceSlots.get(sourceKey) ?? []), edge.id]);
-    targetSlots.set(targetKey, [...(targetSlots.get(targetKey) ?? []), edge.id]);
+    if (!sourceSlots.has(sourceKey)) sourceSlots.set(sourceKey, []);
+    if (!targetSlots.has(targetKey)) targetSlots.set(targetKey, []);
+    sourceSlots.get(sourceKey)!.push(edge.id);
+    targetSlots.get(targetKey)!.push(edge.id);
   });
+  const byId = new Map(edges.map(edge => [edge.id, edge]));
+  const sourceIndices = new Map<string, number>(), targetIndices = new Map<string, number>();
+  const sortSlots = (groups: Map<string, string[]>, source: boolean, indices: Map<string, number>) => {
+    groups.forEach(ids => {
+      const side = source ? sides.get(ids[0]!)!.sourceSide : sides.get(ids[0]!)!.targetSide;
+      const position = (id: string) => {
+        const edge = byId.get(id)!;
+        const rect = source ? edge.target : edge.source;
+        return side === 'left' || side === 'right' ? rect.y + rect.height / 2 : rect.x + rect.width / 2;
+      };
+      // Match port order to destination order instead of alphabetical IDs.
+      ids.sort((a, b) => position(a) - position(b) || a.localeCompare(b));
+      ids.forEach((id, index) => indices.set(id, index));
+    });
+  };
+  sortSlots(sourceSlots, true, sourceIndices);
+  sortSlots(targetSlots, false, targetIndices);
   const assigned = new Map<string, { start: SpatialScreenPoint; end: SpatialScreenPoint }>();
   ordered.forEach((edge) => {
     const pair = sides.get(edge.id);
@@ -200,8 +223,8 @@ export function assignProjectedPerimeterPorts(
     const sourceGroup = sourceSlots.get(sourceKey) ?? [edge.id];
     const targetGroup = targetSlots.get(targetKey) ?? [edge.id];
     assigned.set(edge.id, {
-      start: pointOnProjectedSide(edge.source, pair.sourceSide, sourceGroup.indexOf(edge.id), sourceGroup.length),
-      end: pointOnProjectedSide(edge.target, pair.targetSide, targetGroup.indexOf(edge.id), targetGroup.length),
+      start: pointOnProjectedSide(edge.source, pair.sourceSide, sourceIndices.get(edge.id)!, sourceGroup.length),
+      end: pointOnProjectedSide(edge.target, pair.targetSide, targetIndices.get(edge.id)!, targetGroup.length),
     });
   });
   return assigned;
@@ -230,21 +253,6 @@ export function projectedArcPoints(
   });
 }
 
-function sampleProjectedQuadratic(
-  start: SpatialScreenPoint,
-  end: SpatialScreenPoint,
-  control?: SpatialScreenPoint,
-): SpatialScreenPoint[] {
-  if (!control) return [start, end];
-  return [0, 0.25, 0.5, 0.75, 1].map((t) => {
-    const inverse = 1 - t;
-    return {
-      x: inverse * inverse * start.x + 2 * inverse * t * control.x + t * t * end.x,
-      y: inverse * inverse * start.y + 2 * inverse * t * control.y + t * t * end.y,
-    };
-  });
-}
-
 export function projectedRectFullyInViewport(
   rect: ProjectedRect,
   camera: Pick<SpatialCameraModel, 'viewportWidth' | 'viewportHeight'>,
@@ -267,6 +275,29 @@ export function projectedPathWithinViewport(
     && point.x <= camera.viewportWidth - margin
     && point.y <= camera.viewportHeight - margin
   ));
+}
+
+export function projectedTerminalInViewport(
+  point: SpatialScreenPoint,
+  camera: Pick<SpatialCameraModel, 'viewportWidth' | 'viewportHeight'>,
+  inset = EDGE_VISIBILITY_INSET,
+): boolean {
+  return point.x >= inset
+    && point.y >= inset
+    && point.x <= camera.viewportWidth - inset
+    && point.y <= camera.viewportHeight - inset;
+}
+
+export function projectedEdgeTerminalsVisible(
+  points: readonly SpatialScreenPoint[],
+  camera: Pick<SpatialCameraModel, 'viewportWidth' | 'viewportHeight'>,
+  inset = EDGE_VISIBILITY_INSET,
+): boolean {
+  const start = points[0];
+  const end = points.at(-1);
+  return Boolean(start && end && points.length >= 2
+    && projectedTerminalInViewport(start, camera, inset)
+    && projectedTerminalInViewport(end, camera, inset));
 }
 
 export function estimateRelationLabelSize(caption: string, scale = 1): { width: number; height: number } {
@@ -411,12 +442,15 @@ export function buildProjectedGraphEdge(options: {
   const extraZ = extraAltitudeForEdgeClass(edgeClass, options.sourceZ, options.targetZ, options.zoomLevel);
   const start = options.ports.start;
   const end = options.ports.end;
+  const localAltitude = spatialEdgeAltitude(edgeClass, options.zoomLevel ?? 'near');
+  const sourceAttachZ = edgeClass === 'local' ? Math.max(options.sourceZ, localAltitude) : options.sourceZ;
+  const targetAttachZ = edgeClass === 'local' ? Math.max(options.targetZ, localAltitude) : options.targetZ;
   let worldPoints: SpatialWorldPoint[] = [];
   if (options.worldSourceRect && options.worldTargetRect) {
     const sourceTerminal = options.worldSourcePort
-      ?? spatialScreenPointToWorldAtElevation(start, options.sourceZ, options.camera);
+      ?? spatialScreenPointToWorldAtElevation(start, sourceAttachZ, options.camera);
     const targetTerminal = options.worldTargetPort
-      ?? spatialScreenPointToWorldAtElevation(end, options.targetZ, options.camera);
+      ?? spatialScreenPointToWorldAtElevation(end, targetAttachZ, options.camera);
     const sourceEndpoint: SpatialRouteEndpoint = {
       id: options.sourceId,
       x: sourceTerminal.x,
@@ -425,7 +459,7 @@ export function buildProjectedGraphEdge(options: {
       height: 0,
       regionId: options.sourceRegionId,
       packageId: options.sourcePackageId,
-      elevation: options.sourceZ,
+      elevation: sourceAttachZ,
     };
     const targetEndpoint: SpatialRouteEndpoint = {
       id: options.targetId,
@@ -435,7 +469,7 @@ export function buildProjectedGraphEdge(options: {
       height: 0,
       regionId: options.targetRegionId,
       packageId: options.targetPackageId,
-      elevation: options.targetZ,
+      elevation: targetAttachZ,
     };
     const obstacles = options.obstacles?.filter((obstacle) => (
       obstacle.id !== options.sourceId && obstacle.id !== options.targetId
@@ -446,28 +480,30 @@ export function buildProjectedGraphEdge(options: {
       obstacles,
       options.zoomLevel ?? 'near',
     ).points;
+    if (worldPoints.length > 1) {
+      worldPoints = [
+        { x: sourceTerminal.x, y: sourceTerminal.y, z: sourceAttachZ },
+        ...worldPoints.slice(1, -1),
+        { x: targetTerminal.x, y: targetTerminal.y, z: targetAttachZ },
+      ];
+    }
   }
   const points = worldPoints.length > 1
-    ? worldPoints.map((point) => projectSpatialPoint(point, options.camera))
+    ? [start, ...worldPoints.slice(1, -1).map((point) => projectSpatialPoint(point, options.camera)), end]
     : [start, end];
   const control = worldPoints.length > 1
     ? undefined
     : projectedQuadraticControl(start, end, extraZ, options.camera, options.worldStart, options.worldEnd);
   const caption = options.caption;
   const readable = !options.aggregated || Boolean(caption);
-  const sourceVisible = projectedRectFullyInViewport(options.sourceBounds, options.camera);
-  const targetVisible = projectedRectFullyInViewport(options.targetBounds, options.camera);
-  const pathSamples = control
-    ? sampleProjectedQuadratic(points[0]!, points.at(-1)!, control)
-    : points;
-  // An Edge is a complete visual relation only when both semantic endpoints
-  // and every projected path sample are inside the viewport.  This prevents
-  // continuation fragments and screen-edge shortcuts from being mistaken for
-  // visible relations.
+  const terminalsOnCards = options.aggregated
+    || (projectedPortOnRect(start, options.sourceBounds) && projectedPortOnRect(end, options.targetBounds));
+  const visibilityInset = options.zoomLevel === 'far' && options.aggregated && edgeClass === 'cross-package'
+    ? FAR_PACKAGE_EDGE_VISIBILITY_INSET
+    : EDGE_VISIBILITY_INSET;
   const visible = readable
-    && sourceVisible
-    && targetVisible
-    && projectedPathWithinViewport(pathSamples, options.camera);
+    && terminalsOnCards
+    && projectedEdgeTerminalsVisible(points, options.camera, visibilityInset);
   return {
     id: options.id,
     edgeIds: [...(options.edgeIds ?? [options.id])],
@@ -514,6 +550,14 @@ export function projectedModuleNode(
 
 export function spatialVisibleProjectedEdgeCount(edges: readonly Pick<ProjectedGraphEdge, 'visible' | 'readable'>[]): number {
   return edges.filter((edge) => edge.visible && edge.readable !== false).length;
+}
+
+export function spatialRepresentedRelationCount(
+  edges: readonly Pick<ProjectedGraphEdge, 'visible' | 'readable' | 'count'>[],
+): number {
+  return edges
+    .filter((edge) => edge.visible && edge.readable !== false)
+    .reduce((total, edge) => total + edge.count, 0);
 }
 
 export function sameProjectedGeometry(first: Pick<ProjectedGraphEdge, 'path' | 'points'>, second: Pick<ProjectedGraphEdge, 'path' | 'points'>): boolean {

@@ -302,7 +302,19 @@ function candidatePaths(basePath: string): string[] {
 }
 
 function resolveCandidatePaths(candidates: readonly string[], filePaths: ReadonlySet<string>): { path?: string; reason?: 'unresolved' | 'ambiguous' } {
-  const matches = [...new Set(candidates.map((candidate) => normalizeRelativePath(candidate)).filter((candidate) => filePaths.has(candidate)))];
+  const matches = [...new Set(candidates.flatMap((candidate) => {
+    const path = normalizeRelativePath(candidate);
+    // TypeScript source commonly uses the emitted runtime extension (Node ESM).
+    // Resolve that extension in compiler order, retaining ambiguity between
+    // separate alias/index candidates rather than inventing an edge.
+    const extensions = path.endsWith('.js') ? ['.ts', '.tsx', '.d.ts', '.js', '.jsx']
+      : path.endsWith('.mjs') ? ['.mts', '.d.mts', '.mjs']
+        : path.endsWith('.cjs') ? ['.cts', '.d.cts', '.cjs'] : undefined;
+    const resolved = extensions
+      ? extensions.map((extension) => path.slice(0, path.lastIndexOf('.')) + extension).find((item) => filePaths.has(item))
+      : filePaths.has(path) ? path : undefined;
+    return resolved ? [resolved] : [];
+  }))];
   if (matches.length === 1) return { path: matches[0] };
   return matches.length > 1 ? { reason: 'ambiguous' } : { reason: 'unresolved' };
 }

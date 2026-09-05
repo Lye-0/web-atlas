@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ANALYZER_SPATIAL_TILT_DEGREES, ANALYZER_SPATIAL_YAW_DEGREES, spatialModuleElevation } from './spatialPresentation';
+import { ANALYZER_SPATIAL_TILT_DEGREES, ANALYZER_SPATIAL_YAW_DEGREES, spatialModuleElevation, spatialEdgeAltitude, spatialRegionDepthElevation } from './spatialPresentation';
 import {
   assignSpatialBoundaryPorts,
   computeSpatialWorldBounds,
@@ -25,6 +25,11 @@ import {
   projectedRectFromAnchor,
   projectedRouteExcursion,
   sameProjectedGeometry,
+  spatialRepresentedRelationCount,
+  projectedEdgeTerminalsVisible,
+  projectedTerminalInViewport,
+  EDGE_VISIBILITY_INSET,
+  FAR_PACKAGE_EDGE_VISIBILITY_INSET,
 } from './spatialProjectedGraph';
 import { spatialRouteIntersectsObstacle } from './spatialRouting';
 
@@ -565,5 +570,202 @@ describe('projected graph layer', () => {
     expect(end.x).toBeGreaterThan(start.x);
     expect(edge.arrow.angle).toBeGreaterThan(-0.6);
     expect(edge.arrow.angle).toBeLessThan(0.6);
+  });
+
+  it('counts a short same-directory edge as one visible perimeter-to-perimeter line', () => {
+    const view = camera();
+    const source = projectedModuleNode('module:index', { x: 120, y: 90, z: spatialModuleElevation() }, view);
+    const target = projectedModuleNode('module:schema', { x: 290, y: 90, z: spatialModuleElevation() }, view);
+    const ports = assignProjectedPerimeterPorts([{
+      id: 'local-short',
+      source: source.cardBounds,
+      target: target.cardBounds,
+    }]).get('local-short')!;
+    const edge = buildProjectedGraphEdge({
+      id: 'local-short',
+      sourceId: 'module:index',
+      targetId: 'module:schema',
+      sourceRegionId: 'directory:home',
+      targetRegionId: 'directory:home',
+      sourceBounds: source.cardBounds,
+      targetBounds: target.cardBounds,
+      sourceZ: spatialModuleElevation(),
+      targetZ: spatialModuleElevation(),
+      sourcePackageId: 'package:home',
+      targetPackageId: 'package:home',
+      aggregated: false,
+      selected: false,
+      connected: false,
+      dimmed: false,
+      count: 1,
+      camera: view,
+      ports,
+      zoomLevel: 'near',
+    });
+    expect(edge.visible).toBe(true);
+    expect(spatialVisibleProjectedEdgeCount([edge])).toBe(1);
+    expect(projectedPortOnRect(edge.points[0]!, source.cardBounds)).toBe(true);
+    expect(projectedPortOnRect(edge.points.at(-1)!, target.cardBounds)).toBe(true);
+    expect(spatialEdgeAltitude('local')).toBeGreaterThan(spatialRegionDepthElevation('directory', 1));
+  });
+
+  it('counts HUD visible lines only when both terminals and a path exist', () => {
+    const view = camera();
+    const { edge } = moduleEdge({ camera: view });
+    expect(edge.visible).toBe(true);
+    expect(edge.path.length).toBeGreaterThan(0);
+    expect(projectedEdgeTerminalsVisible(edge.points, view, EDGE_VISIBILITY_INSET)).toBe(true);
+  });
+
+  it('hides an aggregate whose region AABB intersects the viewport but whose ports are offscreen', () => {
+    const view = camera();
+    const home = { x: 40, y: 80, width: 900, height: 400 };
+    const away = { x: 1100, y: 80, width: 160, height: 140 };
+    const ports = assignProjectedPerimeterPorts([{ id: 'port-offscreen', source: home, target: away }]).get('port-offscreen')!;
+    const edge = buildProjectedGraphEdge({
+      id: 'port-offscreen',
+      sourceId: 'directory:home',
+      targetId: 'directory:away',
+      sourceRegionId: 'directory:home',
+      targetRegionId: 'directory:away',
+      sourceBounds: home,
+      targetBounds: away,
+      sourceZ: 8,
+      targetZ: 8,
+      aggregated: true,
+      selected: false,
+      connected: true,
+      dimmed: false,
+      count: 16,
+      camera: view,
+      ports,
+      caption: 'home → away · 16',
+    });
+    expect(home.x < view.viewportWidth && home.x + home.width > 0).toBe(true);
+    expect(edge.visible).toBe(false);
+  });
+
+  it('hides a path that only crosses the viewport with both terminals offscreen', () => {
+    const view = camera();
+    const source = { x: -420, y: 80, width: 150, height: 36 };
+    const target = { x: 920, y: 80, width: 150, height: 36 };
+    const ports = assignProjectedPerimeterPorts([{ id: 'cross-only', source, target }]).get('cross-only')!;
+    const edge = buildProjectedGraphEdge({
+      id: 'cross-only',
+      sourceId: 'module:a',
+      targetId: 'module:b',
+      sourceRegionId: 'directory:a',
+      targetRegionId: 'directory:a',
+      sourceBounds: source,
+      targetBounds: target,
+      sourceZ: 16,
+      targetZ: 16,
+      aggregated: false,
+      selected: false,
+      connected: false,
+      dimmed: false,
+      count: 1,
+      camera: view,
+      ports,
+    });
+    expect(edge.points[0]!.x).toBeLessThan(0);
+    expect(edge.points.at(-1)!.x).toBeGreaterThan(view.viewportWidth);
+    expect(edge.visible).toBe(false);
+  });
+
+  it('sums visible-line multiplicity into represented relations', () => {
+    const view = camera();
+    const make = (id: string, count: number, x: number) => {
+      const source = { x, y: 80, width: 120, height: 80 };
+      const target = { x: x + 180, y: 90, width: 120, height: 80 };
+      const ports = assignProjectedPerimeterPorts([{ id, source, target }]).get(id)!;
+      return buildProjectedGraphEdge({
+        id,
+        sourceId: `directory:${id}-a`,
+        targetId: `directory:${id}-b`,
+        sourceRegionId: `directory:${id}-a`,
+        targetRegionId: `directory:${id}-b`,
+        sourceBounds: source,
+        targetBounds: target,
+        sourceZ: 8,
+        targetZ: 8,
+        aggregated: true,
+        selected: false,
+        connected: false,
+        dimmed: false,
+        count,
+        camera: view,
+        ports,
+        caption: `${id} · ${count}`,
+      });
+    };
+    const edges = [make('a', 22, 40), make('b', 4, 280), make('c', 6, 500)];
+    expect(edges.every((edge) => edge.visible)).toBe(true);
+    expect(spatialVisibleProjectedEdgeCount(edges)).toBe(3);
+    expect(spatialRepresentedRelationCount(edges)).toBe(32);
+  });
+
+  it('keeps Far package aggregates while both terminals stay inside the shallow Far inset', () => {
+    const view = camera();
+    const home = { x: -80, y: 80, width: 80 + FAR_PACKAGE_EDGE_VISIBILITY_INSET, height: 100 };
+    const away = { x: view.viewportWidth - FAR_PACKAGE_EDGE_VISIBILITY_INSET, y: 80, width: 80, height: 100 };
+    const ports = assignProjectedPerimeterPorts([{ id: 'far-edge', source: home, target: away }]).get('far-edge')!;
+    const edge = buildProjectedGraphEdge({
+      id: 'far-edge',
+      sourceId: 'package:home',
+      targetId: 'package:away',
+      sourceRegionId: 'package:home',
+      targetRegionId: 'package:away',
+      sourceBounds: home,
+      targetBounds: away,
+      sourceZ: 8,
+      targetZ: 8,
+      sourcePackageId: 'package:home',
+      targetPackageId: 'package:away',
+      aggregated: true,
+      selected: false,
+      connected: false,
+      dimmed: false,
+      count: 22,
+      camera: view,
+      ports,
+      caption: 'home → away · 22',
+      zoomLevel: 'far',
+    });
+    expect(edge.edgeClass).toBe('cross-package');
+    expect(projectedTerminalInViewport(edge.points[0]!, view, EDGE_VISIBILITY_INSET)).toBe(false);
+    expect(edge.visible).toBe(true);
+  });
+
+  it('still hides Far package aggregates when both terminals leave the viewport', () => {
+    const view = camera();
+    const home = { x: -220, y: 80, width: 150, height: 100 };
+    const away = { x: 860, y: 80, width: 150, height: 100 };
+    const ports = assignProjectedPerimeterPorts([{ id: 'far-off', source: home, target: away }]).get('far-off')!;
+    const edge = buildProjectedGraphEdge({
+      id: 'far-off',
+      sourceId: 'package:home',
+      targetId: 'package:away',
+      sourceRegionId: 'package:home',
+      targetRegionId: 'package:away',
+      sourceBounds: home,
+      targetBounds: away,
+      sourceZ: 8,
+      targetZ: 8,
+      sourcePackageId: 'package:home',
+      targetPackageId: 'package:away',
+      aggregated: true,
+      selected: false,
+      connected: false,
+      dimmed: false,
+      count: 22,
+      camera: view,
+      ports,
+      caption: 'home → away · 22',
+      zoomLevel: 'far',
+    });
+    expect(edge.points[0]!.x).toBeLessThan(0);
+    expect(edge.points.at(-1)!.x).toBeGreaterThan(view.viewportWidth);
+    expect(edge.visible).toBe(false);
   });
 });

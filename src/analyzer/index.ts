@@ -10,6 +10,7 @@ export * from './spatialCoordinates';
 export * from './spatialRouting';
 export * from './spatialProjectedGraph';
 export * from './spatialGraph';
+export * from './spatialInteraction';
 export * from './commandParser';
 export * from './commandTargets';
 export * from './scan';

@@ -7,7 +7,7 @@ export type AnalyzerSpatialSelectionKind = 'none' | 'module' | 'directory' | 'pa
 
 /** Pitch from vertical: enough depth to read planes, shallow enough to keep the map readable. */
 export const ANALYZER_SPATIAL_TILT_DEGREES = 17;
-export const ANALYZER_SPATIAL_YAW_DEGREES = 4;
+export const ANALYZER_SPATIAL_YAW_DEGREES = 0;
 /** Fallback only; live distance is derived from world bounds. */
 export const ANALYZER_SPATIAL_CAMERA_DISTANCE = 1600;
 export const ANALYZER_SPATIAL_CAMERA_SCHEMA = 2;
@@ -17,11 +17,11 @@ export const ANALYZER_SPATIAL_DIRECTIONAL_GROUP_THRESHOLD = 8;
 export const ANALYZER_SPATIAL_EXACT_COUNTERPART_LIMIT = 2;
 export const ANALYZER_SPATIAL_FULL_AGGREGATE_DISTANCE = 280;
 export const ANALYZER_SPATIAL_MODULE_CARD_WIDTH_NEAR = ANALYZER_MODULE_NODE_WIDTH;
-export const ANALYZER_SPATIAL_REGION_ELEVATION = 8;
-export const ANALYZER_SPATIAL_MODULE_ELEVATION = 16;
-export const ANALYZER_SPATIAL_LOCAL_EDGE_ALTITUDE = 22;
-export const ANALYZER_SPATIAL_DIRECTORY_EDGE_ALTITUDE = 32;
-export const ANALYZER_SPATIAL_PACKAGE_EDGE_ALTITUDE = 44;
+export const ANALYZER_SPATIAL_REGION_ELEVATION = 10;
+export const ANALYZER_SPATIAL_MODULE_ELEVATION = 22;
+export const ANALYZER_SPATIAL_LOCAL_EDGE_ALTITUDE = 28;
+export const ANALYZER_SPATIAL_DIRECTORY_EDGE_ALTITUDE = 38;
+export const ANALYZER_SPATIAL_PACKAGE_EDGE_ALTITUDE = 52;
 export const ANALYZER_SPATIAL_PLANE_THICKNESS = 0.16;
 export const ANALYZER_SPATIAL_MAX_XY_DETOUR = 64;
 
@@ -45,11 +45,11 @@ export function spatialLocalEdgeBudget(zoomLevel: AnalyzerSpatialZoomLevel): num
 
 export function spatialRegionDepthElevation(regionKind: AnalyzerRegionKind, depth = 0): number {
   if (regionKind === 'workspace-package') return 2;
-  return ANALYZER_SPATIAL_REGION_ELEVATION + Math.min(12, Math.max(0, depth) * 2.4);
+  return ANALYZER_SPATIAL_REGION_ELEVATION + Math.min(16, Math.max(0, depth) * 3.2);
 }
 
 export function spatialModuleElevation(regionDepth = 0): number {
-  return ANALYZER_SPATIAL_MODULE_ELEVATION + Math.min(8, Math.max(0, regionDepth) * 0.6);
+  return ANALYZER_SPATIAL_MODULE_ELEVATION + Math.min(10, Math.max(0, regionDepth) * 1.2);
 }
 
 export interface SpatialModuleBlockDimensions {
@@ -63,14 +63,13 @@ export function spatialModuleBlockDimensions(
   zoomLevel: AnalyzerSpatialZoomLevel,
   nodeHeight: number,
 ): SpatialModuleBlockDimensions {
-  const far = zoomLevel === 'far';
+  void zoomLevel;
   return {
-    // Far keeps module existence as a small tile; nearer levels use a
-    // slightly inset foundation directly beneath the HTML card.
-    width: far ? 12 : ANALYZER_MODULE_NODE_WIDTH * 0.88,
-    height: far ? 8 : Math.max(8, nodeHeight * 0.88),
-    depth: far ? 1.2 : 0.8,
-    zOffset: far ? 0.55 : -0.45,
+    // Semantic zoom changes text, never the occupied footprint.
+    width: ANALYZER_MODULE_NODE_WIDTH,
+    height: nodeHeight,
+    depth: 2,
+    zOffset: -1,
   };
 }
 
@@ -127,10 +126,14 @@ export function spatialEdgeEmptyReason(options: {
   factCount: number;
   renderedCount: number;
   candidateCount?: number;
-}): 'none' | 'no-dependency' | 'density-budget' {
+  collectedCount?: number;
+}): 'none' | 'no-dependency' | 'no-visible-relation' | 'density-budget' {
   if (options.renderedCount > 0) return 'none';
-  if (options.factCount === 0 || options.candidateCount === 0) return 'no-dependency';
-  return 'density-budget';
+  if (options.factCount === 0) return 'no-dependency';
+  const collected = options.collectedCount ?? 0;
+  const candidates = options.candidateCount ?? collected;
+  if (candidates > 0 && collected === 0) return 'density-budget';
+  return 'no-visible-relation';
 }
 
 export function spatialEdgeImportance(edgeClass: AnalyzerSpatialEdgeClass): number {

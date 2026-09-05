@@ -111,4 +111,55 @@ describe('module dependency layout containment', () => {
     expect(directoryA.y + directoryA.height - contentBottom).toBeLessThanOrEqual(16);
     expect(regions.get('package:b')!.x - (packageA.x + packageA.width)).toBeCloseTo(ANALYZER_MODULE_PACKAGE_GAP);
   });
+
+  it('packs a few children without a giant empty region', () => {
+    const packageA = region('package:small', 'workspace-package', ['module:index', 'module:schema']);
+    const view: AnalyzerViewModel = {
+      view: 'module-dependency',
+      nodes: [
+        moduleNode('module:index', [packageA.id]),
+        moduleNode('module:schema', [packageA.id]),
+      ],
+      edges: [],
+      clusters: [],
+      regions: [packageA],
+      evidence: [],
+      warnings: [],
+    };
+    const layout = layoutAnalyzerView(view);
+    const packed = (layout.regions ?? []).find((item) => item.region.id === packageA.id)!;
+    expect(packed.width).toBeLessThanOrEqual(ANALYZER_MODULE_NODE_WIDTH * 2 + 80);
+    expect(packed.height).toBeLessThanOrEqual(ANALYZER_MODULE_NODE_HEIGHT + 90);
+  });
+
+  it('keeps a large package close to the union of its child footprints', () => {
+    const packageWide = region('package:wide', 'workspace-package', [], {
+      childRegionIds: ['directory:w1', 'directory:w2', 'directory:w3', 'directory:w4'],
+    });
+    const directories = [1, 2, 3, 4].map((index) => region(`directory:w${index}`, 'directory', [`module:w${index}`], {
+      parentRegionId: packageWide.id,
+    }));
+    const view: AnalyzerViewModel = {
+      view: 'module-dependency',
+      nodes: directories.map((item, index) => moduleNode(`module:w${index + 1}`, [packageWide.id, item.id])),
+      edges: [],
+      clusters: [],
+      regions: [packageWide, ...directories],
+      evidence: [],
+      warnings: [],
+    };
+    const layout = layoutAnalyzerView(view);
+    const regions = new Map((layout.regions ?? []).map((positioned) => [positioned.region.id, positioned]));
+    const packed = regions.get(packageWide.id)!;
+    const children = directories.map((item) => regionRect(regions.get(item.id)!));
+    const unionLeft = Math.min(...children.map((item) => item.x));
+    const unionTop = Math.min(...children.map((item) => item.y));
+    const unionRight = Math.max(...children.map((item) => item.x + item.width));
+    const unionBottom = Math.max(...children.map((item) => item.y + item.height));
+    expect(packed.x + packed.width - unionRight).toBeLessThanOrEqual(20);
+    expect(unionLeft - packed.x).toBeLessThanOrEqual(20);
+    expect(packed.y + packed.height - unionBottom).toBeLessThanOrEqual(20);
+    expect(unionTop - packed.y).toBeLessThanOrEqual(48);
+    expect((packed.width * packed.height) / Math.max(1, (unionRight - unionLeft) * (unionBottom - unionTop))).toBeLessThan(1.6);
+  });
 });

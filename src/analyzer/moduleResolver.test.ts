@@ -22,6 +22,27 @@ function module(path: string, graph: ReturnType<typeof resolveModuleGraph>) {
 }
 
 describe('module resolver', () => {
+  it('resolves emitted JS extensions to TypeScript source with compiler precedence', () => {
+    const graph = resolveModuleGraph([
+      source('src/main.ts', `import './value.js'; export * from './esm.mjs'; void import('./common.cjs'); import './view.js';`),
+      source('src/value.ts', ''), source('src/value.js', ''),
+      source('src/esm.mts', ''), source('src/common.cts', ''), source('src/view.tsx', ''),
+    ]);
+    expect(module('src/main.ts', graph)?.imports.map((item) => item.resolvedPath)).toEqual([
+      'src/value.ts', 'src/esm.mts', 'src/common.cts', 'src/view.tsx',
+    ]);
+  });
+
+  it('retains plain JavaScript and unresolved runtime imports without guessing', () => {
+    const graph = resolveModuleGraph([
+      source('src/main.ts', `import './plain.js'; import './missing.mjs'; import './wrong.cjs';`),
+      source('src/plain.js', ''), source('src/wrong.ts', ''),
+    ]);
+    expect(module('src/main.ts', graph)?.imports.map((item) => item.resolvedPath ?? item.reason)).toEqual([
+      'src/plain.js', 'unresolved', 'unresolved',
+    ]);
+  });
+
   it('parses supported import forms without treating comments or strings as imports', () => {
     const imports = parseModuleImports(`
       // import './comment'

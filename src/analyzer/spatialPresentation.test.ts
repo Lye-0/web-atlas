@@ -45,8 +45,9 @@ describe('module dependency spatial presentation', () => {
     expect(ANALYZER_SPATIAL_PLANE_THICKNESS).toBeLessThan(0.5);
     expect(spatialRegionFillOpacity('workspace-package', 0)).toBeLessThan(0.25);
     expect(spatialEdgeEmptyReason({ factCount: 0, renderedCount: 0 })).toBe('no-dependency');
-    expect(spatialEdgeEmptyReason({ factCount: 4, renderedCount: 0 })).toBe('density-budget');
-    expect(spatialEdgeEmptyReason({ factCount: 4, candidateCount: 0, renderedCount: 0 })).toBe('no-dependency');
+    expect(spatialEdgeEmptyReason({ factCount: 4, renderedCount: 0 })).toBe('no-visible-relation');
+    expect(spatialEdgeEmptyReason({ factCount: 4, candidateCount: 0, renderedCount: 0 })).toBe('no-visible-relation');
+    expect(spatialEdgeEmptyReason({ factCount: 4, candidateCount: 4, collectedCount: 0, renderedCount: 0 })).toBe('density-budget');
     expect(spatialEdgeEmptyReason({ factCount: 4, renderedCount: 2 })).toBe('none');
     expect(spatialRegionBorderStyle(true, 'directory').className).toBe('region-border-selected');
     expect(spatialRegionBorderStyle(false, 'workspace-package').className).toBe('region-border');
@@ -63,10 +64,10 @@ describe('module dependency spatial presentation', () => {
 
     const far = spatialModuleBlockDimensions('far', 36);
     const near = spatialModuleBlockDimensions('near', 36);
-    expect(far.width).toBeLessThan(near.width);
-    expect(far.height).toBeLessThan(near.height);
+    expect(far.width).toBe(near.width);
+    expect(far.height).toBe(near.height);
     expect(far.depth).toBeGreaterThan(0);
-    expect(far.zOffset).toBeGreaterThan(0);
+    expect(far.zOffset).toBe(near.zOffset);
     expect(near.zOffset).toBeLessThan(0);
   });
 
@@ -235,11 +236,10 @@ describe('module dependency spatial selection', () => {
     expect(edges.some((item) => item.sourceId === 'module:c' && item.targetId === 'module:d' && item.connected)).toBe(false);
   });
 
-  it('keeps unselected Medium edges on local modules and region aggregates', () => {
-    const edges = collectSpatialEdges(view, visibleNodes, visibleRegions, regionById, expanded, 'medium');
-    expect(edges.some((item) => item.sourceId === 'module:a' && item.targetId === 'module:b' && !item.aggregated)).toBe(true);
-    expect(edges.some((item) => item.sourceId === 'module:a' && item.targetId === 'module:c' && !item.aggregated)).toBe(false);
-    expect(edges.some((item) => item.sourceId === 'directory:a' && item.targetId === 'directory:b' && item.aggregated)).toBe(true);
+  it('keeps an unselected atlas free of implicit dependency lines at every zoom', () => {
+    for (const level of ['far', 'medium', 'near'] as const) {
+      expect(collectSpatialEdges(view, visibleNodes, visibleRegions, regionById, expanded, level)).toEqual([]);
+    }
   });
 
   it('groups high-degree incident edges by nearest visible region without changing facts', () => {
@@ -300,6 +300,91 @@ describe('module dependency spatial selection', () => {
     expect(edges).toHaveLength(3);
   });
 
+  it('keeps a visible low-degree target as exact module-to-module', () => {
+    const exactView: AnalyzerViewModel = { ...view, edges: [edge('a-f', 'module:a', 'module:f')] };
+    const edges = collectSpatialEdges(exactView, visibleNodes, visibleRegions, regionById, expanded, 'near', 'module:a');
+    expect(edges).toHaveLength(1);
+    expect(edges[0]).toEqual(expect.objectContaining({
+      sourceId: 'module:a',
+      targetId: 'module:f',
+      aggregated: false,
+      count: 1,
+    }));
+    expect(edges.some((item) => item.targetId.startsWith('directory:') || item.targetId.startsWith('package:'))).toBe(false);
+    expect(spatialEdgeEmptyReason({ factCount: 1, renderedCount: 1 })).toBe('none');
+  });
+
+  it('does not invent a module endpoint absent from the expanded hierarchy', () => {
+    const exactView: AnalyzerViewModel = { ...view, edges: [edge('a-f', 'module:a', 'module:f')] };
+    const edges = collectSpatialEdges(
+      exactView,
+      visibleNodes.filter((positioned) => positioned.node.id === 'module:a'),
+      visibleRegions,
+      regionById,
+      expanded,
+      'near',
+      'module:a',
+    );
+    expect(edges).toHaveLength(0);
+    expect(edges.some((item) => item.aggregated)).toBe(false);
+    expect(spatialEdgeEmptyReason({ factCount: 1, renderedCount: 0, collectedCount: 0 })).toBe('no-visible-relation');
+    expect(spatialEdgeEmptyReason({ factCount: 1, renderedCount: 0, collectedCount: 0 })).not.toBe('no-dependency');
+  });
+
+  it('keeps a visible low-degree incoming counterpart as exact module-to-module', () => {
+    const exactView: AnalyzerViewModel = { ...view, edges: [edge('a-f', 'module:a', 'module:f')] };
+    const edges = collectSpatialEdges(exactView, visibleNodes, visibleRegions, regionById, expanded, 'near', 'module:f');
+    expect(edges).toEqual([expect.objectContaining({
+      sourceId: 'module:a',
+      targetId: 'module:f',
+      aggregated: false,
+      count: 1,
+    })]);
+  });
+
+  it('does not emit module-region endpoints for low-degree module selection', () => {
+    const exactView: AnalyzerViewModel = { ...view, edges: [edge('a-f', 'module:a', 'module:f')] };
+    const visible = collectSpatialEdges(exactView, visibleNodes, visibleRegions, regionById, expanded, 'near', 'module:a');
+    const hidden = collectSpatialEdges(
+      exactView,
+      visibleNodes.filter((positioned) => positioned.node.id === 'module:a'),
+      visibleRegions,
+      regionById,
+      expanded,
+      'near',
+      'module:a',
+    );
+    const mixed = [...visible, ...hidden].some((item) => {
+      const sourceModule = item.sourceId.startsWith('module:');
+      const targetModule = item.targetId.startsWith('module:');
+      return sourceModule !== targetModule;
+    });
+    expect(mixed).toBe(false);
+  });
+
+  it('does not region-aggregate a single outgoing when total incident count is high', () => {
+    const extras = Array.from({ length: 20 }, (_, index) => {
+      const id = `module:in-${index}`;
+      return {
+        node: node(id, ['package:a', 'directory:b'], 'package:a'),
+        edge: edge(`in-${index}`, id, 'module:b'),
+      };
+    });
+    const crowded: AnalyzerViewModel = {
+      ...view,
+      nodes: [...view.nodes, ...extras.map((item) => item.node)],
+      edges: [...view.edges.filter((item) => item.sourceId === 'module:b' || item.targetId === 'module:b'), ...extras.map((item) => item.edge)],
+    };
+    const incoming = crowded.edges.filter((item) => item.targetId === 'module:b').length;
+    const outgoing = crowded.edges.filter((item) => item.sourceId === 'module:b').length;
+    expect(incoming).toBeGreaterThan(ANALYZER_SPATIAL_INCIDENT_EDGE_THRESHOLD);
+    expect(outgoing).toBe(1);
+    const edges = collectSpatialEdges(crowded, crowded.nodes.map(positionedNode), visibleRegions, regionById, expanded, 'near', 'module:b');
+    expect(edges.some((item) => item.sourceId === 'module:b' && item.targetId === 'module:c' && !item.aggregated)).toBe(true);
+    expect(edges.some((item) => item.sourceId === 'module:b' && item.aggregated)).toBe(false);
+    expect(edges.some((item) => item.targetId === 'module:b' && item.aggregated)).toBe(true);
+  });
+
   it('keeps incoming-only module selection as incoming endpoints', () => {
     const sink = node('module:sink', ['package:a', 'directory:a'], 'package:a');
     const sinkView: AnalyzerViewModel = {
@@ -351,19 +436,19 @@ describe('module dependency spatial selection', () => {
     expect(edges.some((item) => item.sourceId.startsWith('module:'))).toBe(false);
   });
 
-  it('keeps Far package aggregates while a module remains selected', () => {
-    const edges = collectSpatialEdges(view, visibleNodes, visibleRegions, regionById, expanded, 'far', 'module:b');
-    expect(edges.every((item) => item.aggregated)).toBe(true);
-    expect(edges.some((item) => item.sourceId.startsWith('module:'))).toBe(false);
-    expect(edges.some((item) => (item.sourceId === 'package:a' && item.targetId === 'package:f') || (item.sourceId === 'package:f' && item.targetId === 'package:a'))).toBe(true);
+  it('preserves the same selected incident identities through every zoom level', () => {
+    const near = collectSpatialEdges(view, visibleNodes, visibleRegions, regionById, expanded, 'near', 'module:b');
+    const far = collectSpatialEdges(view, visibleNodes, visibleRegions, regionById, expanded, 'far', 'module:b');
+    expect(far).toEqual(near);
+    expect(far.flatMap(item => item.edgeIds).sort()).toEqual(['a-b', 'b-c']);
   });
 
-  it('does not zero Far package aggregates for a degree-0 selected module', () => {
+  it('does not introduce unrelated package lines for an isolated Far selection', () => {
     const isolated = node('module:z', ['package:a', 'directory:a'], 'package:a');
     const isolatedView: AnalyzerViewModel = { ...view, nodes: [...view.nodes, isolated] };
     const unselected = collectSpatialEdges(isolatedView, [...visibleNodes, positionedNode(isolated)], visibleRegions, regionById, expanded, 'far');
     const selected = collectSpatialEdges(isolatedView, [...visibleNodes, positionedNode(isolated)], visibleRegions, regionById, expanded, 'far', 'module:z');
-    expect(unselected.length).toBeGreaterThan(0);
+    expect(unselected).toHaveLength(0);
     expect(selected.length).toBe(unselected.length);
     expect(selected.every((item) => item.aggregated)).toBe(true);
   });
@@ -395,17 +480,10 @@ describe('module dependency spatial selection', () => {
     expect(edges.some((item) => item.sourceId === 'module:a' && item.targetId === 'module:c')).toBe(false);
   });
 
-  it('does not keep an exact module edge when one endpoint leaves the candidate set', () => {
-    const edges = collectSpatialEdges(
-      view,
-      visibleNodes.filter((positioned) => positioned.node.id !== 'module:c'),
-      visibleRegions,
-      regionById,
-      expanded,
-      'near',
-    );
-    expect(edges.some((item) => item.sourceId === 'module:a' && item.targetId === 'module:c')).toBe(false);
-    expect(edges.some((item) => item.sourceId === 'directory:a' && item.targetId === 'directory:b' && item.aggregated)).toBe(true);
+  it('keeps spatially distant selected endpoints in the semantic dependency set', () => {
+    const distant = visibleNodes.map(item => item.node.id === 'module:c' ? { ...item, x: 100000, y: -50000 } : item);
+    const edges = collectSpatialEdges(view, distant, visibleRegions, regionById, expanded, 'near', 'module:b');
+    expect(edges.some(item => item.sourceId === 'module:b' && item.targetId === 'module:c')).toBe(true);
   });
 
   it('preserves duplicate exact facts as a counted aggregate line', () => {
@@ -413,12 +491,37 @@ describe('module dependency spatial selection', () => {
       ...view,
       edges: [edge('duplicate-1', 'module:a', 'module:b'), edge('duplicate-2', 'module:a', 'module:b')],
     };
-    const relation = collectSpatialEdges(duplicated, visibleNodes, visibleRegions, regionById, expanded, 'near')
+    const relation = collectSpatialEdges(duplicated, visibleNodes, visibleRegions, regionById, expanded, 'near', 'module:a')
       .find((item) => item.sourceId === 'module:a' && item.targetId === 'module:b');
     expect(relation).toEqual(expect.objectContaining({
       aggregated: true,
       count: 2,
       edgeIds: ['duplicate-1', 'duplicate-2'],
     }));
+  });
+
+  it('keeps a crowded overview free of implicit arrows until selection', () => {
+    const packages = Array.from({ length: 12 }, (_, index) => region(`package:p${index}`, 'workspace-package'));
+    const directories = packages.map((item, index) => region(`directory:p${index}`, 'directory', item.id));
+    const modules = directories.map((item, index) => node(`module:p${index}`, [item.parentRegionId ?? item.id, item.id], item.parentRegionId ?? item.id));
+    const farView: AnalyzerViewModel = {
+      view: 'module-dependency',
+      nodes: modules,
+      edges: modules.slice(0, -1).map((item, index) => edge(`p${index}-p${index + 1}`, item.id, modules[index + 1]!.id)),
+      clusters: [],
+      evidence: [],
+      warnings: [],
+      regions: [...packages, ...directories],
+    };
+    const farRegionById = new Map((farView.regions ?? []).map((item) => [item.id, item]));
+    const farNodes = farView.nodes.map(positionedNode);
+    const farRegions = (farView.regions ?? []).map(positionedRegion);
+    const farExpanded = new Set((farView.regions ?? []).map((item) => item.id));
+    const edges = collectSpatialEdges(farView, farNodes, farRegions, farRegionById, farExpanded, 'far');
+    const packageLines = edges.filter((item) => item.aggregated
+      && farRegionById.get(item.sourceId)?.regionKind === 'workspace-package'
+      && farRegionById.get(item.targetId)?.regionKind === 'workspace-package');
+    expect(packageLines).toHaveLength(0);
+    expect(edges.length).toBe(packageLines.length);
   });
 });

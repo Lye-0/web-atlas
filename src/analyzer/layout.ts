@@ -1,3 +1,4 @@
+import { packSpatialRegions, spatialModuleColumns } from './spatialPacking';
 import { analyzerPresentationCount, analyzerPresentationCountLabel } from './presentation';
 import type { AnalyzerCluster, AnalyzerPresentationGroup, AnalyzerSemanticRegion, AnalyzerViewModel, AnalyzerViewNode } from './types';
 import { ANALYZER_COMMAND_COMMON_LANE_ID, ANALYZER_EXTERNAL_SUMMARY_ID } from './projectors';
@@ -63,8 +64,6 @@ export const ANALYZER_MODULE_REGION_INSET = 14;
 export const ANALYZER_MODULE_REGION_HEADING = 30;
 const ANALYZER_MODULE_COLLAPSED_WIDTH = ANALYZER_MODULE_NODE_WIDTH + ANALYZER_MODULE_REGION_INSET * 2;
 const ANALYZER_MODULE_COLLAPSED_HEIGHT = ANALYZER_MODULE_REGION_HEADING + ANALYZER_MODULE_REGION_INSET * 2;
-const ANALYZER_MODULE_OWN_COLUMNS = 4;
-const ANALYZER_MODULE_CHILD_COLUMNS = 3;
 const ANALYZER_MODULE_PACKAGE_COLUMNS = 3;
 
 export interface PositionedNode {
@@ -774,6 +773,7 @@ interface ModuleRegionMeasure {
   region: AnalyzerSemanticRegion;
   children: ModuleRegionMeasure[];
   ownNodes: AnalyzerViewNode[];
+  childPositions?: { x: number; y: number }[];
   width: number;
   height: number;
 }
@@ -815,7 +815,7 @@ function moduleRegionMeasure(
     .sort((first, second) => first.label.localeCompare(second.label) || first.id.localeCompare(second.id));
   const children = moduleRegionChildren(view, region, regionById)
     .map((child) => moduleRegionMeasure(view, child, regionById, nodeById, expandedRegionIds, nextActive));
-  const ownColumns = Math.min(ANALYZER_MODULE_OWN_COLUMNS, Math.max(1, ownNodes.length));
+  const ownColumns = spatialModuleColumns(ownNodes.length, ANALYZER_MODULE_NODE_WIDTH, ANALYZER_MODULE_NODE_HEIGHT);
   const ownRows = ownNodes.length === 0 ? 0 : Math.ceil(ownNodes.length / ownColumns);
   const ownWidth = ownNodes.length > 0
     ? ownColumns * ANALYZER_MODULE_NODE_WIDTH + Math.max(0, ownColumns - 1) * ANALYZER_MODULE_NODE_GAP
@@ -823,20 +823,9 @@ function moduleRegionMeasure(
   const ownHeight = ownRows > 0
     ? ownRows * ANALYZER_MODULE_NODE_HEIGHT + Math.max(0, ownRows - 1) * ANALYZER_MODULE_NODE_GAP
     : 0;
-  const childColumns = Math.min(ANALYZER_MODULE_CHILD_COLUMNS, Math.max(1, children.length));
-  const childRows = children.length === 0 ? 0 : Math.ceil(children.length / childColumns);
-  const childColumnWidths = Array.from({ length: childColumns }, (_, column) => Math.max(
-    ANALYZER_MODULE_COLLAPSED_WIDTH,
-    ...children.filter((_, index) => index % childColumns === column).map((child) => child.width),
-  ));
-  const childRowHeights = Array.from({ length: childRows }, (_, row) => Math.max(
-    ANALYZER_MODULE_COLLAPSED_HEIGHT,
-    ...children.slice(row * childColumns, (row + 1) * childColumns).map((child) => child.height),
-  ));
-  const childWidth = childColumnWidths.reduce((total, value) => total + value, 0)
-    + Math.max(0, childColumns - 1) * ANALYZER_MODULE_REGION_GAP;
-  const childHeight = childRowHeights.reduce((total, value) => total + value, 0)
-    + Math.max(0, childRows - 1) * ANALYZER_MODULE_REGION_GAP;
+  const packed = packSpatialRegions(children, ANALYZER_MODULE_REGION_GAP);
+  const childWidth = packed.width;
+  const childHeight = packed.height;
   const contentWidth = Math.max(ownWidth, childWidth);
   const contentHeight = ownHeight
     + (ownHeight > 0 && childHeight > 0 ? ANALYZER_MODULE_REGION_GAP : 0)
@@ -848,11 +837,15 @@ function moduleRegionMeasure(
     ? `· ${moduleCount}`
     : `· ${moduleCount} modules`;
   const headingWidth = spatialRegionHeadingWidth(region.label, countText, 1, region.regionKind !== 'workspace-package');
+  const paddedContent = contentWidth + ANALYZER_MODULE_REGION_INSET * 2;
   return {
     region,
     children,
     ownNodes,
-    width: Math.max(ANALYZER_MODULE_COLLAPSED_WIDTH, headingWidth, contentWidth + ANALYZER_MODULE_REGION_INSET * 2),
+    childPositions: packed.positions,
+    width: contentWidth > 0
+      ? Math.max(paddedContent, Math.min(headingWidth, paddedContent + ANALYZER_MODULE_REGION_INSET))
+      : Math.max(ANALYZER_MODULE_COLLAPSED_WIDTH, Math.min(260, headingWidth)),
     height: Math.max(
       ANALYZER_MODULE_COLLAPSED_HEIGHT,
       ANALYZER_MODULE_REGION_HEADING + ANALYZER_MODULE_REGION_INSET * 2 + contentHeight,
@@ -898,15 +891,7 @@ function layoutModuleDependency(view: AnalyzerViewModel, expandedRegionIds: Read
     };
   }
   const measures = packageRegions.map((region) => moduleRegionMeasure(view, region, regionById, nodeById, effectiveExpandedRegionIds));
-  const columns = Math.min(ANALYZER_MODULE_PACKAGE_COLUMNS, Math.max(1, measures.length));
-  const columnWidths = Array.from({ length: columns }, (_, column) => Math.max(
-    ANALYZER_MODULE_COLLAPSED_WIDTH,
-    ...measures.filter((_, index) => index % columns === column).map((measure) => measure.width),
-  ));
-  const rowHeights = Array.from({ length: measures.length === 0 ? 0 : Math.ceil(measures.length / columns) }, (_, row) => Math.max(
-    ANALYZER_MODULE_COLLAPSED_HEIGHT,
-    ...measures.slice(row * columns, (row + 1) * columns).map((measure) => measure.height),
-  ));
+  const packagesPacked = packSpatialRegions(measures, ANALYZER_MODULE_PACKAGE_GAP);
   const positionedNodes: PositionedNode[] = [];
   const positionedRegions: PositionedSemanticRegion[] = [];
   const place = (measure: ModuleRegionMeasure, x: number, y: number): void => {
@@ -922,7 +907,7 @@ function layoutModuleDependency(view: AnalyzerViewModel, expandedRegionIds: Read
     });
     const contentX = x + ANALYZER_MODULE_REGION_INSET;
     let contentY = y + ANALYZER_MODULE_REGION_HEADING + ANALYZER_MODULE_REGION_INSET;
-    const columnsForNodes = Math.min(ANALYZER_MODULE_OWN_COLUMNS, Math.max(1, measure.ownNodes.length));
+    const columnsForNodes = spatialModuleColumns(measure.ownNodes.length, ANALYZER_MODULE_NODE_WIDTH, ANALYZER_MODULE_NODE_HEIGHT);
     measure.ownNodes.forEach((node, index) => {
       const column = index % columnsForNodes;
       const row = Math.floor(index / columnsForNodes);
@@ -938,31 +923,14 @@ function layoutModuleDependency(view: AnalyzerViewModel, expandedRegionIds: Read
       contentY += ownRows * ANALYZER_MODULE_NODE_HEIGHT + Math.max(0, ownRows - 1) * ANALYZER_MODULE_NODE_GAP;
       if (measure.children.length > 0) contentY += ANALYZER_MODULE_REGION_GAP;
     }
-    const childColumns = Math.min(ANALYZER_MODULE_CHILD_COLUMNS, Math.max(1, measure.children.length));
-    const childWidths = Array.from({ length: childColumns }, (_, column) => Math.max(
-      ANALYZER_MODULE_COLLAPSED_WIDTH,
-      ...measure.children.filter((_, index) => index % childColumns === column).map((child) => child.width),
-    ));
-    let childIndex = 0;
-    measure.children.forEach((child) => {
-      const column = childIndex % childColumns;
-      const row = Math.floor(childIndex / childColumns);
-      const rowY = contentY + measure.children.slice(0, row * childColumns).reduce((total, previous, index) => {
-        if (index % childColumns !== 0) return total;
-        const rowChildren = measure.children.slice(index, index + childColumns);
-        return total + Math.max(...rowChildren.map((candidate) => candidate.height), ANALYZER_MODULE_COLLAPSED_HEIGHT) + ANALYZER_MODULE_REGION_GAP;
-      }, 0);
-      const childX = contentX + childWidths.slice(0, column).reduce((total, value) => total + value + ANALYZER_MODULE_REGION_GAP, 0);
-      place(child, childX, rowY);
-      childIndex += 1;
+    measure.children.forEach((child, index) => {
+      const offset = measure.childPositions![index]!;
+      place(child, contentX + offset.x, contentY + offset.y);
     });
   };
   measures.forEach((measure, index) => {
-    const column = index % columns;
-    const row = Math.floor(index / columns);
-    const x = SIDE_PADDING + columnWidths.slice(0, column).reduce((total, value) => total + value + ANALYZER_MODULE_PACKAGE_GAP, 0);
-    const y = 24 + rowHeights.slice(0, row).reduce((total, value) => total + value + ANALYZER_MODULE_PACKAGE_GAP, 0);
-    place(measure, x, y);
+    const offset = packagesPacked.positions[index]!;
+    place(measure, SIDE_PADDING + offset.x, 24 + offset.y);
   });
   const right = Math.max(640, ...positionedRegions.map((region) => region.x + region.width + SIDE_PADDING), SIDE_PADDING * 2);
   const bottom = Math.max(280, ...positionedRegions.map((region) => region.y + region.height + SIDE_PADDING), 280);

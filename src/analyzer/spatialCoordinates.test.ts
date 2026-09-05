@@ -34,6 +34,33 @@ function camera(panX = 0, panY = 0, scale = 1) {
 }
 
 describe('spatial world / screen coordinates', () => {
+  it('fits a local pair in the full repository coordinate frame', () => {
+    const bounds = computeSpatialWorldBounds(regionRectCorners({x:0,y:0,z:2,width:6000,height:4000}));
+    const pair = [{x:200,y:120,z:30},{x:500,y:220,z:30}];
+    const transform = fitSpatialProjectedBounds(pair,1000,600,ANALYZER_SPATIAL_FIT_PADDING,undefined,bounds);
+    const model = spatialCameraModel(transform,1000,600,undefined,undefined,bounds);
+    for(const point of pair){
+      const screen = projectSpatialPoint(point,model);
+      expect(screen.x).toBeGreaterThan(90); expect(screen.x).toBeLessThan(910);
+      expect(screen.y).toBeGreaterThan(80); expect(screen.y).toBeLessThan(535);
+    }
+  });
+  it('fits a large atlas below the previous scale floor without clipping its regions', () => {
+    const points = regionRectCorners({ x: 0, y: 0, z: 2, width: 10000, height: 6000 });
+    const fit = fitSpatialProjectedBounds(points, 1000, 600, ANALYZER_SPATIAL_FIT_PADDING);
+    expect(fit.scale).toBeLessThan(0.18);
+    const view = spatialCameraModel(fit, 1000, 600, undefined, undefined, {
+      min: { x: 0, y: 0, z: 2 }, max: { x: 10000, y: 6000, z: 2 },
+      center: { x: 5000, y: 3000, z: 2 }, width: 10000, depth: 6000, height: 0,
+    });
+    points.forEach((point) => {
+      const screen = projectSpatialPoint(point, view);
+      expect(screen.x).toBeGreaterThanOrEqual(91.99);
+      expect(screen.x).toBeLessThanOrEqual(908.01);
+      expect(screen.y).toBeGreaterThanOrEqual(83.99);
+      expect(screen.y).toBeLessThanOrEqual(532.01);
+    });
+  });
   it('projects a module world anchor to the same screen point used by the overlay card center', () => {
     const elevation = spatialModuleElevation(1);
     const node = { x: 120, y: 80, height: ANALYZER_MODULE_NODE_HEIGHT };
@@ -53,11 +80,10 @@ describe('spatial world / screen coordinates', () => {
     const right = projectSpatialPoint({ x: 200, y: 0, z: 0 }, view);
     const down = projectSpatialPoint({ x: 0, y: 200, z: 0 }, view);
     const far = projectSpatialPoint({ x: 200, y: 200, z: 0 }, view);
-    expect(far.x).not.toBeCloseTo(right.x, 0);
-    expect(far.y).not.toBeCloseTo(down.y, 0);
-    expect(Math.abs(right.y - origin.y)).toBeGreaterThan(8);
-    expect(Math.abs(down.x - origin.x)).toBeGreaterThan(8);
-    expect(Math.abs((right.y - origin.y) / Math.max(1, right.x - origin.x))).toBeGreaterThan(0.02);
+    expect(far.x).toBeCloseTo(right.x, 8);
+    expect(far.y).toBeCloseTo(down.y, 8);
+    expect(right.y).toBeCloseTo(origin.y, 8);
+    expect(down.x).toBeCloseTo(origin.x, 8);
     const elevated = projectSpatialPoint({ x: 80, y: 80, z: 40 }, view);
     const three = new THREE.OrthographicCamera();
     configureSpatialCamera(three, view);
@@ -65,16 +91,19 @@ describe('spatial world / screen coordinates', () => {
     vector.project(three);
     expect(elevated.x).toBeCloseTo((vector.x * 0.5 + 0.5) * view.viewportWidth, 5);
     expect(elevated.y).toBeCloseTo((-vector.y * 0.5 + 0.5) * view.viewportHeight, 5);
-    expect(ANALYZER_SPATIAL_YAW_DEGREES).toBeGreaterThan(0);
+    expect(ANALYZER_SPATIAL_YAW_DEGREES).toBe(0);
+    expect(elevated.y).toBeLessThan(projectSpatialPoint({ x: 80, y: 80, z: 0 }, view).y);
   });
 
-  it('projects a region plane into a spatial quad rather than a face-on rectangle', () => {
+  it('keeps map axes aligned while depth compresses the plane vertically', () => {
     const view = camera();
     const corners = regionRectCorners({ x: 40, y: 60, width: 240, height: 160, z: 8 }).map((point) => projectSpatialPoint(point, view));
     const xs = new Set(corners.map((point) => Math.round(point.x)));
     const ys = new Set(corners.map((point) => Math.round(point.y)));
-    expect(xs.size).toBeGreaterThan(2);
-    expect(ys.size).toBeGreaterThan(2);
+    expect(xs.size).toBe(2);
+    expect(ys.size).toBe(2);
+    expect(corners[1]!.x - corners[0]!.x).toBeCloseTo(240);
+    expect(corners[2]!.y - corners[0]!.y).toBeLessThan(160);
   });
 
   it('unprojects a screen terminal back onto the requested world elevation', () => {

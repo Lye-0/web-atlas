@@ -29,7 +29,7 @@ export function AnalyzerPage() {
   const { state: session, replaceProject, setActiveView, updateView } = useAnalyzerSession();
   const store = session.store;
   const storedViewState = session.views[view];
-  const [focusRequest, setFocusRequest] = useState<{ view: AnalyzerViewId; entityId: string; nonce: number }>();
+  const [focusRequest, setFocusRequest] = useState<{ view: AnalyzerViewId; entityId: string; nonce: number; entityIds?: string[] }>();
   const [reportedCounts, setReportedCounts] = useState<{ model: AnalyzerViewModel; counts: AnalyzerViewCounts }>();
 
   const model = useMemo(() => store ? projectAnalyzerView(store, view, storedViewState.entryScriptId) : undefined, [store, storedViewState.entryScriptId, view]);
@@ -174,14 +174,33 @@ export function AnalyzerPage() {
     updateView(view, { selectedNodeId: undefined, selectedRegionId: undefined, selectedEdgeId: undefined, detailOpen: false });
   }, [updateView, view]);
 
+  const focusConnection = useCallback((sourceId: string, targetId: string) => {
+    if (view !== 'module-dependency' || !model) return;
+    const expanded = new Set(expandedPresentationIds);
+    if (expanded.size === 0) model.regions?.forEach(region => expanded.add(region.id));
+    for (const id of [sourceId, targetId]) {
+      const path = model.nodes.find(node => node.id === id)?.metadata.regionPath;
+      if (Array.isArray(path)) path.forEach(regionId => expanded.add(regionId));
+    }
+    const relation = model.edges.find(edge => edge.sourceId === sourceId && edge.targetId === targetId);
+    updateView(view, { expandedPresentationIds: expanded, ...(relation ? { selectedEdgeId: relation.id, selectedNodeId: undefined, selectedRegionId: undefined, detailOpen: true } : {}) });
+    setFocusRequest(current => ({ view, entityId: sourceId, entityIds: [sourceId, targetId], nonce: (current?.nonce ?? 0) + 1 }));
+  }, [expandedPresentationIds, model, updateView, view]);
+
   const closeDetail = useCallback(() => {
     updateView(view, { detailOpen: false });
   }, [updateView, view]);
 
   const togglePresentation = useCallback((presentationId: string, options: { select?: boolean } = {}) => {
     if (!model) return;
-    const currentlyExpanded = expandedPresentationIds.has(presentationId);
     const next = new Set(expandedPresentationIds);
+    if (view === 'module-dependency' && next.size === 0) {
+      // Empty is the initial fully expanded atlas. Materialize that state
+      // before the first toggle, including package IDs so all directories
+      // can be collapsed without reverting to the initial overview.
+      model.regions?.forEach((region) => next.add(region.id));
+    }
+    const currentlyExpanded = next.has(presentationId);
 
     const selectedNodeIsDescendant = Boolean(selectedNodeId && presentationOwnsNode(model, presentationId, selectedNodeId));
     const selectedEdgeTouchesDescendant = Boolean(selectedEdgeId && (() => {
@@ -253,12 +272,15 @@ export function AnalyzerPage() {
   }, [updateView, view]);
 
   useEffect(() => {
+    // Tab 5 search highlights candidates; only an explicit choice selects one.
+    // Otherwise clearing selection while a unique search is active reselects it.
+    if (view === 'module-dependency') return;
     if (!search.trim() || searchResults.length !== 1 || selectedNodeId || selectedRegionId || selectedEdgeId) return;
     const [result] = searchResults;
     if (!result) return;
     if (result.kind === 'region') selectRegion(result.item.id, true);
     else selectNode(result.item.id, true);
-  }, [search, searchResults, selectedEdgeId, selectedNodeId, selectedRegionId, selectNode, selectRegion]);
+  }, [search, searchResults, selectedEdgeId, selectedNodeId, selectedRegionId, selectNode, selectRegion, view]);
 
   const activeFocusRequest = focusRequest?.view === view ? focusRequest : undefined;
 
@@ -387,6 +409,7 @@ export function AnalyzerPage() {
                 onSelectRegion={selectRegion}
                 onTogglePresentation={(presentationId) => togglePresentation(presentationId, { select: true })}
                 onClose={closeDetail}
+                onFocusConnection={view === 'module-dependency' ? focusConnection : undefined}
               />
             )}
           </div>

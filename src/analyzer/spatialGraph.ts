@@ -3,10 +3,8 @@ import type { PositionedNode, PositionedSemanticRegion } from './layout';
 import {
   ANALYZER_SPATIAL_DIRECTIONAL_GROUP_THRESHOLD,
   ANALYZER_SPATIAL_EXACT_COUNTERPART_LIMIT,
-  spatialEdgeBudget,
   spatialEdgeClass,
   spatialEdgeImportance,
-  spatialLocalEdgeBudget,
   spatialNodeBelongsToRegion,
   spatialSelectionKind,
   spatialShowsLocalModuleEdges,
@@ -156,6 +154,32 @@ export function collectSpatialEdges(
   selectedRegionId?: string,
   selectedEdgeId?: string,
 ): SpatialPresentationEdge[] {
+  return collectSpatialEdgeSet(
+    view,
+    visibleNodes,
+    visibleRegions,
+    regionById,
+    expanded,
+    zoomLevel,
+    selectedNodeId,
+    selectedRegionId,
+    selectedEdgeId,
+  ).edges;
+}
+
+export function collectSpatialEdgeSet(
+  view: AnalyzerViewModel,
+  visibleNodes: readonly PositionedNode[],
+  visibleRegions: readonly PositionedSemanticRegion[],
+  regionById: ReadonlyMap<string, AnalyzerSemanticRegion>,
+  expanded: ReadonlySet<string>,
+  zoomLevel: AnalyzerSpatialZoomLevel,
+  selectedNodeId?: string,
+  selectedRegionId?: string,
+  selectedEdgeId?: string,
+  groupIncidents = true,
+): { edges: SpatialPresentationEdge[]; groupedCount: number } {
+  if (!selectedNodeId && !selectedRegionId && !selectedEdgeId) return { edges: [], groupedCount: 0 };
   const visibleNodeIds = new Set(visibleNodes.map((positioned) => positioned.node.id));
   const visibleRegionIds = new Set(visibleRegions.map((positioned) => positioned.region.id));
   const nodeById = new Map(view.nodes.map((node) => [node.id, node]));
@@ -166,10 +190,9 @@ export function collectSpatialEdges(
     selectedRegionKind: selectedRegion?.regionKind,
     selectedEdgeId,
   });
-  // Far is a repository/package map.  A selected module remains selected in
-  // the session and detail panel, but must not turn the package map into an
-  // incident-module view.
-  const effectiveSelectionKind = zoomLevel === 'far' && selectionKind === 'module' ? 'none' : selectionKind;
+  // Selection is semantic state: camera distance must never replace it.
+  if (selectionKind === 'none') return { edges: [], groupedCount: 0 };
+  const effectiveSelectionKind = selectionKind;
   const selectedModuleId = effectiveSelectionKind === 'module' ? selectedNodeId : undefined;
   const forceRegionEndpoints = spatialUsesRegionAggregation(zoomLevel, effectiveSelectionKind);
   const allowLocalModules = spatialShowsLocalModuleEdges(zoomLevel, effectiveSelectionKind);
@@ -179,9 +202,9 @@ export function collectSpatialEdges(
   const outgoingDegree = selectedModuleId
     ? view.edges.filter((edge) => edge.sourceId === selectedModuleId).length
     : 0;
-  const groupIncoming = incomingDegree > ANALYZER_SPATIAL_DIRECTIONAL_GROUP_THRESHOLD;
-  const groupOutgoing = outgoingDegree > ANALYZER_SPATIAL_DIRECTIONAL_GROUP_THRESHOLD;
-  const preferredKind = effectiveSelectionKind === 'package' || zoomLevel === 'far'
+  const groupIncoming = groupIncidents && incomingDegree > ANALYZER_SPATIAL_DIRECTIONAL_GROUP_THRESHOLD;
+  const groupOutgoing = groupIncidents && outgoingDegree > ANALYZER_SPATIAL_DIRECTIONAL_GROUP_THRESHOLD;
+  const preferredKind = effectiveSelectionKind === 'package'
     ? 'workspace-package'
     : undefined;
   const grouped = new Map<string, SpatialPresentationEdge>();
@@ -190,6 +213,18 @@ export function collectSpatialEdges(
     nearestVisibleRegionId(node, new Set(), visibleRegionIds, regionById, expanded, false, selectedModuleId)
       ?? regionEndpointForNode(node, visibleRegionIds, regionById, expanded, preferredKind)
   );
+  const counterpartCounts = new Map<string, number>();
+  if (selectedModuleId) {
+    view.edges.forEach((edge) => {
+      if (edge.sourceId !== selectedModuleId && edge.targetId !== selectedModuleId) return;
+      const incoming = edge.targetId === selectedModuleId;
+      const other = nodeById.get(incoming ? edge.sourceId : edge.targetId);
+      const regionId = other && counterpartRegion(other);
+      if (!regionId) return;
+      const key = `${incoming}:${regionId}`;
+      counterpartCounts.set(key, (counterpartCounts.get(key) ?? 0) + 1);
+    });
+  }
 
   view.edges.forEach((edge) => {
     const sourceNode = nodeById.get(edge.sourceId);
@@ -211,12 +246,7 @@ export function collectSpatialEdges(
     const otherRegionId = selectedIncident ? counterpartRegion(otherNode) : undefined;
     const directionalGroup = incoming ? groupIncoming : groupOutgoing;
     const counterpartGroupSize = selectedIncident && selectedModuleId && otherRegionId
-      ? view.edges.filter((candidate) => {
-        const candidateIncoming = candidate.targetId === selectedModuleId;
-        if (candidateIncoming !== incoming) return false;
-        const candidateOther = nodeById.get(candidateIncoming ? candidate.sourceId : candidate.targetId);
-        return candidateOther ? counterpartRegion(candidateOther) === otherRegionId : false;
-      }).length
+      ? counterpartCounts.get(`${incoming}:${otherRegionId}`) ?? 0
       : 0;
     const counterpartVisible = visibleNodeIds.has(otherNode.id);
     const keepExactIncident = selectedIncident
@@ -231,19 +261,28 @@ export function collectSpatialEdges(
       && sameDirectory
       && visibleNodeIds.has(sourceNode.id)
       && visibleNodeIds.has(targetNode.id);
-    const groupIncidentEndpoint = selectedIncident && !preserveExactModule;
     const useRegionEndpoints = (forceRegionEndpoints && !preserveExactModule)
       || (Boolean(selectedRegionId) && !preserveExactModule)
-      || (!preserveExactModule && !localVisible)
-      || groupIncidentEndpoint;
+      || (effectiveSelectionKind !== 'module' && !preserveExactModule && !localVisible);
 
     let sourceId: string | undefined;
     let targetId: string | undefined;
-    if (groupIncidentEndpoint && selectedModuleId) {
-      const regionId = counterpartRegion(otherNode);
-      if (!regionId) return;
-      sourceId = edge.sourceId === selectedModuleId ? selectedModuleId : regionId;
-      targetId = edge.targetId === selectedModuleId ? selectedModuleId : regionId;
+    if (effectiveSelectionKind === 'module' && selectedIncident && selectedModuleId) {
+      // Low-degree directions stay exact Module→Module.  Missing counterparts
+      // are omitted; they must not collapse onto a parent Region.
+      if (!directionalGroup && !explicitlySelected) {
+        if (!counterpartVisible) return;
+        sourceId = edge.sourceId;
+        targetId = edge.targetId;
+      } else if (keepExactIncident || explicitlySelected) {
+        sourceId = edge.sourceId;
+        targetId = edge.targetId;
+      } else {
+        const regionId = counterpartRegion(otherNode);
+        if (!regionId || moduleIds.has(regionId)) return;
+        sourceId = incoming ? regionId : selectedModuleId;
+        targetId = incoming ? selectedModuleId : regionId;
+      }
     } else if (useRegionEndpoints) {
       sourceId = sourceTouchesSelectedRegion && selectedRegionId
         ? selectedRegionId
@@ -273,33 +312,6 @@ export function collectSpatialEdges(
     || second.importance - first.importance
     || second.count - first.count
     || first.id.localeCompare(second.id));
-  if (effectiveSelectionKind === 'module' || effectiveSelectionKind === 'edge'
-    || effectiveSelectionKind === 'directory' || effectiveSelectionKind === 'package') {
-    return ordered.filter((edge) => edge.selected || edge.connected);
-  }
-
-  const localBudget = spatialLocalEdgeBudget(zoomLevel);
-  const localByDirectory = new Map<string, SpatialPresentationEdge[]>();
-  const aggregates: SpatialPresentationEdge[] = [];
-  ordered.forEach((edge) => {
-    if (edge.aggregated) {
-      aggregates.push(edge);
-      return;
-    }
-    const sourceNode = nodeById.get(edge.sourceId);
-    const directoryId = sourceNode ? nodeDirectoryId(sourceNode, regionById) : edge.sourceId;
-    const group = localByDirectory.get(directoryId) ?? [];
-    group.push(edge);
-    localByDirectory.set(directoryId, group);
-  });
-  const budgetedLocal = [...localByDirectory.values()].flatMap((group) => group
-    .sort((first, second) => second.count - first.count || first.id.localeCompare(second.id))
-    .slice(0, localBudget));
-  const edgeBudget = spatialEdgeBudget(zoomLevel);
-  const budgetedAggregates = aggregates
-    .sort((first, second) => second.importance - first.importance || second.count - first.count || first.id.localeCompare(second.id))
-    .slice(0, edgeBudget);
-  const remainingLocalBudget = Math.max(0, edgeBudget - budgetedAggregates.length);
-  const globallyBudgetedLocal = budgetedLocal.slice(0, remainingLocalBudget);
-  return [...globallyBudgetedLocal, ...budgetedAggregates].sort((first, second) => first.id.localeCompare(second.id));
+  const selectedEdges = ordered.filter(edge => edge.selected || edge.connected);
+  return { edges: selectedEdges, groupedCount: selectedEdges.length };
 }

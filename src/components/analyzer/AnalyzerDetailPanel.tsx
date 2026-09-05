@@ -1,8 +1,9 @@
 import { Link } from 'react-router-dom';
-import { analyzerRegionParentId, analyzerSummaryExpanded, analyzerSummarySubtitle, displayDictionaryStack, factDictionaryStackId, factForNode, moduleIdForPath, nodeTypeLabels, relationLabelForNode } from '../../analyzer';
+import { evidenceRangeLabel, analyzerRegionParentId, analyzerSummaryExpanded, analyzerSummarySubtitle, displayDictionaryStack, factDictionaryStackId, factForNode, moduleIdForPath, nodeTypeLabels, relationLabelForNode } from '../../analyzer';
 import type { AnalyzerProjectStore, AnalyzerSemanticRegion, AnalyzerViewEdge, AnalyzerViewModel, AnalyzerViewNode } from '../../analyzer';
 import { stackPath } from '../../utils/routes';
 import { EvidenceCodeBlock } from './EvidenceCodeBlock';
+import { ModuleDependencyDetails } from './ModuleDependencyDetails';
 
 interface AnalyzerDetailPanelProps {
   store: AnalyzerProjectStore;
@@ -15,6 +16,7 @@ interface AnalyzerDetailPanelProps {
   onSelectRegion?: (regionId: string, focus?: boolean) => void;
   onTogglePresentation: (presentationId: string) => void;
   onClose: () => void;
+  onFocusConnection?: (sourceId: string, targetId: string) => void;
 }
 
 function metadataValue(value: AnalyzerViewNode['metadata'][string]): string {
@@ -31,7 +33,7 @@ function EvidenceList({ evidenceIds, view, store }: { evidenceIds: string[]; vie
   return <div className="analyzer-evidence-list">{evidence.map((item) => <EvidenceCodeBlock key={item.id} evidence={item} source={store.sources[item.filePath]} />)}</div>;
 }
 
-function RelationList({ nodeId, view, onSelectNode, onSelectRegion }: { nodeId: string; view: AnalyzerViewModel; onSelectNode: (nodeId: string, focus?: boolean) => void; onSelectRegion?: (regionId: string, focus?: boolean) => void }) {
+function RelationList({ nodeId, view, onSelectNode, onSelectRegion, onFocusConnection }: { nodeId: string; view: AnalyzerViewModel; onSelectNode: (nodeId: string, focus?: boolean) => void; onSelectRegion?: (regionId: string, focus?: boolean) => void; onFocusConnection?: (sourceId: string, targetId: string) => void }) {
   const relations = view.edges.filter((edge) => edge.sourceId === nodeId || edge.targetId === nodeId);
   if (relations.length === 0) return <p className="analyzer-muted-copy">このViewで表示している直接関係はありません。</p>;
   return (
@@ -47,6 +49,7 @@ function RelationList({ nodeId, view, onSelectNode, onSelectRegion }: { nodeId: 
               <span>{relationLabelForNode(relation, nodeId)}</span>
               <strong>{target?.label ?? targetRegion?.label}</strong>
             </button>
+            {onFocusConnection && <button type="button" className="analyzer-connection-fit" onClick={() => onFocusConnection(relation.sourceId, relation.targetId)} aria-label={`${target?.label ?? targetRegion?.label}との両端を表示`}>両端を表示</button>}
           </li>
         );
       })}
@@ -376,7 +379,7 @@ function detectionReason(node: AnalyzerViewNode, fact: ReturnType<typeof factFor
   }
 }
 
-function NodeDetails({ node, view, store, expandedPresentationIds, onSelectNode, onSelectRegion, onTogglePresentation }: { node: AnalyzerViewNode; view: AnalyzerViewModel; store: AnalyzerProjectStore; expandedPresentationIds: ReadonlySet<string>; onSelectNode: (nodeId: string, focus?: boolean) => void; onSelectRegion?: (regionId: string, focus?: boolean) => void; onTogglePresentation: (presentationId: string) => void }) {
+function NodeDetails({ node, view, store, expandedPresentationIds, onSelectNode, onSelectRegion, onTogglePresentation, onFocusConnection }: { node: AnalyzerViewNode; view: AnalyzerViewModel; store: AnalyzerProjectStore; expandedPresentationIds: ReadonlySet<string>; onSelectNode: (nodeId: string, focus?: boolean) => void; onSelectRegion?: (regionId: string, focus?: boolean) => void; onTogglePresentation: (presentationId: string) => void; onFocusConnection?: (sourceId: string, targetId: string) => void }) {
   const fact = factForNode(store, node);
   const moduleFact = fact?.kind === 'module' ? fact : undefined;
   const dictionary = displayDictionaryStack(factDictionaryStackId(fact ?? node));
@@ -463,7 +466,7 @@ function NodeDetails({ node, view, store, expandedPresentationIds, onSelectNode,
                     {target ? (
                       <button type="button" onClick={() => onSelectNode(target.id, true)}>
                         <span>{reference.kind}</span>
-                        <strong>{target.label} · {reference.specifier}{evidence ? ` · ${evidence.filePath}:${evidence.contextStartLine}` : ''}</strong>
+                        <strong>{target.label} · {reference.specifier}{evidence ? ` · ${evidenceRangeLabel(evidence)}` : ''}</strong>
                       </button>
                     ) : (
                       <div className="analyzer-detail-import-row"><span>{reference.kind}</span><strong>{reference.specifier}</strong></div>
@@ -498,7 +501,7 @@ function NodeDetails({ node, view, store, expandedPresentationIds, onSelectNode,
       )}
       <section className="analyzer-detail-section">
         <h3>Relations</h3>
-      <RelationList nodeId={node.id} view={view} onSelectNode={onSelectNode} onSelectRegion={onSelectRegion} />
+      <RelationList onFocusConnection={onFocusConnection} nodeId={node.id} view={view} onSelectNode={onSelectNode} onSelectRegion={onSelectRegion} />
       </section>
       <section className="analyzer-detail-section">
         <h3>Metadata</h3>
@@ -508,7 +511,7 @@ function NodeDetails({ node, view, store, expandedPresentationIds, onSelectNode,
   );
 }
 
-function EdgeDetails({ edge, view, store, onSelectNode, onSelectRegion }: { edge: AnalyzerViewEdge; view: AnalyzerViewModel; store: AnalyzerProjectStore; onSelectNode: (nodeId: string, focus?: boolean) => void; onSelectRegion?: (regionId: string, focus?: boolean) => void }) {
+function EdgeDetails({ edge, view, store, onSelectNode, onSelectRegion, onFocusConnection }: { edge: AnalyzerViewEdge; view: AnalyzerViewModel; store: AnalyzerProjectStore; onSelectNode: (nodeId: string, focus?: boolean) => void; onSelectRegion?: (regionId: string, focus?: boolean) => void; onFocusConnection?: (sourceId: string, targetId: string) => void }) {
   const source = view.nodes.find((node) => node.id === edge.sourceId);
   const target = view.nodes.find((node) => node.id === edge.targetId);
   const sourceRegion = view.regions?.find((region) => region.id === edge.sourceId);
@@ -526,6 +529,7 @@ function EdgeDetails({ edge, view, store, onSelectNode, onSelectRegion }: { edge
         <h3>Relation</h3>
         <p className="analyzer-edge-summary">{source?.label ?? edge.sourceId} <span aria-hidden="true">→</span> {target?.label ?? edge.targetId}</p>
         <div className="analyzer-edge-actions">
+          {onFocusConnection && <button type="button" onClick={() => onFocusConnection(edge.sourceId, edge.targetId)}>両端を表示</button>}
           {source && <button type="button" onClick={() => onSelectNode(source.id, true)}>Sourceを見る</button>}
           {sourceRegion && <button type="button" onClick={() => onSelectRegion?.(sourceRegion.id, true)}>Sourceを見る</button>}
           {target && <button type="button" onClick={() => onSelectNode(target.id, true)}>Targetを見る</button>}
@@ -559,10 +563,16 @@ function metadataStringFromEdge(edge: AnalyzerViewEdge, key: string): string | u
   return typeof value === 'string' ? value : undefined;
 }
 
-export function AnalyzerDetailPanel({ store, view, selectedNodeId, selectedRegionId, selectedEdgeId, expandedPresentationIds, onSelectNode, onSelectRegion, onTogglePresentation, onClose }: AnalyzerDetailPanelProps) {
+export function AnalyzerDetailPanel({ store, view, selectedNodeId, selectedRegionId, selectedEdgeId, expandedPresentationIds, onSelectNode, onSelectRegion, onTogglePresentation, onClose, onFocusConnection }: AnalyzerDetailPanelProps) {
   const node = selectedNodeId ? view.nodes.find((candidate) => candidate.id === selectedNodeId) : undefined;
   const region = selectedRegionId ? view.regions?.find((candidate) => candidate.id === selectedRegionId) : undefined;
   const edge = selectedEdgeId ? view.edges.find((candidate) => candidate.id === selectedEdgeId) : undefined;
+  if (view.view === 'module-dependency' && (node || region || edge)) {
+    return <aside key={node?.id ?? region?.id ?? edge?.id} className="analyzer-detail-panel is-module-detail" aria-label="Analyzer detail panel">
+      <ModuleDependencyDetails key={node?.id ?? region?.id ?? edge?.id} node={node} region={region} edge={edge} view={view} store={store}
+        onSelectNode={onSelectNode} onSelectRegion={onSelectRegion} onFocusConnection={onFocusConnection} onClose={onClose}/>
+    </aside>;
+  }
   return (
     <aside className="analyzer-detail-panel" aria-label="Analyzer detail panel">
       {!node && !region && !edge ? (
@@ -579,7 +589,7 @@ export function AnalyzerDetailPanel({ store, view, selectedNodeId, selectedRegio
           <div className="analyzer-detail-panel-close-row">
             <button type="button" className="analyzer-detail-close" onClick={onClose} aria-label="Close detail panel">Close</button>
           </div>
-          <NodeDetails node={node} view={view} store={store} expandedPresentationIds={expandedPresentationIds} onSelectNode={onSelectNode} onSelectRegion={onSelectRegion} onTogglePresentation={onTogglePresentation} />
+          <NodeDetails onFocusConnection={onFocusConnection} node={node} view={view} store={store} expandedPresentationIds={expandedPresentationIds} onSelectNode={onSelectNode} onSelectRegion={onSelectRegion} onTogglePresentation={onTogglePresentation} />
         </>
       ) : region ? (
         <>
@@ -593,7 +603,7 @@ export function AnalyzerDetailPanel({ store, view, selectedNodeId, selectedRegio
           <div className="analyzer-detail-panel-close-row">
             <button type="button" className="analyzer-detail-close" onClick={onClose} aria-label="Close detail panel">Close</button>
           </div>
-          <EdgeDetails edge={edge} view={view} store={store} onSelectNode={onSelectNode} onSelectRegion={onSelectRegion} />
+          <EdgeDetails onFocusConnection={onFocusConnection} edge={edge} view={view} store={store} onSelectNode={onSelectNode} onSelectRegion={onSelectRegion} />
         </>
       ) : null}
     </aside>

@@ -89,7 +89,7 @@ export const SPATIAL_OVERLAY_PRIORITY: Record<SpatialOverlayKind, number> = {
   'minor-heading': 34,
 };
 
-const SPATIAL_FIT_MIN_SCALE = 0.18;
+const SPATIAL_FIT_MIN_SCALE = 0.01;
 const SPATIAL_FIT_MAX_SCALE = 1.8;
 
 export function computeSpatialWorldBounds(points: readonly SpatialWorldPoint[]): SpatialWorldBounds {
@@ -257,8 +257,7 @@ function cameraAxes(eye: SpatialVec3, target: SpatialVec3): { x: SpatialVec3; y:
   return { x: xAxis, y: yAxis, z: zAxis };
 }
 
-function viewProject(point: SpatialVec3, pose: SpatialCameraPose): SpatialVec3 {
-  const axes = cameraAxes(pose.eye, pose.target);
+function viewProject(point: SpatialVec3, pose: SpatialCameraPose, axes = cameraAxes(pose.eye, pose.target)): SpatialVec3 {
   const rel = subVec(point, pose.eye);
   const vx = dotVec(axes.x, rel);
   const vy = dotVec(axes.y, rel);
@@ -281,7 +280,7 @@ function ndcToScreen(ndc: SpatialVec3, viewportWidth: number, viewportHeight: nu
 export function spatialCameraPose(model: SpatialCameraModel): SpatialCameraPose {
   const width = Math.max(1, model.viewportWidth);
   const height = Math.max(1, model.viewportHeight);
-  const scale = Math.max(0.05, model.scale);
+  const scale = Math.max(SPATIAL_FIT_MIN_SCALE, model.scale);
   const radius = spatialBoundsRadius(model.bounds);
   const distance = cameraDistance(model.bounds);
   const offset = cameraOffset(model, distance);
@@ -311,8 +310,16 @@ export interface SpatialProjectionDiagnostics {
   screen: SpatialScreenPoint;
 }
 
+const projectionCache = new WeakMap<SpatialCameraModel, { pose: SpatialCameraPose; axes: ReturnType<typeof cameraAxes> }>();
+
 export function spatialNdc(point: SpatialWorldPoint, model: SpatialCameraModel): SpatialVec3 {
-  return viewProject(layoutToThreePoint(point), spatialCameraPose(model));
+  let projection = projectionCache.get(model);
+  if (!projection) {
+    const pose = spatialCameraPose(model);
+    projection = { pose, axes: cameraAxes(pose.eye, pose.target) };
+    projectionCache.set(model, projection);
+  }
+  return viewProject(layoutToThreePoint(point), projection.pose, projection.axes);
 }
 
 export function spatialProjectionDiagnostics(point: SpatialWorldPoint, model: SpatialCameraModel): SpatialProjectionDiagnostics {
@@ -651,11 +658,12 @@ export function fitSpatialProjectedBounds(
   viewportHeight: number,
   padding: AnalyzerFitPadding = ANALYZER_FIT_PADDING,
   tiltDegrees = ANALYZER_SPATIAL_TILT_DEGREES,
+  sceneBounds?: SpatialWorldBounds,
 ): AnalyzerGraphTransform {
   if (viewportWidth <= 0 || viewportHeight <= 0 || points.length === 0) {
     return withSpatialCameraSchema({ x: padding.left, y: padding.top, scale: 0.5 });
   }
-  const bounds = computeSpatialWorldBounds(points);
+  const bounds = sceneBounds ?? computeSpatialWorldBounds(points);
   const identity = spatialCameraModel({ x: 0, y: 0, scale: 1 }, viewportWidth, viewportHeight, tiltDegrees, ANALYZER_SPATIAL_YAW_DEGREES, bounds);
   const projected = points.map((point) => projectSpatialPoint(point, identity));
   const minX = Math.min(...projected.map((point) => point.x));
