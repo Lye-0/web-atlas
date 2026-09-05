@@ -7,6 +7,7 @@ import { AnalyzerEmptyOrbit } from '../components/analyzer/AnalyzerEmptyOrbit';
 import { AnalyzerGraphStage } from '../components/analyzer/AnalyzerGraphStage';
 import { AnalyzerProjectPicker } from '../components/analyzer/AnalyzerProjectPicker';
 import { AnalyzerToolbar } from '../components/analyzer/AnalyzerToolbar';
+import { useWorkspaceFullscreen } from '../components/analyzer/useWorkspaceFullscreen';
 
 const viewIds = new Set<AnalyzerViewId>(['architecture', 'workspace', 'command', 'dependencies', 'module-dependency']);
 const AnalyzerSpatialGraphStage = lazy(async () => {
@@ -28,6 +29,7 @@ export function AnalyzerPage() {
   const view = viewFromPath(location.pathname);
   const { state: session, replaceProject, setActiveView, updateView } = useAnalyzerSession();
   const store = session.store;
+  const fullscreen = useWorkspaceFullscreen(view === 'module-dependency' && Boolean(store));
   const storedViewState = session.views[view];
   const [focusRequest, setFocusRequest] = useState<{ view: AnalyzerViewId; entityId: string; nonce: number; entityIds?: string[] }>();
   const [reportedCounts, setReportedCounts] = useState<{ model: AnalyzerViewModel; counts: AnalyzerViewCounts }>();
@@ -348,7 +350,9 @@ export function AnalyzerPage() {
             </div>
           )}
 
-          <div className={`analyzer-workspace${detailOpen ? ' has-detail' : ''}`}>
+          <div ref={fullscreen.root} className={`analyzer-workspace${detailOpen ? ' has-detail' : ''}${fullscreen.isFullscreen ? ' is-fullscreen' : ''}`}
+            role={fullscreen.isFullscreen ? 'dialog' : undefined} aria-modal={fullscreen.isFullscreen || undefined}
+            aria-label={fullscreen.isFullscreen ? 'Module Dependency 全画面表示' : undefined} onKeyDownCapture={fullscreen.onKeyDownCapture}>
             {view === 'module-dependency' ? (
               <Suspense fallback={<div className="analyzer-graph-stage analyzer-spatial-graph-stage"><div className="analyzer-graph-empty">Loading spatial renderer…</div></div>}>
                 <AnalyzerSpatialGraphStage
@@ -371,6 +375,8 @@ export function AnalyzerPage() {
                   onTransformChange={updateCamera}
                   cameraResetKey={session.scanVersion}
                   onCountsChange={reportCounts}
+                  isFullscreen={fullscreen.isFullscreen}
+                  onToggleFullscreen={fullscreen.toggle}
                 />
               </Suspense>
             ) : (

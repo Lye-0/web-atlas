@@ -58,7 +58,7 @@ describe('spatial atlas repository contracts', () => {
     expect(result.width / result.height).toBeGreaterThan(0.5);
     expect(result.width / result.height).toBeLessThan(3);
     const layout = layoutAnalyzerView(view);
-    const exact = collectSpatialEdgeSet(view, layout.nodes, layout.regions ?? [], new Map(view.regions?.map(region => [region.id, region])), new Set(), 'far', view.nodes.find(node => node.label === 'module-0.ts')!.id, undefined, undefined, false);
+    const exact = collectSpatialEdgeSet(view, layout.nodes, layout.regions ?? [], new Map(view.regions?.map(region => [region.id, region])), new Set(), 'far', view.nodes.find(node => node.label === 'module-0.ts')!.id, undefined, undefined);
     expect(exact.edges).toHaveLength(1199);
     expect(exact.edges.every(edge => !edge.aggregated)).toBe(true);
   });

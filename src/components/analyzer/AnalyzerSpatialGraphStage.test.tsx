@@ -92,7 +92,7 @@ describe('Spatial Atlas gesture integration', () => {
     });
     expect(host.querySelector('[aria-label="a.ts, a.ts"]')?.getAttribute('aria-pressed')).toBe('true');
     expect(host.querySelectorAll('.analyzer-spatial-edge-hit')).toHaveLength(1);
-    await act(async () => [...host.querySelectorAll('button')].find(button=>button.textContent==='選択解除')!.click());
+    await act(async () => host.querySelector('[role="application"]')!.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true})));
     expect(host.querySelectorAll('.analyzer-spatial-edge-hit')).toHaveLength(0);
   });
 
@@ -133,28 +133,20 @@ describe('Spatial Atlas gesture integration', () => {
     expect(parseFloat(host.querySelector<HTMLElement>('[aria-label="a.ts, a.ts"]')!.style.left)-left).toBeCloseTo(80);
   });
 
-  it('labels and filters imports relative to the selected module', async () => {
+  it('labels imports relative to the selected module', async () => {
     await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="a.ts, a.ts"]')!.click());
     expect(host.querySelector('.analyzer-spatial-edge-hit')!.getAttribute('data-direction')).toBe('imports');
     expect(host.querySelector('.analyzer-spatial-edge-hit')!.getAttribute('aria-label')).toBe('a.ts が b.ts を import');
-    await act(async()=>host.querySelector<HTMLButtonElement>('button.is-imported-by')!.click());
-    expect(host.querySelectorAll('.analyzer-spatial-edge-hit')).toHaveLength(0);
-    await act(async()=>host.querySelector<HTMLButtonElement>('button.is-imports')!.click());
-    expect(host.querySelectorAll('.analyzer-spatial-edge-hit')).toHaveLength(1);
     await act(async()=>host.querySelector<HTMLButtonElement>('[aria-label="b.ts, b.ts"]')!.click());
     expect(host.querySelector('.analyzer-spatial-edge-hit')!.getAttribute('data-direction')).toBe('imported-by');
-    expect(host.querySelector('button.is-imported-by')!.textContent).toContain('1');
   });
 
-  it('keeps display controls outside the pannable canvas', async () => {
+  it('keeps only compact camera controls without a reserved information toolbar', () => {
     const stage = host.querySelector<HTMLElement>('[role="application"]')!;
-    const controls = host.querySelector('.analyzer-spatial-toolbar')!;
-    expect(stage.contains(controls)).toBe(false);
-    expect(stage.contains(zoomIn())).toBe(false);
-    await act(async()=>host.querySelector<HTMLButtonElement>('[aria-label="a.ts, a.ts"]')!.click());
-    const button = host.querySelector<HTMLButtonElement>('button.is-imports')!;
-    expect(stage.contains(button)).toBe(false);
-    await act(async()=>{button.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));});
-    expect(host.querySelectorAll('.analyzer-spatial-edge-hit')).toHaveLength(0);
+    expect(stage.contains(zoomIn())).toBe(true);
+    expect(host.querySelector('.analyzer-spatial-toolbar')).toBeNull();
+    expect(host.querySelector('.analyzer-spatial-lod')).toBeNull();
+    expect(host.querySelector('.analyzer-spatial-edge-count')).toBeNull();
   });
+
 });

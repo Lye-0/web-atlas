@@ -17,7 +17,6 @@ import {
   spatialRegionDepthElevation,
   spatialModuleElevation,
   spatialSelectionKind,
-  spatialUsesRegionAggregation,
   spatialLocalEdgeBudget,
 } from './spatialPresentation';
 import { routeSpatialEdge, spatialRouteIntersectsObstacle, spatialRouteXyExcursion } from './spatialRouting';
@@ -242,7 +241,7 @@ describe('module dependency spatial selection', () => {
     }
   });
 
-  it('groups high-degree incident edges by nearest visible region without changing facts', () => {
+  it('keeps every high-degree incident as a separate exact dependency', () => {
     const extras = Array.from({ length: ANALYZER_SPATIAL_INCIDENT_EDGE_THRESHOLD }, (_, index) => {
       const id = `module:extra-${index}`;
       return {
@@ -258,12 +257,12 @@ describe('module dependency spatial selection', () => {
     const crowdedNodes = crowded.nodes.map(positionedNode);
     const edges = collectSpatialEdges(crowded, crowdedNodes, visibleRegions, regionById, expanded, 'near', 'module:b');
     expect(view.edges.length + extras.length).toBe(crowded.edges.length);
-    expect(edges.some((item) => item.sourceId === 'directory:b' && item.targetId === 'module:b' && item.aggregated && item.count >= ANALYZER_SPATIAL_INCIDENT_EDGE_THRESHOLD)).toBe(true);
-    expect(edges.filter((item) => item.sourceId.startsWith('module:extra-')).length).toBe(0);
+    expect(edges.every(item => !item.aggregated && item.count === 1)).toBe(true);
+    expect(edges.filter((item) => item.sourceId.startsWith('module:extra-')).length).toBe(extras.length);
     expect(edges.some((item) => item.sourceId === 'module:b' && item.targetId === 'module:c' && !item.aggregated)).toBe(true);
   });
 
-  it('groups only the high-degree direction and keeps a single outgoing exact', () => {
+  it('keeps high incoming degree and a single outgoing dependency exact', () => {
     const extras = Array.from({ length: 20 }, (_, index) => {
       const id = `module:in-${index}`;
       return {
@@ -277,7 +276,8 @@ describe('module dependency spatial selection', () => {
       edges: [...view.edges, ...extras.map((item) => item.edge)],
     };
     const edges = collectSpatialEdges(crowded, crowded.nodes.map(positionedNode), visibleRegions, regionById, expanded, 'near', 'module:b');
-    expect(edges.some((item) => item.sourceId === 'directory:b' && item.targetId === 'module:b' && item.aggregated)).toBe(true);
+    expect(edges.filter(item => item.targetId === 'module:b')).toHaveLength(21);
+    expect(edges.every(item => !item.aggregated)).toBe(true);
     expect(edges.some((item) => item.sourceId === 'module:b' && item.targetId === 'module:c' && !item.aggregated)).toBe(true);
   });
 
@@ -382,7 +382,7 @@ describe('module dependency spatial selection', () => {
     const edges = collectSpatialEdges(crowded, crowded.nodes.map(positionedNode), visibleRegions, regionById, expanded, 'near', 'module:b');
     expect(edges.some((item) => item.sourceId === 'module:b' && item.targetId === 'module:c' && !item.aggregated)).toBe(true);
     expect(edges.some((item) => item.sourceId === 'module:b' && item.aggregated)).toBe(false);
-    expect(edges.some((item) => item.targetId === 'module:b' && item.aggregated)).toBe(true);
+    expect(edges.every(item => !item.aggregated)).toBe(true);
   });
 
   it('keeps incoming-only module selection as incoming endpoints', () => {
@@ -400,40 +400,21 @@ describe('module dependency spatial selection', () => {
     expect(edges.every((item) => item.sourceId !== 'module:sink')).toBe(true);
   });
 
-  it('uses directory boundary aggregation instead of highlighting internal module edges', () => {
-    expect(spatialUsesRegionAggregation('near', 'directory')).toBe(true);
+  it('shows the exact file dependencies crossing a Directory boundary', () => {
     const edges = collectSpatialEdges(view, visibleNodes, visibleRegions, regionById, expanded, 'near', undefined, 'directory:a');
-    expect(edges.every((item) => item.aggregated)).toBe(true);
-    expect(edges.some((item) => item.sourceId === 'module:a' && item.targetId === 'module:b')).toBe(false);
-    expect(edges).toEqual(expect.arrayContaining([
-      expect.objectContaining({ sourceId: 'directory:a', targetId: 'directory:b', connected: true, count: 2 }),
-      expect.objectContaining({ sourceId: 'directory:a', targetId: 'directory:f', connected: true }),
-    ]));
+    expect(edges.map(item => item.id)).toEqual(['a-c','b-c','a-f']);
+    expect(edges.every(item => !item.aggregated && item.count === 1)).toBe(true);
+    expect(edges.map(item => [item.sourceId,item.targetId])).toEqual([
+      ['module:a','module:c'],['module:b','module:c'],['module:a','module:f'],
+    ]);
   });
 
-  it('uses package boundary aggregation for cross-package relations', () => {
-    expect(spatialSelectionKind({ selectedRegionKind: 'workspace-package' })).toBe('package');
-    const edges = collectSpatialEdges(view, visibleNodes, visibleRegions, regionById, expanded, 'near', undefined, 'package:a');
-    expect(edges.every((item) => item.aggregated)).toBe(true);
-    expect(edges.some((item) => item.sourceId.startsWith('module:'))).toBe(false);
-    expect(edges).toEqual(expect.arrayContaining([
-      expect.objectContaining({ sourceId: 'package:a', targetId: 'package:f', connected: true, count: 2 }),
-    ]));
-    expect(edges.some((item) => item.sourceId === 'directory:a' && item.connected)).toBe(false);
-  });
-
-  it('hides unrelated module edges while a Directory is selected', () => {
-    const edges = collectSpatialEdges(view, visibleNodes, visibleRegions, regionById, expanded, 'near', undefined, 'directory:a');
-    expect(edges.every((item) => item.sourceId === 'directory:a' || item.targetId === 'directory:a')).toBe(true);
-    expect(edges.some((item) => item.sourceId.startsWith('module:'))).toBe(false);
-    expect(edges.some((item) => item.sourceId === 'directory:b' && item.targetId === 'directory:f')).toBe(false);
-    expect(edges.some((item) => item.sourceId === 'module:x')).toBe(false);
-  });
-
-  it('hides unrelated module edges while a Package is selected', () => {
-    const edges = collectSpatialEdges(view, visibleNodes, visibleRegions, regionById, expanded, 'near', undefined, 'package:a');
-    expect(edges.every((item) => item.sourceId === 'package:a' || item.targetId === 'package:a')).toBe(true);
-    expect(edges.some((item) => item.sourceId.startsWith('module:'))).toBe(false);
+  it('shows exact cross-package dependencies at every zoom', () => {
+    for (const level of ['near','medium','far'] as const) {
+      const edges = collectSpatialEdges(view, visibleNodes, visibleRegions, regionById, expanded, level, undefined, 'package:a');
+      expect(edges.map(item => item.id)).toEqual(['c-f','a-f']);
+      expect(edges.every(item => !item.aggregated && item.sourceId.startsWith('module:') && item.targetId==='module:f')).toBe(true);
+    }
   });
 
   it('preserves the same selected incident identities through every zoom level', () => {
@@ -486,18 +467,14 @@ describe('module dependency spatial selection', () => {
     expect(edges.some(item => item.sourceId === 'module:b' && item.targetId === 'module:c')).toBe(true);
   });
 
-  it('preserves duplicate exact facts as a counted aggregate line', () => {
+  it('keeps repeated imports between the same files as separate Fact edges', () => {
     const duplicated: AnalyzerViewModel = {
       ...view,
       edges: [edge('duplicate-1', 'module:a', 'module:b'), edge('duplicate-2', 'module:a', 'module:b')],
     };
-    const relation = collectSpatialEdges(duplicated, visibleNodes, visibleRegions, regionById, expanded, 'near', 'module:a')
-      .find((item) => item.sourceId === 'module:a' && item.targetId === 'module:b');
-    expect(relation).toEqual(expect.objectContaining({
-      aggregated: true,
-      count: 2,
-      edgeIds: ['duplicate-1', 'duplicate-2'],
-    }));
+    const edges = collectSpatialEdges(duplicated, visibleNodes, visibleRegions, regionById, expanded, 'near', 'module:a');
+    expect(edges.map(item=>item.edgeIds)).toEqual([['duplicate-1'],['duplicate-2']]);
+    expect(edges.every(item=>!item.aggregated && item.count===1)).toBe(true);
   });
 
   it('keeps a crowded overview free of implicit arrows until selection', () => {

@@ -15,12 +15,12 @@ interface Props {
   onClose: () => void;
 }
 
-function Section({ title, count, initiallyOpen = false, children }: {
-  title: string; count?: number; initiallyOpen?: boolean; children: ReactNode;
+function Section({ title, count, initiallyOpen = false, children, direction }: {
+  title: string; count?: number; initiallyOpen?: boolean; children: ReactNode; direction?: 'imports' | 'imported-by';
 }) {
   const [open, setOpen] = useState(initiallyOpen);
   return <details className="analyzer-detail-accordion" open={open} onToggle={event => setOpen(event.currentTarget.open)}>
-    <summary><span>{title}</span>{count !== undefined && <small>{count}</small>}</summary>
+    <summary data-direction={direction}><span>{title}</span>{count !== undefined && <small>{count}</small>}</summary>
     {open && <div className="analyzer-detail-accordion-body">{children}</div>}
   </details>;
 }
@@ -113,10 +113,10 @@ export function ModuleDependencyDetails({ node, region, edge, view, store, onSel
       </div>
     </header>
     {(node || region) && <>
-      <Section title="→ import先" count={outgoing.length} initiallyOpen={outgoing.length > 0}>
+      <Section title="→ import先" direction="imports" count={outgoing.length} initiallyOpen={outgoing.length > 0}>
         <Connections edges={outgoing} incoming={false} view={view} onSelectNode={onSelectNode} onFocusConnection={node ? onFocusConnection : undefined}/>
       </Section>
-      <Section title="← import元" count={incoming.length} initiallyOpen={incoming.length > 0 && (outgoing.length === 0 || incoming.length <= 4)}>
+      <Section title="← import元" direction="imported-by" count={incoming.length} initiallyOpen={incoming.length > 0 && (outgoing.length === 0 || incoming.length <= 4)}>
         <Connections edges={incoming} incoming view={view} onSelectNode={onSelectNode} onFocusConnection={node ? onFocusConnection : undefined}/>
       </Section>
       {region && <>

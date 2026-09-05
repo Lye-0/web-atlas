@@ -11,7 +11,6 @@ import {
   spatialEdgeClass,
   collectSpatialEdgeSet,
   computeSpatialWorldBounds,
-  estimateRelationLabelSize,
   fitSpatialProjectedBounds,
   focusSpatialCamera,
   isRootPackageRegion,
@@ -36,8 +35,6 @@ import {
   spatialRegionDepthElevation,
   spatialRegionVisible,
   spatialRegionHeadingWidth,
-  spatialVisibleProjectedEdgeCount,
-  spatialRepresentedRelationCount,
   spatialCameraFrameTransform,
   zoomSpatialCamera,
   spatialWheelZoomFactor,
@@ -58,7 +55,6 @@ import {
   type SpatialCameraModel,
   type SpatialOverlayItem,
   type SpatialOverlayKind,
-  type SpatialScreenPoint,
   type SpatialWorldRect,
   type SpatialWorldPoint,
   type SpatialRouteObstacle,
@@ -88,6 +84,8 @@ interface AnalyzerSpatialGraphStageProps {
   onTransformChange: (update: AnalyzerGraphTransform | ((current: AnalyzerGraphTransform) => AnalyzerGraphTransform)) => void;
   cameraResetKey: string | number;
   onCountsChange: (counts: AnalyzerViewCounts) => void;
+  isFullscreen?: boolean;
+  onToggleFullscreen?: () => void;
 }
 
 type SpatialEndpoint = PositionedNode | PositionedSemanticRegion;
@@ -147,46 +145,6 @@ function projectedRectIntersectsViewport(
     && rect.y + rect.height >= -margin
     && rect.x <= camera.viewportWidth + margin
     && rect.y <= camera.viewportHeight + margin;
-}
-
-function screenPointAtFraction(
-  points: readonly SpatialScreenPoint[],
-  fraction: number,
-): SpatialScreenPoint | undefined {
-  if (points.length === 0) return undefined;
-  if (points.length === 1) return points[0];
-  const lengths = points.slice(1).map((point, index) => {
-    const previous = points[index]!;
-    return Math.hypot(point.x - previous.x, point.y - previous.y);
-  });
-  const total = lengths.reduce((sum, length) => sum + length, 0);
-  if (total <= 0) return points[0];
-  let remaining = Math.max(0, Math.min(1, fraction)) * total;
-  for (let index = 0; index < lengths.length; index += 1) {
-    const length = lengths[index]!;
-    if (remaining <= length) {
-      const start = points[index]!;
-      const end = points[index + 1]!;
-      const t = length > 0 ? remaining / length : 0;
-      return {
-        x: start.x + (end.x - start.x) * t,
-        y: start.y + (end.y - start.y) * t,
-      };
-    }
-    remaining -= length;
-  }
-  return points.at(-1);
-}
-
-function screenRectsOverlap(
-  first: ProjectedRect,
-  second: ProjectedRect,
-  padding = 4,
-): boolean {
-  return first.x < second.x + second.width + padding
-    && first.x + first.width + padding > second.x
-    && first.y < second.y + second.height + padding
-    && first.y + first.height + padding > second.y;
 }
 
 function endpointDisplayName(
@@ -281,6 +239,8 @@ export function AnalyzerSpatialGraphStage({
   onTransformChange,
   cameraResetKey,
   onCountsChange,
+  isFullscreen = false,
+  onToggleFullscreen,
 }: AnalyzerSpatialGraphStageProps) {
   const stageRef = useRef<HTMLDivElement>(null);
   const suppressClickRef = useRef(false);
@@ -316,8 +276,6 @@ export function AnalyzerSpatialGraphStage({
     setStageElement(element);
   }, []);
   const [showHelp, setShowHelp] = useState(false);
-  const [showIndividual, setShowIndividual] = useState(false);
-  const [directionFilter, setDirectionFilter] = useState<'all' | 'imports' | 'imported-by'>('all');
   const [settledTransform, setSettledTransform] = useState(transform);
   const cameraKey = `${cameraResetKey}:${view.view}`;
   onTransformChangeRef.current = onTransformChange;
@@ -346,40 +304,18 @@ export function AnalyzerSpatialGraphStage({
     const selectedEdge = selectedEdgeId ? view.edges.find((edge) => edge.id === selectedEdgeId) : undefined;
     return new Set([selectedEdge?.sourceId, selectedEdge?.targetId].filter((id): id is string => Boolean(id)));
   }, [selectedEdgeId, view.edges]);
-  const selectionTitle = useMemo(() => {
-    const node = view.nodes.find(item => item.id === selectedNodeId);
-    if (node) return node.label;
-    if (selectedRegionId) return regionById.get(selectedRegionId)?.label;
-    const edge = view.edges.find(item => item.id === selectedEdgeId);
-    return edge ? `${view.nodes.find(item => item.id === edge.sourceId)?.label} → ${view.nodes.find(item => item.id === edge.targetId)?.label}` : view.projectLabel;
-  }, [view.nodes, view.edges, view.projectLabel, selectedNodeId, selectedRegionId, selectedEdgeId, regionById]);
   const selectedContextNodeIds = useMemo(() => {
     const ids = new Set(selectedEdgeEndpointIds);
     if (selectedNodeId) {
       ids.add(selectedNodeId);
-      const nodeById = new Map(view.nodes.map((node) => [node.id, node]));
-      const addDirection = (incoming: boolean) => {
-        const incidents = view.edges
-          .filter((edge) => incoming ? edge.targetId === selectedNodeId : edge.sourceId === selectedNodeId)
-          .sort((first, second) => first.id.localeCompare(second.id));
-        const groups = new Map<string, string[]>();
-        incidents.forEach((edge) => {
-          const counterpartId = incoming ? edge.sourceId : edge.targetId;
-          const counterpart = nodeById.get(counterpartId);
-          const path = counterpart?.metadata.regionPath;
-          const key = Array.isArray(path) ? String(path.at(-1) ?? counterpartId) : counterpartId;
-          groups.set(key, [...(groups.get(key) ?? []), counterpartId]);
-        });
-        const showAll = showIndividual || incidents.length <= 8;
-        groups.forEach((counterparts) => {
-          if (showAll || counterparts.length <= 2) counterparts.forEach((id) => ids.add(id));
-        });
-      };
-      addDirection(true);
-      addDirection(false);
+      for (const edge of view.edges) {
+        if (edge.sourceId === selectedNodeId || edge.targetId === selectedNodeId) {
+          ids.add(edge.sourceId); ids.add(edge.targetId);
+        }
+      }
     }
     return ids;
-  }, [selectedEdgeEndpointIds, selectedNodeId, showIndividual, view.edges, view.nodes]);
+  }, [selectedEdgeEndpointIds, selectedNodeId, view.edges]);
   const visiblePositionedRegions = useMemo(
     () => (layout.regions ?? []).filter((positioned) => spatialRegionVisible(positioned.region, regionById, expandedPresentationIds)),
     [expandedPresentationIds, layout.regions, regionById],
@@ -666,10 +602,9 @@ export function AnalyzerSpatialGraphStage({
   const spatialEdgeSet = useMemo(() => {
     if (import.meta.env.DEV) {
       countersRef.current.edgeCollections += 1;
-      countersRef.current.aggregateRebuilds += 1;
     }
-    return collectSpatialEdgeSet(view, renderedPositionedModules, visiblePositionedRegions, regionById, expandedPresentationIds, 'near', selectedNodeId, selectedRegionId, selectedEdgeId, !showIndividual);
-  }, [renderedPositionedModules, visiblePositionedRegions, expandedPresentationIds, regionById, selectedEdgeId, selectedNodeId, selectedRegionId, showIndividual, view]);
+    return collectSpatialEdgeSet(view, renderedPositionedModules, visiblePositionedRegions, regionById, expandedPresentationIds, 'near', selectedNodeId, selectedRegionId, selectedEdgeId);
+  }, [renderedPositionedModules, visiblePositionedRegions, expandedPresentationIds, regionById, selectedEdgeId, selectedNodeId, selectedRegionId, view]);
   const selectionMembers = useMemo(() => {
     if (selectedNodeId) return new Set([selectedNodeId]);
     if (!selectedRegionId) return new Set<string>();
@@ -687,13 +622,7 @@ export function AnalyzerSpatialGraphStage({
     const outgoing = selectionMembers.has(edge.sourceId), incoming = selectionMembers.has(edge.targetId);
     return outgoing && incoming ? 'internal' : incoming ? 'imported-by' : 'imports';
   }, [selectionMembers]);
-  const directionCounts = useMemo(() => {
-    const counts = { imports: 0, 'imported-by': 0, internal: 0 };
-    for (const edge of spatialEdgeSet.edges) counts[edgeDirection(edge)] += edge.count;
-    return counts;
-  }, [edgeDirection, spatialEdgeSet.edges]);
-  const spatialEdges = useMemo(() => spatialEdgeSet.edges.filter(edge => directionFilter === 'all' || edgeDirection(edge) === directionFilter), [spatialEdgeSet.edges, directionFilter, edgeDirection]);
-  useEffect(() => setDirectionFilter('all'), [selectedNodeId, selectedRegionId, selectedEdgeId]);
+  const spatialEdges = spatialEdgeSet.edges;
 
   const routeCamera = useMemo(() => spatialCameraModel(
     { x: 0, y: 0, scale: 1 }, 1000, 1000,
@@ -743,14 +672,13 @@ export function AnalyzerSpatialGraphStage({
       const sourceName = endpointDisplayName(source, uniqueRegionLabels, 'near');
       const targetName = endpointDisplayName(target, uniqueRegionLabels, 'near');
       const direction = edgeDirection(edge);
-      const description = `${sourceName} が ${targetName} を import${edge.aggregated ? `（${edge.count}件の依存を集約）` : ''}`;
-      const caption = edge.aggregated ? `${sourceName} → ${targetName} ｜ ${edge.count}件を集約` : undefined;
+      const description = `${sourceName} が ${targetName} を import`;
       const start = sourceWorldPort ?? spatialScreenPointToWorldAtElevation(routePorts.start, endpointElevation(source), routeCamera);
       const end = targetWorldPort ?? spatialScreenPointToWorldAtElevation(routePorts.end, endpointElevation(target), routeCamera);
       return {
         id: edge.id, edgeIds: edge.edgeIds, sourceId: edge.sourceId, targetId: edge.targetId,
         aggregated: edge.aggregated, selected: edge.selected, connected: edge.connected, dimmed: edge.dimmed,
-        count: edge.count, caption, description, direction, readable: true, visible: true,
+        count: edge.count, description, direction, readable: true, visible: true,
         edgeClass: spatialEdgeClass(endpointPackageKey(source), endpointPackageKey(target), endpointRegionKey(source), endpointRegionKey(target)),
         worldPoints: spatialBridgeRoute(start, end, spatialRouteObstacles, lanes.get(edge.id) ?? 0, spatialPortNormal(start, endpointWorldRect(source)), spatialPortNormal(end, endpointWorldRect(target))),
         points: [], path: '', arrow: { x: 0, y: 0, angle: 0 }, labelAnchor: { x: 0, y: 0 },
@@ -807,8 +735,6 @@ export function AnalyzerSpatialGraphStage({
   );
   const visibleCanvasModuleCount = useMemo(() => [...projectedModules.values()].filter(node => projectedRectIntersectsViewport(node.cardBounds, camera)).length, [projectedModules, camera]);
   const connectedIds = useMemo(() => new Set(spatialEdges.flatMap(edge => [edge.sourceId, edge.targetId])), [spatialEdges]);
-  const visibleEdgeCount = spatialVisibleProjectedEdgeCount(visibleProjectedEdges);
-  const representedRelationCount = spatialRepresentedRelationCount(visibleProjectedEdges);
   useEffect(() => {
     if (interactingRef.current) return;
     onCountsChange({
@@ -817,45 +743,7 @@ export function AnalyzerSpatialGraphStage({
       hiddenNodes: Math.max(0, totalModuleCount - visibleCanvasModuleCount),
     });
   }, [onCountsChange, totalModuleCount, visibleCanvasModuleCount]);
-  const overlayItems = useMemo(() => {
-    const items = [...entityOverlayItems];
-    visibleProjectedEdges.forEach((edge) => {
-      if (!edge.aggregated || !edge.caption) return;
-      const size = estimateRelationLabelSize(edge.caption, labelScale);
-      const labelAnchors = [
-        edge.labelAnchor,
-        ...[0.45, 0.55, 0.38, 0.62]
-          .map((fraction) => screenPointAtFraction(edge.points, fraction))
-          .filter((point): point is SpatialScreenPoint => Boolean(point)),
-      ];
-      const screen = labelAnchors
-        .map((point) => ({
-          x: point.x - size.width / 2,
-          y: point.y - size.height / 2,
-          width: size.width,
-          height: size.height,
-        }))
-        .find((candidate) => (
-          candidate.x >= 0
-          && candidate.y >= 0
-          && candidate.x + candidate.width <= camera.viewportWidth
-          && candidate.y + candidate.height <= camera.viewportHeight
-          && !items.some((item) => screenRectsOverlap(item.screen, candidate))
-        ));
-      // A relation label is an aid to the rendered edge, never a detached
-      // fragment.  Every fallback candidate is still on the same
-      // projected edge polyline; if none is clear, omit the label.
-      if (!screen) return;
-      items.push({
-        id: `relation-label:${edge.id}`,
-        kind: 'relation-label',
-        screen,
-        locked: false,
-      });
-    });
-    return items;
-  }, [camera, entityOverlayItems, labelScale, visibleProjectedEdges]);
-
+  const overlayItems = entityOverlayItems;
   const overlayVisibility = useMemo(() => {
     if (import.meta.env.DEV) countersRef.current.collisionSolves += 1;
     return resolveSpatialOverlayCollision(overlayItems);
@@ -878,31 +766,6 @@ export function AnalyzerSpatialGraphStage({
 
   return (
     <div className="analyzer-spatial-workspace">
-      <div className="analyzer-spatial-toolbar" aria-label="Module Dependency display options" onKeyDown={(event) => { if (event.key === 'Escape') onClearSelection(); }}>
-      <div className="analyzer-stage-controls" aria-label="Spatial graph controls">
-        <button type="button" onClick={fitCamera} title="現在表示しているMap全体を表示">Fit</button>
-        <button type="button" onClick={resetTransform} title="カメラと表示状態を初期化">Reset</button>
-        <button type="button" onClick={() => changeZoom(1.14)} aria-label="Zoom in">+</button>
-        <button type="button" onClick={() => changeZoom(0.88)} aria-label="Zoom out">−</button>
-        <span ref={scaleLabelRef}>{Math.round(settledTransform.scale * 100)}%</span>
-        <button type="button" className="analyzer-help-button" onClick={() => setShowHelp((current) => !current)} aria-expanded={showHelp} aria-controls="analyzer-spatial-help" aria-label="Spatial graph操作ヘルプ">?</button>
-      </div>
-      <div className="analyzer-spatial-lod" aria-label="Spatial detail level">
-        <strong>{selectionTitle}</strong>
-        <span>{visibleCanvasModuleCount} / {totalModuleCount} modules</span>
-        {selectedNodeId || selectedRegionId || selectedEdgeId ? <>
-          <span>{visibleEdgeCount}本 · {representedRelationCount}件の依存</span>
-          <button type="button" onClick={onClearSelection}>選択解除</button>
-          <div className="analyzer-spatial-directions" role="group" aria-label="選択項目から見た依存の向き">
-            <button type="button" aria-pressed={directionFilter === 'all'} onClick={() => setDirectionFilter('all')}>すべて</button>
-            <button type="button" className="is-imports" title="選択した項目が読み込む依存先" aria-pressed={directionFilter === 'imports'} onClick={() => setDirectionFilter('imports')}>→ import先 <b>{directionCounts.imports}</b></button>
-            <button type="button" className="is-imported-by" title="選択した項目を読み込む依存元" aria-pressed={directionFilter === 'imported-by'} onClick={() => setDirectionFilter('imported-by')}>← import元 <b>{directionCounts['imported-by']}</b></button>
-            {selectedNodeId && <button type="button" aria-pressed={!showIndividual} onClick={() => setShowIndividual(current => !current)}>Directoryで集約</button>}
-          </div>
-          <small>矢印は importする側 → 読み込まれる側{directionCounts.internal > 0 ? ` · 領域内 ${directionCounts.internal}件` : ''}</small>
-        </> : <span>Module / Directoryを選択して依存を表示</span>}
-      </div>
-      </div>
     <div
       ref={attachStage}
       className="analyzer-graph-stage analyzer-spatial-graph-stage"
@@ -942,10 +805,19 @@ export function AnalyzerSpatialGraphStage({
       tabIndex={0}
       aria-label="Module Dependency spatial graph. Drag to pan and use the wheel to zoom."
     >
+      <div className="analyzer-stage-controls" aria-label="Spatial graph controls">
+        <button type="button" onClick={fitCamera} title="現在表示しているMap全体を表示">Fit</button>
+        <button type="button" onClick={resetTransform} title="カメラと表示状態を初期化">Reset</button>
+        <button type="button" onClick={() => changeZoom(1.14)} aria-label="Zoom in">+</button>
+        <button type="button" onClick={() => changeZoom(0.88)} aria-label="Zoom out">−</button>
+        <span ref={scaleLabelRef}>{Math.round(settledTransform.scale * 100)}%</span>
+        {onToggleFullscreen && <button type="button" onClick={onToggleFullscreen} aria-pressed={isFullscreen} aria-label={isFullscreen ? '全画面を終了' : '全画面表示'} title={isFullscreen ? '全画面を終了（Esc）' : '全画面表示'}>{isFullscreen ? '↙' : '⛶'}</button>}
+        <button type="button" className="analyzer-help-button" onClick={() => setShowHelp((current) => !current)} aria-expanded={showHelp} aria-controls="analyzer-spatial-help" aria-label="Spatial graph操作ヘルプ">?</button>
+      </div>
       {showHelp && (
         <div id="analyzer-spatial-help" className="analyzer-stage-help" role="dialog" aria-label="Spatial graph操作ヘルプ">
           <strong>Spatial Atlas</strong>
-          <p>ドラッグで移動、Wheelでカーソル位置を拡大縮小。矢印キーで移動、＋ / −でズーム、Homeで全体表示。Moduleを選択すると依存元・依存先を表示します。Directoryはダブルクリック、またはEnterで展開 / 折りたたみできます。</p>
+          <p>ドラッグで移動、Wheelでカーソル位置を拡大縮小。矢印キーで移動、＋ / −でズーム、Homeで全体表示。青はimport先、琥珀色はimport元です。Directoryはダブルクリック、またはEnterで展開 / 折りたたみできます。Escで選択解除、全画面表示中はEscで通常表示へ戻ります。</p>
         </div>
       )}
       {view.nodes.length > 0 && view.edges.length === 0 && (
@@ -1078,25 +950,6 @@ export function AnalyzerSpatialGraphStage({
                 </g>
               ))}
             </svg>
-            {visibleProjectedEdges.map((edge) => {
-              const overlayId = `relation-label:${edge.id}`;
-              const visibility = overlayVisibility.get(overlayId);
-              if (!visibility || visibility === 'hide') return null;
-              if (!edge.aggregated || !edge.caption) return null;
-              const item = overlayItems.find((candidate) => candidate.id === overlayId);
-              if (!item) return null;
-              const caption = edge.caption;
-              return (
-                <span
-                  key={overlayId}
-                  className={`analyzer-spatial-edge-count${edge.connected || edge.selected ? ' is-emphasis' : ''} is-counterpart`}
-                  style={{ left: item.screen.x, top: item.screen.y }}
-                  aria-label={caption}
-                >
-                  <em>{caption}</em>
-                </span>
-              );
-            })}
           </div>
           {selectedNodeId && (
             <nav className="analyzer-spatial-breadcrumb" aria-label="Module Dependency breadcrumb">
