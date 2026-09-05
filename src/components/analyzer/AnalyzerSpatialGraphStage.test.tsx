@@ -14,10 +14,10 @@ const view: AnalyzerViewModel = {
   edges: [{ id: 'a-b', sourceId: 'a', targetId: 'b', kind: 'imports', label: 'imports', evidenceIds: [], metadata: {} }],
 };
 
-function Harness() {
+function Harness({ graph = view }: { graph?: AnalyzerViewModel }) {
   const [transform, setTransform] = useState<AnalyzerGraphTransform>({ x: 0, y: 0, scale: 0.7 });
   const [selected, setSelected] = useState<string>();
-  return <AnalyzerSpatialGraphStage view={view} selectedNodeId={selected} filter="all" search="" expandedPresentationIds={expanded}
+  return <AnalyzerSpatialGraphStage view={graph} selectedNodeId={selected} filter="all" search="" expandedPresentationIds={expanded}
     onTogglePresentation={noop} onClearSelection={() => setSelected(undefined)} onResetPresentation={noop} onSelectNode={setSelected}
     onSelectRegion={noop} onSelectEdge={noop} transform={transform} hasStoredCamera
     onTransformChange={setTransform} cameraResetKey="test" onCountsChange={noop} />;
@@ -65,6 +65,43 @@ describe('Spatial Atlas gesture integration', () => {
     const fitted = scale();
     await act(async () => vi.advanceTimersByTime(1000));
     expect(scale()).toBe(fitted);
+  });
+
+  it('updates directory text in the camera frame without a second resize or content swap at settle', async () => {
+    const graph: AnalyzerViewModel = {
+      ...view,
+      nodes: view.nodes.map(node => ({ ...node, metadata: { regionPath: ['src'] } })),
+      regions: [{ id: 'src', entityKind: 'region', regionKind: 'directory', label: 'src', childIds: ['a', 'b'],
+        ports: [], selectable: true, evidenceIds: [], metadata: { moduleCount: 2 } }],
+    };
+    await act(async () => root.render(<Harness key="headings" graph={graph} />));
+    const heading = host.querySelector<HTMLElement>('.analyzer-spatial-region-heading')!;
+    const initial = heading.style.transform;
+    const text = heading.textContent;
+    expect(heading.style.visibility).toBe('visible');
+    expect(heading.closest('.analyzer-spatial-overlay')).toBeNull();
+
+    await act(async () => { zoomIn().click(); vi.advanceTimersByTime(20); });
+    const live = heading.style.cssText;
+    expect(heading.style.transform).not.toBe(initial);
+    expect(heading.textContent).toBe(text);
+    const stage = host.querySelector<HTMLElement>('[role="application"]')!;
+    const collections = stage.dataset.edgeCollections;
+    const layouts = stage.dataset.layoutRecomputes;
+    await act(async () => vi.advanceTimersByTime(400));
+    expect(heading.style.cssText).toBe(live);
+    expect(heading.textContent).toBe(text);
+
+    await act(async () => {
+      stage.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+      vi.advanceTimersByTime(20);
+    });
+    expect(heading.style.cssText).not.toBe(live);
+    const panned = heading.style.cssText;
+    expect(stage.dataset.edgeCollections).toBe(collections);
+    expect(stage.dataset.layoutRecomputes).toBe(layouts);
+    await act(async () => vi.advanceTimersByTime(400));
+    expect(heading.style.cssText).toBe(panned);
   });
 
   it('prevents page scrolling for wheel gestures and supports keyboard navigation', async () => {

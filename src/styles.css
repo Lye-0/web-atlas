@@ -3100,14 +3100,24 @@ summary:focus-visible {
   border-color: rgba(216, 186, 145, 0.72);
 }
 
+.analyzer-spatial-headings {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
 .analyzer-spatial-region-heading {
   position: absolute;
+  left: 0;
+  top: 0;
   z-index: 4;
   display: flex;
   align-items: center;
-  max-width: min(360px, calc(100% - 16px));
+  visibility: hidden;
+  transform-origin: 0 0;
   gap: 7px;
-  min-height: 24px;
+  height: 24px;
   padding: 0 0 3px;
   border: 0;
   border-bottom: 1px solid #5e7a64;
@@ -3116,21 +3126,18 @@ summary:focus-visible {
   color: #e0eade;
   cursor: pointer;
   font-family: var(--font-body);
-  font-size: 0.62rem;
+  font-size: 13px;
+  line-height: 1;
   letter-spacing: 0.01em;
   pointer-events: auto;
   text-align: left;
   text-transform: none;
   white-space: nowrap;
+  transition: none;
 }
 
 .analyzer-spatial-region-heading.is-major {
-  font-size: 0.7rem;
-}
-
-.analyzer-spatial-region-heading.is-major strong {
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-size: 14px;
 }
 
 .analyzer-spatial-region-heading.is-selected {
@@ -3140,11 +3147,6 @@ summary:focus-visible {
 
 .analyzer-spatial-region-heading.is-package {
   color: rgba(210, 236, 226, 0.92);
-}
-
-.analyzer-spatial-region-heading.is-far {
-  font-size: 0.6rem;
-  letter-spacing: 0.05em;
 }
 
 .analyzer-spatial-region-heading.is-match {
@@ -3161,29 +3163,33 @@ summary:focus-visible {
 }
 
 .analyzer-spatial-region-heading strong {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .analyzer-spatial-region-glyph {
+  flex-shrink: 0;
   color: #a4bbaa;
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 0.7em;
   letter-spacing: .1em;
 }
 
 .analyzer-spatial-region-count,
 .analyzer-spatial-region-path {
+  flex-shrink: 0;
   color: #b2c5b6;
-  font-size: 10px;
+  font-size: 0.77em;
   letter-spacing: 0.04em;
   white-space: nowrap;
 }
 
 .analyzer-spatial-region-toggle {
+  flex-shrink: 0;
   color: var(--accent-strong);
-  font-size: calc(0.8rem * var(--spatial-label-scale));
+  font-size: 1em;
 }
 
 .analyzer-spatial-region-path {

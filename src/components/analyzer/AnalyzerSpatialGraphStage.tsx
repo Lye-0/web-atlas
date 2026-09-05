@@ -26,11 +26,9 @@ import {
   regionHeadingWorldAnchor,
   regionMatchesSearch,
   regionRectCorners,
-  resolveSpatialOverlayCollision,
   shortestUniqueRegionLabels,
   spatialCameraModel,
   spatialLabelScreenScale,
-  spatialPackageHeadingCount,
   spatialModuleElevation,
   spatialRegionDepthElevation,
   spatialRegionVisible,
@@ -53,8 +51,6 @@ import {
   type ProjectedModuleNode,
   type ProjectedRect,
   type SpatialCameraModel,
-  type SpatialOverlayItem,
-  type SpatialOverlayKind,
   type SpatialWorldRect,
   type SpatialWorldPoint,
   type SpatialRouteObstacle,
@@ -63,6 +59,7 @@ import { SpatialAtlasScene } from './SpatialAtlasScene';
 import { spatialBridgeRoute, spatialPortNormal, assignSpatialBridgeLanes, spatialPathIntersectsViewport } from '../../analyzer/spatialBridge';
 import { spatialScreenPointToWorldAtElevation } from '../../analyzer/spatialCoordinates';
 import { configureSpatialCamera } from '../../analyzer/spatialThreeCamera';
+import { projectSpatialHeadings } from '../../analyzer/spatialHeadings';
 
 interface AnalyzerSpatialGraphStageProps {
   view: AnalyzerViewModel;
@@ -201,13 +198,12 @@ function moduleNodeVisible(
   return expandedPath || matched || node.id === selectedNodeId || forcedNodeIds.has(node.id);
 }
 
-function headingKind(region: AnalyzerSemanticRegion, selected: boolean): SpatialOverlayKind {
-  if (selected) return 'selected-region-heading';
+function headingPriority(region: AnalyzerSemanticRegion, selected: boolean): number {
+  if (selected) return 96;
   if (region.regionKind === 'workspace-package') {
-    return isRootPackageRegion(region) ? 'root-package-heading' : 'package-heading';
+    return isRootPackageRegion(region) ? 88 : 80;
   }
-  if ((region.depth ?? 0) <= 1) return 'major-directory-heading';
-  return 'minor-heading';
+  return (region.depth ?? 0) <= 1 ? 58 : 34;
 }
 
 function projectedEndpointBounds(
@@ -250,6 +246,8 @@ export function AnalyzerSpatialGraphStage({
   const focusNonceRef = useRef(-1);
   const liveTransformRef = useRef(transform);
   const overlayRef = useRef<HTMLDivElement>(null);
+  const headingElementsRef = useRef(new Map<string, HTMLButtonElement>());
+  const updateHeadingsRef = useRef<((camera: SpatialCameraModel) => void) | undefined>(undefined);
   const baseCameraRef = useRef<SpatialCameraModel | undefined>(undefined);
   const invalidateOutRef = useRef<(() => void) | undefined>(undefined);
   const routesRef = useRef<readonly ProjectedGraphEdge[]>([]);
@@ -441,6 +439,7 @@ export function AnalyzerSpatialGraphStage({
       baseCameraRef.current = camera;
       if (overlayRef.current) overlayRef.current.style.transform = '';
       if (scaleLabelRef.current) scaleLabelRef.current.textContent = `${Math.round(camera.scale * 100)}%`;
+      updateHeadingsRef.current?.(camera);
       invalidateOutRef.current?.();
     }
   }, [camera]);
@@ -475,6 +474,7 @@ export function AnalyzerSpatialGraphStage({
           overlayRef.current.style.transform = spatialCameraFrameTransform(baseCameraRef.current, liveCameraRef.current);
         }
         if (scaleLabelRef.current) scaleLabelRef.current.textContent = `${Math.round(next.scale * 100)}%`;
+        updateHeadingsRef.current?.(liveCameraRef.current);
         invalidateOutRef.current?.();
         if (import.meta.env.DEV && stageRef.current) {
           stageRef.current.dataset.cameraFrames = String(counters.cameraVisualUpdates);
@@ -694,39 +694,42 @@ export function AnalyzerSpatialGraphStage({
       visible: edge.readable && spatialPathIntersectsViewport(points, camera.viewportWidth, camera.viewportHeight),
     };
   }), [routedEdges, camera]);
-  const entityOverlayItems = useMemo(() => {
-    const items: SpatialOverlayItem[] = [];
-    visiblePositionedRegions.forEach((positioned) => {
-      if (positioned.width * camera.scale < 100 || positioned.height * camera.scale < 32) return;
-      const selected = positioned.region.id === selectedRegionId;
-      const kind = headingKind(positioned.region, selected);
-      const screen = projectSpatialPoint(regionHeadingWorldAnchor(positioned, endpointElevation(positioned)), camera);
-      const displayLabel = regionDisplayLabel(positioned.region, uniqueRegionLabels, zoomLevel);
-      const moduleCount = typeof positioned.region.metadata.moduleCount === 'number'
-        ? positioned.region.metadata.moduleCount
-        : positioned.region.childIds.length;
-      const countText = positioned.region.regionKind === 'workspace-package'
-        ? spatialPackageHeadingCount(zoomLevel, moduleCount)
-        : zoomLevel === 'far' ? '' : `· ${moduleCount} modules`;
-      const width = spatialRegionHeadingWidth(
-        displayLabel,
-        countText,
-        labelScale,
-        positioned.region.regionKind !== 'workspace-package',
-      );
-      const firstModuleTop = Math.min(...positioned.region.childIds.flatMap(id => {
-        const node = projectedModules.get(id);
-        return node ? [node.cardBounds.y] : [];
-      }));
-      items.push({
-        id: positioned.region.id,
-        kind,
-        screen: { x: screen.x, y: Math.min(screen.y - 11, firstModuleTop - 28), width, height: 24 },
-        locked: selected || kind === 'root-package-heading',
-      });
-    });
-    return items;
-  }, [camera, labelScale, selectedRegionId, uniqueRegionLabels, visiblePositionedRegions, zoomLevel, projectedModules]);
+  const headingModels = useMemo(() => {
+    const modules = new Map(renderedPositionedModules.map(node => [node.node.id, node]));
+    return visiblePositionedRegions.map(positioned => {
+      const region = positioned.region;
+      const label = regionDisplayLabel(region, uniqueRegionLabels, 'near');
+      const count = typeof region.metadata.moduleCount === 'number' ? region.metadata.moduleCount : region.childIds.length;
+      // Orthographic pan/zoom preserves the topmost corner. Resolve it only when layout changes.
+      const firstModuleTop = region.childIds.flatMap(id => {
+        const node = modules.get(id);
+        return node ? regionRectCorners(endpointWorldRect(node)) : [];
+      }).reduce<SpatialWorldPoint | undefined>((top, point) => !top
+        || projectSpatialPoint(point, routeCamera).y < projectSpatialPoint(top, routeCamera).y ? point : top, undefined);
+      return {
+        id: region.id, region, label, count,
+        anchor: regionHeadingWorldAnchor(positioned, endpointElevation(positioned)),
+        bounds: endpointWorldRect(positioned), firstModuleTop,
+        width: spatialRegionHeadingWidth(label, `· ${count}`, 1, region.regionKind !== 'workspace-package') + 16,
+        priority: headingPriority(region, region.id === selectedRegionId),
+      };
+    }).sort((a, b) => b.priority - a.priority || (a.region.depth ?? 0) - (b.region.depth ?? 0) || a.id.localeCompare(b.id));
+  }, [renderedPositionedModules, routeCamera, selectedRegionId, uniqueRegionLabels, visiblePositionedRegions]);
+
+  useLayoutEffect(() => {
+    const paintHeadings = (liveCamera: SpatialCameraModel) => {
+      for (const frame of projectSpatialHeadings(headingModels, liveCamera)) {
+        const element = headingElementsRef.current.get(frame.id);
+        if (!element) continue;
+        element.style.visibility = frame.visible ? 'visible' : 'hidden';
+        element.style.transform = `translate3d(${frame.x}px, ${frame.y}px, 0) scale(${frame.scale})`;
+        element.style.width = `${frame.width / frame.scale}px`;
+      }
+    };
+    updateHeadingsRef.current = paintHeadings;
+    paintHeadings(liveCameraRef.current);
+    return () => { updateHeadingsRef.current = undefined; };
+  }, [headingModels]);
 
   const visibleProjectedEdges = useMemo(
     () => projectedEdges.filter((edge) => edge.visible && edge.points.length >= 2 && Boolean(edge.path))
@@ -743,11 +746,6 @@ export function AnalyzerSpatialGraphStage({
       hiddenNodes: Math.max(0, totalModuleCount - visibleCanvasModuleCount),
     });
   }, [onCountsChange, totalModuleCount, visibleCanvasModuleCount]);
-  const overlayItems = entityOverlayItems;
-  const overlayVisibility = useMemo(() => {
-    if (import.meta.env.DEV) countersRef.current.collisionSolves += 1;
-    return resolveSpatialOverlayCollision(overlayItems);
-  }, [overlayItems]);
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
@@ -841,59 +839,49 @@ export function AnalyzerSpatialGraphStage({
               <SpatialAtlasScene regions={visiblePositionedRegions} modules={visiblePositionedModules} edges={routedEdges}
               cameraRef={liveCameraRef} cameraModel={camera} selectedNodeId={selectedNodeId} selectedRegionId={selectedRegionId} connectedIds={connectedIds} search={search} />
           </Canvas>
+          <div className="analyzer-spatial-headings" aria-label="Directory and package headings">
+            {headingModels.map(({ id, region, label, count }) => {
+              const selected = id === selectedRegionId;
+              const matches = Boolean(search.trim()) && regionMatchesSearch(region, search);
+              const expanded = expandedPresentationIds.size === 0 || expandedPresentationIds.has(id);
+              const packageRegion = region.regionKind === 'workspace-package';
+              const majorRegion = packageRegion || (region.depth ?? 0) <= 1;
+              return (
+                <button
+                  key={id}
+                  ref={element => {
+                    if (element) headingElementsRef.current.set(id, element);
+                    else headingElementsRef.current.delete(id);
+                  }}
+                  type="button"
+                  className={`analyzer-spatial-region-heading${packageRegion ? ' is-package' : ''}${selected ? ' is-selected' : ''}${matches ? ' is-match' : ''}${!expanded && !packageRegion ? ' is-collapsed' : ''}${majorRegion ? ' is-major' : ''}`}
+                  onClick={() => onSelectRegion(id)}
+                  onDoubleClick={() => { if (!packageRegion) onTogglePresentation(id); }}
+                  onKeyDown={event => {
+                    if (!packageRegion && event.key === 'Enter') {
+                      event.preventDefault();
+                      onTogglePresentation(id);
+                    }
+                  }}
+                  aria-label={`${label}, ${count} modules`}
+                  aria-pressed={selected}
+                  aria-expanded={packageRegion ? undefined : expanded}
+                  title={`${region.subtitle ?? region.label} · ${count} modules${packageRegion ? '' : ' · double click to expand or collapse'}`}
+                >
+                  <span className="analyzer-spatial-region-glyph" aria-hidden="true">{packageRegion ? 'PKG' : 'DIR'}</span>
+                  <strong>{label}</strong>
+                  <span className="analyzer-spatial-region-count">· {count}</span>
+                  {!packageRegion && <span className="analyzer-spatial-region-toggle" aria-hidden="true">{expanded ? '−' : '+'}</span>}
+                </button>
+              );
+            })}
+          </div>
           <div ref={overlayRef} className="analyzer-spatial-overlay" aria-label="Module Dependency map controls" style={{ '--spatial-label-scale': labelScale } as CSSProperties}>
             {selectedNodeId && (() => {
               const node = projectedModules.get(selectedNodeId);
               if (!node || node.cardBounds.height >= 18 || !projectedRectIntersectsViewport(node.cardBounds, camera)) return null;
               return <span className="analyzer-spatial-selected-indicator" style={{left:node.anchorX,top:node.cardBounds.y-12}}>{view.nodes.find(item=>item.id===selectedNodeId)?.label}</span>;
             })()}
-            {visiblePositionedRegions.map((positioned) => {
-              const region = positioned.region;
-              const visibility = overlayVisibility.get(region.id);
-              if (!visibility || visibility === 'hide') return null;
-              const selected = region.id === selectedRegionId;
-              const matches = !search.trim() || regionMatchesSearch(region, search);
-              const expanded = expandedPresentationIds.size === 0 || expandedPresentationIds.has(region.id);
-              const packageRegion = region.regionKind === 'workspace-package';
-              const majorRegion = packageRegion || (region.depth ?? 0) <= 1;
-              const moduleCount = typeof region.metadata.moduleCount === 'number'
-                ? region.metadata.moduleCount
-                : region.childIds.length;
-              const item = overlayItems.find((candidate) => candidate.id === region.id);
-              if (!item) return null;
-              return (
-                <button
-                  key={region.id}
-                  type="button"
-                  className={`analyzer-spatial-region-heading${packageRegion ? ' is-package' : ''}${selected ? ' is-selected' : ''}${matches && search.trim() ? ' is-match' : ''}${!expanded && !packageRegion ? ' is-collapsed' : ''}${majorRegion ? ' is-major' : ''}${zoomLevel === 'far' && packageRegion ? ' is-far' : ''}`}
-                  style={{
-                    left: item.screen.x,
-                    top: item.screen.y,
-                    fontSize: majorRegion ? 13 : 12,
-                  }}
-                  onClick={() => onSelectRegion(region.id)}
-                  onDoubleClick={() => {
-                    if (!packageRegion) onTogglePresentation(region.id);
-                  }}
-                  onKeyDown={(event) => {
-                    if (!packageRegion && event.key === 'Enter') {
-                      event.preventDefault();
-                      onTogglePresentation(region.id);
-                    }
-                  }}
-                  aria-pressed={selected}
-                  aria-expanded={packageRegion ? undefined : expanded}
-                  title={`${region.subtitle ?? region.label}${packageRegion ? '' : ' · double click to expand or collapse'}`}
-                >
-                  <span className="analyzer-spatial-region-glyph" aria-hidden="true">{packageRegion ? 'PKG' : 'DIR'}</span>
-                  <strong>{regionDisplayLabel(region, uniqueRegionLabels, zoomLevel)}</strong>
-                  {visibility === 'show' && (packageRegion || zoomLevel !== 'far') && (
-                    <span className="analyzer-spatial-region-count">{spatialPackageHeadingCount(zoomLevel, moduleCount)}</span>
-                  )}
-                  {visibility === 'show' && !packageRegion && <span className="analyzer-spatial-region-toggle" aria-hidden="true">{expanded ? '−' : '+'}</span>}
-                </button>
-              );
-            })}
             {renderedPositionedModules.map((positioned) => {
               const node = positioned.node;
               const projected = projectedModules.get(node.id);

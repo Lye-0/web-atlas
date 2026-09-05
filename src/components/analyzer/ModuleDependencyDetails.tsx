@@ -113,10 +113,10 @@ export function ModuleDependencyDetails({ node, region, edge, view, store, onSel
       </div>
     </header>
     {(node || region) && <>
-      <Section title="→ import先" direction="imports" count={outgoing.length} initiallyOpen={outgoing.length > 0}>
+      <Section title="← import先" direction="imports" count={outgoing.length} initiallyOpen={outgoing.length > 0}>
         <Connections edges={outgoing} incoming={false} view={view} onSelectNode={onSelectNode} onFocusConnection={node ? onFocusConnection : undefined}/>
       </Section>
-      <Section title="← import元" direction="imported-by" count={incoming.length} initiallyOpen={incoming.length > 0 && (outgoing.length === 0 || incoming.length <= 4)}>
+      <Section title="→ import元" direction="imported-by" count={incoming.length} initiallyOpen={incoming.length > 0 && (outgoing.length === 0 || incoming.length <= 4)}>
         <Connections edges={incoming} incoming view={view} onSelectNode={onSelectNode} onFocusConnection={node ? onFocusConnection : undefined}/>
       </Section>
       {region && <>
