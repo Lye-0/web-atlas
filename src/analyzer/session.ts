@@ -12,6 +12,8 @@ export interface AnalyzerViewSession {
   entryScriptId?: string;
   detailOpen: boolean;
   camera?: AnalyzerGraphTransform;
+  semantic?: { scope: string; kind: string; confidence: string; layer: 'source' | 'observed' | 'combined'; depth: number; direction: 'both' | 'incoming' | 'outgoing'; orbit: boolean; overview: boolean; page: number; auxiliary?: boolean; members?: string[] };
+  semanticCamera?: { position: [number, number, number]; target: [number, number, number]; zoom: number };
 }
 
 export interface AnalyzerSessionState {
@@ -29,7 +31,7 @@ export type AnalyzerSessionAction =
   | { type: 'setActiveView'; view: AnalyzerViewId }
   | { type: 'updateView'; view: AnalyzerViewId; update: AnalyzerViewSessionUpdate };
 
-export const analyzerViewIds: AnalyzerViewId[] = ['architecture', 'workspace', 'command', 'dependencies', 'module-dependency'];
+export const analyzerViewIds: AnalyzerViewId[] = ['architecture', 'workspace', 'command', 'dependencies', 'module-dependency', 'runtime-flow', 'function-call-flow', 'data-flow', 'data-model', 'architecture-map'];
 
 export function createInitialAnalyzerViewSession(): AnalyzerViewSession {
   return {

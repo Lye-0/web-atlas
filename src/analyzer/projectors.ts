@@ -1696,7 +1696,8 @@ export function projectAnalyzerView(store: AnalyzerProjectStore, view: AnalyzerV
   if (view === 'workspace') return projectWorkspace(store);
   if (view === 'command') return projectCommand(store, entryScriptId);
   if (view === 'module-dependency') return projectModuleDependency(store);
-  return projectDependencies(store);
+  if (view === 'dependencies') return projectDependencies(store);
+  throw new Error(`${view} requires the asynchronous semantic analysis and projectSemanticView`);
 }
 
 export function factDictionaryStackId(fact: AnalyzerFact | AnalyzerViewNode | undefined): string | undefined {

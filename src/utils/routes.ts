@@ -12,6 +12,11 @@ export const analyzerRoutes = {
   command: '/analyzer/command',
   dependencies: '/analyzer/dependencies',
   'module-dependency': '/analyzer/module-dependency',
+  'runtime-flow': '/analyzer/runtime-flow',
+  'function-call-flow': '/analyzer/function-call-flow',
+  'data-flow': '/analyzer/data-flow',
+  'data-model': '/analyzer/data-model',
+  'architecture-map': '/analyzer/architecture-map',
 } as const;
 
 export const categoryPath = (categoryId: string) => `${dictionaryRoutes.categories}/${encodeURIComponent(categoryId)}`;

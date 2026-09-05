@@ -20,6 +20,12 @@ interface AnalyzerToolbarProps {
 
 const viewPaths: Record<AnalyzerViewId, string> = analyzerRoutes;
 
+export function AnalyzerViewTabs() {
+  return <nav className="analyzer-view-tabs" aria-label="Analyzer views">
+    {(Object.keys(analyzerViewLabels) as AnalyzerViewId[]).map(viewId => <NavLink key={viewId} to={viewPaths[viewId]} className={({ isActive }) => `analyzer-view-tab${isActive ? ' is-active' : ''}`}>{analyzerViewLabels[viewId]}</NavLink>)}
+  </nav>;
+}
+
 function filterOptions(view: AnalyzerViewId): Array<{ value: AnalyzerFilter; label: string }> {
   if (view === 'architecture') return [
     { value: 'all', label: 'すべてのNode' },
@@ -67,17 +73,7 @@ export function AnalyzerToolbar({
   const options = filterOptions(view);
   return (
     <div className="analyzer-toolbar">
-      <nav className="analyzer-view-tabs" aria-label="Analyzer views">
-        {(Object.keys(analyzerViewLabels) as AnalyzerViewId[]).map((viewId) => (
-          <NavLink
-            key={viewId}
-            to={viewPaths[viewId]}
-            className={({ isActive }) => `analyzer-view-tab${isActive ? ' is-active' : ''}`}
-          >
-            {analyzerViewLabels[viewId]}
-          </NavLink>
-        ))}
-      </nav>
+      <AnalyzerViewTabs />
 
       <div className="analyzer-control-row">
         <label className="analyzer-search-control">

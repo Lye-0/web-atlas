@@ -8,6 +8,9 @@ import { AnalyzerGraphStage } from '../components/analyzer/AnalyzerGraphStage';
 import { AnalyzerProjectPicker } from '../components/analyzer/AnalyzerProjectPicker';
 import { AnalyzerToolbar } from '../components/analyzer/AnalyzerToolbar';
 import { useWorkspaceFullscreen } from '../components/analyzer/useWorkspaceFullscreen';
+import { isSemanticView } from '../analyzer/semantic/types';
+
+const SemanticAnalyzerPage = lazy(() => import('./SemanticAnalyzerPage'));
 
 const viewIds = new Set<AnalyzerViewId>(['architecture', 'workspace', 'command', 'dependencies', 'module-dependency']);
 const AnalyzerSpatialGraphStage = lazy(async () => {
@@ -25,6 +28,12 @@ function viewFromPath(pathname: string): AnalyzerViewId {
 }
 
 export function AnalyzerPage() {
+  const { pathname } = useLocation();
+  const id = pathname.split('/').at(-1) ?? '';
+  return isSemanticView(id) ? <Suspense fallback={<p role="status">Analyzerを読み込み中…</p>}><SemanticAnalyzerPage view={id} /></Suspense> : <LegacyAnalyzerPage />;
+}
+
+function LegacyAnalyzerPage() {
   const location = useLocation();
   const view = viewFromPath(location.pathname);
   const { state: session, replaceProject, setActiveView, updateView } = useAnalyzerSession();
