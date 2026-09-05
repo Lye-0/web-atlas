@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { getCategory, getStack } from '../data';
-import { categoryPath, stackPath } from './routes';
+import { analyzerRoot, analyzerRoutes, categoryPath, stackPath } from './routes';
 
 describe('dictionary routes', () => {
   it('resolves stable IDs to the expected entries and URLs', () => {
@@ -13,5 +13,16 @@ describe('dictionary routes', () => {
   it('encodes route IDs when a future entry contains special characters', () => {
     expect(stackPath('example/stack')).toBe('/dictionary/stacks/example%2Fstack');
     expect(categoryPath('example category')).toBe('/dictionary/categories/example%20category');
+  });
+
+  it('keeps Analyzer views on explicit stable routes', () => {
+    expect(analyzerRoot).toBe('/analyzer');
+    expect(analyzerRoutes).toEqual({
+      architecture: '/analyzer/architecture',
+      workspace: '/analyzer/workspace',
+      command: '/analyzer/command',
+      dependencies: '/analyzer/dependencies',
+      'module-dependency': '/analyzer/module-dependency',
+    });
   });
 });

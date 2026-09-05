@@ -1,10 +1,11 @@
 import { NavLink } from 'react-router-dom';
-import { dictionaryRoutes } from '../../utils/routes';
+import { analyzerRoot, dictionaryRoutes } from '../../utils/routes';
 
 const links = [
   { to: dictionaryRoutes.map, label: 'Map', title: '技術の全体像' },
   { to: dictionaryRoutes.categories, label: 'Categories', title: '分類を理解する' },
   { to: dictionaryRoutes.stacks, label: 'Stacks', title: '個別の技術を調べる' },
+  { to: analyzerRoot, label: 'Analyzer', title: 'ローカルプロジェクトを解析' },
 ];
 
 export function DictionaryNav() {

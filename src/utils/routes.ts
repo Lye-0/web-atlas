@@ -4,5 +4,15 @@ export const dictionaryRoutes = {
   stacks: '/dictionary/stacks',
 } as const;
 
+export const analyzerRoot = '/analyzer';
+
+export const analyzerRoutes = {
+  architecture: '/analyzer/architecture',
+  workspace: '/analyzer/workspace',
+  command: '/analyzer/command',
+  dependencies: '/analyzer/dependencies',
+  'module-dependency': '/analyzer/module-dependency',
+} as const;
+
 export const categoryPath = (categoryId: string) => `${dictionaryRoutes.categories}/${encodeURIComponent(categoryId)}`;
 export const stackPath = (stackId: string) => `${dictionaryRoutes.stacks}/${encodeURIComponent(stackId)}`;
