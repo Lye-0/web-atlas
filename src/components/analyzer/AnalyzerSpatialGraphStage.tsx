@@ -60,6 +60,9 @@ import { spatialBridgeRoute, spatialPortNormal, assignSpatialBridgeLanes, spatia
 import { spatialScreenPointToWorldAtElevation } from '../../analyzer/spatialCoordinates';
 import { configureSpatialCamera } from '../../analyzer/spatialThreeCamera';
 import { projectSpatialHeadings } from '../../analyzer/spatialHeadings';
+import { SPATIAL_FLOW_SPEED, type SpatialFlowState } from '../../analyzer/spatialFlow';
+import { useSpatialFlowMotion } from './useSpatialFlowMotion';
+import { SpatialParticleControl } from './SpatialParticleControl';
 
 interface AnalyzerSpatialGraphStageProps {
   view: AnalyzerViewModel;
@@ -250,6 +253,8 @@ export function AnalyzerSpatialGraphStage({
   const updateHeadingsRef = useRef<((camera: SpatialCameraModel) => void) | undefined>(undefined);
   const baseCameraRef = useRef<SpatialCameraModel | undefined>(undefined);
   const invalidateOutRef = useRef<(() => void) | undefined>(undefined);
+  const flowStateRef = useRef<SpatialFlowState>({ distance: 0, active: false, reduced: false });
+  const flowFramesRef = useRef(0);
   const routesRef = useRef<readonly ProjectedGraphEdge[]>([]);
   const lodRef = useRef(spatialLodLevelWithHysteresis(transform.scale));
   const countersRef = useRef(createSpatialInteractionCounters());
@@ -269,6 +274,7 @@ export function AnalyzerSpatialGraphStage({
   ));
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [stageElement, setStageElement] = useState<HTMLDivElement | null>(null);
+  const flow = useSpatialFlowMotion(stageElement);
   const attachStage = useCallback((element: HTMLDivElement | null) => {
     stageRef.current = element;
     setStageElement(element);
@@ -475,7 +481,6 @@ export function AnalyzerSpatialGraphStage({
         }
         if (scaleLabelRef.current) scaleLabelRef.current.textContent = `${Math.round(next.scale * 100)}%`;
         updateHeadingsRef.current?.(liveCameraRef.current);
-        invalidateOutRef.current?.();
         if (import.meta.env.DEV && stageRef.current) {
           stageRef.current.dataset.cameraFrames = String(counters.cameraVisualUpdates);
           stageRef.current.dataset.edgeCollections = String(counters.edgeCollections);
@@ -485,6 +490,18 @@ export function AnalyzerSpatialGraphStage({
           const stats = counters;
           perfLabelRef.current.textContent = `${stats.cameraVisualUpdates} cam · ${stats.edgeCollections} edges · ${stats.sessionWrites} save`;
         }
+      },
+      onRenderFrame: (elapsed) => {
+        const motion = flowStateRef.current;
+        if (motion.active) {
+          motion.distance += elapsed * SPATIAL_FLOW_SPEED * (motion.reduced ? 0.45 : 1)
+            / Math.max(0.65, Math.sqrt(liveCameraRef.current.scale));
+          if (import.meta.env.DEV && stageRef.current) {
+            stageRef.current.dataset.flowFrames = String(++flowFramesRef.current);
+            stageRef.current.dataset.flowDistance = motion.distance.toFixed(2);
+          }
+        }
+        invalidateOutRef.current?.();
       },
       onSettle: (next) => {
         interactingRef.current = false;
@@ -496,6 +513,7 @@ export function AnalyzerSpatialGraphStage({
       },
     });
     loopRef.current = loop;
+    loop.setAnimating(flowStateRef.current.active);
     return () => loop.dispose();
   }, []);
 
@@ -736,6 +754,14 @@ export function AnalyzerSpatialGraphStage({
       .sort((a, b) => Number(a.selected) - Number(b.selected) || Number(a.connected) - Number(b.connected)),
     [projectedEdges],
   );
+  const flowActive = flow.enabled && flow.visible && visibleProjectedEdges.length > 0;
+  useLayoutEffect(() => {
+    flowStateRef.current.active = flowActive;
+    flowStateRef.current.reduced = flow.reduced;
+    loopRef.current?.setAnimating(flowActive);
+    invalidateOutRef.current?.();
+    return () => { loopRef.current?.setAnimating(false); };
+  }, [flowActive, flow.reduced]);
   const visibleCanvasModuleCount = useMemo(() => [...projectedModules.values()].filter(node => projectedRectIntersectsViewport(node.cardBounds, camera)).length, [projectedModules, camera]);
   const connectedIds = useMemo(() => new Set(spatialEdges.flatMap(edge => [edge.sourceId, edge.targetId])), [spatialEdges]);
   useEffect(() => {
@@ -809,13 +835,14 @@ export function AnalyzerSpatialGraphStage({
         <button type="button" onClick={() => changeZoom(1.14)} aria-label="Zoom in">+</button>
         <button type="button" onClick={() => changeZoom(0.88)} aria-label="Zoom out">−</button>
         <span ref={scaleLabelRef}>{Math.round(settledTransform.scale * 100)}%</span>
+        <SpatialParticleControl mode={flow.mode} onChange={flow.setMode} onOpen={() => setShowHelp(false)} />
         {onToggleFullscreen && <button type="button" onClick={onToggleFullscreen} aria-pressed={isFullscreen} aria-label={isFullscreen ? '全画面を終了' : '全画面表示'} title={isFullscreen ? '全画面を終了（Esc）' : '全画面表示'}>{isFullscreen ? '↙' : '⛶'}</button>}
         <button type="button" className="analyzer-help-button" onClick={() => setShowHelp((current) => !current)} aria-expanded={showHelp} aria-controls="analyzer-spatial-help" aria-label="Spatial graph操作ヘルプ">?</button>
       </div>
       {showHelp && (
         <div id="analyzer-spatial-help" className="analyzer-stage-help" role="dialog" aria-label="Spatial graph操作ヘルプ">
           <strong>Spatial Atlas</strong>
-          <p>ドラッグで移動、Wheelでカーソル位置を拡大縮小。矢印キーで移動、＋ / −でズーム、Homeで全体表示。青はimport先、琥珀色はimport元です。Directoryはダブルクリック、またはEnterで展開 / 折りたたみできます。Escで選択解除、全画面表示中はEscで通常表示へ戻ります。</p>
+          <p>ドラッグで移動、Wheelでカーソル位置を拡大縮小。矢印キーで移動、＋ / −でズーム、Homeで全体表示。青はimport先、琥珀色はimport元です。「パーティクル」のメニューから通常・控えめ・オフを選べます。Directoryはダブルクリック、またはEnterで展開 / 折りたたみできます。Escで選択解除、全画面表示中はEscで通常表示へ戻ります。</p>
         </div>
       )}
       {view.nodes.length > 0 && view.edges.length === 0 && (
@@ -837,7 +864,8 @@ export function AnalyzerSpatialGraphStage({
           >
             <SpatialCameraBinder modelRef={liveCameraRef} invalidateOut={invalidateOutRef} />
               <SpatialAtlasScene regions={visiblePositionedRegions} modules={visiblePositionedModules} edges={routedEdges}
-              cameraRef={liveCameraRef} cameraModel={camera} selectedNodeId={selectedNodeId} selectedRegionId={selectedRegionId} connectedIds={connectedIds} search={search} />
+              cameraRef={liveCameraRef} cameraModel={camera} selectedNodeId={selectedNodeId} selectedRegionId={selectedRegionId} connectedIds={connectedIds} search={search}
+              flowEnabled={flow.enabled} flowActive={flowActive} flowStateRef={flowStateRef} />
           </Canvas>
           <div className="analyzer-spatial-headings" aria-label="Directory and package headings">
             {headingModels.map(({ id, region, label, count }) => {

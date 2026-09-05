@@ -9,6 +9,8 @@ import { ANALYZER_MODULE_NODE_WIDTH, type PositionedNode, type PositionedSemanti
 import { spatialModuleElevation, spatialRegionDepthElevation } from '../../analyzer/spatialPresentation';
 import { projectSpatialPoint, type SpatialCameraModel, type SpatialWorldPoint } from '../../analyzer/spatialCoordinates';
 import type { ProjectedGraphEdge } from '../../analyzer/spatialProjectedGraph';
+import type { SpatialFlowPath, SpatialFlowState } from '../../analyzer/spatialFlow';
+import { SpatialFlowParticles } from './SpatialFlowParticles';
 
 const floorRotation = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
 function elevation(node: PositionedNode) {
@@ -177,11 +179,15 @@ function LabelPage({ modules, cameraRef }: { modules: readonly PositionedNode[];
   return <instancedMesh ref={ref} args={[resources.geometry,resources.material,modules.length]} onBeforeRender={()=>{resources.material.uniforms.detail!.value=cameraRef.current.scale*(modules[0]?.height??48)>=18?1:0;}} />;
 }
 
-function Edges({ edges, cameraRef }: { edges: readonly ProjectedGraphEdge[]; cameraRef: { current: SpatialCameraModel } }) {
+function Edges({ edges, cameraRef, flowEnabled, flowActive, flowStateRef }: {
+  edges: readonly ProjectedGraphEdge[]; cameraRef: { current: SpatialCameraModel };
+  flowEnabled: boolean; flowActive: boolean; flowStateRef: { current: SpatialFlowState };
+}) {
   const arrows = useRef<THREE.InstancedMesh>(null);
   const resources = useMemo(()=>{
     const tubes: THREE.BufferGeometry[] = []; const shadows:number[]=[];
     const marks:{point:THREE.Vector3;direction:THREE.Vector3;color:THREE.Color}[]=[];
+    const flowPaths: SpatialFlowPath[] = [];
     for(const edge of edges){
       const color=new THREE.Color(connectionColor(edge));
       const points=edge.worldPoints.map(vector);
@@ -190,8 +196,10 @@ function Edges({ edges, cameraRef }: { edges: readonly ProjectedGraphEdge[]; cam
       const geometry = new THREE.TubeGeometry(curve, segments, 1, 6, false);
       const centers = new Float32Array(geometry.attributes.position!.count * 3);
       const colors = new Float32Array(centers.length);
+      const flowPoints: THREE.Vector3[] = [];
       for (let ring = 0; ring <= segments; ring++) {
         const point = curve.getPointAt(ring / segments);
+        flowPoints.push(point);
         for (let side = 0; side <= 6; side++) {
           const index = (ring * 7 + side) * 3;
           centers.set(point.toArray(), index); colors.set(color.toArray(), index);
@@ -200,6 +208,7 @@ function Edges({ edges, cameraRef }: { edges: readonly ProjectedGraphEdge[]; cam
       geometry.setAttribute('center', new THREE.BufferAttribute(centers, 3));
       geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
       tubes.push(geometry);
+      flowPaths.push({ id: edge.id, points: flowPoints, color: connectionColor(edge) });
       for(let i=1;i<points.length;i++) {
         // A subdued ground projection makes the elevated span legible without lighting passes.
         for (const point of [points[i-1]!, points[i]!]) shadows.push(point.x + 3, 34.5, point.z + 4);
@@ -217,7 +226,7 @@ function Edges({ edges, cameraRef }: { edges: readonly ProjectedGraphEdge[]; cam
     const shadow = new LineSegments2(shadowGeometry, new LineMaterial({ linewidth: 3, color: '#000000', transparent: true, opacity: .22, depthWrite: false }));
     shadow.renderOrder = 0; halo.renderOrder = 1;
     const line = new THREE.Mesh(geometry,material); line.renderOrder = 2;
-    return { line, halo, shadow, marks };
+    return { line, halo, shadow, marks, flowPaths };
   },[edges]);
   useEffect(()=>()=>{
     resources.line.geometry.dispose(); resources.line.material.dispose(); resources.halo.material.dispose();
@@ -245,12 +254,15 @@ function Edges({ edges, cameraRef }: { edges: readonly ProjectedGraphEdge[]; cam
     lastUpdate.current={resources,scale};
   }, [cameraRef, resources, scratch]);
   useLayoutEffect(updateArrows, [updateArrows]);
-  return <><primitive object={resources.shadow}/><primitive object={resources.halo} onBeforeRender={updateArrows}/><primitive object={resources.line}/><instancedMesh key={resources.marks.length} ref={arrows} args={[undefined,undefined,resources.marks.length]} renderOrder={3} frustumCulled={false} onBeforeRender={updateArrows}><coneGeometry args={[1,1,6]}/><meshBasicMaterial/></instancedMesh></>;
+  return <><primitive object={resources.shadow}/><primitive object={resources.halo} onBeforeRender={updateArrows}/><primitive object={resources.line}/><instancedMesh key={resources.marks.length} ref={arrows} args={[undefined,undefined,resources.marks.length]} renderOrder={3} frustumCulled={false} onBeforeRender={updateArrows}><coneGeometry args={[1,1,6]}/><meshBasicMaterial/></instancedMesh>
+    {flowEnabled && <SpatialFlowParticles paths={resources.flowPaths} stateRef={flowStateRef} cameraRef={cameraRef} active={flowActive} />}
+  </>;
 }
 
-export function SpatialAtlasScene({ regions, modules, edges, cameraRef, cameraModel, selectedNodeId, selectedRegionId, connectedIds, search }: {
+export function SpatialAtlasScene({ regions, modules, edges, cameraRef, cameraModel, selectedNodeId, selectedRegionId, connectedIds, search, flowEnabled, flowActive, flowStateRef }: {
   regions: readonly PositionedSemanticRegion[]; modules: readonly PositionedNode[]; edges: readonly ProjectedGraphEdge[];
   cameraRef: { current: SpatialCameraModel }; cameraModel: SpatialCameraModel; selectedNodeId?: string; selectedRegionId?: string; connectedIds: ReadonlySet<string>; search:string;
+  flowEnabled: boolean; flowActive: boolean; flowStateRef: { current: SpatialFlowState };
 }) {
   const directions = useMemo(() => {
     const map = new Map<string, string>();
@@ -273,7 +285,7 @@ export function SpatialAtlasScene({ regions, modules, edges, cameraRef, cameraMo
     {regions.length>0 && <Regions regions={regions} selectedId={selectedRegionId}/>}
     <group visible={cameraModel.scale*(modules[0]?.height??36)>=3}><Modules modules={modules} selectedId={selectedNodeId} connectedIds={connectedIds} search={search} directions={directions} cameraRef={cameraRef}/></group>
     {visiblePages.map(page=><LabelPage key={page.id} modules={page.modules} cameraRef={cameraRef}/>)}
-    {edges.length>0 && <Edges edges={edges} cameraRef={cameraRef}/>}
+    {edges.length>0 && <Edges edges={edges} cameraRef={cameraRef} flowEnabled={flowEnabled} flowActive={flowActive} flowStateRef={flowStateRef} />}
   </>;
 }
 

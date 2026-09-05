@@ -26,7 +26,7 @@ describe('Module detail progressive disclosure',()=>{
   const open=async(item:HTMLDetailsElement)=>{await act(async()=>{item.open=true;item.dispatchEvent(new Event('toggle'));});};
 
   it('keeps every dependency reachable while initially showing six and deferring evidence',async()=>{
-    const dependencies=section('→ import先');
+    const dependencies=section('← import先');
     expect(dependencies.open).toBe(true);
     expect(dependencies.querySelectorAll('li')).toHaveLength(6);
     await act(async()=>dependencies.querySelector<HTMLButtonElement>('.analyzer-detail-show-more')!.click());

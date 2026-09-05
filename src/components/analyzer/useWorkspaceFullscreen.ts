@@ -42,6 +42,7 @@ export function useWorkspaceFullscreen(enabled: boolean) {
 
   const onKeyDownCapture = (event: KeyboardEvent<HTMLDivElement>) => {
     if (mode === 'none') return;
+    if (event.key === 'Escape' && (event.target as HTMLElement).closest('[role="menu"]')) return;
     if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); void exit(); }
     if (event.key === 'Tab') {
       const items = [...event.currentTarget.querySelectorAll<HTMLElement>('button, [href], input, select, summary, [tabindex]:not([tabindex="-1"])')]

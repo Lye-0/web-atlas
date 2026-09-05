@@ -26,9 +26,17 @@ function Harness({ graph = view }: { graph?: AnalyzerViewModel }) {
 describe('Spatial Atlas gesture integration', () => {
   let host: HTMLDivElement;
   let root: Root;
+  let setStageVisible: (visible: boolean) => void;
   beforeEach(async () => {
     vi.useFakeTimers();
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    vi.stubGlobal('IntersectionObserver', class {
+      constructor(callback: IntersectionObserverCallback) {
+        setStageVisible = visible => callback([{ isIntersecting: visible } as IntersectionObserverEntry], this as unknown as IntersectionObserver);
+      }
+      observe() { setStageVisible(true); }
+      disconnect() { /* no external observer */ }
+    });
     vi.stubGlobal('ResizeObserver', class {
       callback: ResizeObserverCallback;
       constructor(callback: ResizeObserverCallback) { this.callback = callback; }
@@ -48,6 +56,92 @@ describe('Spatial Atlas gesture integration', () => {
   });
   const zoomIn = () => document.querySelector<HTMLButtonElement>('button[aria-label="Zoom in"]')!;
   const scale = () => document.querySelector('.analyzer-stage-controls > span')!.textContent;
+
+  const particleButton = () => host.querySelector<HTMLButtonElement>('.analyzer-particle-trigger')!;
+  const chooseParticleMode = async (label: string) => {
+    await act(async () => particleButton().click());
+    await act(async () => [...host.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]')].find(button => button.textContent?.includes(label))!.click());
+  };
+
+  it('defaults particles on, runs only for visible connections, and stops for OFF, hidden pages and cleared selection', async () => {
+    const stage = host.querySelector<HTMLElement>('[role="application"]')!;
+    expect(particleButton().textContent).toContain('通常');
+    expect(stage.contains(particleButton())).toBe(true);
+    await act(async () => vi.advanceTimersByTime(100));
+    expect(stage.dataset.flowFrames).toBeUndefined();
+    await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="a.ts, a.ts"]')!.click());
+    await act(async () => vi.advanceTimersByTime(100));
+    expect(Number(stage.dataset.flowFrames)).toBeGreaterThan(0);
+    const beforeScroll = stage.dataset.flowFrames;
+    await act(async () => setStageVisible(false));
+    await act(async () => vi.advanceTimersByTime(200));
+    expect(stage.dataset.flowFrames).toBe(beforeScroll);
+    await act(async () => setStageVisible(true));
+    await act(async () => vi.advanceTimersByTime(100));
+    expect(Number(stage.dataset.flowFrames)).toBeGreaterThan(Number(beforeScroll));
+    const beforeHidden = stage.dataset.flowFrames;
+    const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
+    await act(async () => document.dispatchEvent(new Event('visibilitychange')));
+    await act(async () => vi.advanceTimersByTime(200));
+    expect(stage.dataset.flowFrames).toBe(beforeHidden);
+    hidden.mockReturnValue(false);
+    await act(async () => document.dispatchEvent(new Event('visibilitychange')));
+    await act(async () => vi.advanceTimersByTime(100));
+    expect(Number(stage.dataset.flowFrames)).toBeGreaterThan(Number(beforeHidden));
+    await chooseParticleMode('オフ');
+    const offFrames = stage.dataset.flowFrames;
+    await act(async () => vi.advanceTimersByTime(200));
+    expect(stage.dataset.flowFrames).toBe(offFrames);
+    await chooseParticleMode('通常');
+    await act(async () => stage.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    const clearedFrames = stage.dataset.flowFrames;
+    await act(async () => vi.advanceTimersByTime(200));
+    expect(stage.dataset.flowFrames).toBe(clearedFrames);
+    hidden.mockRestore();
+  });
+
+  it('provides a toolbar control that reduces flow speed without changing dependency selection', async () => {
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>('[aria-label="a.ts, a.ts"]')!.click();
+    });
+    const stage = host.querySelector<HTMLElement>('[role="application"]')!;
+    await act(async () => vi.advanceTimersByTime(100));
+    const start = Number(stage.dataset.flowDistance);
+    await act(async () => vi.advanceTimersByTime(100));
+    const normal = Number(stage.dataset.flowDistance) - start;
+    await chooseParticleMode('控えめ');
+    const slowStart = Number(stage.dataset.flowDistance);
+    await act(async () => vi.advanceTimersByTime(100));
+    expect(Number(stage.dataset.flowDistance) - slowStart).toBeLessThan(normal * 0.6);
+    expect(particleButton().textContent).toContain('控えめ');
+    expect(host.querySelector('[aria-label="a.ts, a.ts"]')!.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('defaults to reduced particles when the system requests reduced motion', async () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+    await act(async () => root.render(<Harness key="reduced-motion" />));
+    expect(particleButton().textContent).toContain('控えめ');
+  });
+
+  it('supports menu keyboard navigation and dismissal without clearing the selected module', async () => {
+    await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="a.ts, a.ts"]')!.click());
+    await act(async () => particleButton().click());
+    const menu = host.querySelector<HTMLElement>('[role="menu"]')!;
+    expect(document.activeElement?.getAttribute('aria-checked')).toBe('true');
+    await act(async () => menu.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })));
+    expect(document.activeElement?.textContent).toContain('控えめ');
+    await act(async () => (document.activeElement as HTMLButtonElement).click());
+    expect(host.querySelector('[role="menu"]')).toBeNull();
+    expect(document.activeElement).toBe(particleButton());
+    expect(particleButton().textContent).toContain('控えめ');
+    await act(async () => particleButton().click());
+    await act(async () => document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    expect(host.querySelector('[role="menu"]')).toBeNull();
+    expect(host.querySelector('[aria-label="a.ts, a.ts"]')!.getAttribute('aria-pressed')).toBe('true');
+    await act(async () => particleButton().click());
+    await act(async () => document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+    expect(host.querySelector('[role="menu"]')).toBeNull();
+  });
 
   it('accumulates rapid zoom input, then resets the whole-layer transform after reconcile', async () => {
     await act(async () => { zoomIn().click(); zoomIn().click(); vi.advanceTimersByTime(20); });

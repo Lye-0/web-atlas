@@ -176,6 +176,8 @@ interface SpatialCameraLoopOptions {
   wheelSettleMs?: number;
   sessionDebounceMs?: number;
   onVisualFrame: (transform: AnalyzerGraphTransform) => void;
+  /** Camera and optional ambient motion share one render, after the DOM camera update. */
+  onRenderFrame?: (elapsedSeconds: number) => void;
   onSettle: (transform: AnalyzerGraphTransform) => void;
   onSessionWrite: (transform: AnalyzerGraphTransform) => void;
   counters?: SpatialInteractionCounters;
@@ -184,6 +186,7 @@ interface SpatialCameraLoopOptions {
 export function createSpatialCameraLoop(options: SpatialCameraLoopOptions) {
   const raf = options.raf ?? ((callback) => requestAnimationFrame(callback));
   const caf = options.caf ?? ((handle) => cancelAnimationFrame(handle));
+  const now = options.now ?? (() => performance.now());
   const scheduleTimeout = options.timeout ?? ((callback, ms) => window.setTimeout(callback, ms));
   const cancelScheduled = options.clearTimeout ?? ((handle) => window.clearTimeout(handle));
   const wheelSettleMs = options.wheelSettleMs ?? SPATIAL_INTERACTION_WHEEL_SETTLE_MS;
@@ -196,15 +199,23 @@ export function createSpatialCameraLoop(options: SpatialCameraLoopOptions) {
   let wheelTimer: number | undefined;
   let sessionTimer: number | undefined;
   let interacting = false;
+  let animating = false;
+  let lastAnimationTime: number | undefined;
 
-  const flushVisual = () => {
+  const flushVisual = (timestamp = now()) => {
     frame = undefined;
-    if (!pending) return;
-    const next = pending;
-    pending = undefined;
-    latest = next;
-    if (counters) counters.cameraVisualUpdates += 1;
-    options.onVisualFrame(next);
+    const cameraChanged = Boolean(pending);
+    if (pending) {
+      const next = pending;
+      pending = undefined;
+      latest = next;
+      if (counters) counters.cameraVisualUpdates += 1;
+      options.onVisualFrame(next);
+    }
+    const elapsed = animating && lastAnimationTime !== undefined ? Math.max(0, Math.min(0.05, (timestamp - lastAnimationTime) / 1000)) : 0;
+    lastAnimationTime = animating ? timestamp : undefined;
+    if (cameraChanged || animating) options.onRenderFrame?.(elapsed);
+    if (animating && frame === undefined) frame = raf(flushVisual);
   };
 
   const scheduleVisual = (transform: AnalyzerGraphTransform) => {
@@ -240,6 +251,13 @@ export function createSpatialCameraLoop(options: SpatialCameraLoopOptions) {
   };
 
   return {
+    setAnimating(active: boolean) {
+      if (active === animating) return;
+      animating = active;
+      lastAnimationTime = undefined;
+      if (active && frame === undefined) frame = raf(flushVisual);
+      if (!active && !pending && frame !== undefined) { caf(frame); frame = undefined; }
+    },
     interacting: () => interacting,
     latest: () => latest,
     setTarget(transform: AnalyzerGraphTransform, kind: 'pan' | 'zoom' | 'programmatic') {
@@ -277,8 +295,11 @@ export function createSpatialCameraLoop(options: SpatialCameraLoopOptions) {
       frame = wheelTimer = sessionTimer = undefined;
       pending = latest = undefined;
       interacting = false;
+      lastAnimationTime = undefined;
+      if (animating) frame = raf(flushVisual);
     },
     dispose() {
+      animating = false;
       if (frame !== undefined) caf(frame);
       if (wheelTimer !== undefined) cancelScheduled(wheelTimer);
       if (sessionTimer !== undefined) cancelScheduled(sessionTimer);

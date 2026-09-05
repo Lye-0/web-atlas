@@ -72,6 +72,10 @@ describe('Module Dependency exploration in the Analyzer shell', () => {
     expect(workspace.querySelector('.analyzer-stage-controls')).not.toBeNull();
     expect(workspace.querySelector('.analyzer-intro, .analyzer-toolbar, .analyzer-view-tabs')).toBeNull();
     expect(document.body.style.overflow).toBe('hidden');
+    await act(async () => workspace.querySelector<HTMLButtonElement>('.analyzer-particle-trigger')!.click());
+    await act(async () => document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    expect(workspace.querySelector('[role="menu"]')).toBeNull();
+    expect(workspace.classList.contains('is-fullscreen')).toBe(true);
     await act(async()=>workspace.querySelector('[role="application"]')!.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true})));
     expect(workspace.classList.contains('is-fullscreen')).toBe(false);
     expect(workspace.querySelector('[aria-label="a.ts, src/near/a.ts"]')!.getAttribute('aria-pressed')).toBe('true');

@@ -4194,6 +4194,90 @@ summary:focus-visible {
   text-align: center;
 }
 
+.analyzer-spatial-graph-stage .analyzer-stage-controls {
+  max-width: calc(100% - 24px);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.analyzer-particle-control {
+  position: relative;
+}
+
+.analyzer-stage-controls .analyzer-particle-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.analyzer-particle-trigger svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.3;
+  transition: transform 140ms ease;
+}
+
+.analyzer-particle-trigger[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+.analyzer-stage-controls .analyzer-particle-trigger:not([data-mode="off"]) {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+  background: rgba(172, 220, 202, 0.16);
+}
+
+.analyzer-particle-control span {
+  min-width: 0;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+}
+
+.analyzer-particle-control .analyzer-particle-mode {
+  opacity: 0.72;
+  font-size: 0.64rem;
+}
+
+.analyzer-particle-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 10;
+  display: grid;
+  gap: 2px;
+  min-width: 144px;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #111c19;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.36);
+}
+
+.analyzer-stage-controls .analyzer-particle-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 32px;
+  border-color: transparent;
+  background: transparent;
+  text-align: left;
+}
+
+.analyzer-particle-control .analyzer-particle-check {
+  width: 14px;
+  color: var(--accent-strong);
+}
+
+.analyzer-stage-controls .analyzer-particle-menu button[aria-checked="true"],
+.analyzer-stage-controls .analyzer-particle-menu button:hover,
+.analyzer-stage-controls .analyzer-particle-menu button:focus-visible {
+  color: var(--accent-strong);
+  background: rgba(172, 220, 202, 0.12);
+}
+
 .analyzer-help-button {
   color: var(--accent-strong) !important;
   font-weight: 700;
@@ -4887,6 +4971,10 @@ summary:focus-visible {
   .analyzer-stage-controls {
     top: 8px;
     right: 8px;
+  }
+
+  .analyzer-spatial-graph-stage .analyzer-stage-help {
+    top: 92px;
   }
 
   .analyzer-detail-empty,

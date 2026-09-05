@@ -62,6 +62,43 @@ function largeFixture(moduleCount: number, relationCount: number): AnalyzerViewM
 }
 
 describe('spatial camera interaction', () => {
+  it('shares one render between motion and camera updates, and stops without writing a session', () => {
+    const frames = new Map<number, FrameRequestCallback>();
+    let id = 0;
+    const events: string[] = [];
+    const elapsed: number[] = [];
+    let writes = 0;
+    const loop = createSpatialCameraLoop({
+      raf: callback => { frames.set(++id, callback); return id; }, caf: handle => { frames.delete(handle); },
+      timeout: () => 1, clearTimeout: () => undefined,
+      onVisualFrame: () => events.push('camera'), onRenderFrame: delta => { events.push('render'); elapsed.push(delta); },
+      onSettle: () => undefined, onSessionWrite: () => { writes++; },
+    });
+    const tick = (time: number) => {
+      const [handle, callback] = [...frames][0]!;
+      frames.delete(handle); callback(time);
+    };
+    expect(frames.size).toBe(0);
+    loop.setAnimating(true);
+    tick(0);
+    loop.setTarget({ x: 20, y: 0, scale: 1 }, 'pan');
+    expect(frames.size).toBe(1);
+    events.length = 0;
+    tick(16);
+    expect(events).toEqual(['camera', 'render']);
+    expect(elapsed).toEqual([0, 0.016]);
+    loop.setAnimating(false);
+    expect(frames.size).toBe(0);
+    loop.setAnimating(true);
+    tick(100000);
+    expect(elapsed.at(-1)).toBe(0);
+    loop.cancel();
+    expect(frames.size).toBe(1);
+    loop.dispose();
+    expect(frames.size).toBe(0);
+    expect(writes).toBe(0);
+  });
+
   it('preserves the cursor anchor under the actual orthographic projection at any elevation', () => {
     const viewport = { width: 1200, height: 680 };
     const current = { x: 127, y: -83, scale: 0.43 };
