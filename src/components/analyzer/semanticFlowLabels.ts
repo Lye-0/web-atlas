@@ -79,8 +79,8 @@ export function projectSemanticFlowLabels(camera: Camera, size: { width: number;
       const x = Math.max(3, Math.min(size.width - width - inset - 3, px + dx!)), y = Math.max(top + height / 2, Math.min(bottom - height / 2, py + dy!));
       const rect = { left: x + inset, top: y - height / 2, width, height };
       const clearance = prior ? 3 : 9;
-      const ownDotOverlap = label.selected && px + 17 > rect.left + .001 && px - 17 < rect.left + width - .001
-        && py + 17 > rect.top + .001 && py - 17 < rect.top + height - .001;
+      const ownDotOverlap = !label.region && px + inset > rect.left + .001 && px - inset < rect.left + width - .001
+        && py + inset > rect.top + .001 && py - inset < rect.top + height - .001;
       const overlap = occupied.reduce((sum, previous) => sum + Math.max(0, Math.min(rect.left + width + clearance, previous.left + previous.width) - Math.max(rect.left - clearance, previous.left))
         * Math.max(0, Math.min(rect.top + height + clearance, previous.top + previous.height) - Math.max(rect.top - clearance, previous.top)), 0)
         + pointOverlap(label.id, rect) + (ownDotOverlap ? 1_000_000 : 0);

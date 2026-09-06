@@ -140,6 +140,22 @@ describe('semantic 3D label synchronization', () => {
     }
   });
 
+  it.each(['representative', 'related', 'hovered', 'edge endpoint'])('keeps a %s label off its own dot after narrow-viewport clamping', kind => {
+    const node = positioned('callback L39', 320), size = { width: 343, height: 618 };
+    const labels = projectSemanticFlowLabels(sceneCamera(), size, 3, [node], new Set(), new Set(), {
+      relatedIds: new Set(kind === 'related' ? [node.node.id] : []),
+      hoveredIds: new Set(kind === 'hovered' ? [node.node.id] : []),
+      priorityIds: new Set(kind === 'edge endpoint' ? [node.node.id] : []),
+    });
+    expect(labels).toHaveLength(1);
+    const label = labels[0]!, left = label.x + 9, right = left + label.width!, height = label.hovered ? 46 : 28;
+    const dx = Math.max(left - label.pointX!, label.pointX! - right, 0);
+    const dy = Math.max(label.y - height / 2 - label.pointY!, label.pointY! - label.y - height / 2, 0);
+    expect(Math.hypot(dx, dy)).toBeGreaterThanOrEqual(8.99);
+    expect(left).toBeGreaterThanOrEqual(0); expect(right).toBeLessThanOrEqual(size.width);
+    expect(label.id).toBe(node.node.id);
+  });
+
   it('retains visible names and their label sides through small camera and zoom movements', () => {
     const camera = sceneCamera(), size = { width: 1000, height: 800 };
     const positions = [positioned('run', -240), positioned('other', 0), positioned('target', 240)];
