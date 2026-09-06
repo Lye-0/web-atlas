@@ -14,6 +14,11 @@ export interface AnalyzerViewSession {
   camera?: AnalyzerGraphTransform;
   semantic?: { scope: string; kind: string; confidence: string; layer: 'source' | 'observed' | 'combined'; depth: number; direction: 'both' | 'incoming' | 'outgoing'; orbit: boolean; overview: boolean; page: number; auxiliary?: boolean; members?: string[] };
   semanticCamera?: { position: [number, number, number]; target: [number, number, number]; zoom: number };
+  flow?: { mode: '2d' | '3d'; expandedGroupIds: string[]; particleMode?: 'normal' | 'reduced' | 'off' };
+  flowCameras?: {
+    '2d'?: { x: number; y: number; scale: number };
+    '3d'?: { position: [number, number, number]; target: [number, number, number]; zoom: number };
+  };
 }
 
 export interface AnalyzerSessionState {

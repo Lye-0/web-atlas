@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { ANALYZER_DEFAULT_TRANSFORM, ANALYZER_EXTERNAL_SUMMARY_ID, analyzerViewCounts, analyzerViewLabels, isCompatibleSpatialCameraTransform, presentationOwnsNode, presentAnalyzerView, projectAnalyzerView, regionMatchesSearch, restoreAnalyzerViewSession, useAnalyzerSession, viewNodeSearchText } from '../analyzer';
+import { ANALYZER_DEFAULT_TRANSFORM, ANALYZER_EXTERNAL_SUMMARY_ID, analyzerViewCounts, isCompatibleSpatialCameraTransform, presentationOwnsNode, presentAnalyzerView, projectAnalyzerView, regionMatchesSearch, restoreAnalyzerViewSession, useAnalyzerSession, viewNodeSearchText } from '../analyzer';
 import type { AnalyzerGraphTransform, AnalyzerProjectStore, AnalyzerSemanticRegion, AnalyzerViewCounts, AnalyzerViewId, AnalyzerViewModel, AnalyzerViewNode, AnalyzerViewSession, DirectoryHandleLike } from '../analyzer';
 import { AnalyzerDetailPanel } from '../components/analyzer/AnalyzerDetailPanel';
 import { AnalyzerEmptyOrbit } from '../components/analyzer/AnalyzerEmptyOrbit';
@@ -9,6 +9,9 @@ import { AnalyzerProjectPicker } from '../components/analyzer/AnalyzerProjectPic
 import { AnalyzerToolbar } from '../components/analyzer/AnalyzerToolbar';
 import { useWorkspaceFullscreen } from '../components/analyzer/useWorkspaceFullscreen';
 import { isSemanticView } from '../analyzer/semantic/types';
+import { AnalyzerProjectHeader, AnalyzerViewHeading } from '../components/analyzer/AnalyzerViewChrome';
+import { SearchResultStrip } from '../components/analyzer/SearchResultStrip';
+import { compareAnalyzerSearchResults, matchAnalyzerSearch, moduleSearchDocument } from '../analyzer/search';
 
 const SemanticAnalyzerPage = lazy(() => import('./SemanticAnalyzerPage'));
 
@@ -50,6 +53,12 @@ function LegacyAnalyzerPage() {
   const effectiveEntryScriptId = entryScriptId ?? model?.entryScriptId;
   const searchResults = useMemo<AnalyzerSearchResult[]>(() => {
     if (!model || !search.trim()) return [];
+    if (view === 'module-dependency') return model.nodes
+      .filter(node => node.type === 'module' && (filter === 'all' || filter === 'module'))
+      .flatMap(item => {
+        const match = matchAnalyzerSearch(moduleSearchDocument(item), search);
+        return match ? [{ item, match, label: item.label, path: String(item.metadata.modulePath ?? ''), id: item.id }] : [];
+      }).sort(compareAnalyzerSearchResults).map(({ item }) => ({ kind: 'node', item }));
     const nodes: AnalyzerSearchResult[] = model.nodes
       .filter((node) => viewNodeSearchText(node).includes(search.trim().toLowerCase()))
       .map((item) => ({ kind: 'node', item }));
@@ -57,7 +66,7 @@ function LegacyAnalyzerPage() {
       .filter((region) => regionMatchesSearch(region, search))
       .map((item) => ({ kind: 'region', item }));
     return [...nodes, ...regions].slice(0, 8);
-  }, [model, search]);
+  }, [model, search, view, filter]);
 
   const fallbackCounts = useMemo(() => {
     if (!model) return { visibleNodes: 0, totalNodes: 0, hiddenNodes: 0 };
@@ -297,14 +306,14 @@ function LegacyAnalyzerPage() {
 
   return (
     <div className="page-stack analyzer-page">
-      <section className="page-intro analyzer-intro">
+      {view === 'module-dependency' ? <AnalyzerProjectHeader onScanned={handleScanned} /> : <section className="page-intro analyzer-intro">
         <div>
           <p className="eyebrow">04 / LOCAL ANALYSIS</p>
           <h1>Analyzer</h1>
           <p className="intro-copy">プロジェクトをScopeごとに分け、どのCanonical Stackを使っているかを直接Evidenceとともにたどります。</p>
         </div>
         <AnalyzerProjectPicker onScanned={handleScanned} />
-      </section>
+      </section>}
 
       {!store || !model ? (
         <section className="analyzer-empty-state" aria-labelledby="analyzer-empty-title">
@@ -322,16 +331,10 @@ function LegacyAnalyzerPage() {
         </section>
       ) : (
         <section className="analyzer-shell" aria-labelledby="analyzer-view-title">
-          <div className="analyzer-shell-heading">
-            <div>
-              <p className="section-kicker">Evidence Graph</p>
-              <h2 id="analyzer-view-title">{analyzerViewLabels[view]}</h2>
-            </div>
-            <div className="analyzer-scan-meta">
+          <AnalyzerViewHeading view={view}>
               <span>{store.files.length} files indexed</span>
               <span>{store.facts.length} facts · {store.evidence.length} evidence</span>
-            </div>
-          </div>
+          </AnalyzerViewHeading>
 
           <AnalyzerToolbar
             view={view}
@@ -347,7 +350,11 @@ function LegacyAnalyzerPage() {
             counts={nodeCounts}
           />
 
-          {searchResults.length > 0 && (
+          {view === 'module-dependency' ? <SearchResultStrip query={search} selectedId={selectedNodeId}
+            items={searchResults.map(result => ({ id: result.item.id, label: result.item.label,
+              subtitle: String(result.item.metadata.modulePath ?? result.item.subtitle ?? ''),
+              reason: result.kind === 'node' ? matchAnalyzerSearch(moduleSearchDocument(result.item), search)?.reason : undefined }))}
+            onSelect={id => selectNode(id, true)} /> : searchResults.length > 0 && (
             <div className="analyzer-search-results" role="listbox" aria-label="Analyzer search results">
               {searchResults.map((result) => (
                 <button key={`${result.kind}:${result.item.id}`} type="button" onClick={() => result.kind === 'region' ? selectRegion(result.item.id, true) : selectNode(result.item.id, true)}>

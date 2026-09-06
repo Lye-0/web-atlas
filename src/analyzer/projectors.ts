@@ -1717,6 +1717,7 @@ export function viewTitle(view: AnalyzerViewModel['view']): string {
 }
 
 export function viewNodeSearchText(node: AnalyzerViewNode): string {
+  if (node.type === 'module') return [node.label, node.metadata.modulePath, node.metadata.directoryPath, node.metadata.packageName, node.metadata.packagePath].filter(value => typeof value === 'string').join(' ').toLowerCase();
   return [node.label, node.subtitle, ...Object.values(node.metadata).flatMap((value) => Array.isArray(value) ? value : value === undefined ? [] : [String(value)])]
     .join(' ')
     .toLowerCase();

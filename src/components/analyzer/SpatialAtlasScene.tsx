@@ -11,6 +11,7 @@ import { projectSpatialPoint, type SpatialCameraModel, type SpatialWorldPoint } 
 import type { ProjectedGraphEdge } from '../../analyzer/spatialProjectedGraph';
 import type { SpatialFlowPath, SpatialFlowState } from '../../analyzer/spatialFlow';
 import { SpatialFlowParticles } from './SpatialFlowParticles';
+import { analyzerDirectionColors } from '../../analyzer/edgeDirection';
 
 const floorRotation = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
 function elevation(node: PositionedNode) {
@@ -18,7 +19,7 @@ function elevation(node: PositionedNode) {
   return spatialModuleElevation(Array.isArray(path) ? Math.max(0, path.length - 1) : 0);
 }
 function vector(point: SpatialWorldPoint) { return new THREE.Vector3(point.x, point.z, point.y); }
-const edgeColors = { imports: '#82c6e2', 'imported-by': '#dfb785', internal: '#afcbbd' };
+const edgeColors = { imports: analyzerDirectionColors.outgoing, 'imported-by': analyzerDirectionColors.incoming, internal: analyzerDirectionColors.internal };
 function connectionColor(edge: ProjectedGraphEdge) { return edgeColors[edge.direction ?? 'imports']; }
 
 function tubeMaterial(outline: boolean) {

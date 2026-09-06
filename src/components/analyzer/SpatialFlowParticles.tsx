@@ -2,11 +2,12 @@ import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { buildSpatialFlowData, SPATIAL_FLOW_PATHS_PER_BATCH, type SpatialFlowPath, type SpatialFlowState } from '../../analyzer/spatialFlow';
 import type { SpatialCameraModel } from '../../analyzer/spatialCoordinates';
+type FlowCameraViewport = Pick<SpatialCameraModel, 'scale' | 'viewportWidth' | 'viewportHeight'>;
 
 function FlowBatch({ paths, stateRef, cameraRef }: {
   paths: readonly SpatialFlowPath[];
   stateRef: { current: SpatialFlowState };
-  cameraRef: { current: SpatialCameraModel };
+  cameraRef: { current: FlowCameraViewport };
 }) {
   const resources = useMemo(() => {
     const data = buildSpatialFlowData(paths);
@@ -103,7 +104,7 @@ function FlowBatch({ paths, stateRef, cameraRef }: {
 export function SpatialFlowParticles({ paths, stateRef, cameraRef, active }: {
   paths: readonly SpatialFlowPath[];
   stateRef: { current: SpatialFlowState };
-  cameraRef: { current: SpatialCameraModel };
+  cameraRef: { current: FlowCameraViewport };
   active: boolean;
 }) {
   const batches = useMemo(() => Array.from({ length: Math.ceil(paths.length / SPATIAL_FLOW_PATHS_PER_BATCH) }, (_, i) =>

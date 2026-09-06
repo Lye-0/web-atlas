@@ -8,6 +8,26 @@ function runtimeGraph(analysis: SemanticAnalysis): { nodes: SemanticNode[]; edge
   for (const edge of edges) if (!['calls', 'callback'].includes(edge.kind)) { kept.add(edge.source); kept.add(edge.target); }
   const outgoing = new Map<string, SemanticEdge[]>();
   edges.forEach(edge => outgoing.set(edge.source, [...(outgoing.get(edge.source) ?? []), edge]));
+  const incoming = new Map<string, SemanticEdge[]>();
+  edges.forEach(edge => incoming.set(edge.target, [...(incoming.get(edge.target) ?? []), edge]));
+  const reachable = (links: Map<string, SemanticEdge[]>, reverse: boolean) => {
+    const found = new Set(kept), queue = [...kept];
+    for (let index = 0; index < queue.length; index++) for (const edge of links.get(queue[index]!) ?? []) {
+      const next = reverse ? edge.source : edge.target;
+      if (!found.has(next)) { found.add(next); queue.push(next); }
+    }
+    return found;
+  };
+  const forward = reachable(outgoing, false), backward = reachable(incoming, true);
+  const relevant = new Set([...forward].filter(id => backward.has(id)));
+  const junctions = new Map<string, string>();
+  // Keep branching/merging boundaries. Only unambiguous serial helpers may disappear.
+  // This retains every branch's evidence without enumerating exponentially many complete paths.
+  for (const id of relevant) if (!kept.has(id)) {
+    const inCount = (incoming.get(id) ?? []).filter(edge => relevant.has(edge.source)).length;
+    const outCount = (outgoing.get(id) ?? []).filter(edge => relevant.has(edge.target)).length;
+    if (inCount > 1 || outCount > 1) { kept.add(id); junctions.set(id, inCount > 1 && outCount > 1 ? '分岐・合流' : inCount > 1 ? '合流' : '分岐'); }
+  }
   const projected: SemanticEdge[] = [];
   for (const id of kept) {
     const queue = (outgoing.get(id) ?? []).map(edge => ({ edge, path: [edge] })); const seen = new Set<string>();
@@ -15,14 +35,15 @@ function runtimeGraph(analysis: SemanticAnalysis): { nodes: SemanticNode[]; edge
       const { edge, path } = queue[i]!;
       if (kept.has(edge.target)) {
         projected.push(path.length === 1 ? edge : { ...edge, id: `runtime:${id}:${edge.target}:${path.map(item => item.id).join('|')}`, source: id,
-          label: `${path.length} calls`, kind: 'processing-path', evidence: path.flatMap(item => item.evidence),
-          confidence: path.some(item => item.confidence !== 'source') ? 'inferred' : 'source' });
+          label: `${path.length}段階の静的関係${path.some(item => item.kind === 'callback') ? '（callbackを含む）' : ''}`, kind: 'processing-path', evidence: path.flatMap(item => item.evidence),
+          provenance: { edges: path.flatMap(item => item.provenance?.edges ?? [item]), intermediateNodeIds: path.slice(0, -1).map(item => item.target) },
+          confidence: path.some(item => item.confidence === 'unresolved') ? 'unresolved' : path.some(item => item.confidence !== 'source') ? 'inferred' : 'source' });
       } else if (!seen.has(edge.target)) {
         seen.add(edge.target); for (const next of outgoing.get(edge.target) ?? []) queue.push({ edge: next, path: [...path, next] });
       }
     }
   }
-  return { nodes: analysis.nodes.filter(node => kept.has(node.id)), edges: projected };
+  return { nodes: analysis.nodes.filter(node => kept.has(node.id)).map(node => junctions.has(node.id) ? { ...node, attributes: { ...node.attributes, runtimeJunction: junctions.get(node.id)! } } : node), edges: projected };
 }
 
 function architectureGraph(nodes: SemanticNode[], edges: SemanticEdge[]): { nodes: SemanticNode[]; edges: SemanticEdge[] } {

@@ -2,6 +2,7 @@ import type { SemanticAnalysis, SemanticEdge, SemanticNode, SemanticViewId } fro
 
 export interface TraceImport { nodes: SemanticNode[]; edges: SemanticEdge[]; warnings: string[]; name: string; spans: number; logs: number }
 type RecordValue = Record<string, unknown>;
+type TraceFormat = 'OTLP' | 'Jaeger' | 'Chrome Trace' | 'structured';
 const record = (value: unknown): RecordValue => value && typeof value === 'object' && !Array.isArray(value) ? value as RecordValue : {};
 const list = (value: unknown): unknown[] => Array.isArray(value) ? value : [];
 const string = (value: unknown) => typeof value === 'string' ? value : typeof value === 'number' ? String(value) : '';
@@ -24,6 +25,28 @@ function duration(start: unknown, end: unknown): number | undefined {
   try { const delta = BigInt(string(end)) - BigInt(string(start)); return delta >= 0 ? Number(delta / 1000n) / 1000 : undefined; } catch { return undefined; }
 }
 
+/** Keep supplied clocks as exact strings; a duration or layout is never a new timestamp. */
+function timingAttributes(raw: RecordValue, format: TraceFormat): SemanticNode['attributes'] {
+  const result: SemanticNode['attributes'] = { recordFormat: format };
+  for (const key of ['startTimeUnixNano', 'endTimeUnixNano', 'timeUnixNano', 'observedTimeUnixNano', 'startTime', 'endTime', 'timestamp', 'time', 'ts', 'endTs']) {
+    if (typeof raw[key] === 'string' || typeof raw[key] === 'number') result[key] = string(raw[key]);
+  }
+  if (raw.startTimeUnixNano !== undefined || raw.endTimeUnixNano !== undefined || raw.timeUnixNano !== undefined) {
+    result.timeUnit = 'nanoseconds'; result.timeOrigin = 'Unix epoch';
+  } else if (format === 'Jaeger') { result.timeUnit = 'microseconds'; result.timeOrigin = 'Unix epoch'; }
+  else if (format === 'Chrome Trace') { result.timeUnit = 'microseconds'; result.timeOrigin = 'trace clock'; }
+  else {
+    if (typeof raw.timeUnit === 'string') result.timeUnit = raw.timeUnit;
+    if (typeof raw.timeOrigin === 'string') result.timeOrigin = raw.timeOrigin;
+  }
+  if (raw.duration !== undefined || raw.dur !== undefined) {
+    result.durationRaw = string(raw.duration ?? raw.dur);
+    if (format === 'Jaeger' || format === 'Chrome Trace') result.durationUnit = 'microseconds';
+    else if (typeof raw.durationUnit === 'string') result.durationUnit = raw.durationUnit;
+  }
+  return result;
+}
+
 /** Import records only; no instrumentation, execution, uploads or inferred chronological parentage. */
 export function importExecutionTrace(text: string, name: string, analysis?: SemanticAnalysis): TraceImport {
   if (text.length > 20 * 1024 * 1024) throw new Error('実行データは20 MB以下のファイルを選んでください。');
@@ -35,7 +58,7 @@ export function importExecutionTrace(text: string, name: string, analysis?: Sema
   const nodes = new Map<string, SemanticNode>(); const edges: SemanticEdge[] = []; const warnings: string[] = [];
   const parentIds = new Map<string, string>();
   let count = 0; let spans = 0; let logs = 0;
-  const add = (raw: RecordValue, service: string, kind: 'span' | 'log', inherited: SemanticNode['attributes'] = {}) => {
+  const add = (raw: RecordValue, service: string, kind: 'span' | 'log', inherited: SemanticNode['attributes'] = {}, format: TraceFormat = 'structured') => {
     if (++count > 20000) throw new Error('実行データは20,000レコード以下に分割してください。');
     const attr = { ...inherited, ...attributes(raw.attributes ?? raw.tags) };
     const traceId = string(raw.traceId ?? raw.traceID ?? raw.trace_id);
@@ -48,7 +71,7 @@ export function importExecutionTrace(text: string, name: string, analysis?: Sema
     const line = Number(attr['code.line.number'] ?? attr['code.lineno'] ?? raw.line) || undefined;
     const node: SemanticNode = { id, kind, label: (string(body) || `${kind} ${count}`).slice(0, 180),
       path: path || undefined, line, group: service || string(raw.service) || '実行データ', confidence: 'observed', evidence: [],
-      attributes: { ...attr, traceId, spanId, sourceFile: name, ...(ms !== undefined ? { durationMs: ms } : {}),
+      attributes: { ...attr, ...timingAttributes(raw, format), traceId, spanId, sourceFile: name, ...(ms !== undefined ? { durationMs: ms } : {}),
         ...(raw.severityText ? { severity: string(raw.severityText) } : {}),
         ...(raw.timeUnixNano ? { timestamp: string(raw.timeUnixNano) } : {}),
       } };
@@ -59,35 +82,35 @@ export function importExecutionTrace(text: string, name: string, analysis?: Sema
   const root = record(data);
   for (const resource of list(root.resourceSpans)) {
     const item = record(resource); const attrs = attributes(record(item.resource).attributes); const service = string(attrs['service.name']);
-    for (const scope of list(item.scopeSpans ?? item.instrumentationLibrarySpans)) for (const span of list(record(scope).spans)) add(record(span), service, 'span', attrs);
+    for (const scope of list(item.scopeSpans ?? item.instrumentationLibrarySpans)) for (const span of list(record(scope).spans)) add(record(span), service, 'span', attrs, 'OTLP');
   }
   for (const resource of list(root.resourceLogs)) {
     const item = record(resource); const attrs = attributes(record(item.resource).attributes); const service = string(attrs['service.name']);
-    for (const scope of list(item.scopeLogs ?? item.instrumentationLibraryLogs)) for (const log of list(record(scope).logRecords)) add(record(log), service, 'log', attrs);
+    for (const scope of list(item.scopeLogs ?? item.instrumentationLibraryLogs)) for (const log of list(record(scope).logRecords)) add(record(log), service, 'log', attrs, 'OTLP');
   }
   for (const trace of list(root.data)) {
     const item = record(trace); const processes = record(item.processes);
     for (const span of list(item.spans)) {
-      const raw = record(span); const service = string(record(processes[string(raw.processID)]).serviceName); add(raw, service, 'span');
-      for (const log of list(raw.logs)) { const event = record(log); const attr = attributes(event.fields); add({ traceID: raw.traceID, spanID: raw.spanID, body: attr.event ?? attr.message ?? 'span event', attributes: attr }, service, 'log'); }
+      const raw = record(span); const service = string(record(processes[string(raw.processID)]).serviceName); add(raw, service, 'span', {}, 'Jaeger');
+      for (const log of list(raw.logs)) { const event = record(log); const attr = attributes(event.fields); add({ traceID: raw.traceID, spanID: raw.spanID, timestamp: event.timestamp, body: attr.event ?? attr.message ?? 'span event', attributes: attr }, service, 'log', {}, 'Jaeger'); }
     }
   }
   const chromeStacks = new Map<string, RecordValue[]>(); let chromeId = 0; let omitted = 0;
   for (const event of list(root.traceEvents)) {
     const item = record(event); const service = string(item.cat) || `process ${string(item.pid)}`;
     const thread = `${string(item.pid)}:${string(item.tid)}`;
-    if (item.ph === 'X') add({ ...item, spanId: `chrome-${chromeId++}`, attributes: record(item.args), duration: item.dur }, service, 'span');
+    if (item.ph === 'X') add({ ...item, spanId: `chrome-${chromeId++}`, attributes: record(item.args), duration: item.dur }, service, 'span', {}, 'Chrome Trace');
     else if (item.ph === 'B') {
       const stack = chromeStacks.get(thread) ?? [];
       stack.push({ ...item, traceId: `chrome:${thread}`, spanId: `chrome-${chromeId++}`, parentSpanId: stack.at(-1)?.spanId, attributes: record(item.args) }); chromeStacks.set(thread, stack);
     } else if (item.ph === 'E') {
       const start = chromeStacks.get(thread)?.pop();
-      if (start) add({ ...start, duration: Number(item.ts) - Number(start.ts) }, string(start.cat) || service, 'span');
+      if (start) add({ ...start, endTs: item.ts, duration: Number(item.ts) - Number(start.ts) }, string(start.cat) || service, 'span', {}, 'Chrome Trace');
       else warnings.push('開始イベントのないChrome Trace終了イベントがあります');
-    } else if (['i', 'I'].includes(string(item.ph))) add({ ...item, traceId: `chrome:${thread}`, spanId: chromeStacks.get(thread)?.at(-1)?.spanId, body: item.name, attributes: record(item.args) }, service, 'log');
+    } else if (['i', 'I'].includes(string(item.ph))) add({ ...item, traceId: `chrome:${thread}`, spanId: chromeStacks.get(thread)?.at(-1)?.spanId, body: item.name, attributes: record(item.args) }, service, 'log', {}, 'Chrome Trace');
     else if (item.ph !== 'M') omitted++;
   }
-  for (const stack of chromeStacks.values()) for (const start of stack) { add({ ...start, attributes: { ...record(start.attributes), incomplete: true } }, string(start.cat), 'span'); warnings.push('終了イベントのないChrome Trace spanがあります'); }
+  for (const stack of chromeStacks.values()) for (const start of stack) { add({ ...start, attributes: { ...record(start.attributes), incomplete: true } }, string(start.cat), 'span', {}, 'Chrome Trace'); warnings.push('終了イベントのないChrome Trace spanがあります'); }
   if (omitted) warnings.push(`${omitted}件のChrome Traceイベントは対応するphaseではないため省略しました`);
   const records = Array.isArray(data) ? data : [...list(root.spans), ...list(root.logs), ...(root.message || root.name ? [root] : [])];
   for (const item of records) {

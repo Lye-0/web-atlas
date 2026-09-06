@@ -13,7 +13,10 @@ export interface SemanticNode {
 export interface SemanticEdge {
   id: string; source: string; target: string; label: string; kind: string;
   views: SemanticViewId[]; confidence: SemanticConfidence; evidence: SemanticEvidence[];
+  /** Original source relations behind a display aggregate or compressed runtime path. */
+  provenance?: { edges: SemanticRelationSource[]; intermediateNodeIds?: string[] };
 }
+export type SemanticRelationSource = Pick<SemanticEdge, 'id' | 'source' | 'target' | 'kind' | 'label' | 'confidence' | 'evidence'>;
 export interface SemanticCoverage { path: string; language: string; status: 'parsed' | 'partial' | 'unsupported' | 'skipped'; message?: string }
 export interface SemanticAnalysis {
   nodes: SemanticNode[]; edges: SemanticEdge[]; coverage: SemanticCoverage[]; warnings: string[];

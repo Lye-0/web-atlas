@@ -1,25 +1,45 @@
-import type { SemanticGraph, SemanticNode } from './types';
+import type { SemanticEdge, SemanticEvidence, SemanticGraph, SemanticNode } from './types';
 
 export const semanticPageSize = 240;
 export const semanticGroupKey = (node: SemanticNode) => node.path ? `${node.group} / ${node.path.split('/').slice(0, -1).join('/') || '.'}` : node.group;
+export const semanticOverviewId = (node: SemanticNode) => `overview:${node.group} / ${node.path?.split('/').slice(0, 2).join('/') ?? 'runtime'}`;
+export function uniqueSemanticEvidence(items: readonly SemanticEvidence[]): SemanticEvidence[] {
+  return [...new Map(items.map(item => [`${item.path}:${item.start}:${item.end}:${item.description}`, item])).values()];
+}
 
 /** Every original object remains addressable; summaries retain all member IDs. */
-export function summarizeSemanticGraph(graph: SemanticGraph): SemanticGraph {
+export function summarizeSemanticGraph(graph: SemanticGraph, expanded: ReadonlySet<string> = new Set()): SemanticGraph {
   const groups = new Map<string, SemanticNode>(); const owner = new Map<string, string>();
   for (const node of graph.nodes) {
     const key = `${node.group} / ${node.path?.split('/').slice(0, 2).join('/') ?? 'runtime'}`;
-    const id = `overview:${key}`; owner.set(node.id, id);
+    const id = semanticOverviewId(node);
+    if (expanded.has(id)) { groups.set(node.id, node); owner.set(node.id, node.id); continue; }
+    owner.set(node.id, id);
     const existing = groups.get(id);
-    if (existing) (existing.attributes.members as string[]).push(node.id);
-    else groups.set(id, { id, kind: 'subsystem', label: key, group: node.group, confidence: 'inferred', evidence: [], attributes: { members: [node.id], overview: true } });
+    if (existing) {
+      (existing.attributes.members as string[]).push(node.id);
+      existing.evidence.push(...node.evidence);
+      if (node.path) (existing.attributes.files as string[]).push(node.path);
+    } else groups.set(id, { id, kind: 'subsystem', label: key, group: node.group, confidence: 'inferred', evidence: [...node.evidence], attributes: { members: [node.id], files: node.path ? [node.path] : [], overview: true } });
   }
-  const edges = new Map<string, SemanticGraph['edges'][number]>(); const counts = new Map<string, number>();
+  for (const group of groups.values()) if (group.attributes.overview) {
+    group.evidence = uniqueSemanticEvidence(group.evidence);
+    group.attributes.files = [...new Set(group.attributes.files as string[])];
+  }
+  const edges = new Map<string, SemanticEdge>(); const counts = new Map<string, number>();
   for (const edge of graph.edges) {
-    const source = owner.get(edge.source)!, target = owner.get(edge.target)!; if (source === target) continue;
-    const id = `${source}:${target}`; counts.set(id, (counts.get(id) ?? 0) + 1);
-    if (!edges.has(id)) edges.set(id, { ...edge, id, source, target, evidence: edge.evidence.slice(0, 1), label: '' });
-    edges.get(id)!.label = `${counts.get(id)} relations`;
+    const source = owner.get(edge.source)!, target = owner.get(edge.target)!;
+    if (source === edge.source && target === edge.target) { edges.set(edge.id, edge); continue; }
+    // Different relationship kinds and confidence levels must never impersonate the first edge.
+    const id = `summary:${JSON.stringify([source, target, edge.kind, edge.confidence])}`;
+    counts.set(id, (counts.get(id) ?? 0) + 1);
+    const originals = edge.provenance?.edges ?? [edge];
+    const existing = edges.get(id);
+    if (existing) { existing.evidence.push(...edge.evidence); existing.provenance!.edges.push(...originals); }
+    else edges.set(id, { ...edge, id, source, target, evidence: [...edge.evidence], provenance: { edges: [...originals] } });
+    edges.get(id)!.label = `${edge.kind} · ${counts.get(id)}関係`;
   }
+  for (const edge of edges.values()) if (edge.id.startsWith('summary:')) edge.evidence = uniqueSemanticEvidence(edge.evidence);
   return { ...graph, nodes: [...groups.values()], edges: [...edges.values()] };
 }
 

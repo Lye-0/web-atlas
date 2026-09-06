@@ -7,6 +7,8 @@ const modelTypes = new Set(['interface_declaration', 'type_alias_declaration', '
 const callTypes = new Set(['call_expression', 'invocation_expression', 'method_invocation', 'function_call_expression', 'member_call_expression', 'scoped_call_expression', 'call', 'object_creation_expression', 'new_expression', 'macro_invocation', 'selector']);
 const assignmentTypes = new Set(['variable_declarator', 'assignment', 'assignment_expression', 'short_var_declaration', 'let_declaration', 'init_declarator', 'property_declaration']);
 const ignoredCalls = new Set(['if', 'for', 'while', 'switch', 'catch', 'return', 'typeof', 'sizeof', 'require', 'import', 'super']);
+const eventRegistrationCalls = new Set(['addEventListener', 'registerCommand', 'onDidReceiveMessage', 'onMessage', 'onRequest', 'onCall', 'onSchedule', 'onDocumentCreated', 'subscribe']);
+const callbackCalls = new Set(['Promise', 'map', 'flatMap', 'forEach', 'filter', 'reduce', 'reduceRight', 'some', 'every', 'find', 'findIndex', 'sort', 'then', 'catch', 'finally', 'setTimeout', 'setInterval', 'setImmediate', 'queueMicrotask']);
 const identifierTypes = new Set(['identifier', 'simple_identifier', 'variable_name', 'field_identifier', 'shorthand_property_identifier', 'shorthand_property_identifier_pattern']);
 const fieldTypes = new Set(['property_signature', 'public_field_definition', 'field_declaration', 'property_declaration', 'field_definition', 'property_element', 'assignment', 'class_parameter', 'declaration']);
 const views = { call: ['function-call-flow', 'runtime-flow'] as SemanticViewId[], data: ['data-flow'] as SemanticViewId[], model: ['data-model'] as SemanticViewId[] };
@@ -80,7 +82,7 @@ function modelFields(node: Node, orm = false): SemanticField[] {
 }
 
 interface FunctionRecord { node: SemanticNode; start: number; end: number; parent?: string; parameters: string[]; parameterBindings?: string[][]; className?: string }
-interface CallRecord { astId: number; node: SemanticNode; owner: string; callee: string; args: string[][]; argumentCalls: number[][]; callbacks: string[]; receiver: string[]; receiverCalls: number[]; result?: string; path: string; evidence: SemanticEvidence; target?: string; operation?: string; literalArgs: string[] }
+interface CallRecord { astId: number; node: SemanticNode; owner: string; callee: string; args: string[][]; argumentCalls: number[][]; argumentReferences: (string | undefined)[]; callbacks: string[]; receiver: string[]; receiverCalls: number[]; result?: string; path: string; evidence: SemanticEvidence; target?: string; operation?: string; literalArgs: string[] }
 interface AssignmentRecord { id: string; owner: string; path: string; name: string; inputs: string[]; calls: number[]; evidence: SemanticEvidence; scopeStart: number; scopeEnd: number; conditional: boolean; declaration: boolean }
 interface ImportBinding { local: string; original: string; specifier: string }
 interface RouteAnnotation { method: string; address: string; target?: FunctionRecord; className?: string; evidence: SemanticEvidence }
@@ -164,7 +166,11 @@ export async function analyzeSemanticSources(input: SemanticInput, loadLanguage:
         }
       });
       localFunctions.sort((a, b) => a.start - b.start || b.end - a.end);
-      for (const fn of localFunctions) if (!fn.node.attributes.initializer) fn.parent = localFunctions.filter(parent => parent !== fn && parent.start <= fn.start && parent.end >= fn.end && (parent.start < fn.start || parent.end > fn.end || parent.node.attributes.initializer)).sort((a, b) => a.end - a.start - (b.end - b.start))[0]?.node.id;
+      for (const fn of localFunctions) if (!fn.node.attributes.initializer) {
+        const parent = localFunctions.filter(parent => parent !== fn && parent.start <= fn.start && parent.end >= fn.end && (parent.start < fn.start || parent.end > fn.end || parent.node.attributes.initializer)).sort((a, b) => a.end - a.start - (b.end - b.start))[0];
+        fn.parent = parent?.node.id;
+        if (parent && !parent.node.attributes.initializer) fn.node.attributes.ownerName = parent.node.label;
+      }
       functions.push(...localFunctions);
       for (const fn of localFunctions.filter(fn => fn.node.attributes.entry)) {
         for (const runtime of resources.filter(node => node.attributes.entryPath === path)) builder.edge(runtime.id, fn.node.id, 'runtime-entry', 'entry point', ['runtime-flow'], [...runtime.evidence, ...fn.node.evidence]);
@@ -296,7 +302,9 @@ export async function analyzeSemanticSources(input: SemanticInput, loadLanguage:
           const argumentsList = argsNode?.namedChildren ?? [];
           const op = builder.node('operation', `${leaf(callee)}()`, path, `${ast.startIndex}-${ast.endIndex}`, [ev], 'source', { owner: owner.node.id, callee });
           const callbackIds = argumentsList.flatMap(argument => { const callback = localFunctions.find(fn => fn.start >= argument.startIndex && fn.end <= argument.endIndex && fn.parent === owner.node.id); return callback ? [callback.node.id] : []; });
-          const record: CallRecord = { astId: ast.id, node: op, owner: owner.node.id, callee, args: argumentsList.map(identifiers), argumentCalls: argumentsList.map(immediateCalls), callbacks: callbackIds, receiver: identifiers(receiver ?? calleeNode), receiverCalls: immediateCalls(receiver ?? calleeNode), path, evidence: ev, literalArgs: argumentsList.flatMap(literals) };
+          const record: CallRecord = { astId: ast.id, node: op, owner: owner.node.id, callee, args: argumentsList.map(identifiers), argumentCalls: argumentsList.map(immediateCalls),
+            argumentReferences: argumentsList.map(argument => /^(?:[\w$]+(?:(?:\.|::|->)[\w$]+)*)$/.test(argument.text) ? argument.text : undefined),
+            callbacks: callbackIds, receiver: identifiers(receiver ?? calleeNode), receiverCalls: immediateCalls(receiver ?? calleeNode), path, evidence: ev, literalArgs: argumentsList.flatMap(literals) };
           if (/^(?:JSON\.stringify|serialize|encode|marshal)$/.test(callee)) op.attributes.dataOperation = 'serialization';
           if (/^(?:JSON\.parse|deserialize|decode|unmarshal)$/.test(callee) || /\.(?:json|text|blob|arrayBuffer)$/.test(callee)) op.attributes.dataOperation = 'deserialization';
           if (/\b(?:validate|safeParse|parse)$/.test(callee)) op.attributes.dataOperation = 'validation';
@@ -307,7 +315,7 @@ export async function analyzeSemanticSources(input: SemanticInput, loadLanguage:
           while (parent && !functionTypes.has(parent.type)) { if (/decorator|annotation|attribute/.test(parent.type)) { isAnnotation = true; break; } parent = parent.parent; }
           if (/^(?:GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD|ALL|MAPGET|MAPPOST|MAPPUT|MAPDELETE|ROUTE|HANDLEFUNC|PATH|RE_PATH)$/.test(method) && route && !isAnnotation && !/database|\bdb\b|storage|bucket/i.test(callee)) {
             const httpMethod = method === 'ROUTE' ? argumentsList.at(-1)?.text.match(/\b(get|post|put|patch|delete)\s*\(/i)?.[1]?.toUpperCase() ?? 'ANY' : /^(?:ALL|HANDLEFUNC|PATH|RE_PATH)$/.test(method) ? 'ANY' : method.replace('MAP', '');
-            const endpoint = builder.node('entry', `${httpMethod} ${route}`, path, ast.startIndex, [ev], 'source', { endpoint: route, method: httpMethod });
+            const endpoint = builder.node('entry', `${httpMethod} ${route}`, path, ast.startIndex, [ev], 'source', { endpoint: route, method: httpMethod, owner: owner.node.id });
             const handler = localFunctions.find(fn => fn.start > ast.startIndex && fn.end <= ast.endIndex);
             if (handler) { builder.edge(endpoint.id, handler.node.id, 'handles', 'handler', ['runtime-flow'], [ev]); handler.node.attributes.entry = true; }
             else {
@@ -321,12 +329,13 @@ export async function analyzeSemanticSources(input: SemanticInput, loadLanguage:
               }
             }
           }
-          if (/^(?:addEventListener|registerCommand|onDidReceiveMessage|onMessage|onRequest|onCall|onSchedule|onDocumentCreated|subscribe)$/.test(leaf(callee))) {
+          if (eventRegistrationCalls.has(leaf(callee))) {
             const event = record.literalArgs[0] ?? leaf(callee);
-            const entry = builder.node('entry', `${leaf(callee)} · ${event}`, path, ast.startIndex, [ev], 'source', { event, registration: callee });
+            const entry = builder.node('entry', `${leaf(callee)} · ${event}`, path, ast.startIndex, [ev], 'source', { event, registration: callee, owner: owner.node.id });
+            builder.edge(owner.node.id, entry.id, 'registers-event', `${leaf(callee)}を登録`, ['runtime-flow'], [ev]);
             const handler = localFunctions.find(fn => fn.start > ast.startIndex && fn.end <= ast.endIndex);
             if (handler) { builder.edge(entry.id, handler.node.id, 'handles', 'event handler', ['runtime-flow'], [ev]); handler.node.attributes.entry = true; }
-            else { const candidate = argumentsList[leaf(callee) === 'onDidReceiveMessage' ? 0 : 1]; if (candidate) entry.attributes.handler = candidate.text; }
+            else { const candidate = argumentsList[/^(?:onDidReceiveMessage|onMessage|subscribe)$/.test(leaf(callee)) ? 0 : /^(?:addEventListener|registerCommand)$/.test(leaf(callee)) ? 1 : argumentsList.length - 1]; if (candidate) entry.attributes.handler = candidate.text; }
           }
           if (/(?:^|\.)(?:fetch|axios|request|requestJson|apiRequest|apiFetch|useQuery|useMutation)$/.test(callee) || /axios\.(?:get|post|put|delete|patch)$/.test(callee)) {
             const address = record.literalArgs.find(value => /^(?:https?:|\/)/.test(value)) ?? record.literalArgs[0];
@@ -362,7 +371,7 @@ export async function analyzeSemanticSources(input: SemanticInput, loadLanguage:
         if (ast.type === 'jsx_attribute') {
           const name = ast.namedChildren[0]?.text ?? ''; if (!/^on[A-Z]/.test(name)) return;
           const ev = evidence(path, ast, `${name}イベントの登録`);
-          const entry = builder.node('entry', `${name} · L${ev.line}`, path, ast.startIndex, [ev], 'source', { event: name });
+          const entry = builder.node('entry', `${name} · L${ev.line}`, path, ast.startIndex, [ev], 'source', { event: name, owner: ownerAt(ast).node.id });
           builder.edge(ownerAt(ast).node.id, entry.id, 'registers-event', name, ['runtime-flow'], [ev]);
           const handler = localFunctions.find(fn => fn.start >= ast.startIndex && fn.end <= ast.endIndex);
           if (handler) { builder.edge(entry.id, handler.node.id, 'handles', 'UI event', ['runtime-flow'], [ev]); handler.node.attributes.entry = true; }
@@ -423,8 +432,10 @@ function resolveRelationships(builder: SemanticBuilder, input: SemanticInput, fu
   const importedFiles = new Map<string, string[]>();
   for (const ref of input.imports) importedFiles.set(ref.from, [...(importedFiles.get(ref.from) ?? []), ref.to]);
   const sourcePaths = Object.keys(input.sources);
+  const reachableCache = new Map<string, Set<string>>();
   const normalizePath = (value: string) => { const parts: string[] = []; for (const part of value.split('/')) { if (part === '..') parts.pop(); else if (part && part !== '.') parts.push(part); } return parts.join('/'); };
   const reachable = (path: string, specifier?: string) => {
+    const key = `${path}\0${specifier ?? ''}`, cached = reachableCache.get(key); if (cached) return cached;
     const paths = new Set<string>(); const queue = specifier ? input.imports.filter(item => item.from === path && item.specifier === specifier).map(item => item.to) : importedFiles.get(path) ?? [];
     if (!queue.length && specifier) {
       const language = semanticLanguage(path);
@@ -448,7 +459,7 @@ function resolveRelationships(builder: SemanticBuilder, input: SemanticInput, fu
       if (!code.split('\n').some(line => /^\s*export\b/.test(line) && line.includes(ref.specifier))) continue;
       if (!paths.has(ref.to)) { paths.add(ref.to); queue.push(ref.to); }
     }
-    return paths;
+    reachableCache.set(key, paths); return paths;
   };
   const params = new Map<string, SemanticNode[]>();
   for (const fn of functions) params.set(fn.node.id, fn.parameters.map((name, index) => builder.node('value', name, fn.node.path, fn.start + index, fn.node.evidence, 'source', { owner: fn.node.id, parameter: true, parameterIndex: index, bindings: fn.parameterBindings?.[index] ?? [name] })));
@@ -471,28 +482,55 @@ function resolveRelationships(builder: SemanticBuilder, input: SemanticInput, fu
     }
     return reaching;
   };
-  for (const call of calls) {
-    const owner = byId.get(call.owner)!; const name = leaf(call.callee);
-    const memberCall = call.callee.includes('.') || call.callee.includes('::');
-    const lexicalShadow = !memberCall && (byName.get(name) ?? []).some(fn => fn.node.path === call.path && fn.parent === owner.node.id);
-    const binding = lexicalShadow ? undefined : bindings.get(call.path)?.find(item => item.local === call.callee || call.callee.startsWith(`${item.local}.`) || call.callee.startsWith(`${item.local}::`));
-    let candidates = byName.get(binding && !memberCall && binding.original !== '*' && binding.original !== 'default' ? binding.original : name) ?? [];
+  const namedClasses = new Set([...builder.nodes.values()].filter(node => node.kind === 'model' && /class/.test(String(node.attributes.modelKind))).map(node => `${node.path}\0${node.label}`));
+  const resolveFunctionReference = (callee: string, path: string, ownerId: string, before: number): { candidates: FunctionRecord[]; confidence: SemanticConfidence } => {
+    const owner = byId.get(ownerId)!; const name = leaf(callee);
+    const memberCall = /\.|::|->/.test(callee);
+    const receiver = memberCall ? callee.split(/\.|::|->/)[0]! : callee;
+    // A parameter/local value shadows imports and declarations. Unknown receivers stay unresolved.
+    if (valuesFor(ownerId, receiver, before).length) return { candidates: [], confidence: 'unresolved' };
+    let lexical: FunctionRecord[] = [];
+    if (!memberCall) {
+      let scope: string | undefined = ownerId;
+      while (scope) {
+        const scopeRecord = byId.get(scope);
+        const nested = (byName.get(name) ?? []).filter(fn => fn.node.path === path && fn.parent === scope
+          && (!scopeRecord?.node.attributes.initializer || !fn.className));
+        if (nested.length) { lexical = nested; break; }
+        // Languages with implicit instance calls resolve the current class before outer functions.
+        if (scope === ownerId && owner.className && !/^(?:javascript|typescript|tsx)$/.test(owner.node.language ?? '')) {
+          const methods = (byName.get(name) ?? []).filter(fn => fn.node.path === path && fn.className === owner.className);
+          if (methods.length) { lexical = methods; break; }
+        }
+        scope = scopeRecord?.parent;
+      }
+    }
+    const binding = lexical.length ? undefined : bindings.get(path)?.find(item => item.local === callee || callee.startsWith(`${item.local}.`) || callee.startsWith(`${item.local}::`));
+    let candidates = lexical.length ? lexical : byName.get(binding && !memberCall && binding.original !== '*' && binding.original !== 'default' ? binding.original : name) ?? [];
     let confidence: SemanticConfidence = 'source';
     if (binding) {
-      const paths = reachable(call.path, binding.specifier);
+      const paths = reachable(path, binding.specifier);
       if (binding.original === 'default' && !memberCall) candidates = functions.filter(fn => fn.node.attributes.defaultExport);
       if (!memberCall && !candidates.length) candidates = functions.filter(fn => fn.className === binding.original && /^(constructor|__init__|initialize)$/.test(String(fn.node.attributes.name)));
       if (memberCall && binding.original !== '*') candidates = candidates.filter(fn => fn.className === binding.original || binding.original === 'default');
       candidates = candidates.filter(fn => fn.node.path && paths.has(fn.node.path));
       if (memberCall) confidence = 'inferred';
-      if (candidates.some(fn => !input.imports.some(ref => ref.from === call.path && ref.to === fn.node.path))) confidence = 'inferred';
-    } else {
-      const local = candidates.filter(fn => fn.node.path === call.path && (fn.parent === owner.node.id || fn.parent === owner.parent || fn.node.id === owner.node.id || fn.node.attributes.className && fn.className === owner.className));
-      candidates = local.length ? local : candidates.filter(fn => fn.node.path === call.path && fn.parent === functions.find(item => item.node.path === call.path && item.node.attributes.initializer)?.node.id);
-      if (call.callee.includes('.') && !/^(?:this|self)\./.test(call.callee)) confidence = 'inferred';
-      if (!memberCall) candidates = candidates.filter(fn => !fn.className || fn.className === owner.className);
+      if (candidates.some(fn => !input.imports.some(ref => ref.from === path && ref.to === fn.node.path))) confidence = 'inferred';
+    } else if (memberCall) {
+      const directMember = /^(?:[\w$]+)(?:\.|::|->)[\w$]+$/.test(callee);
+      const currentClass = directMember && /^(?:this|self)(?:\.|::|->)/.test(callee) ? owner.className : undefined;
+      const namedClass = directMember && namedClasses.has(`${path}\0${receiver}`) ? receiver : undefined;
+      candidates = currentClass || namedClass ? candidates.filter(fn => fn.node.path === path && fn.className === (currentClass ?? namedClass)) : [];
+      if (namedClass) confidence = 'inferred';
+    } else if (!lexical.length) {
+      candidates = [];
     }
-    if (!call.callee.includes('.') && valuesFor(call.owner, call.callee, call.evidence.start).length) candidates = [];
+    return { candidates, confidence };
+  };
+  for (const call of calls) {
+    const name = leaf(call.callee);
+    const resolved = resolveFunctionReference(call.callee, call.path, call.owner, call.evidence.start);
+    const candidates = resolved.candidates; let confidence = resolved.confidence;
     let target: SemanticNode;
     if (candidates.length === 1) { target = candidates[0]!.node; call.target = target.id; }
     else {
@@ -500,7 +538,17 @@ function resolveRelationships(builder: SemanticBuilder, input: SemanticInput, fu
       confidence = 'unresolved';
     }
     builder.edge(call.owner, target.id, 'calls', call.callee, views.call, [call.evidence], confidence);
-    if (/^(?:Promise|map|flatMap|forEach|filter|reduce|reduceRight|some|every|find|findIndex|sort|then|catch|finally|setTimeout|setInterval|setImmediate|queueMicrotask)$/.test(name)) for (const callback of call.callbacks) builder.edge(call.owner, callback, 'callback', `${name} callback`, views.call, [call.evidence], 'inferred');
+    if (callbackCalls.has(name) || eventRegistrationCalls.has(name)) {
+      const callbackIds = new Set(call.callbacks);
+      const indices = /^(?:addEventListener|registerCommand)$/.test(name) ? [1] : name === 'then' ? [0, 1]
+        : eventRegistrationCalls.has(name) && !/^(?:onDidReceiveMessage|onMessage|subscribe)$/.test(name) ? [call.argumentReferences.length - 1] : [0];
+      for (const index of indices) {
+        const reference = call.argumentReferences[index]; if (!reference) continue;
+        const candidate = resolveFunctionReference(reference, call.path, call.owner, call.evidence.start).candidates;
+        if (candidate.length === 1) callbackIds.add(candidate[0]!.node.id);
+      }
+      for (const callback of callbackIds) builder.edge(call.owner, callback, 'callback', `${name} callback${eventRegistrationCalls.has(name) ? '（登録）' : ''}`, eventRegistrationCalls.has(name) ? ['function-call-flow'] : views.call, [call.evidence], 'inferred');
+    }
     call.node.attributes.target = target.id;
     call.args.forEach((names, index) => names.flatMap(name => valuesFor(call.owner, name, call.evidence.start)).forEach(value => {
       builder.edge(value.id, call.node.id, 'argument', `argument ${index + 1}`, views.data, [call.evidence], value.attributes.conditional ? 'inferred' : 'source');
@@ -557,6 +605,11 @@ function resolveRelationships(builder: SemanticBuilder, input: SemanticInput, fu
   }
   for (const entry of [...builder.nodes.values()].filter(node => node.kind === 'entry' && node.attributes.handler)) {
     const handler = String(entry.attributes.handler);
+    if (typeof entry.attributes.owner === 'string' && !entry.attributes.handlerClass && byId.has(entry.attributes.owner)) {
+      const resolved = resolveFunctionReference(handler, entry.path!, entry.attributes.owner, entry.evidence[0]?.start ?? 0);
+      if (resolved.candidates.length === 1) { const target = resolved.candidates[0]!.node; builder.edge(entry.id, target.id, 'handles', 'handler', ['runtime-flow'], entry.evidence, resolved.confidence); target.attributes.entry = true; }
+      continue;
+    }
     const binding = bindings.get(entry.path ?? '')?.find(item => item.local === handler || handler.startsWith(`${item.local}.`));
     const paths = binding ? reachable(entry.path!, binding.specifier) : undefined;
     const name = binding && binding.original !== '*' && !handler.includes('.') ? binding.original : leaf(handler);
@@ -571,7 +624,7 @@ function parseSchemaFile(builder: SemanticBuilder, path: string, source: string,
   for (const match of source.matchAll(pattern)) {
     const name = language === 'sql' ? match[1]! : match[2]!; const body = language === 'sql' ? match[2]! : match[3]!;
     const line = source.slice(0, match.index).split('\n').length;
-    const ev = { path, start: match.index!, end: match.index! + Math.min(match[0].length, 160), line, endLine: line, description: `${name}のSchema定義` };
+    const ev = { path, start: match.index!, end: match.index! + match[0].length, line, endLine: line + match[0].split('\n').length - 1, description: `${name}のSchema定義` };
     const model = builder.node('model', name, path, match.index!, [ev], 'source', { modelKind: language });
     model.fields = body.split(language === 'sql' ? /,(?![^()]*\))/ : /\n/).flatMap(raw => {
       const item = raw.trim().match(/^["`]?([\w]+)["`]?\s*:?\s+([^\n]+)/);

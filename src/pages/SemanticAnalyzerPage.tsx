@@ -7,17 +7,18 @@ import { confidenceLabels, kindLabels, semanticQuestions, semanticViewIds } from
 import type { SemanticAnalysis, SemanticEvidence, SemanticGraph, SemanticNode, SemanticViewId } from '../analyzer/semantic/types';
 import { projectSemanticView, semanticNeighbours } from '../analyzer/semantic/project';
 import { semanticPageSize, summarizeSemanticGraph } from '../analyzer/semantic/presentation';
-import { importExecutionTrace, type TraceImport } from '../analyzer/semantic/traces';
+import { importExecutionTrace } from '../analyzer/semantic/traces';
 import { languageLabels } from '../analyzer/semantic/languages';
 import { AnalyzerViewTabs } from '../components/analyzer/AnalyzerToolbar';
 import { AnalyzerProjectPicker } from '../components/analyzer/AnalyzerProjectPicker';
 import { AnalyzerEmptyOrbit } from '../components/analyzer/AnalyzerEmptyOrbit';
 import { useWorkspaceFullscreen } from '../components/analyzer/useWorkspaceFullscreen';
 import { analyzerRoutes } from '../utils/routes';
+import { semanticTraceCache as traceCache } from '../analyzer/semantic/traceCache';
+import FlowAnalyzerPage from './FlowAnalyzerPage';
 import './semantic-analyzer.css';
 
 const SemanticGraphCanvas = lazy(() => import('../components/analyzer/SemanticGraphCanvas').then(module => ({ default: module.SemanticGraphCanvas })));
-const traceCache = new WeakMap<AnalyzerProjectStore, TraceImport>();
 const defaults: NonNullable<AnalyzerViewSession['semantic']> = { scope: '', kind: '', confidence: '', layer: 'source', depth: 0, direction: 'both', orbit: false, overview: true, page: 0 };
 const emptyAnalysis: SemanticAnalysis = { nodes: [], edges: [], coverage: [], warnings: [], stats: { files: 0, functions: 0, models: 0, unresolved: 0, elapsedMs: 0 } };
 
@@ -31,6 +32,10 @@ function Evidence({ items, sources }: { items: SemanticEvidence[]; sources: Reco
 }
 
 export default function SemanticAnalyzerPage({ view }: { view: SemanticViewId }) {
+  return view === 'runtime-flow' || view === 'function-call-flow' ? <FlowAnalyzerPage view={view} /> : <LegacySemanticAnalyzerPage view={view} />;
+}
+
+function LegacySemanticAnalyzerPage({ view }: { view: SemanticViewId }) {
   const { state, replaceProject, updateView, setActiveView } = useAnalyzerSession(); const navigate = useNavigate();
   const store = state.store; const session = state.views[view]; const options = session.semantic ?? defaults;
   const [loaded, setLoaded] = useState<{ store: AnalyzerProjectStore; analysis: SemanticAnalysis }>();

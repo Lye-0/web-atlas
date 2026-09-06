@@ -1,0 +1,48 @@
+.semantic-flow-page { min-width:0; }
+.semantic-flow-page .analyzer-filter-control { flex:0 1 155px; grid-template-columns:auto minmax(80px,1fr); }
+.semantic-flow-settings { display:flex; align-items:end; flex-wrap:wrap; gap:12px 16px; padding:16px; border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--surface); }
+.semantic-flow-settings label { display:grid; gap:5px; min-width:0; font-size:.73rem; color:var(--muted); }
+.semantic-flow-settings select { height:34px; max-width:220px; padding:4px 8px; color:var(--text); background:var(--surface-soft); border:1px solid var(--line); border-radius:5px; }
+.semantic-flow-settings .semantic-flow-checkbox { display:flex; gap:6px; align-items:center; min-height:34px; }.semantic-flow-checkbox input { accent-color:var(--accent); }
+.semantic-flow-context { display:flex; justify-content:space-between; gap:10px; font-size:.72rem; color:var(--muted); }
+.semantic-flow-progress { display:flex; flex-wrap:wrap; gap:12px; align-items:center; font-size:.75rem; color:var(--muted); }
+.semantic-flow-notice { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin:0; padding:10px 14px; border:1px solid #b9915980; background:#342e2140; color:var(--text-soft); font-size:.76rem; line-height:1.5; }
+.semantic-flow-page button { cursor:pointer; }
+.semantic-flow-page :is(button,select,input,summary):focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.semantic-flow-notice button,.semantic-flow-progress button,.semantic-flow-detail button,.semantic-flow-page .semantic-coverage button,.semantic-flow-page .semantic-trace-info button,.semantic-flow-page .semantic-error button { border:1px solid var(--line); border-radius:5px; background:var(--surface-soft); color:var(--text); padding:7px 10px; font:inherit; }
+.semantic-flow-stage { position:relative; background-color:#0c1415; background-image:radial-gradient(#294038 1px,transparent 1px); background-size:24px 24px; isolation:isolate; }
+.semantic-flow-stage .analyzer-stage-controls { z-index:5; max-width:calc(100% - 24px); flex-wrap:wrap; justify-content:flex-end; }
+.semantic-flow-stage .analyzer-stage-controls button { min-height:32px; }.semantic-flow-stage .analyzer-stage-controls button:disabled { opacity:.4; cursor:default; }
+.semantic-flow-mode { display:flex; padding:2px; border:1px solid var(--line); border-radius:5px; gap:2px; }
+.semantic-flow-mode button { border-color:transparent; }.semantic-flow-mode button[aria-pressed=true] { border-color:var(--accent); color:var(--accent); background:#273e32; }
+.semantic-flow-stage .analyzer-stage-help { z-index:6; }.semantic-flow-stage .analyzer-stage-help button { margin-top:6px; }
+.semantic-flow-2d,.semantic-flow-3d { position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none; }
+.semantic-flow-2d { user-select:none; outline-offset:-3px; }
+.semantic-flow-node { cursor:pointer; outline:none; }
+.semantic-flow-node rect { fill:#13251f; stroke:#4e7566; stroke-width:1.3; }
+.semantic-flow-node.is-connected rect { fill:#1a302a; stroke:#83aaa3; }.semantic-flow-node.is-match rect { stroke:#edc78a; stroke-width:2.2; }
+.semantic-flow-node.is-selected rect { fill:#24443a; stroke:#bfe7d8; stroke-width:2.8; }
+.semantic-flow-node .semantic-flow-selection-ring { fill:none; stroke:#c1e9dc; stroke-width:1.2; }
+.semantic-flow-node:focus-visible rect { stroke:#fff; stroke-width:3; }.semantic-flow-node:focus-visible .semantic-flow-selection-ring { stroke-dasharray:4 3; }
+.semantic-flow-node-name { fill:#e7f0ea; font:600 12px var(--font-sans,system-ui); pointer-events:none; }
+.semantic-flow-node-path { fill:#a9bdb2; font:10px var(--font-mono,monospace); pointer-events:none; }.semantic-flow-node-dot { fill:#9bc0af; }
+.semantic-flow-edge-hit { fill:none; stroke:transparent; stroke-width:15px; cursor:pointer; }.semantic-flow-edge-hit:focus-visible { stroke:#eaf2ee70; outline:none; }
+.semantic-flow-legend { position:absolute; z-index:3; left:12px; bottom:12px; display:flex; flex-wrap:wrap; gap:5px 14px; max-width:calc(100% - 24px); padding:8px 11px; border:1px solid var(--line); border-radius:6px; background:#101a1bea; color:var(--muted); font-size:.67rem; pointer-events:none; }
+.semantic-flow-3d-labels { position:absolute; inset:0; overflow:hidden; pointer-events:none; }
+.semantic-flow-3d-labels button { position:absolute; transform:translate(9px,-50%); max-width:225px; display:grid; gap:4px; padding:3px 7px; text-align:left; border:1px solid #4c6a5f70; border-radius:4px; background:#11231dde; color:#d7e7dc; font-size:11px; pointer-events:auto; }
+.semantic-flow-3d-labels :is(strong,small) { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }.semantic-flow-3d-labels strong { font-weight:550; }.semantic-flow-3d-labels small { font-size:9px; color:#b8d1c2; }
+.semantic-flow-3d-labels button.is-selected { border-color:#bfe7d8; background:#234137f2; box-shadow:0 0 0 2px #bfe7d850; font-size:12px; }.semantic-flow-3d-labels button.is-match { color:#edcc94; }
+.semantic-flow-3d-selection-description { position:absolute; width:1px; height:1px; padding:0; overflow:hidden; clip-path:inset(50%); }
+.semantic-flow-loading { position:absolute; top:45%; width:100%; text-align:center; color:var(--muted); font-size:.8rem; }
+.semantic-flow-page .semantic-flow-detail { max-height:clamp(540px,67vh,760px); min-width:0; border:1px solid var(--line); border-radius:var(--radius-sm); }
+.semantic-flow-detail header button { font-size:18px; line-height:1; }.semantic-flow-detail .semantic-path,.semantic-flow-detail .semantic-signature { font-size:11px; }
+.semantic-flow-detail .semantic-connections > div { padding:10px 0; }.semantic-flow-detail .semantic-connections > div > small { font-size:10px; color:var(--muted); }
+.semantic-flow-detail .semantic-connections > div[data-direction=outgoing] > small { color:#82c6e2; }.semantic-flow-detail .semantic-connections > div[data-direction=incoming] > small { color:#dfb785; }
+.semantic-flow-detail .semantic-connections p { display:flex; flex-wrap:wrap; align-items:center; margin:4px 0; gap:4px; }
+.semantic-flow-detail .semantic-connections button { display:inline; max-width:100%; padding:3px 5px; border:0; font-size:11px; text-align:left; overflow-wrap:anywhere; }.semantic-flow-detail .semantic-connections p+button { color:var(--muted); font-size:10px; }
+.semantic-relation-endpoints { display:flex; flex-wrap:wrap; align-items:center; gap:6px; line-height:1.7; }.semantic-relation-endpoints button,.semantic-original-relations button { max-width:100%; overflow-wrap:anywhere; text-align:left; }
+.semantic-original-relations { padding-left:18px; }.semantic-original-relations li { padding:10px 0; }.semantic-flow-detail .semantic-evidence pre { font-size:11px; line-height:1.7; max-height:420px; overflow:auto; }
+.semantic-flow-page .semantic-coverage { border:1px solid var(--line); border-radius:var(--radius-sm); padding:14px 18px; }
+.semantic-flow-workspace.is-fullscreen { display:grid; height:100dvh; padding:14px; gap:14px; }.semantic-flow-workspace.is-fullscreen .semantic-flow-stage { height:100%; min-height:0; }.semantic-flow-workspace.is-fullscreen .semantic-flow-detail { max-height:100%; }
+@media(max-width:1100px) { .semantic-flow-workspace.has-detail { grid-template-columns:minmax(0,1fr); }.semantic-flow-detail { grid-column:auto; max-height:480px; }.semantic-flow-context { flex-wrap:wrap; }.semantic-flow-workspace.is-fullscreen.has-detail { grid-template-columns:minmax(0,1fr) 300px; } }
+@media(max-width:700px) { .semantic-flow-page .analyzer-filter-control { flex:1 1 120px; }.semantic-flow-stage { height:620px; }.semantic-flow-stage .analyzer-stage-controls { top:8px; left:8px; right:8px; max-width:none; justify-content:flex-start; gap:4px; }.semantic-flow-stage .analyzer-stage-controls button { min-height:32px; font-size:11px; }.semantic-flow-mode { padding:0; }.semantic-flow-legend { font-size:10px; gap:4px 10px; }.semantic-flow-workspace.is-fullscreen.has-detail { grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(260px,1fr) minmax(140px,35vh); }.semantic-flow-workspace.is-fullscreen { padding:8px; }.semantic-flow-detail { max-height:440px; }.semantic-flow-3d-labels button { max-width:175px; } }
