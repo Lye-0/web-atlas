@@ -109,4 +109,6 @@ Run `pnpm test`, `pnpm typecheck`, `pnpm lint` and `pnpm build`. Real-WASM tests
 
 To opt into read-only repository validation, set `WEB_ATLAS_VALIDATION_REPOS` to semicolon-separated absolute repository paths before running tests. The reader skips symlinks and excluded directories and does not run target code or write to those repositories. `WEB_ATLAS_VALIDATION_SNAPSHOT=1` additionally writes masked store/analysis snapshots only to this project's ignored `.cache/semantic-validation` directory for browser verification. These snapshots are temporary and are not shipped.
 
+The independent explorer source-fact comparison is a separate opt-in: also set `WEB_ATLAS_EXPLORER_ACCURACY_FACTS` to the matching review-facts JSON file. It consumes that report and the existing masked store/analysis snapshots for the configured reference projects. Ordinary repository validation does not require these review artifacts.
+
 Browser verification must separately cover Worker/WASM loading, all five projections, detail navigation, 2D/3D interactions, fullscreen, responsive layout and the execution-data file chooser. Node parser tests alone do not establish browser compatibility.

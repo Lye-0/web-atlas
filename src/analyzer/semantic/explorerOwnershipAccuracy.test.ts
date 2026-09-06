@@ -88,10 +88,11 @@ describe('independent explorer ownership and relation accuracy', () => {
 
 interface SourceFactReport { projects: { name: string; nodes: { id: string; path: string; label: string; expectedLine: number }[]; relations: { sourceId: string; targetId: string; edgeId: string; path: string; line: number }[] }[] }
 const roots = (process.env.WEB_ATLAS_VALIDATION_REPOS ?? '').split(';').filter(Boolean);
+const factsPath = process.env.WEB_ATLAS_EXPLORER_ACCURACY_FACTS ?? '';
 
 describe('independent opted-in explorer source comparison', () => {
-  it.skipIf(!roots.length)('retains real-project source ownership and every selected canonical relation', async () => {
-    const facts = JSON.parse(await readFile('.cache/accuracy-review/source-facts.json', 'utf8')) as SourceFactReport;
+  it.skipIf(!roots.length || !factsPath)('retains real-project source ownership and every selected canonical relation', async () => {
+    const facts = JSON.parse(await readFile(factsPath, 'utf8')) as SourceFactReport;
     for (const root of roots) {
       const name = basename(root), selected = facts.projects.find(project => project.name === name)!;
       const analysis = JSON.parse(await readFile(`.cache/semantic-validation/${name}-analysis.json`, 'utf8')) as SemanticAnalysis;
