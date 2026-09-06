@@ -111,7 +111,8 @@ function Scene({ graph, explorer, direction = 'both', selectedIds, selectedEdgeI
   }, [camera, gl, invalidate, save]);
   const fit = useCallback((ids?: string[], reset = false) => {
     const control = controls.current; if (!control) return;
-    const targets = ids?.length ? positions.filter(point => ids.includes(point.node.id)) : positions;
+    const requestedIds = new Set(ids);
+    const targets = requestedIds.size ? positions.filter(point => requestedIds.has(point.node.id)) : positions;
     if (!targets.length) return;
     const targetIds = new Set(targets.map(point => point.node.id));
     const fitPoints = [...targets, ...(!ids || ids.length > 1 ? paths.filter(path => !ids || targetIds.has(path.edge.source) && targetIds.has(path.edge.target)).flatMap(path => path.points) : [])];
