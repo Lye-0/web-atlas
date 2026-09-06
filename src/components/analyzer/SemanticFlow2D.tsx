@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { AnalyzerViewSession } from '../../analyzer/session';
-import { layoutSemanticFlow, sampleFlowPath, semanticFlowEdgePaths, semanticMemberIds } from '../../analyzer/semantic/flowPresentation';
-import { spatialFlowPhase, SPATIAL_FLOW_SPEED } from '../../analyzer/spatialFlow';
+import { layoutSemanticFlow, semanticFlowEdgePaths, semanticMemberIds } from '../../analyzer/semantic/flowPresentation';
+import { spatialFlowPhase, SPATIAL_FLOW_PARTICLE_SPACING, SPATIAL_FLOW_SPEED } from '../../analyzer/spatialFlow';
 import type { SemanticGraph } from '../../analyzer/semantic/types';
 
 export type FlowCamera2D = NonNullable<NonNullable<AnalyzerViewSession['flowCameras']>['2d']>;
@@ -24,6 +24,7 @@ export function SemanticFlow2D({ graph, selectedIds, selectedEdgeId, matchIds, c
   const positions = useMemo(() => layoutSemanticFlow(graph, '2d'), [graph]);
   const paths = useMemo(() => semanticFlowEdgePaths(graph, positions, selectedIds, selectedEdgeId, '2d', graph.edges.length > 140), [graph, positions, selectedIds, selectedEdgeId]);
   const active = useMemo(() => paths.filter(path => path.selected), [paths]);
+  const particleSpacing = SPATIAL_FLOW_PARTICLE_SPACING * (motion.reduced ? 2 : 1);
   const shownPaths = graph.edges.length <= 140 ? paths : active;
   const selectedNodes = useMemo(() => new Set(active.flatMap(path => [path.edge.source, path.edge.target])), [active]);
   const callbacks = useRef({ onCamera });
@@ -79,19 +80,16 @@ export function SemanticFlow2D({ graph, selectedIds, selectedEdgeId, matchIds, c
   useEffect(() => {
     if (!motion.enabled || !motion.visible || !active.length) return;
     let frame = 0, last = 0, distance = 0;
-    const particles = active.map(path => ({ ...path, length: path.points.slice(1).reduce((sum, point, i) => sum + Math.hypot(point.x - path.points[i]!.x, point.y - path.points[i]!.y), 0) }));
-    const circles = root.current?.querySelectorAll<SVGCircleElement>('[data-flow-particle]');
+    const particles = root.current?.querySelectorAll<SVGPathElement>('[data-flow-particle]');
     const animate = (time: number) => {
       if (last) distance += Math.min(time - last, 100) / 1000 * SPATIAL_FLOW_SPEED; last = time;
-      circles?.forEach(circle => {
-        const path = particles[Number(circle.dataset.path)]!;
-        const point = sampleFlowPath(path.points, distance / path.length + spatialFlowPhase(path.edge.id) + Number(circle.dataset.phase));
-        circle.setAttribute('cx', String(point.x)); circle.setAttribute('cy', String(point.y));
+      particles?.forEach(path => {
+        path.setAttribute('stroke-dashoffset', String(-distance - Number(path.dataset.phase) * particleSpacing));
       });
       frame = requestAnimationFrame(animate);
     };
     frame = requestAnimationFrame(animate); return () => cancelAnimationFrame(frame);
-  }, [active, motion.enabled, motion.reduced, motion.visible]);
+  }, [active, motion.enabled, motion.visible, particleSpacing]);
   const drag = useRef<{ x: number; y: number; startX: number; startY: number; moved: boolean } | undefined>(undefined);
   const visibleNodes = positions.filter(point => point.x * camera.scale + camera.x > -220 && point.x * camera.scale + camera.x < viewport.width + 220 && point.y * camera.scale + camera.y > -100 && point.y * camera.scale + camera.y < viewport.height + 100);
   return <svg ref={root} className="semantic-flow-2d" role="application" tabIndex={0} aria-label="分類2D。矢印キーで移動、HomeでFit。検索結果からも選択できます。"
@@ -121,10 +119,10 @@ export function SemanticFlow2D({ graph, selectedIds, selectedEdgeId, matchIds, c
     }}>
     <defs>{['#82c6e2', '#dfb785', '#afcbbd', '#496660'].map(color => <marker key={color} id={`flow-arrow-${color.slice(1)}`} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse" markerUnits="strokeWidth"><path d="M 0 0 L 10 5 L 0 10 z" fill={color} /></marker>)}</defs>
     <g transform={`translate(${camera.x} ${camera.y}) scale(${camera.scale})`}>
-      <g data-flow-layer="edge-targets">{shownPaths.map(path => { const d = path.points.map((point, index) => `${index ? 'L' : 'M'}${point.x},${point.y}`).join(' '); return <path key={path.edge.id} data-edge-hit-id={path.edge.id} d={d} className="semantic-flow-edge-hit" role="button" tabIndex={path.selected ? 0 : -1} aria-label={`${path.edge.label}の根拠を表示`}
+      <g data-flow-layer="edge-targets">{shownPaths.map(path => <path key={path.edge.id} data-edge-hit-id={path.edge.id} d={path.svgPath} className="semantic-flow-edge-hit" role="button" tabIndex={path.selected ? 0 : -1} aria-label={`${path.edge.label}の根拠を表示`}
           onClick={event => { event.stopPropagation(); if (!drag.current?.moved) onSelectEdge(path.edge.id); drag.current = undefined; }}
-          onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelectEdge(path.edge.id); } }} />;
-      })}</g>
+          onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelectEdge(path.edge.id); } }} />
+      )}</g>
       <g data-flow-layer="nodes">{visibleNodes.map(point => {
         const members = semanticMemberIds(point.node), selected = members.some(id => selectedIds.has(id));
         const matching = members.filter(id => matchIds.has(id)).length;
@@ -143,9 +141,12 @@ export function SemanticFlow2D({ graph, selectedIds, selectedEdgeId, matchIds, c
         </g>;
       })}</g>
       <g data-flow-layer="edges" pointerEvents="none">{shownPaths.map(path => <g key={path.edge.id} data-edge-id={path.edge.id} data-source={path.edge.source} data-target={path.edge.target} data-direction={path.direction ?? ''}>
-        <path d={path.points.map((point, index) => `${index ? 'L' : 'M'}${point.x},${point.y}`).join(' ')} fill="none" stroke={path.color} strokeWidth={path.selected ? 2.6 : 1.2} opacity={path.selected ? 1 : .4} markerEnd={`url(#flow-arrow-${path.color.slice(1)})`} />
+        <path d={path.svgPath} fill="none" stroke={path.color} strokeWidth={path.selected ? 2.6 : 1.2} opacity={path.selected ? 1 : .4} markerEnd={`url(#flow-arrow-${path.color.slice(1)})`} />
       </g>)}</g>
-      <g data-flow-layer="particles" pointerEvents="none">{motion.enabled && motion.visible && active.flatMap((path, pathIndex) => Array.from({ length: motion.reduced ? 1 : 3 }, (_, index) => <circle key={`${path.edge.id}:${index}`} data-flow-particle data-path={pathIndex} data-phase={index / 3} r={motion.reduced ? 2.5 : 3.5} fill={path.color} pointerEvents="none" />))}</g>
+      {/* Round zero-length dashes keep exact arc spacing without a DOM node per dot. */}
+      <g data-flow-layer="particles" pointerEvents="none">{motion.enabled && motion.visible && active.map(path => <path key={path.edge.id} data-flow-particle data-particle-edge-id={path.edge.id} data-phase={spatialFlowPhase(path.edge.id)}
+        d={path.svgPath} fill="none" stroke={path.color} strokeWidth={motion.reduced ? 5 : 7} strokeLinecap="round"
+        strokeDasharray={`0 ${particleSpacing}`} strokeDashoffset={-spatialFlowPhase(path.edge.id) * particleSpacing} />)}</g>
     </g>
   </svg>;
 }

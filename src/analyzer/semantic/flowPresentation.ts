@@ -3,7 +3,7 @@ import { semanticDepths, semanticOverviewId, summarizeSemanticGraph, type Semant
 import type { SemanticEdge, SemanticGraph, SemanticNode } from './types';
 
 export interface FlowPoint { x: number; y: number; z: number }
-export interface FlowEdgePath { edge: SemanticEdge; points: FlowPoint[]; color: string; selected: boolean; direction?: 'incoming' | 'outgoing' | 'internal' }
+export interface FlowEdgePath { edge: SemanticEdge; points: FlowPoint[]; svgPath: string; color: string; selected: boolean; direction?: 'incoming' | 'outgoing' | 'internal' }
 
 export function presentSemanticFlow(graph: SemanticGraph, expanded: ReadonlySet<string>, overview: boolean): SemanticGraph {
   if (!overview || graph.nodes.length <= 120) return graph;
@@ -47,31 +47,39 @@ export function layoutSemanticFlow(graph: SemanticGraph, mode: '2d' | '3d'): Sem
   return result;
 }
 
-function curve(a: FlowPoint, b: FlowPoint, bend: number, mode: '2d' | '3d'): FlowPoint[] {
+function cubicCurve(start: FlowPoint, c1: FlowPoint, c2: FlowPoint, end: FlowPoint) {
+  const points = Array.from({ length: 49 }, (_, index) => {
+    const t = index / 48, u = 1 - t;
+    return { x: u ** 3 * start.x + 3 * u ** 2 * t * c1.x + 3 * u * t ** 2 * c2.x + t ** 3 * end.x,
+      y: u ** 3 * start.y + 3 * u ** 2 * t * c1.y + 3 * u * t ** 2 * c2.y + t ** 3 * end.y,
+      z: u ** 3 * start.z + 3 * u ** 2 * t * c1.z + 3 * u * t ** 2 * c2.z + t ** 3 * end.z };
+  });
+  return { points, svgPath: `M${start.x},${start.y} C${c1.x},${c1.y} ${c2.x},${c2.y} ${end.x},${end.y}` };
+}
+
+function curve(a: FlowPoint, b: FlowPoint, bend: number | undefined, mode: '2d' | '3d') {
   const dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z;
   const length = Math.hypot(dx, dy, dz);
   if (length < .01) {
-    const side = bend < 0 ? 1 : -1, extra = Math.abs(bend);
+    const side = (bend ?? 0) < 0 ? 1 : -1, extra = Math.abs(bend ?? 0);
     const start = mode === '2d' ? { x: a.x + 110, y: a.y + side * 10, z: a.z } : { x: a.x + 8, y: a.y, z: a.z };
     const end = mode === '2d' ? { x: a.x + 42, y: a.y + side * 34, z: a.z } : { x: a.x, y: a.y + side * 8, z: a.z };
     const c1 = { x: a.x + (mode === '2d' ? 200 : 58) + extra, y: start.y, z: a.z };
     const c2 = { x: a.x + (mode === '2d' ? 164 : 48), y: a.y + side * ((mode === '2d' ? 112 : 56) + extra), z: a.z };
-    return Array.from({ length: 33 }, (_, index) => {
-      const t = index / 32, u = 1 - t;
-      return { x: u ** 3 * start.x + 3 * u ** 2 * t * c1.x + 3 * u * t ** 2 * c2.x + t ** 3 * end.x,
-        y: u ** 3 * start.y + 3 * u ** 2 * t * c1.y + 3 * u * t ** 2 * c2.y + t ** 3 * end.y, z: a.z };
-    });
+    return cubicCurve(start, c1, c2, end);
   }
   const boundary = mode === '2d' ? 1 / Math.max(Math.abs(dx / length) / 106, Math.abs(dy / length) / 30) + 4 : 7;
   const normalLength = Math.hypot(dx, dy);
   const normal = normalLength > .0001 ? { x: -dy / normalLength, y: dx / normalLength, z: 0 }
     : { x: dz >= 0 ? 1 : -1, y: 0, z: 0 };
-  return Array.from({ length: 25 }, (_, index) => {
-    const t = index / 24;
-    const trimmed = boundary / length + t * Math.max(0, 1 - boundary * 2 / length);
-    const offset = Math.sin(t * Math.PI) * bend;
-    return { x: a.x + dx * trimmed + normal.x * offset, y: a.y + dy * trimmed + normal.y * offset, z: a.z + dz * trimmed };
-  });
+  const trim = Math.min(.45, boundary / length);
+  const start = { x: a.x + dx * trim, y: a.y + dy * trim, z: a.z + dz * trim };
+  const end = { x: b.x - dx * trim, y: b.y - dy * trim, z: b.z - dz * trim };
+  // A gentle arch also distinguishes a single connection from the node/lane grid.
+  const arc = bend ?? Math.min(mode === '2d' ? 56 : 38, Math.max(6, length * (1 - 2 * trim) * .18));
+  const control = (t: number) => ({ x: start.x + (end.x - start.x) * t + normal.x * arc * 4 / 3,
+    y: start.y + (end.y - start.y) * t + normal.y * arc * 4 / 3, z: start.z + (end.z - start.z) * t });
+  return cubicCurve(start, control(1 / 3), control(2 / 3), end);
 }
 
 export function semanticFlowEdgePaths(graph: SemanticGraph, positions: readonly SemanticPosition[], selection: ReadonlySet<string>, selectedEdgeId: string | undefined, mode: '2d' | '3d', selectedOnly = false): FlowEdgePath[] {
@@ -92,8 +100,8 @@ export function semanticFlowEdgePaths(graph: SemanticGraph, positions: readonly 
     const a = byId.get(edge.source), b = byId.get(edge.target); if (!a || !b) return [];
     const slot = slots.get(edge.id)!;
     const spacing = Math.min(32, (mode === '2d' ? 144 : 80) / Math.max(1, slot.count - 1));
-    const bend = slot.count > 1 ? (slot.index - (slot.count - 1) / 2) * spacing * (edge.source.localeCompare(edge.target) > 0 ? -1 : 1) : 0;
-    return [{ edge, points: curve(a, b, bend, mode), direction, selected, color: direction ? analyzerDirectionColors[direction] : selected ? analyzerDirectionColors.outgoing : '#496660' }];
+    const bend = slot.count > 1 ? (slot.index - (slot.count - 1) / 2 + (slot.count % 2 ? .25 : 0)) * spacing * (edge.source.localeCompare(edge.target) > 0 ? -1 : 1) : undefined;
+    return [{ edge, ...curve(a, b, bend, mode), direction, selected, color: direction ? analyzerDirectionColors[direction] : selected ? analyzerDirectionColors.outgoing : '#496660' }];
   });
 }
 

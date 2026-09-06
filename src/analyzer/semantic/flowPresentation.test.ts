@@ -69,6 +69,18 @@ describe('flow search and presentation contracts', () => {
     const points = [{ x: 0, y: 0, z: 0 }, { x: 100, y: 0, z: 0 }];
     expect(sampleFlowPath(points, .2).x).toBeCloseTo(20); expect(sampleFlowPath(points, .7).x).toBeCloseTo(70);
   });
+  it.each(['2d', '3d'] as const)('gives single connections a smooth arc while preserving their endpoints in %s', mode => {
+    const single = { ...graph, edges: [graph.edges[0]!] };
+    const positions = [{ node: graph.nodes[0]!, x: 0, y: 0, z: 0 }, { node: graph.nodes[1]!, x: 1000, y: 0, z: 0 }];
+    const path = semanticFlowEdgePaths(single, positions, new Set(['a']), undefined, mode)[0]!;
+    const reverseSelection = semanticFlowEdgePaths(single, positions, new Set(['b']), undefined, mode)[0]!;
+    expect(path.svgPath).toContain(' C'); expect(path.svgPath).not.toContain(' L');
+    expect(path.points[0]!.x).toBeCloseTo(mode === '2d' ? 110 : 7);
+    expect(path.points.at(-1)!.x).toBeCloseTo(mode === '2d' ? 890 : 993);
+    expect(path.points[0]!.y).toBe(0); expect(path.points.at(-1)!.y).toBe(0);
+    expect(Math.max(...path.points.map(point => point.y))).toBeGreaterThan(20);
+    expect(path.points).toEqual(reverseSelection.points); expect(path.edge.id).toBe('direct');
+  });
   it('bounds the total curve spread for many canonical relations between display groups', () => {
     const repeated: SemanticGraph = { ...graph, edges: Array.from({ length: 130 }, (_, i) => ({ ...graph.edges[0]!, id: `call-${i}` })) };
     const positions = layoutSemanticFlow(repeated, '2d'), paths = semanticFlowEdgePaths(repeated, positions, new Set(), undefined, '2d');

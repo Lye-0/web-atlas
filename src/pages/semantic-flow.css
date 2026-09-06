@@ -26,7 +26,7 @@
 .semantic-flow-node:focus-visible rect { stroke:#fff; stroke-width:3; }.semantic-flow-node:focus-visible .semantic-flow-selection-ring { stroke-dasharray:4 3; }
 .semantic-flow-node-name { fill:#e7f0ea; font:600 12px var(--font-sans,system-ui); pointer-events:none; }
 .semantic-flow-node-path { fill:#a9bdb2; font:10px var(--font-mono,monospace); pointer-events:none; }.semantic-flow-node-dot { fill:#9bc0af; }
-.semantic-flow-edge-hit { fill:none; stroke:transparent; stroke-width:15px; cursor:pointer; }.semantic-flow-edge-hit:focus-visible { stroke:#eaf2ee70; outline:none; }
+.semantic-flow-edge-hit { fill:none; stroke:transparent; stroke-width:15px; cursor:pointer; outline:none; }.semantic-flow-edge-hit:focus-visible { stroke:#eaf2ee70; }
 .semantic-flow-legend { position:absolute; z-index:3; left:12px; bottom:12px; display:flex; flex-wrap:wrap; gap:5px 14px; max-width:calc(100% - 24px); padding:8px 11px; border:1px solid var(--line); border-radius:6px; background:#101a1bea; color:var(--muted); font-size:.67rem; pointer-events:none; }
 .semantic-flow-3d-labels { position:absolute; inset:0; overflow:hidden; pointer-events:none; }
 .semantic-flow-3d-labels button { position:absolute; left:0; top:0; transform:translate(9px,-50%); transition:none; will-change:transform; max-width:225px; display:grid; gap:4px; padding:3px 7px; text-align:left; border:1px solid #4c6a5f70; border-radius:4px; background:#11231dde; color:#d7e7dc; font-size:11px; pointer-events:auto; }
