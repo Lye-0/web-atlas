@@ -1,8 +1,13 @@
 import { OrthographicCamera, Vector3 } from 'three';
 import { describe, expect, it, vi } from 'vitest';
-import { FlowLabelLayer, projectSemanticFlowLabels, type FlowLabelPlacement } from './semanticFlowLabels';
+import { FlowLabelLayer, hitSemanticFlowPoint, projectSemanticFlowLabels, type FlowLabelPlacement } from './semanticFlowLabels';
+import type { SemanticPosition } from '../../analyzer/semantic/presentation';
+import type { SemanticFlowRegion } from '../../analyzer/semantic/flowRegions';
 
 const placement = (id = 'run', x = 100, y = 200): FlowLabelPlacement => ({ id, x, y, label: id, path: `src/${id}.ts:2`, selected: false, match: false });
+const positioned = (id: string, x = 0, y = 0, z = 0): SemanticPosition => ({ x, y, z, node: { id, kind: 'function', label: id, path: `src/git/${id}.ts`, group: 'Source', confidence: 'source', evidence: [], attributes: {} } });
+const region: SemanticFlowRegion = { id: 'directory:src/git', kind: 'directory', label: 'src/git', x: -300, y: -120, z: -20, width: 600, height: 240, count: 3, nodeIds: ['run', 'other', 'target'] };
+const sceneCamera = () => { const camera = new OrthographicCamera(-500, 500, 400, -400, .1, 1000); camera.position.set(0, 0, 100); camera.lookAt(0, 0, 0); return camera; };
 
 describe('semantic 3D label synchronization', () => {
   it('projects the current camera before the renderer refreshes its world matrix', () => {
@@ -56,5 +61,48 @@ describe('semantic 3D label synchronization', () => {
     expect(button.style.transform).toContain('500px, 600px');
     layer.attach('run', null); layer.suspend(); layer.update([]);
     expect(publish).toHaveBeenCalledTimes(2);
+  });
+
+  it('uses region names in the far view and reveals representative names on approach', () => {
+    const camera = sceneCamera(), positions = [positioned('run', -220), positioned('other'), positioned('target', 220)];
+    const far = projectSemanticFlowLabels(camera, { width: 1000, height: 800 }, .2, positions, new Set(), new Set(), { regions: [region] });
+    expect(far.map(label => label.label)).toEqual(['src/git']); expect(far[0]!.region).toBe(true);
+    const near = projectSemanticFlowLabels(camera, { width: 1000, height: 800 }, 2, positions, new Set(), new Set(), { regions: [region] });
+    expect(near.some(label => !label.region)).toBe(true);
+    expect(near.filter(label => !label.region).length).toBeLessThanOrEqual(4);
+  });
+
+  it('keeps selected, hovered and selected-edge endpoints readable even in the far view', () => {
+    const positions = [positioned('run'), positioned('hover', 10), positioned('target', 260)];
+    const labels = projectSemanticFlowLabels(sceneCamera(), { width: 1000, height: 800 }, .1, positions, new Set(['run']), new Set(), {
+      regions: [region], hoveredIds: new Set(['hover']), relatedIds: new Set(['target']), priorityIds: new Set(['target']),
+    });
+    expect(labels.filter(label => !label.region).map(label => label.id).sort()).toEqual(['hover', 'run', 'target']);
+    expect(labels.find(label => label.id === 'hover')?.path).toBe('src/git/hover.ts');
+    const run = labels.find(label => label.id === 'run')!, hover = labels.find(label => label.id === 'hover')!;
+    expect(Math.abs(run.y - hover.y) >= 46 || Math.abs(run.x - hover.x) >= 225).toBe(true);
+  });
+
+  it('shows the currently visible region even after more than sixteen offscreen regions', () => {
+    const hidden = Array.from({ length: 20 }, (_, index) => ({ ...region, id: `off-${index}`, label: `off-${index}`, count: 100, x: 10000 }));
+    const labels = projectSemanticFlowLabels(sceneCamera(), { width: 1000, height: 800 }, .1, [], new Set(), new Set(), { regions: [...hidden, region] });
+    expect(labels.map(label => label.label)).toEqual(['src/git']);
+  });
+
+  it('keeps the dot-to-label hover corridor and leader in the same frame, then clears both on suspension', () => {
+    const layer = new FlowLabelLayer(() => {}), button = document.createElement('button'), line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    layer.update([{ ...placement('run', 250, 300), hovered: true, pointX: 200, pointY: 300, width: 120 }]);
+    layer.attach('run', button); layer.attachLeader('run', line);
+    expect(layer.hoverAt(210, 300)).toBe('run'); expect(layer.hoverAt(300, 300)).toBe('run'); expect(layer.hoverAt(800, 300)).toBeUndefined();
+    expect(line.getAttribute('x1')).toBe('200'); expect(line.getAttribute('x2')).toBe('259');
+    layer.update([{ ...placement('run', 260, 320), hovered: true, pointX: 210, pointY: 320, width: 120 }]);
+    expect(line.getAttribute('y1')).toBe('320'); expect(line.getAttribute('y2')).toBe('320');
+    layer.suspend(); expect(layer.hoverAt(300, 320)).toBeUndefined(); expect(line.style.visibility).toBe('hidden');
+  });
+
+  it('uses the closest visible dot for hover and click without inventing a region selection', () => {
+    const camera = sceneCamera(), size = { width: 1000, height: 800 };
+    expect(hitSemanticFlowPoint(camera, size, [positioned('back'), positioned('front', 0, 0, 50)], 500, 400)).toBe('front');
+    expect(hitSemanticFlowPoint(camera, size, [positioned('run')], 800, 400)).toBeUndefined();
   });
 });

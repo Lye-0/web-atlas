@@ -3,16 +3,19 @@ import type { AnalyzerViewSession } from '../../analyzer/session';
 import { layoutSemanticFlow, semanticFlowEdgePaths, semanticMemberIds } from '../../analyzer/semantic/flowPresentation';
 import { spatialFlowPhase, SPATIAL_FLOW_PARTICLE_SPACING, SPATIAL_FLOW_SPEED } from '../../analyzer/spatialFlow';
 import type { SemanticGraph } from '../../analyzer/semantic/types';
+import { semanticFlowRegions, semanticRegionIdentity, semanticVisibleRegions } from '../../analyzer/semantic/flowRegions';
+import { SemanticFlowLocation, SemanticFlowMap } from './SemanticFlowMap';
 
 export type FlowCamera2D = NonNullable<NonNullable<AnalyzerViewSession['flowCameras']>['2d']>;
 export interface FlowCameraCommand { kind: 'fit' | 'reset' | 'focus' | 'zoom-in' | 'zoom-out'; nonce: number; ids?: string[] }
 export interface SemanticFlowRenderProps {
   graph: SemanticGraph; selectedIds: ReadonlySet<string>; selectedEdgeId?: string; matchIds: ReadonlySet<string>;
   command?: FlowCameraCommand; motion: { enabled: boolean; reduced: boolean; visible: boolean };
+  overlayTop?: number;
   onSelect: (id: string) => void; onSelectEdge: (id: string) => void; onClear: () => void;
 }
 
-export function SemanticFlow2D({ graph, selectedIds, selectedEdgeId, matchIds, command, motion, camera: savedCamera, onCamera, onSelect, onSelectEdge, onClear }: SemanticFlowRenderProps & {
+export function SemanticFlow2D({ graph, selectedIds, selectedEdgeId, matchIds, command, motion, overlayTop, camera: savedCamera, onCamera, onSelect, onSelectEdge, onClear }: SemanticFlowRenderProps & {
   camera?: FlowCamera2D; onCamera: (camera: FlowCamera2D) => void;
 }) {
   const root = useRef<SVGSVGElement>(null);
@@ -22,6 +25,7 @@ export function SemanticFlow2D({ graph, selectedIds, selectedEdgeId, matchIds, c
   const previousSize = useRef(viewport);
   const lastCommand = useRef(command?.nonce);
   const positions = useMemo(() => layoutSemanticFlow(graph, '2d'), [graph]);
+  const regions = useMemo(() => semanticFlowRegions(positions, '2d'), [positions]);
   const paths = useMemo(() => semanticFlowEdgePaths(graph, positions, selectedIds, selectedEdgeId, '2d', graph.edges.length > 140), [graph, positions, selectedIds, selectedEdgeId]);
   const active = useMemo(() => paths.filter(path => path.selected), [paths]);
   const particleSpacing = SPATIAL_FLOW_PARTICLE_SPACING * (motion.reduced ? 2 : 1);
@@ -46,12 +50,14 @@ export function SemanticFlow2D({ graph, selectedIds, selectedEdgeId, matchIds, c
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     for (const point of targets) { minX = Math.min(minX, point.x - 124); maxX = Math.max(maxX, point.x + 124); minY = Math.min(minY, point.y - 54); maxY = Math.max(maxY, point.y + 54); }
     const targetIds = new Set(targets.map(point => point.node.id));
+    if (!ids) for (const region of regions) { minX = Math.min(minX, region.x); maxX = Math.max(maxX, region.x + region.width); minY = Math.min(minY, region.y); maxY = Math.max(maxY, region.y + region.height); }
     if (!ids || ids.length > 1) for (const path of paths) if ((!ids || targetIds.has(path.edge.source) && targetIds.has(path.edge.target))) for (const point of path.points) {
       minX = Math.min(minX, point.x - 18); maxX = Math.max(maxX, point.x + 18); minY = Math.min(minY, point.y - 18); maxY = Math.max(maxY, point.y + 18);
     }
-    const scale = Math.min((viewport.width - 40) / (maxX - minX), (viewport.height - 130) / (maxY - minY), ids?.length === 1 ? 1.45 : 1.15);
-    commit({ x: viewport.width / 2 - (minX + maxX) / 2 * scale, y: (viewport.height + 50) / 2 - (minY + maxY) / 2 * scale, scale });
-  }, [positions, paths, viewport, commit]);
+    const plotTop = overlayTop ?? (viewport.width < 700 ? 198 : 148), plotHeight = Math.max(80, viewport.height - plotTop - 84);
+    const scale = Math.min((viewport.width - 40) / (maxX - minX), plotHeight / (maxY - minY), ids?.length === 1 ? 1.45 : 1.15);
+    commit({ x: viewport.width / 2 - (minX + maxX) / 2 * scale, y: plotTop + plotHeight / 2 - (minY + maxY) / 2 * scale, scale });
+  }, [positions, regions, paths, viewport, overlayTop, commit]);
   useLayoutEffect(() => {
     if (viewport.width <= 0 || viewport.height <= 0) return;
     if (!initialized.current && positions.length) { initialized.current = true; fit(); }
@@ -92,7 +98,11 @@ export function SemanticFlow2D({ graph, selectedIds, selectedEdgeId, matchIds, c
   }, [active, motion.enabled, motion.visible, particleSpacing]);
   const drag = useRef<{ x: number; y: number; startX: number; startY: number; moved: boolean } | undefined>(undefined);
   const visibleNodes = positions.filter(point => point.x * camera.scale + camera.x > -220 && point.x * camera.scale + camera.x < viewport.width + 220 && point.y * camera.scale + camera.y > -100 && point.y * camera.scale + camera.y < viewport.height + 100);
-  return <svg ref={root} className="semantic-flow-2d" role="application" tabIndex={0} aria-label="分類2D。矢印キーで移動、HomeでFit。検索結果からも選択できます。"
+  const mapViewport = { x: -camera.x / camera.scale, y: -camera.y / camera.scale, width: viewport.width / camera.scale, height: viewport.height / camera.scale };
+  const location = semanticVisibleRegions(regions, mapViewport);
+  const selectedPosition = positions.find(point => semanticMemberIds(point.node).some(id => selectedIds.has(id)));
+  const selectedRegion = selectedPosition ? semanticRegionIdentity(selectedPosition.node) : undefined;
+  return <><svg ref={root} className="semantic-flow-2d" role="application" tabIndex={0} aria-label="分類2D。矢印キーで移動、HomeでFit。検索結果からも選択できます。"
     data-camera-x={camera.x} data-camera-y={camera.y} data-camera-scale={camera.scale} data-node-count={graph.nodes.length} data-edge-count={graph.edges.length}
     onPointerDown={event => {
       if (event.button !== 0) return;
@@ -119,6 +129,7 @@ export function SemanticFlow2D({ graph, selectedIds, selectedEdgeId, matchIds, c
     }}>
     <defs>{['#82c6e2', '#dfb785', '#afcbbd', '#496660'].map(color => <marker key={color} id={`flow-arrow-${color.slice(1)}`} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse" markerUnits="strokeWidth"><path d="M 0 0 L 10 5 L 0 10 z" fill={color} /></marker>)}</defs>
     <g transform={`translate(${camera.x} ${camera.y}) scale(${camera.scale})`}>
+      <g data-flow-layer="regions" pointerEvents="none">{regions.map(region => <rect key={region.id} data-region-id={region.id} x={region.x} y={region.y} width={region.width} height={region.height} rx={12} className={`semantic-flow-region${region.id === selectedRegion?.id ? ' is-selected' : ''}`} />)}</g>
       <g data-flow-layer="edge-targets">{shownPaths.map(path => <path key={path.edge.id} data-edge-hit-id={path.edge.id} d={path.svgPath} className="semantic-flow-edge-hit" role="button" tabIndex={path.selected ? 0 : -1} aria-label={`${path.edge.label}の根拠を表示`}
           onClick={event => { event.stopPropagation(); if (!drag.current?.moved) onSelectEdge(path.edge.id); drag.current = undefined; }}
           onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelectEdge(path.edge.id); } }} />
@@ -148,5 +159,13 @@ export function SemanticFlow2D({ graph, selectedIds, selectedEdgeId, matchIds, c
         d={path.svgPath} fill="none" stroke={path.color} strokeWidth={motion.reduced ? 5 : 7} strokeLinecap="round"
         strokeDasharray={`0 ${particleSpacing}`} strokeDashoffset={-spatialFlowPhase(path.edge.id) * particleSpacing} />)}</g>
     </g>
-  </svg>;
+    <g className="semantic-flow-region-headings" pointerEvents="none">{regions.filter(region => location.ids.includes(region.id) && region.height * camera.scale > 24).map(region => {
+      const x = Math.max(14, region.x * camera.scale + camera.x + 10), y = Math.max(overlayTop ?? (viewport.width < 700 ? 198 : 148), region.y * camera.scale + camera.y + 19);
+      if (y > Math.min(viewport.height - 70, (region.y + region.height) * camera.scale + camera.y - 8) || x > viewport.width - 100) return null;
+      return <text key={region.id} x={x} y={y} data-region-label={region.id}><title>{region.label} · {region.count}対象</title>{region.label}<tspan dx={8}>{region.count}対象</tspan></text>;
+    })}</g>
+  </svg>
+    <SemanticFlowLocation label={location.label} selection={selectedPosition ? `${selectedRegion!.label} · ${selectedPosition.node.path ?? selectedPosition.node.label}` : undefined} />
+    <SemanticFlowMap regions={regions} viewport={mapViewport} selectedRegion={selectedRegion?.id} onFit={() => fit()} onNavigate={(x, y) => commit(current => ({ ...current, x: viewport.width / 2 - x * current.scale, y: viewport.height / 2 - y * current.scale }))} />
+  </>;
 }

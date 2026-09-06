@@ -4,22 +4,28 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import type { AnalyzerViewSession } from '../../analyzer/session';
 import { layoutSemanticFlow, semanticFlowEdgePaths } from '../../analyzer/semantic/flowPresentation';
+import { semanticFlowRegions, semanticRegionIdentity } from '../../analyzer/semantic/flowRegions';
 import { SPATIAL_FLOW_PARTICLE_SPACING, SPATIAL_FLOW_SPEED, type SpatialFlowState } from '../../analyzer/spatialFlow';
 import { SpatialFlowParticles } from './SpatialFlowParticles';
 import type { SemanticFlowRenderProps } from './SemanticFlow2D';
 import { bindSemanticFlowKeyboard } from './semanticFlowKeyboard';
-import { FlowLabelLayer, projectSemanticFlowLabels, type FlowLabelContent, type FlowLabelPlacement } from './semanticFlowLabels';
+import { FlowLabelLayer, hitSemanticFlowPoint, projectSemanticFlowLabels, type FlowLabelContent, type FlowLabelPlacement } from './semanticFlowLabels';
+import { SemanticFlowLocation } from './SemanticFlowMap';
 
 type CameraState = NonNullable<AnalyzerViewSession['semanticCamera']>;
-interface Props extends SemanticFlowRenderProps { camera?: CameraState; onCamera: (camera: CameraState) => void; onUnavailable: () => void }
+interface Props extends SemanticFlowRenderProps { camera?: CameraState; onCamera: (camera: CameraState) => void; onUnavailable: () => void; onFocusRegion?: (ids: string[]) => void }
 
-function Scene({ graph, selectedIds, selectedEdgeId, matchIds, command, motion, camera: savedCamera, onCamera, onSelect, onClear, onUnavailable, onLabels }: Props & { onLabels: (labels: FlowLabelPlacement[]) => void }) {
+function Scene({ graph, selectedIds, selectedEdgeId, matchIds, command, motion, overlayTop, camera: savedCamera, onCamera, onSelect, onClear, onUnavailable, onLabels, hoveredIds, onHover, hoverAt }: Props & {
+  onLabels: (labels: FlowLabelPlacement[]) => void; hoveredIds: ReadonlySet<string>; onHover: (id?: string) => void; hoverAt: (x: number, y: number) => string | undefined;
+}) {
   const { camera, gl, size, invalidate } = useThree();
   const controls = useRef<OrbitControls | null>(null);
-  const callbacks = useRef({ onCamera, onSelect, onClear, onUnavailable, onLabels });
-  useEffect(() => { callbacks.current = { onCamera, onSelect, onClear, onUnavailable, onLabels }; }, [onCamera, onSelect, onClear, onUnavailable, onLabels]);
+  const callbacks = useRef({ onCamera, onSelect, onClear, onUnavailable, onLabels, onHover, hoverAt });
+  useEffect(() => { callbacks.current = { onCamera, onSelect, onClear, onUnavailable, onLabels, onHover, hoverAt }; }, [onCamera, onSelect, onClear, onUnavailable, onLabels, onHover, hoverAt]);
   useEffect(() => () => callbacks.current.onLabels([]), []);
   const positions = useMemo(() => layoutSemanticFlow(graph, '3d'), [graph]);
+  const regions = useMemo(() => semanticFlowRegions(positions, '3d'), [positions]);
+  const priorityIds = useMemo(() => new Set(graph.edges.filter(edge => edge.id === selectedEdgeId).flatMap(edge => [edge.source, edge.target])), [graph.edges, selectedEdgeId]);
   const paths = useMemo(() => semanticFlowEdgePaths(graph, positions, selectedIds, selectedEdgeId, '3d', true), [graph, positions, selectedIds, selectedEdgeId]);
   const flowPaths = useMemo(() => paths.map(path => ({ id: path.edge.id, color: path.color, points: path.points })), [paths]);
   const stateRef = useRef<SpatialFlowState>({ active: false, distance: 0, reduced: false });
@@ -28,12 +34,26 @@ function Scene({ graph, selectedIds, selectedEdgeId, matchIds, command, motion, 
   const initialized = useRef(false);
   const initialCamera = useRef(savedCamera);
   const labelDirty = useRef(true);
-  useEffect(() => { labelDirty.current = true; invalidate(); }, [positions, selectedIds, matchIds, selectedEdgeId, size, invalidate]);
+  useEffect(() => { labelDirty.current = true; invalidate(); }, [positions, selectedIds, matchIds, selectedEdgeId, hoveredIds, size, overlayTop, invalidate]);
   useEffect(() => {
     stateRef.current.active = motion.enabled && motion.visible && flowPaths.length > 0;
     stateRef.current.reduced = motion.reduced; invalidate();
   }, [motion.enabled, motion.visible, motion.reduced, flowPaths, invalidate]);
   const connected = useMemo(() => new Set(paths.flatMap(path => [path.edge.source, path.edge.target])), [paths]);
+  const regionAsset = useMemo(() => {
+    const surfaces: number[] = [], borders: number[] = [];
+    for (const region of regions) {
+      const a = [region.x, region.y, region.z], b = [region.x + region.width, region.y, region.z], c = [region.x + region.width, region.y + region.height, region.z], d = [region.x, region.y + region.height, region.z];
+      surfaces.push(...a, ...b, ...c, ...a, ...c, ...d); borders.push(...a, ...b, ...b, ...c, ...c, ...d, ...d, ...a);
+    }
+    const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.Float32BufferAttribute(surfaces, 3));
+    const borderGeometry = new THREE.BufferGeometry(); borderGeometry.setAttribute('position', new THREE.Float32BufferAttribute(borders, 3));
+    const material = new THREE.MeshBasicMaterial({ color: '#315840', transparent: true, opacity: .14, side: THREE.DoubleSide, depthWrite: false });
+    const borderMaterial = new THREE.LineBasicMaterial({ color: '#6b9a80', transparent: true, opacity: .36, depthWrite: false });
+    const object = new THREE.Mesh(geometry, material), border = new THREE.LineSegments(borderGeometry, borderMaterial); object.renderOrder = -2; border.renderOrder = -1;
+    return { object, border, geometry, borderGeometry, material, borderMaterial };
+  }, [regions]);
+  useEffect(() => () => { regionAsset.geometry.dispose(); regionAsset.borderGeometry.dispose(); regionAsset.material.dispose(); regionAsset.borderMaterial.dispose(); }, [regionAsset]);
   const nodeAsset = useMemo(() => {
     const vertices: number[] = [], colors: number[] = [], sizes: number[] = [];
     positions.forEach(point => {
@@ -96,7 +116,9 @@ function Scene({ graph, selectedIds, selectedEdgeId, matchIds, command, motion, 
     const targets = ids?.length ? positions.filter(point => ids.includes(point.node.id)) : positions;
     if (!targets.length) return;
     const targetIds = new Set(targets.map(point => point.node.id));
-    const fitPoints = [...targets, ...(!ids || ids.length > 1 ? paths.filter(path => !ids || targetIds.has(path.edge.source) && targetIds.has(path.edge.target)).flatMap(path => path.points) : [])];
+    const fitPoints = [...targets, ...(!ids || ids.length > 1 ? paths.filter(path => !ids || targetIds.has(path.edge.source) && targetIds.has(path.edge.target)).flatMap(path => path.points) : []),
+      ...(!ids ? regions.flatMap(region => [{ x: region.x, y: region.y, z: region.z }, { x: region.x + region.width, y: region.y, z: region.z },
+        { x: region.x, y: region.y + region.height, z: region.z }, { x: region.x + region.width, y: region.y + region.height, z: region.z }]) : [])];
     const box = new THREE.Box3().setFromPoints(fitPoints.map(point => new THREE.Vector3(point.x, point.y, point.z)));
     const center = box.getCenter(new THREE.Vector3());
     const direction = reset ? new THREE.Vector3(1, .65, 1.5).normalize() : camera.position.clone().sub(control.target).normalize();
@@ -104,9 +126,9 @@ function Scene({ graph, selectedIds, selectedEdgeId, matchIds, command, motion, 
     const projected = fitPoints.map(point => new THREE.Vector3(point.x, point.y, point.z).applyMatrix4(camera.matrixWorldInverse));
     const viewBox = new THREE.Box3().setFromPoints(projected).getSize(new THREE.Vector3());
     const cam = camera as THREE.OrthographicCamera;
-    cam.zoom = Math.min((size.width - 70) / (viewBox.x + 80), (size.height - 160) / (viewBox.y + 80), ids?.length === 1 ? 3 : 2);
+    cam.zoom = Math.min((size.width - 70) / (viewBox.x + 80), (size.height - 210) / (viewBox.y + 80), ids?.length === 1 ? 3 : 2);
     cam.updateProjectionMatrix(); control.update(); labelDirty.current = true; save(); invalidate();
-  }, [positions, paths, camera, size, save, invalidate]);
+  }, [positions, regions, paths, camera, size, save, invalidate]);
   useEffect(() => {
     if (initialized.current || !positions.length || !controls.current) return;
     initialized.current = true;
@@ -124,20 +146,25 @@ function Scene({ graph, selectedIds, selectedEdgeId, matchIds, command, motion, 
   }, [command, camera, fit, save, invalidate]);
   useEffect(() => {
     const element = gl.domElement; let down = { x: 0, y: 0 };
-    const start = (event: PointerEvent) => { down = { x: event.clientX, y: event.clientY }; element.focus({ preventScroll: true }); };
+    const start = (event: PointerEvent) => { down = { x: event.clientX, y: event.clientY }; element.focus({ preventScroll: true }); callbacks.current.onHover(); };
+    const hit = (event: PointerEvent) => {
+      const rect = element.getBoundingClientRect();
+      return { x: event.clientX - rect.left, y: event.clientY - rect.top, width: rect.width, height: rect.height };
+    };
+    const move = (event: PointerEvent) => {
+      if (event.buttons) return;
+      const p = hit(event), id = hitSemanticFlowPoint(camera, p, positions, p.x, p.y) ?? callbacks.current.hoverAt(p.x, p.y);
+      element.style.cursor = id ? 'pointer' : '';
+      callbacks.current.onHover(id);
+    };
+    const leave = () => { element.style.cursor = ''; callbacks.current.onHover(); };
     const end = (event: PointerEvent) => {
       if (event.button !== 0 || Math.hypot(event.clientX - down.x, event.clientY - down.y) > 5) return;
-      const rect = element.getBoundingClientRect(), point = new THREE.Vector3();
-      let nearest: { id: string; distance: number; depth: number } | undefined;
-      for (const item of positions) {
-        point.set(item.x, item.y, item.z).project(camera);
-        const distance = Math.hypot((point.x + 1) * rect.width / 2 - event.clientX + rect.left, (1 - point.y) * rect.height / 2 - event.clientY + rect.top);
-        if (point.z >= -1 && point.z <= 1 && distance <= 13 && (!nearest || distance < nearest.distance - 1 || Math.abs(distance - nearest.distance) < 1 && point.z < nearest.depth)) nearest = { id: item.node.id, distance, depth: point.z };
-      }
-      if (nearest) callbacks.current.onSelect(nearest.id); else callbacks.current.onClear();
+      const p = hit(event), id = hitSemanticFlowPoint(camera, p, positions, p.x, p.y);
+      if (id) callbacks.current.onSelect(id); else callbacks.current.onClear();
     };
-    element.addEventListener('pointerdown', start); element.addEventListener('pointerup', end);
-    return () => { element.removeEventListener('pointerdown', start); element.removeEventListener('pointerup', end); };
+    element.addEventListener('pointerdown', start); element.addEventListener('pointerup', end); element.addEventListener('pointermove', move); element.addEventListener('pointerleave', leave);
+    return () => { element.removeEventListener('pointerdown', start); element.removeEventListener('pointerup', end); element.removeEventListener('pointermove', move); element.removeEventListener('pointerleave', leave); element.style.cursor = ''; };
   }, [camera, gl, positions]);
   const labelOrder = useMemo(() => [...positions].sort((a, b) => Number(selectedIds.has(b.node.id)) - Number(selectedIds.has(a.node.id)) || Number(matchIds.has(b.node.id)) - Number(matchIds.has(a.node.id)) || Number(connected.has(b.node.id)) - Number(connected.has(a.node.id)) || Number(b.node.kind === 'entry') - Number(a.node.kind === 'entry')), [positions, selectedIds, matchIds, connected]);
   useFrame((_, delta) => {
@@ -146,12 +173,12 @@ function Scene({ graph, selectedIds, selectedEdgeId, matchIds, command, motion, 
     (edgeAsset.arrowMaterial.uniforms.viewport!.value as THREE.Vector2).set(size.width, size.height);
     cameraRef.current = { scale: zoom, viewportWidth: size.width, viewportHeight: size.height };
     if (labelDirty.current) {
-      callbacks.current.onLabels(projectSemanticFlowLabels(camera, size, zoom, labelOrder, selectedIds, matchIds));
+      callbacks.current.onLabels(projectSemanticFlowLabels(camera, size, zoom, labelOrder, selectedIds, matchIds, { regions, relatedIds: connected, priorityIds, hoveredIds, overlayTop }));
       labelDirty.current = false;
     }
     if (stateRef.current.active) { stateRef.current.distance += Math.min(delta, .1) * SPATIAL_FLOW_SPEED; invalidate(); }
   });
-  return <><color attach="background" args={['#050c09']} /><primitive object={edgeAsset.object} /><primitive object={edgeAsset.arrows} /><primitive object={nodeAsset.object} />
+  return <><color attach="background" args={['#050c09']} /><primitive object={regionAsset.object} /><primitive object={regionAsset.border} /><primitive object={edgeAsset.object} /><primitive object={edgeAsset.arrows} /><primitive object={nodeAsset.object} />
     <SpatialFlowParticles paths={flowPaths} stateRef={stateRef} cameraRef={cameraRef} active={motion.enabled && motion.visible} spacing={SPATIAL_FLOW_PARTICLE_SPACING} />
   </>;
 }
@@ -166,12 +193,29 @@ class FlowGraphBoundary extends Component<{ children: ReactNode; onUnavailable: 
 export function SemanticFlow3D(props: Props) {
   const [labels, setLabels] = useState<FlowLabelContent[]>([]);
   const [labelLayer] = useState(() => new FlowLabelLayer(setLabels));
-  useLayoutEffect(() => { labelLayer.resume(); return () => labelLayer.suspend(); }, [labelLayer]);
+  const [hoveredId, setHoveredId] = useState<string>(), [focusedId, setFocusedId] = useState<string>();
+  const clearHoverTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const onHover = useCallback((id?: string) => {
+    if (id) { clearTimeout(clearHoverTimer.current); clearHoverTimer.current = undefined; setHoveredId(id); }
+    else if (clearHoverTimer.current === undefined) clearHoverTimer.current = setTimeout(() => { setHoveredId(undefined); clearHoverTimer.current = undefined; }, 120);
+  }, []);
+  const hoveredIds = useMemo(() => new Set([hoveredId, focusedId].filter((id): id is string => Boolean(id))), [hoveredId, focusedId]);
+  const regionNodes = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const node of props.graph.nodes) { const id = `flow-region:${semanticRegionIdentity(node).id}`, nodes = map.get(id) ?? []; nodes.push(node.id); map.set(id, nodes); }
+    return map;
+  }, [props.graph.nodes]);
+  const selected = props.graph.nodes.find(node => props.selectedIds.has(node.id));
+  useLayoutEffect(() => { labelLayer.resume(); return () => { clearTimeout(clearHoverTimer.current); labelLayer.suspend(); }; }, [labelLayer]);
   return <div className="semantic-flow-3d" data-node-count={props.graph.nodes.length} data-edge-count={props.graph.edges.length}>
-    <FlowGraphBoundary onUnavailable={props.onUnavailable}><Canvas orthographic frameloop="demand" dpr={[1, 1.7]} camera={{ position: [900, 650, 1500], zoom: 1, near: .1, far: 1000000 }} gl={{ antialias: true, alpha: true }}><Scene {...props} onLabels={labelLayer.update} /></Canvas></FlowGraphBoundary>
+    <FlowGraphBoundary onUnavailable={props.onUnavailable}><Canvas orthographic frameloop="demand" dpr={[1, 1.7]} camera={{ position: [900, 650, 1500], zoom: 1, near: .1, far: 1000000 }} gl={{ antialias: true, alpha: true }}><Scene {...props} onLabels={labelLayer.update} hoveredIds={hoveredIds} onHover={onHover} hoverAt={labelLayer.hoverAt} /></Canvas></FlowGraphBoundary>
+    <svg className="semantic-flow-label-leaders" aria-hidden="true">{labels.filter(label => !label.region).map(label => <line key={label.id} ref={element => labelLayer.attachLeader(label.id, element)} />)}</svg>
     <div className="semantic-flow-3d-labels">{labels.map(label => <button key={label.id} ref={element => labelLayer.attach(label.id, element)} type="button"
-      className={`${label.selected ? 'is-selected' : ''}${label.match ? ' is-match' : ''}`} aria-pressed={label.selected} title={`${label.label}\n${label.path}`}
-      onClick={() => props.onSelect(label.id)}><strong>{label.label}</strong>{label.selected && <small>{label.path}</small>}</button>)}</div>
+      data-flow-label-id={label.id} className={`${label.selected ? 'is-selected' : ''}${label.match ? ' is-match' : ''}${label.hovered ? ' is-hovered' : ''}${label.related ? ' is-related' : ''}${label.region ? ' is-region' : ''}`} aria-pressed={label.region ? undefined : label.selected} title={`${label.label}\n${label.path}`}
+      aria-label={label.region ? `${label.label}の領域へ移動 · ${label.path}` : undefined}
+      onPointerEnter={() => { if (!label.region) onHover(label.id); }} onPointerLeave={() => onHover()} onFocus={() => { if (!label.region) setFocusedId(label.id); }} onBlur={() => setFocusedId(undefined)}
+      onClick={() => label.region ? props.onFocusRegion?.(regionNodes.get(label.id) ?? []) : props.onSelect(label.id)}><strong>{label.label}</strong>{(label.region || label.selected || label.hovered) && <small>{label.path}</small>}</button>)}</div>
+    <SemanticFlowLocation label={`${regionNodes.size}領域 · 横方向は関係のつながり`} description="フォルダー・所属ごとのまとまり" selection={selected ? `${semanticRegionIdentity(selected).label} · ${selected.path ?? selected.label}` : undefined} />
     <div className="semantic-flow-3d-selection-description" aria-live="polite">{[...props.selectedIds].map(id => props.graph.nodes.find(node => node.id === id)?.label).filter(Boolean).join('、')}</div>
   </div>;
 }

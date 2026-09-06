@@ -15,6 +15,7 @@ import { AnalyzerViewTabs } from '../components/analyzer/AnalyzerToolbar';
 import { SearchResultStrip } from '../components/analyzer/SearchResultStrip';
 import { SemanticFlowStage } from '../components/analyzer/SemanticFlowStage';
 import { SemanticFlowDetail } from '../components/analyzer/SemanticFlowDetail';
+import { semanticFlowDirectionLanguage } from '../components/analyzer/semanticFlowLanguage';
 import { useWorkspaceFullscreen } from '../components/analyzer/useWorkspaceFullscreen';
 import { analyzerRoutes } from '../utils/routes';
 import './semantic-flow.css';
@@ -146,7 +147,7 @@ export default function FlowAnalyzerPage({ view }: { view: 'runtime-flow' | 'fun
         <label>確度<select value={options.confidence} onChange={event => changeOptions({ confidence: event.target.value })}><option value="">すべて</option>{Object.entries(confidenceLabels).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
         <label>表示データ<select value={options.layer} onChange={event => changeOptions({ layer: event.target.value as typeof options.layer })}><option value="source">ソース解析</option><option value="observed">実行ログ・Trace</option><option value="combined">ソース ＋ 実測</option></select></label>
         <label>選択の周辺<select value={options.depth} onChange={event => changeOptions({ depth: Number(event.target.value) })}><option value={0}>全体</option>{[1, 2, 3, 5].map(depth => <option key={depth} value={depth}>{depth}段階</option>)}</select></label>
-        <label>関係方向<select value={options.direction} onChange={event => changeOptions({ direction: event.target.value as typeof options.direction })}><option value="both">入る・出る関係</option><option value="incoming">入る関係・呼び出し元</option><option value="outgoing">出る関係・呼び出し先</option></select></label>
+        <label>関係方向<select value={options.direction} onChange={event => changeOptions({ direction: event.target.value as typeof options.direction })}><option value="both">入る・出る関係</option><option value="incoming">{semanticFlowDirectionLanguage(view).incoming}から</option><option value="outgoing">{semanticFlowDirectionLanguage(view).outgoing}へ</option></select></label>
         <label className="semantic-flow-checkbox"><input type="checkbox" checked={Boolean(options.auxiliary)} onChange={event => changeOptions({ auxiliary: event.target.checked })} />Test・生成定義を含む</label>
         <label className="semantic-flow-checkbox"><input type="checkbox" checked={options.overview} onChange={event => changeOptions({ overview: event.target.checked })} />分類2Dで大きなグラフをまとめる</label>
         <button type="button" className="analyzer-quiet-button" disabled={!analysis} onClick={() => traceInput.current?.click()}>実行データを読み込む</button>
@@ -174,7 +175,7 @@ export default function FlowAnalyzerPage({ view }: { view: 'runtime-flow' | 'fun
         {store && session.detailOpen && (selected || selectedEdge) && <SemanticFlowDetail key={selected?.id ?? selectedEdge?.id} node={selected} edge={selectedEdge} nodes={allNodes} edges={graph.edges} sources={store.semanticSources ?? store.sources} view={view}
           onSelect={id => selectNode(id)} onSelectEdge={id => selectEdge(id)} onClose={() => updateView(view, { detailOpen: false })} onJump={jump} />}
       </div>
-      {analysis && <details className="semantic-coverage"><summary>解析範囲 · {analysis.stats.files.toLocaleString()} files · {analysis.stats.unresolved.toLocaleString()}未解決 calls · {(analysis.stats.elapsedMs / 1000).toFixed(1)}秒</summary>
+      {analysis && <details className="semantic-coverage"><summary>解析範囲 · {analysis.stats.files.toLocaleString()} files · 解析全体で定義先が未特定の呼び出し {analysis.stats.unresolved.toLocaleString()}箇所 · {(analysis.stats.elapsedMs / 1000).toFixed(1)}秒</summary>
         <p>ソースで確認＝構文上の宣言・関係。推定＝名前・設定・callback契約からの対応付け。実測＝読み込んだ実行記録。未解決＝静的に呼び出し先を確定できない関係。イベント登録と実際の実行は区別されます。</p>
         <p>検索は名前・パス・所属・明示的な識別名を対象に、複数語のすべてを含む候補を返します。入力で配置や選択は変わりません。分類2Dの配置と粒子は、実測された実行順序を示すものではありません。</p>
         {[...analysis.warnings, ...(store?.warnings.map(item => item.message) ?? []), ...(traces?.warnings ?? [])].map((warning, index) => <p key={index}>{warning}</p>)}

@@ -63,6 +63,8 @@ import { projectSpatialHeadings } from '../../analyzer/spatialHeadings';
 import { SPATIAL_FLOW_SPEED, type SpatialFlowState } from '../../analyzer/spatialFlow';
 import { useSpatialFlowMotion } from './useSpatialFlowMotion';
 import { SpatialParticleControl } from './SpatialParticleControl';
+import { SemanticFlowLegend } from './SemanticFlowLegend';
+import { semanticFlowDirectionLanguage } from './semanticFlowLanguage';
 
 interface AnalyzerSpatialGraphStageProps {
   view: AnalyzerViewModel;
@@ -842,7 +844,9 @@ export function AnalyzerSpatialGraphStage({
       {showHelp && (
         <div id="analyzer-spatial-help" className="analyzer-stage-help" role="dialog" aria-label="Spatial graph操作ヘルプ">
           <strong>Spatial Atlas</strong>
-          <p>ドラッグで移動、Wheelでカーソル位置を拡大縮小。矢印キーで移動、＋ / −でズーム、Homeで全体表示。青はimport先、琥珀色はimport元です。「パーティクル」のメニューから通常・控えめ・オフを選べます。Directoryはダブルクリック、またはEnterで展開 / 折りたたみできます。Escで選択解除、全画面表示中はEscで通常表示へ戻ります。</p>
+          <p>ドラッグで移動、Wheelでカーソル位置を拡大縮小。矢印キーで移動、＋ / −でズーム、Homeで全体表示。「パーティクル」のメニューから通常・控えめ・オフを選べます。Directoryはダブルクリック、またはEnterで展開 / 折りたたみできます。Escで選択解除、全画面表示中はEscで通常表示へ戻ります。</p>
+          <SemanticFlowLegend view="module-dependency" inline />
+          <p>{semanticFlowDirectionLanguage('module-dependency').help}</p>
         </div>
       )}
       {view.nodes.length > 0 && view.edges.length === 0 && (

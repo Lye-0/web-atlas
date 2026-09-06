@@ -26,7 +26,7 @@ describe('semantic 2D drawing and selection layers', () => {
   afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.clearAllMocks(); vi.unstubAllGlobals(); });
 
   it('paints lines and particles above cards while leaving edge hit targets below cards', () => {
-    expect([...host.querySelectorAll('[data-flow-layer]')].map(item => item.getAttribute('data-flow-layer'))).toEqual(['edge-targets', 'nodes', 'edges', 'particles']);
+    expect([...host.querySelectorAll('[data-flow-layer]')].map(item => item.getAttribute('data-flow-layer'))).toEqual(['regions', 'edge-targets', 'nodes', 'edges', 'particles']);
     const visual = host.querySelector('[data-flow-layer="edges"]')!, particles = host.querySelector('[data-flow-layer="particles"]')!;
     expect(visual.getAttribute('pointer-events')).toBe('none'); expect(particles.getAttribute('pointer-events')).toBe('none');
     expect([...visual.querySelectorAll('[data-edge-id]')].map(item => [item.getAttribute('data-edge-id'), item.getAttribute('data-source'), item.getAttribute('data-target')])).toEqual([['a-b', 'a', 'b'], ['b-c', 'b', 'c'], ['a-c', 'a', 'c']]);
@@ -72,5 +72,19 @@ describe('semantic 2D drawing and selection layers', () => {
     expect(onSelectEdge).toHaveBeenLastCalledWith('a-c');
     await act(async () => edge.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true })));
     expect(onSelectEdge).toHaveBeenCalledTimes(2); expect(onClear).not.toHaveBeenCalled();
+  });
+
+  it('moves the minimap viewport independently of selection and can return from empty space', async () => {
+    const map = host.querySelector('.semantic-flow-minimap svg')!, main = host.querySelector('.semantic-flow-2d')!;
+    const originalY = Number(main.getAttribute('data-camera-y'));
+    await act(async () => map.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })));
+    expect(Number(main.getAttribute('data-camera-y'))).toBeCloseTo(originalY - 175);
+    for (let index = 0; index < 8; index++) await act(async () => map.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })));
+    expect(host.querySelector('.semantic-flow-location strong')?.textContent).toBe('領域の外');
+    expect(host.querySelector('.semantic-flow-location span')?.textContent).toContain('src/a.ts');
+    expect(host.querySelector('[data-node-id="a"]')).toBeNull(); expect(onClear).not.toHaveBeenCalled();
+    await act(async () => map.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true })));
+    expect(host.querySelector('.semantic-flow-location strong')?.textContent).toContain('全体');
+    expect(host.querySelector('[data-node-id="a"]')?.getAttribute('aria-pressed')).toBe('true');
   });
 });

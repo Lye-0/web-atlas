@@ -1,8 +1,9 @@
 import { act, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { confidenceLabels, semanticViewIds, type SemanticEdge, type SemanticEvidence, type SemanticNode } from '../../analyzer/semantic/types';
+import { semanticViewIds, type SemanticEdge, type SemanticEvidence, type SemanticNode } from '../../analyzer/semantic/types';
 import { SemanticFlowDetail } from './SemanticFlowDetail';
+import { semanticRelationConfidence, semanticRelationLabel } from './semanticFlowLanguage';
 
 const evidence = (description: string, line = 2, endLine = line): SemanticEvidence => ({ path: 'src/service.ts', start: line * 10, end: endLine * 10 + 9, line, endLine, description });
 const node = (id: string): SemanticNode => ({ id, kind: 'function', label: id, path: `src/${id}.ts`, line: 2, endLine: 8, group: 'Services', confidence: 'source', evidence: [evidence(`${id} declaration`)], attributes: {} });
@@ -31,9 +32,9 @@ describe('Semantic flow detail exploration', () => {
     const outgoing = [...parallel, ...Array.from({ length: 7 }, (_, index) => relation(`out-${index + 1}`, 'run', `peer-${index + 1}`))];
     const incoming = relation('inbound', 'caller', 'run'), self = relation('recursive', 'run', 'run');
     await render({ node: nodes.get('run'), edges: [...outgoing, incoming, self] });
-    const out = section('出る関係・呼び出し先');
+    const out = section('呼び出し先');
     expect(out.querySelector('summary small')?.textContent).toBe('15');
-    expect(section('入る関係・呼び出し元').querySelector('summary small')?.textContent).toBe('1');
+    expect(section('呼び出し元').querySelector('summary small')?.textContent).toBe('1');
     expect(section('自己参照').querySelector('summary small')?.textContent).toBe('1');
     expect(out.querySelectorAll('.semantic-flow-connection-row')).toHaveLength(6);
     await click(out.querySelector<HTMLButtonElement>('.analyzer-detail-show-more')!);
@@ -45,14 +46,24 @@ describe('Semantic flow detail exploration', () => {
     expect(group.querySelectorAll('.semantic-flow-relation-link')).toHaveLength(6);
     await click(group.querySelector<HTMLButtonElement>('.analyzer-detail-show-more')!);
     expect(group.querySelectorAll('.semantic-flow-relation-link')).toHaveLength(8);
-    for (const edge of [...outgoing, incoming, self]) {
-      const button = [...host.querySelectorAll<HTMLButtonElement>('.semantic-flow-relation-link > button')].find(item => item.textContent === `${edge.label} · ${confidenceLabels[edge.confidence]}`)!;
-      expect(button.parentElement?.querySelector('code')?.textContent).toBe(edge.kind);
+    for (const [index, edge] of [...outgoing, incoming, self].entries()) {
+      const button = host.querySelectorAll<HTMLButtonElement>('.semantic-flow-relation-link > button')[index]!;
+      expect(button.textContent).toBe(`${semanticRelationLabel(edge)} · ${semanticRelationConfidence(edge)}`);
+      expect(button.parentElement?.querySelector('code')).toBeNull();
       await click(button);
       expect(onSelectEdge).toHaveBeenLastCalledWith(edge.id);
     }
     await click(out.querySelector<HTMLButtonElement>('.analyzer-module-connection-name')!);
     expect(onSelect).toHaveBeenLastCalledWith('peer-0');
+    for (const edge of [...outgoing, incoming, self]) {
+      await render({ edge });
+      await open(section('関係情報').querySelector<HTMLDetailsElement>('.semantic-flow-source-info')!);
+      const entries = [...section('関係情報').querySelectorAll('dl > div')].map(item => [item.querySelector('dt')?.textContent, item.querySelector('dd')?.textContent]);
+      expect(entries).toContainEqual(['関係ID', edge.id]);
+      expect(entries).toContainEqual(['Kind', edge.kind]);
+      expect(entries).toContainEqual(['Confidence', edge.confidence]);
+      expect(entries).toContainEqual(['元の表示名', edge.label]);
+    }
   });
 
   it('defers auxiliary content and restores the compact state when selection changes', async () => {
@@ -105,8 +116,10 @@ describe('Semantic flow detail exploration', () => {
     expect(endpoints[1]?.querySelector('small')?.textContent).toBe('src/save.ts:2–8');
     await click(endpoints[0]!); expect(onSelect).toHaveBeenLastCalledWith('run');
     await click(endpoints[1]!); expect(onSelect).toHaveBeenLastCalledWith('save');
-    expect(section('関係情報').textContent).toContain('calls');
     expect(section('関係情報').textContent).toContain('推定');
+    await open(section('関係情報').querySelector<HTMLDetailsElement>('.semantic-flow-source-info')!);
+    expect(section('関係情報').textContent).toContain('calls');
+    expect(section('関係情報').textContent).toContain('inferred');
     expect(section('Evidence').open).toBe(true);
     expect(section('Evidence').querySelector('summary small')?.textContent).toBe('1');
     expect(section('Evidence').textContent).toContain('src/service.ts:2–80');
@@ -122,11 +135,51 @@ describe('Semantic flow detail exploration', () => {
     const rows = [...originals.querySelectorAll('.semantic-flow-original-relation')];
     expect(rows).toHaveLength(8);
     for (const [index, original] of provenance.entries()) {
-      expect(rows[index]?.textContent).toContain(`${original.label} · ${original.kind} · ${confidenceLabels[original.confidence]}`);
+      expect(rows[index]?.textContent).toContain(`${semanticRelationLabel(original)} · ${semanticRelationConfidence(original)}`);
+      await open(rows[index]!.querySelector<HTMLDetailsElement>('.semantic-flow-source-info')!);
+      expect(rows[index]?.textContent).toContain(original.label);
+      expect(rows[index]?.textContent).toContain(original.kind);
+      expect(rows[index]?.textContent).toContain(original.confidence);
+      expect(rows[index]?.textContent).toContain(original.id);
       expect(rows[index]?.textContent).toContain(`${original.id} evidence`);
     }
     expect(originals.querySelector('pre')).toBeNull();
     await open(rows[7]!.querySelector<HTMLDetailsElement>('.semantic-evidence > details')!);
     expect(rows[7]?.querySelector('pre')?.textContent).toContain('source row 2');
+  });
+
+  it('distinguishes confirmed calls from unknown definitions without merging same-named targets or call sites', async () => {
+    const first = { ...evidence('first call', 10), start: 100, end: 109 }, second = { ...evidence('second call on the same line', 10), start: 120, end: 129 }, third = evidence('another caller', 25);
+    const unresolved: SemanticNode = { ...node('external:service:client.save'), label: 'client.save', kind: 'external', path: 'src/service.ts', line: 10, endLine: 10, confidence: 'unresolved', evidence: [first], attributes: { callee: 'client.save', reason: '呼び出し先を静的に解決できません', candidates: [] } };
+    const other: SemanticNode = { ...unresolved, id: 'external:other:client.save', path: 'src/other.ts', evidence: [{ ...first, path: 'src/other.ts' }] };
+    const scopedNodes = new Map(nodes); scopedNodes.set(unresolved.id, unresolved); scopedNodes.set(other.id, other);
+    const calls: SemanticEdge[] = [first, second, third].map((item, index) => ({ ...relation(`unknown-call-${index}`, index === 2 ? 'save' : 'run', unresolved.id), label: 'client.save', confidence: 'unresolved', evidence: [item] }));
+    const unrelated = { ...relation('other-call', 'caller', other.id), evidence: other.evidence, confidence: 'unresolved' as const };
+    await render({ node: unresolved, nodes: scopedNodes, edges: [...calls, unrelated] });
+    const note = host.querySelector('.semantic-flow-resolution-note')!;
+    expect(note.textContent).toContain('呼び出し式はソースにあります');
+    expect(note.textContent).toContain('関数の定義を特定できていません');
+    expect(note.textContent).toContain('3箇所の呼び出し');
+    expect(host.querySelector('.analyzer-module-detail-path')?.textContent).toBe('呼び出し箇所の一例: src/service.ts:10');
+    expect(host.querySelector('.analyzer-node-type')?.textContent).toBe('呼び出し先');
+    const group = section('呼び出し元').querySelector<HTMLDetailsElement>('.semantic-flow-relation-group')!;
+    await open(group);
+    const buttons = [...section('呼び出し元').querySelectorAll<HTMLButtonElement>('.semantic-flow-relation-link > button')];
+    expect(buttons).toHaveLength(3);
+    for (const [index, button] of buttons.entries()) { await click(button); expect(onSelectEdge).toHaveBeenLastCalledWith(calls[index]!.id); }
+    await open(section('Evidence'));
+    expect(section('Evidence').querySelector('summary small')?.textContent).toBe('3');
+    expect(section('Evidence').textContent).toContain('first call');
+    expect(section('Evidence').textContent).toContain('second call on the same line');
+    expect(section('Evidence').textContent).toContain('another caller');
+    expect(section('Evidence').textContent).not.toContain('src/other.ts');
+    await render({ edge: calls[1], nodes: scopedNodes });
+    expect(host.querySelector('.semantic-flow-resolution-note')?.textContent).toContain('この呼び出し式はソースで確認できています');
+    expect(section('Evidence').textContent).toContain('second call on the same line');
+    expect(section('Evidence').textContent).not.toContain('first call');
+    await open(section('関係情報').querySelector<HTMLDetailsElement>('.semantic-flow-source-info')!);
+    expect(section('関係情報').textContent).toContain('unknown-call-1');
+    expect(section('関係情報').textContent).toContain('calls');
+    expect(section('関係情報').textContent).toContain('unresolved');
   });
 });

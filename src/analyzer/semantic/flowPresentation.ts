@@ -1,6 +1,7 @@
 import { analyzerDirectionColors, analyzerEdgeDirection } from '../edgeDirection';
 import { semanticDepths, semanticOverviewId, summarizeSemanticGraph, type SemanticPosition } from './presentation';
 import type { SemanticEdge, SemanticGraph, SemanticNode } from './types';
+import { semanticRegionIdentity } from './flowRegions';
 
 export interface FlowPoint { x: number; y: number; z: number }
 export interface FlowEdgePath { edge: SemanticEdge; points: FlowPoint[]; svgPath: string; color: string; selected: boolean; direction?: 'incoming' | 'outgoing' | 'internal' }
@@ -24,25 +25,30 @@ export function semanticMemberIds(node: SemanticNode): string[] {
 /** SCC depth follows source→target; grouping never invents or reverses a relationship. */
 export function layoutSemanticFlow(graph: SemanticGraph, mode: '2d' | '3d'): SemanticPosition[] {
   const depths = semanticDepths(graph);
-  const stages = new Map<number, SemanticNode[]>();
+  const groups = new Map<string, { label: string; stages: Map<number, SemanticNode[]>; columns: number; rows: number; offset: number }>();
   for (const node of graph.nodes) {
-    const depth = depths.get(node.id) ?? 0;
-    const stage = stages.get(depth) ?? []; stage.push(node); stages.set(depth, stage);
+    const identity = semanticRegionIdentity(node), depth = depths.get(node.id) ?? 0;
+    const group = groups.get(identity.id) ?? { label: identity.label, stages: new Map(), columns: 1, rows: 1, offset: 0 };
+    const stage = group.stages.get(depth) ?? []; stage.push(node); group.stages.set(depth, stage); groups.set(identity.id, group);
   }
+  const ordered = [...groups].sort(([idA, a], [idB, b]) => a.label.localeCompare(b.label) || idA.localeCompare(idB));
+  const widths = new Map<number, number>(); let offset = 0;
+  for (const [, group] of ordered) {
+    const maximum = Math.max(1, ...[...group.stages.values()].map(nodes => nodes.length));
+    group.columns = mode === '2d' ? Math.max(1, Math.ceil(Math.sqrt(maximum / 6))) : Math.ceil(Math.sqrt(maximum));
+    group.rows = mode === '2d' ? Math.ceil(maximum / group.columns) : group.columns;
+    group.offset = offset; offset += group.rows * (mode === '2d' ? 86 : 50) + (mode === '2d' ? 96 : 110);
+    for (const [depth, nodes] of group.stages) widths.set(depth, Math.max(widths.get(depth) ?? 0, Math.min(group.columns, nodes.length) * 242 + 86));
+  }
+  const stageX = new Map<number, number>(); let x = 0;
+  for (const [depth, width] of [...widths].sort(([a], [b]) => a - b)) { stageX.set(depth, x); x += width; }
   const result: SemanticPosition[] = [];
-  for (const [depth, nodes] of [...stages].sort(([a], [b]) => a - b)) {
-    nodes.sort((a, b) => a.group.localeCompare(b.group) || (a.path ?? '').localeCompare(b.path ?? '') || (a.line ?? 0) - (b.line ?? 0) || a.id.localeCompare(b.id));
-    if (mode === '3d') {
-      // Stable compact planes: every canonical target is present, with depth revealing progression.
-      const columns = Math.max(1, Math.ceil(Math.sqrt(nodes.length)));
-      nodes.forEach((node, index) => result.push({ node, x: depth * 250, y: (index % columns - (columns - 1) / 2) * 50,
-        z: (Math.floor(index / columns) - (Math.ceil(nodes.length / columns) - 1) / 2) * 50 }));
-    } else {
-      const columns = Math.max(1, Math.ceil(Math.sqrt(nodes.length / 6)));
-      // Parallel lanes within one stage keep long graphs navigable without classifying by kind alone.
-      const beforeWidth = [...stages].filter(([other]) => other < depth).reduce((sum, [, previous]) => sum + Math.max(1, Math.ceil(Math.sqrt(previous.length / 6))) * 242 + 86, 0);
-      nodes.forEach((node, index) => result.push({ node, x: beforeWidth + index % columns * 242, y: Math.floor(index / columns) * 86, z: 0 }));
-    }
+  for (const [, group] of ordered) for (const [depth, nodes] of [...group.stages].sort(([a], [b]) => a - b)) {
+    nodes.sort((a, b) => (a.path ?? '').localeCompare(b.path ?? '') || (a.line ?? 0) - (b.line ?? 0) || a.id.localeCompare(b.id));
+    nodes.forEach((node, index) => {
+      if (mode === '3d') result.push({ node, x: depth * 250, y: -group.offset - (index % group.rows) * 50, z: Math.floor(index / group.rows) * 50 });
+      else result.push({ node, x: stageX.get(depth)! + index % group.columns * 242, y: group.offset + Math.floor(index / group.columns) * 86, z: 0 });
+    });
   }
   return result;
 }
