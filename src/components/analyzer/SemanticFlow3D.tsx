@@ -1,4 +1,4 @@
-import { Component, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Component, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -8,16 +8,17 @@ import { SPATIAL_FLOW_SPEED, type SpatialFlowState } from '../../analyzer/spatia
 import { SpatialFlowParticles } from './SpatialFlowParticles';
 import type { SemanticFlowRenderProps } from './SemanticFlow2D';
 import { bindSemanticFlowKeyboard } from './semanticFlowKeyboard';
+import { FlowLabelLayer, projectSemanticFlowLabels, type FlowLabelContent, type FlowLabelPlacement } from './semanticFlowLabels';
 
 type CameraState = NonNullable<AnalyzerViewSession['semanticCamera']>;
-interface Label { id: string; label: string; path: string; x: number; y: number; selected: boolean; match: boolean }
 interface Props extends SemanticFlowRenderProps { camera?: CameraState; onCamera: (camera: CameraState) => void; onUnavailable: () => void }
 
-function Scene({ graph, selectedIds, selectedEdgeId, matchIds, command, motion, camera: savedCamera, onCamera, onSelect, onClear, onUnavailable, onLabels }: Props & { onLabels: (labels: Label[]) => void }) {
+function Scene({ graph, selectedIds, selectedEdgeId, matchIds, command, motion, camera: savedCamera, onCamera, onSelect, onClear, onUnavailable, onLabels }: Props & { onLabels: (labels: FlowLabelPlacement[]) => void }) {
   const { camera, gl, size, invalidate } = useThree();
   const controls = useRef<OrbitControls | null>(null);
   const callbacks = useRef({ onCamera, onSelect, onClear, onUnavailable, onLabels });
   useEffect(() => { callbacks.current = { onCamera, onSelect, onClear, onUnavailable, onLabels }; }, [onCamera, onSelect, onClear, onUnavailable, onLabels]);
+  useEffect(() => () => callbacks.current.onLabels([]), []);
   const positions = useMemo(() => layoutSemanticFlow(graph, '3d'), [graph]);
   const paths = useMemo(() => semanticFlowEdgePaths(graph, positions, selectedIds, selectedEdgeId, '3d', true), [graph, positions, selectedIds, selectedEdgeId]);
   const flowPaths = useMemo(() => paths.map(path => ({ id: path.edge.id, color: path.color, points: path.points })), [paths]);
@@ -145,22 +146,12 @@ function Scene({ graph, selectedIds, selectedEdgeId, matchIds, command, motion, 
     (edgeAsset.arrowMaterial.uniforms.viewport!.value as THREE.Vector2).set(size.width, size.height);
     cameraRef.current = { scale: zoom, viewportWidth: size.width, viewportHeight: size.height };
     if (labelDirty.current) {
-      const labels: Label[] = [], point = new THREE.Vector3();
-      for (const item of labelOrder) {
-        const selected = selectedIds.has(item.node.id), match = matchIds.has(item.node.id);
-        if (labels.length >= 36 && !selected) break;
-        point.set(item.x, item.y, item.z).project(camera);
-        if (Math.abs(point.x) > .94 || Math.abs(point.y) > .82 || point.z < -1 || point.z > 1) continue;
-        if (zoom < .45 && !selected && !match && item.node.kind !== 'entry' && labels.length >= 8) continue;
-        const x = (point.x + 1) * size.width / 2, y = (1 - point.y) * size.height / 2;
-        if (!selected && labels.some(label => Math.abs(label.x - x) < 160 && Math.abs(label.y - y) < 30)) continue;
-        labels.push({ id: item.node.id, label: item.node.label, path: `${item.node.path ?? item.node.group}${item.node.line ? `:${item.node.line}` : ''}`, x, y, selected, match });
-      }
-      callbacks.current.onLabels(labels); labelDirty.current = false;
+      callbacks.current.onLabels(projectSemanticFlowLabels(camera, size, zoom, labelOrder, selectedIds, matchIds));
+      labelDirty.current = false;
     }
     if (stateRef.current.active) { stateRef.current.distance += Math.min(delta, .1) * SPATIAL_FLOW_SPEED; invalidate(); }
   });
-  return <><primitive object={edgeAsset.object} /><primitive object={edgeAsset.arrows} /><primitive object={nodeAsset.object} />
+  return <><color attach="background" args={['#050c09']} /><primitive object={edgeAsset.object} /><primitive object={edgeAsset.arrows} /><primitive object={nodeAsset.object} />
     <SpatialFlowParticles paths={flowPaths} stateRef={stateRef} cameraRef={cameraRef} active={motion.enabled && motion.visible} />
   </>;
 }
@@ -173,10 +164,12 @@ class FlowGraphBoundary extends Component<{ children: ReactNode; onUnavailable: 
 }
 
 export function SemanticFlow3D(props: Props) {
-  const [labels, setLabels] = useState<Label[]>([]);
+  const [labels, setLabels] = useState<FlowLabelContent[]>([]);
+  const [labelLayer] = useState(() => new FlowLabelLayer(setLabels));
+  useLayoutEffect(() => { labelLayer.resume(); return () => labelLayer.suspend(); }, [labelLayer]);
   return <div className="semantic-flow-3d" data-node-count={props.graph.nodes.length} data-edge-count={props.graph.edges.length}>
-    <FlowGraphBoundary onUnavailable={props.onUnavailable}><Canvas orthographic frameloop="demand" dpr={[1, 1.7]} camera={{ position: [900, 650, 1500], zoom: 1, near: .1, far: 1000000 }} gl={{ antialias: true, alpha: true }}><Scene {...props} onLabels={setLabels} /></Canvas></FlowGraphBoundary>
-    <div className="semantic-flow-3d-labels">{labels.map(label => <button key={label.id} type="button" style={{ left: label.x, top: label.y }}
+    <FlowGraphBoundary onUnavailable={props.onUnavailable}><Canvas orthographic frameloop="demand" dpr={[1, 1.7]} camera={{ position: [900, 650, 1500], zoom: 1, near: .1, far: 1000000 }} gl={{ antialias: true, alpha: true }}><Scene {...props} onLabels={labelLayer.update} /></Canvas></FlowGraphBoundary>
+    <div className="semantic-flow-3d-labels">{labels.map(label => <button key={label.id} ref={element => labelLayer.attach(label.id, element)} type="button"
       className={`${label.selected ? 'is-selected' : ''}${label.match ? ' is-match' : ''}`} aria-pressed={label.selected} title={`${label.label}\n${label.path}`}
       onClick={() => props.onSelect(label.id)}><strong>{label.label}</strong>{label.selected && <small>{label.path}</small>}</button>)}</div>
     <div className="semantic-flow-3d-selection-description" aria-live="polite">{[...props.selectedIds].map(id => props.graph.nodes.find(node => node.id === id)?.label).filter(Boolean).join('、')}</div>

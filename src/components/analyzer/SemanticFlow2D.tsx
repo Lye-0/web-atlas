@@ -121,13 +121,11 @@ export function SemanticFlow2D({ graph, selectedIds, selectedEdgeId, matchIds, c
     }}>
     <defs>{['#82c6e2', '#dfb785', '#afcbbd', '#496660'].map(color => <marker key={color} id={`flow-arrow-${color.slice(1)}`} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse" markerUnits="strokeWidth"><path d="M 0 0 L 10 5 L 0 10 z" fill={color} /></marker>)}</defs>
     <g transform={`translate(${camera.x} ${camera.y}) scale(${camera.scale})`}>
-      {shownPaths.map(path => { const d = path.points.map((point, index) => `${index ? 'L' : 'M'}${point.x},${point.y}`).join(' '); return <g key={path.edge.id} data-edge-id={path.edge.id} data-source={path.edge.source} data-target={path.edge.target} data-direction={path.direction ?? ''}>
-        <path d={d} fill="none" stroke={path.color} strokeWidth={path.selected ? 2.6 : 1.2} opacity={path.selected ? 1 : .4} markerEnd={`url(#flow-arrow-${path.color.slice(1)})`} />
-        <path d={d} className="semantic-flow-edge-hit" role="button" tabIndex={path.selected ? 0 : -1} aria-label={`${path.edge.label}の根拠を表示`}
+      <g data-flow-layer="edge-targets">{shownPaths.map(path => { const d = path.points.map((point, index) => `${index ? 'L' : 'M'}${point.x},${point.y}`).join(' '); return <path key={path.edge.id} data-edge-hit-id={path.edge.id} d={d} className="semantic-flow-edge-hit" role="button" tabIndex={path.selected ? 0 : -1} aria-label={`${path.edge.label}の根拠を表示`}
           onClick={event => { event.stopPropagation(); if (!drag.current?.moved) onSelectEdge(path.edge.id); drag.current = undefined; }}
-          onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelectEdge(path.edge.id); } }} />
-      </g>; })}
-      {visibleNodes.map(point => {
+          onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelectEdge(path.edge.id); } }} />;
+      })}</g>
+      <g data-flow-layer="nodes">{visibleNodes.map(point => {
         const members = semanticMemberIds(point.node), selected = members.some(id => selectedIds.has(id));
         const matching = members.filter(id => matchIds.has(id)).length;
         const detail = camera.scale > .4 || selected || (matching > 0 && visibleNodes.length < 100);
@@ -143,8 +141,11 @@ export function SemanticFlow2D({ graph, selectedIds, selectedEdgeId, matchIds, c
             <text x={-94} y={14} className="semantic-flow-node-path">{point.node.attributes.overview ? `${members.length}対象${matching ? ` · ${matching}件一致` : ''} · 展開` : `${(point.node.path?.split('/').at(-1) ?? point.node.group).slice(0, 26)}${point.node.line ? `:${point.node.line}` : ''}`}</text></>
             : <circle r={8} className="semantic-flow-node-dot" />}
         </g>;
-      })}
-      {motion.enabled && motion.visible && active.flatMap((path, pathIndex) => Array.from({ length: motion.reduced ? 1 : 3 }, (_, index) => <circle key={`${path.edge.id}:${index}`} data-flow-particle data-path={pathIndex} data-phase={index / 3} r={motion.reduced ? 2.5 : 3.5} fill={path.color} pointerEvents="none" />))}
+      })}</g>
+      <g data-flow-layer="edges" pointerEvents="none">{shownPaths.map(path => <g key={path.edge.id} data-edge-id={path.edge.id} data-source={path.edge.source} data-target={path.edge.target} data-direction={path.direction ?? ''}>
+        <path d={path.points.map((point, index) => `${index ? 'L' : 'M'}${point.x},${point.y}`).join(' ')} fill="none" stroke={path.color} strokeWidth={path.selected ? 2.6 : 1.2} opacity={path.selected ? 1 : .4} markerEnd={`url(#flow-arrow-${path.color.slice(1)})`} />
+      </g>)}</g>
+      <g data-flow-layer="particles" pointerEvents="none">{motion.enabled && motion.visible && active.flatMap((path, pathIndex) => Array.from({ length: motion.reduced ? 1 : 3 }, (_, index) => <circle key={`${path.edge.id}:${index}`} data-flow-particle data-path={pathIndex} data-phase={index / 3} r={motion.reduced ? 2.5 : 3.5} fill={path.color} pointerEvents="none" />))}</g>
     </g>
   </svg>;
 }

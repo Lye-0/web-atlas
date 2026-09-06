@@ -26,7 +26,7 @@ export function SemanticFlowStage({ graph, mode, selectedIds, selectedEdgeId, ma
   useEffect(() => { if (focus && focus.nonce !== previousFocus.current) { previousFocus.current = focus.nonce; run('focus', focus.ids); } }, [focus, run]);
   const motion = useMemo(() => ({ enabled: flow.enabled, reduced: flow.reduced, visible: flow.visible }), [flow.enabled, flow.reduced, flow.visible]);
   const properties = { graph, selectedIds, selectedEdgeId, matchIds, motion, command, onSelect, onSelectEdge, onClear };
-  return <div ref={setElement} className="analyzer-graph-stage semantic-flow-stage" data-mode={mode}>
+  return <div ref={setElement} className="analyzer-graph-stage analyzer-spatial-graph-stage semantic-flow-stage" data-mode={mode}>
     <div className="analyzer-stage-controls" aria-label="グラフ操作">
       <div className="semantic-flow-mode" role="group" aria-label="表示モード"><button type="button" aria-pressed={mode === '2d'} onClick={() => onMode('2d')}>分類2D</button><button type="button" aria-pressed={mode === '3d'} onClick={() => onMode('3d')}>一覧3D</button></div>
       <button type="button" onClick={() => run('fit')} title="現在の表示対象全体を収める">Fit</button>

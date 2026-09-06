@@ -26,6 +26,10 @@ describe('semantic Analyzer exploration', () => {
   let host: HTMLDivElement, root: Root;
   const render = async (project = store) => act(async () => root.render(<MemoryRouter initialEntries={['/analyzer/function-call-flow']}><AnalyzerSessionProvider><Project project={project} /></AnalyzerSessionProvider></MemoryRouter>));
   const button = (label: string) => [...host.querySelectorAll<HTMLButtonElement>('button')].find(element => element.textContent === label)!;
+  const openDetailSection = (label: string) => act(async () => {
+    const section = [...host.querySelectorAll<HTMLDetailsElement>('.semantic-flow-detail .analyzer-detail-accordion')].find(element => element.querySelector(':scope > summary > span')?.textContent === label)!;
+    section.open = true; section.dispatchEvent(new Event('toggle'));
+  });
   const choose = (id: string) => act(async () => host.querySelector(`[data-node-id="${id}"]`)!.dispatchEvent(new MouseEvent('click', { bubbles: true })));
   const search = (value: string) => act(async () => { const input = host.querySelector<HTMLInputElement>('input[type="search"]')!; Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value); input.dispatchEvent(new Event('input', { bubbles: true })); });
   beforeEach(async () => {
@@ -41,7 +45,8 @@ describe('semantic Analyzer exploration', () => {
     expect(host.querySelectorAll('.analyzer-view-tabs a')).toHaveLength(10);
     expect(host.querySelector('.semantic-object-list')).toBeNull();
     await choose('run');
-    expect(host.querySelector('.semantic-detail')?.textContent).toContain('save()'); expect(host.querySelector('.semantic-detail')?.textContent).toContain('run declaration');
+    expect(host.querySelector('.semantic-detail')?.textContent).toContain('save()');
+    await openDetailSection('Evidence'); expect(host.querySelector('.semantic-detail')?.textContent).toContain('run declaration');
     await act(async () => button('一覧3D').click()); expect(host.querySelector('[data-orbit]')?.getAttribute('data-orbit')).toBe('true');
     await act(async () => host.querySelector<HTMLAnchorElement>('a[href="/analyzer/data-model"]')!.click());
     expect(host.querySelector('.semantic-object-list')?.textContent).toContain('User'); expect(host.querySelector('.semantic-object-list')?.textContent).not.toContain('run');
@@ -64,7 +69,7 @@ describe('semantic Analyzer exploration', () => {
     await choose('run');
     await act(async () => button('save() · ソースで確認').click());
     expect(host.querySelector('.semantic-detail')?.textContent).toContain('save call');
-    const target = [...host.querySelectorAll<HTMLButtonElement>('.semantic-detail button')].find(element => element.textContent === 'save')!;
+    const target = [...host.querySelectorAll<HTMLButtonElement>('.semantic-detail button')].find(element => element.querySelector('strong')?.textContent === 'save')!;
     await act(async () => target.click()); expect(host.querySelector('.semantic-detail h3')?.textContent).toBe('save');
   });
   it('shows a recoverable engine error and retries', async () => {
@@ -126,6 +131,7 @@ describe('semantic Analyzer exploration', () => {
     await choose('User');
     expect(host.querySelector('.semantic-fields')?.textContent).toContain('idstring');
     expect(host.querySelector('.semantic-detail')?.textContent).toContain('未展開のフィールド: sharedColumns');
+    await openDetailSection('関連するView');
     expect(host.querySelectorAll('.semantic-crosslinks button')).toHaveLength(4);
     await act(async () => button('Data Model ↗').click());
     expect(host.querySelector('.semantic-detail h3')?.textContent).toBe('User'); expect(host.querySelector('.semantic-fields')?.textContent).toContain('idstring');
@@ -142,6 +148,7 @@ describe('semantic Analyzer exploration', () => {
     ];
     vi.mocked(getSemanticAnalysis).mockImplementation(() => ({ promise: Promise.resolve({ ...analysis, nodes: [...analysis.nodes, ...values] }), unsubscribe: () => {} }));
     await render({ ...store, scannedAt: 'owner-values' }); await choose('run');
+    await openDetailSection('関連するView');
     await act(async () => button('Data Flow ↗').click());
     expect(host.querySelector('.semantic-object-list')?.textContent).toContain('input'); expect(host.querySelector('.semantic-object-list')?.textContent).toContain('result');
     expect(host.querySelector('.semantic-object-list')?.textContent).not.toContain('other');
