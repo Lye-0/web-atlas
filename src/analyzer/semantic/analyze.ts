@@ -293,7 +293,10 @@ export async function analyzeSemanticSources(input: SemanticInput, loadLanguage:
         }
         if (callTypes.has(ast.type)) {
           if (ast.type === 'selector' && !ast.namedChildren.some(child => child.type === 'argument_part')) return;
-          const calleeNode = ast.type === 'selector' ? ast.previousNamedSibling : field(ast, 'function', 'name', 'method') ?? ast.namedChildren[0];
+          let calleeNode = ast.type === 'selector' ? ast.previousNamedSibling : field(ast, 'function', 'name', 'method') ?? ast.namedChildren[0];
+          // The TypeScript grammar can place await inside the function field of
+          // a generic call. Resolve its operand, preserving the full call range.
+          if (ast.type === 'call_expression' && calleeNode?.type === 'await_expression' && calleeNode.namedChildCount === 1) calleeNode = calleeNode.namedChildren[0];
           if (!calleeNode) return;
           const receiver = field(ast, 'object');
           const callee = (receiver && receiver.id !== calleeNode.id ? `${receiver.text}.${calleeNode.text}` : calleeNode.text).slice(0, 240); if (ignoredCalls.has(callee)) return;
