@@ -33,7 +33,7 @@ const contains = (rect: SemanticMapRect, x: number, y: number) => x >= rect.x &&
 const overlaps = (a: SemanticMapRect, b: SemanticMapRect) => a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
 
 describe('Directory lanes and viewport location', () => {
-  it.each(['2d', '3d'] as const)('keeps 144 canonical nodes, edge evidence and disjoint Directory bounds in %s', mode => {
+  it.each(['2d', '3d'] as const)('keeps 144 canonical nodes, edge evidence and their recorded Directory membership in %s', mode => {
     const graph = fixture(), before = JSON.stringify(graph);
     const positions = layoutSemanticFlow(graph, mode), regions = semanticFlowRegions(positions, mode);
     expect(positions).toHaveLength(144);
@@ -45,7 +45,7 @@ describe('Directory lanes and viewport location', () => {
       expect(point.node).toBe(graph.nodes.find(node => node.id === point.node.id));
       expect([point.x, point.y, point.z].every(Number.isFinite)).toBe(true);
       const expectedDirectory = point.node.path!.slice(0, point.node.path!.lastIndexOf('/'));
-      const enclosing = regions.filter(region => contains(region, point.x, point.y));
+      const enclosing = regions.filter(region => contains(region, point.x, point.y) && (mode === '2d' || point.z >= region.z && point.z <= region.z + (region.depth ?? 0)));
       expect(enclosing.map(region => region.label)).toEqual([expectedDirectory]);
       const own = enclosing[0]!, halfWidth = mode === '2d' ? 106 : 7, halfHeight = mode === '2d' ? 30 : 7;
       expect(contains(own, point.x - halfWidth, point.y - halfHeight)).toBe(true);
@@ -54,7 +54,7 @@ describe('Directory lanes and viewport location', () => {
     for (const [index, region] of regions.entries()) {
       expect(region.count).toBe(24);
       expect(region.nodeIds).toHaveLength(24);
-      for (const other of regions.slice(index + 1)) expect(overlaps(region, other)).toBe(false);
+      for (const other of regions.slice(index + 1)) expect(overlaps(region, other) && (mode === '2d' || region.z < other.z + other.depth! && region.z + region.depth! > other.z)).toBe(false);
     }
     const paths = semanticFlowEdgePaths(graph, positions, new Set(), undefined, mode);
     expect(paths).toHaveLength(graph.edges.length);
@@ -103,7 +103,7 @@ describe('Directory lanes and viewport location', () => {
         expect(shown.nodes.some(node => node.id === edge.target && semanticMemberIds(node).includes(original.target))).toBe(true);
       }
       expect(semanticFlowEdgePaths(shown, positions, new Set(), undefined, mode)).toHaveLength(graph.edges.length);
-      for (const [index, region] of regions.entries()) for (const other of regions.slice(index + 1)) expect(overlaps(region, other)).toBe(false);
+      for (const [index, region] of regions.entries()) for (const other of regions.slice(index + 1)) expect(overlaps(region, other) && (mode === '2d' || region.z < other.z + other.depth! && region.z + region.depth! > other.z)).toBe(false);
     }
     expect(JSON.stringify(graph)).toBe(before);
   });

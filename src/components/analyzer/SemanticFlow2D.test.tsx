@@ -3,20 +3,24 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SemanticGraph } from '../../analyzer/semantic/types';
 import { SemanticFlow2D } from './SemanticFlow2D';
+import { layoutExplorerRelations } from '../../analyzer/semantic/semanticExplorer';
+import { semanticFlowEdgePaths } from '../../analyzer/semantic/flowPresentation';
 
 const graph: SemanticGraph = { view: 'function-call-flow', nodes: ['a', 'b', 'c'].map(id => ({ id, label: id, kind: 'function', group: 'Source', path: `src/${id}.ts`, confidence: 'source', evidence: [], attributes: {} })),
   edges: [['a', 'b'], ['b', 'c'], ['a', 'c']].map(([source, target]) => ({ id: `${source}-${target}`, source: source!, target: target!, label: `${source} calls ${target}`, kind: 'calls', confidence: 'source', evidence: [], views: ['function-call-flow'] })) };
 
 describe('semantic 2D drawing and selection layers', () => {
   let host: HTMLDivElement, root: Root;
+  let screenSize = { width: 1000, height: 700 };
   const onSelect = vi.fn(), onSelectEdge = vi.fn(), onClear = vi.fn();
   const render = (motion = { enabled: true, reduced: false, visible: true }) => act(async () => root.render(<SemanticFlow2D graph={graph} selectedIds={new Set(['a'])} matchIds={new Set()} camera={{ x: 130, y: 180, scale: .7 }}
     motion={motion} onCamera={() => {}} onSelect={onSelect} onSelectEdge={onSelectEdge} onClear={onClear} />));
   beforeEach(async () => {
+    screenSize = { width: 1000, height: 700 };
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
     vi.stubGlobal('ResizeObserver', class {
       constructor(private callback: ResizeObserverCallback) {}
-      observe(target: Element) { this.callback([{ target, contentRect: { width: 1000, height: 700 } } as ResizeObserverEntry], this as unknown as ResizeObserver); }
+      observe(target: Element) { this.callback([{ target, contentRect: screenSize } as ResizeObserverEntry], this as unknown as ResizeObserver); }
       disconnect() {}
     });
     vi.stubGlobal('requestAnimationFrame', vi.fn(() => 1)); vi.stubGlobal('cancelAnimationFrame', vi.fn());
@@ -26,7 +30,7 @@ describe('semantic 2D drawing and selection layers', () => {
   afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.clearAllMocks(); vi.unstubAllGlobals(); });
 
   it('paints lines and particles above cards while leaving edge hit targets below cards', () => {
-    expect([...host.querySelectorAll('[data-flow-layer]')].map(item => item.getAttribute('data-flow-layer'))).toEqual(['regions', 'edge-targets', 'nodes', 'edges', 'particles']);
+    expect([...host.querySelectorAll('[data-flow-layer]')].map(item => item.getAttribute('data-flow-layer'))).toEqual(['edge-targets', 'nodes', 'edges', 'particles']);
     const visual = host.querySelector('[data-flow-layer="edges"]')!, particles = host.querySelector('[data-flow-layer="particles"]')!;
     expect(visual.getAttribute('pointer-events')).toBe('none'); expect(particles.getAttribute('pointer-events')).toBe('none');
     expect([...visual.querySelectorAll('[data-edge-id]')].map(item => [item.getAttribute('data-edge-id'), item.getAttribute('data-source'), item.getAttribute('data-target')])).toEqual([['a-b', 'a', 'b'], ['b-c', 'b', 'c'], ['a-c', 'a', 'c']]);
@@ -74,17 +78,54 @@ describe('semantic 2D drawing and selection layers', () => {
     expect(onSelectEdge).toHaveBeenCalledTimes(2); expect(onClear).not.toHaveBeenCalled();
   });
 
-  it('moves the minimap viewport independently of selection and can return from empty space', async () => {
-    const map = host.querySelector('.semantic-flow-minimap svg')!, main = host.querySelector('.semantic-flow-2d')!;
+  it('pans the local diagram independently of selection and fits back from empty space', async () => {
+    const main = host.querySelector('.semantic-flow-2d')!;
     const originalY = Number(main.getAttribute('data-camera-y'));
-    await act(async () => map.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })));
-    expect(Number(main.getAttribute('data-camera-y'))).toBeCloseTo(originalY - 175);
-    for (let index = 0; index < 8; index++) await act(async () => map.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })));
-    expect(host.querySelector('.semantic-flow-location strong')?.textContent).toBe('領域の外');
-    expect(host.querySelector('.semantic-flow-location span')?.textContent).toContain('src/a.ts');
+    await act(async () => main.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })));
+    expect(Number(main.getAttribute('data-camera-y'))).toBeCloseTo(originalY - 60);
+    for (let index = 0; index < 20; index++) await act(async () => main.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })));
+    expect(main.getAttribute('data-explorer-center')).toBe('a');
     expect(host.querySelector('[data-node-id="a"]')).toBeNull(); expect(onClear).not.toHaveBeenCalled();
-    await act(async () => map.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true })));
-    expect(host.querySelector('.semantic-flow-location strong')?.textContent).toContain('全体');
+    await act(async () => main.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true })));
+    expect(host.querySelectorAll('[data-node-id]')).toHaveLength(3);
     expect(host.querySelector('[data-node-id="a"]')?.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('starts a high-degree center at a readable scale, keeps every local edge on selection, and explicitly fits every curve', async () => {
+    const dense: SemanticGraph = { ...graph, nodes: [graph.nodes[0]!, ...Array.from({ length: 160 }, (_, index) => ({ ...graph.nodes[1]!, id: `callee-${index}`, label: `callee-${index}` }))],
+      edges: Array.from({ length: 160 }, (_, index) => ({ ...graph.edges[0]!, id: `call-${index}`, target: `callee-${index}` })) };
+    const renderDense = (selected: string, fit = false) => act(async () => root.render(<SemanticFlow2D key="dense" graph={dense} selectedIds={new Set([selected])} matchIds={new Set()}
+      location={{ scopeId: 'file', centerId: 'a', depth: 1, direction: 'both' }} command={fit ? { kind: 'fit', nonce: 1 } : undefined}
+      motion={{ enabled: false, reduced: false, visible: true }} onCamera={() => {}} onSelect={onSelect} onSelectEdge={onSelectEdge} onClear={onClear} />));
+    await renderDense('a');
+    const camera = () => { const main = host.querySelector('.semantic-flow-2d')!; return ['data-camera-x', 'data-camera-y', 'data-camera-scale'].map(name => Number(main.getAttribute(name))); };
+    const before = camera(); expect(before[2]).toBeGreaterThanOrEqual(.85);
+    expect(host.querySelectorAll('[data-edge-id]')).toHaveLength(160);
+    await renderDense('callee-0');
+    expect(camera()).toEqual(before); expect(host.querySelector('.semantic-flow-2d')?.getAttribute('data-explorer-center')).toBe('a');
+    expect(host.querySelectorAll('[data-edge-id]')).toHaveLength(160);
+    await renderDense('callee-0', true);
+    expect(host.querySelectorAll('[data-node-id]')).toHaveLength(161);
+    const [x, y, scale] = camera() as [number, number, number];
+    for (const path of semanticFlowEdgePaths(dense, layoutExplorerRelations(dense, 'a'), new Set(['callee-0']), undefined, '2d')) for (const point of path.points) {
+      expect(point.x * scale + x).toBeGreaterThanOrEqual(0); expect(point.x * scale + x).toBeLessThanOrEqual(1000);
+      expect(point.y * scale + y).toBeGreaterThanOrEqual(0); expect(point.y * scale + y).toBeLessThanOrEqual(700);
+    }
+  });
+
+  it('initially contains a six-object local diagram below measured navigation at a readable scale', async () => {
+    screenSize = { width: 841, height: 618 };
+    const local: SemanticGraph = { ...graph, nodes: [graph.nodes[0]!, ...Array.from({ length: 5 }, (_, index) => ({ ...graph.nodes[1]!, id: `callee-${index}`, label: `callee-${index}` }))],
+      edges: Array.from({ length: 5 }, (_, index) => ({ ...graph.edges[0]!, id: `call-${index}`, target: `callee-${index}` })) };
+    await act(async () => root.render(<SemanticFlow2D key="six-objects" graph={local} selectedIds={new Set(['a'])} matchIds={new Set()} overlayTop={160}
+      location={{ scopeId: 'file', centerId: 'a', depth: 1, direction: 'both' }} motion={{ enabled: false, reduced: false, visible: true }} onCamera={() => {}} onSelect={onSelect} onSelectEdge={onSelectEdge} onClear={onClear} />));
+    const main = host.querySelector('.semantic-flow-2d')!;
+    const scale = Number(main.getAttribute('data-camera-scale')), x = Number(main.getAttribute('data-camera-x')), y = Number(main.getAttribute('data-camera-y'));
+    expect(scale).toBeGreaterThanOrEqual(.8); expect(scale).toBeLessThanOrEqual(1.05);
+    expect(host.querySelectorAll('[data-node-id]')).toHaveLength(6);
+    for (const point of layoutExplorerRelations(local, 'a')) {
+      expect((point.x - 111) * scale + x).toBeGreaterThanOrEqual(0); expect((point.x + 111) * scale + x).toBeLessThanOrEqual(841);
+      expect((point.y - 35) * scale + y).toBeGreaterThanOrEqual(160); expect((point.y + 35) * scale + y).toBeLessThanOrEqual(618 - 76);
+    }
   });
 });

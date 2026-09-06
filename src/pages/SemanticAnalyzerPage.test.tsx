@@ -30,8 +30,18 @@ describe('semantic Analyzer exploration', () => {
     const section = [...host.querySelectorAll<HTMLDetailsElement>('.semantic-flow-detail .analyzer-detail-accordion')].find(element => element.querySelector(':scope > summary > span')?.textContent === label)!;
     section.open = true; section.dispatchEvent(new Event('toggle'));
   });
-  const choose = (id: string) => act(async () => host.querySelector(`[data-node-id="${id}"]`)!.dispatchEvent(new MouseEvent('click', { bubbles: true })));
   const search = (value: string) => act(async () => { const input = host.querySelector<HTMLInputElement>('input[type="search"]')!; Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value); input.dispatchEvent(new Event('input', { bubbles: true })); });
+  const choose = async (id: string, query = id) => {
+    if (!host.querySelector(`[data-node-id="${id}"]`)) {
+      const previous = host.querySelector<HTMLInputElement>('input[type="search"]')!.value;
+      await search(query); await act(async () => host.querySelector<HTMLButtonElement>('[role="option"]')!.click());
+      expect(host.querySelector('.semantic-flow-2d')?.getAttribute('data-explorer-center')).toBe(id);
+      await search(previous);
+    }
+    await act(async () => host.querySelector(`[data-node-id="${id}"]`)!.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+  };
+  const openBlock = async (label: string) => act(async () => [...host.querySelectorAll<HTMLButtonElement>('.semantic-explorer-block')].find(item => item.querySelector('strong')?.textContent === label)!.click());
+  const expectFiltered = (nodes: number, edges: number) => expect(host.textContent).toContain(`絞り込み後 ${nodes}対象 / ${edges}関係`);
   beforeEach(async () => {
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
     vi.stubGlobal('ResizeObserver', class { constructor(private callback: ResizeObserverCallback) {} observe() { this.callback([{ contentRect: { width: 1000, height: 600 } } as ResizeObserverEntry], this as unknown as ResizeObserver); } disconnect() {} });
@@ -47,7 +57,7 @@ describe('semantic Analyzer exploration', () => {
     await choose('run');
     expect(host.querySelector('.semantic-detail')?.textContent).toContain('save()');
     await openDetailSection('Evidence'); expect(host.querySelector('.semantic-detail')?.textContent).toContain('run declaration');
-    await act(async () => button('一覧3D').click()); expect(host.querySelector('[data-orbit]')?.getAttribute('data-orbit')).toBe('true');
+    await act(async () => button('3D').click()); expect(host.querySelector('[data-orbit]')?.getAttribute('data-orbit')).toBe('true');
     await act(async () => host.querySelector<HTMLAnchorElement>('a[href="/analyzer/data-model"]')!.click());
     expect(host.querySelector('.semantic-object-list')?.textContent).toContain('User'); expect(host.querySelector('.semantic-object-list')?.textContent).not.toContain('run');
     await act(async () => host.querySelector<HTMLButtonElement>('.semantic-object-list button')!.click()); expect(host.querySelector('.semantic-fields')?.textContent).toContain('string');
@@ -59,7 +69,8 @@ describe('semantic Analyzer exploration', () => {
     const file = { name: 'run.json', size: 100, text: async () => JSON.stringify([{ name: 'observed run', spanId: '1', attributes: { 'code.function.name': 'run' } }]) };
     Object.defineProperty(input, 'files', { configurable: true, value: [file] });
     await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
-    expect(host.querySelector('.semantic-trace-info')?.textContent).toContain('1 spans'); expect(host.querySelector('.semantic-flow-stage')?.textContent).toContain('observed run');
+    expect(host.querySelector('.semantic-trace-info')?.textContent).toContain('1 spans');
+    await act(async () => button('3D').click()); expect(host.querySelector('[data-graph]')?.textContent).toContain('observed run'); await act(async () => button('2D').click());
     await choose('run');
     await render({ ...store, scannedAt: 'second' });
     expect(host.querySelector('.semantic-trace-info')).toBeNull(); expect(host.querySelector('.semantic-detail')).toBeNull();
@@ -75,16 +86,19 @@ describe('semantic Analyzer exploration', () => {
   it('shows a recoverable engine error and retries', async () => {
     vi.mocked(getSemanticAnalysis).mockImplementationOnce(() => ({ promise: Promise.reject(new Error('Engine unavailable')), unsubscribe: () => {} }));
     await render({ ...store, scannedAt: 'failed' }); expect(host.querySelector('[role="alert"]')?.textContent).toContain('Engine unavailable');
-    await act(async () => button('再実行').click()); expect(host.querySelector('[role="alert"]')).toBeNull(); expect(host.querySelector('.semantic-flow-stage [data-node-id]')).not.toBeNull();
+    await act(async () => button('再実行').click()); expect(host.querySelector('[role="alert"]')).toBeNull();
+    await openBlock('app.ts'); expect(host.querySelector('[data-node-open-id="run"]')).not.toBeNull();
   });
   it('opens actual subsystem members in another view', async () => {
     await act(async () => host.querySelector<HTMLAnchorElement>('a[href="/analyzer/architecture-map"]')!.click());
     await act(async () => host.querySelector<HTMLButtonElement>('.semantic-object-list button')!.click());
     expect(host.querySelector('.semantic-member-files')?.textContent).toContain('app.ts');
     await act(async () => button('Function Call Flow ↗').click());
+    await openBlock('app.ts');
     expect(host.querySelector('.semantic-flow-stage')?.textContent).toContain('run'); expect(host.querySelector('.semantic-empty-result')).toBeNull();
   });
   it('uses search only for candidates/highlights and preserves selection/camera when cleared', async () => {
+    await choose('run'); await act(async () => host.querySelector('.semantic-flow-2d')!.dispatchEvent(new MouseEvent('click', { bubbles: true })));
     const initial = host.querySelector('.semantic-flow-2d')!;
     const camera = [initial.getAttribute('data-camera-x'), initial.getAttribute('data-camera-y'), initial.getAttribute('data-camera-scale')];
     await search('run');
@@ -102,11 +116,11 @@ describe('semantic Analyzer exploration', () => {
   it('preserves the 2D and 3D cameras independently and keeps the same selected edge evidence', async () => {
     await choose('run'); await act(async () => button('save() · ソースで確認').click());
     const camera2D = host.querySelector('.semantic-flow-2d')!.getAttribute('data-camera-scale');
-    await act(async () => button('一覧3D').click()); await act(async () => button('3Dテスト移動').click());
+    await act(async () => button('3D').click()); await act(async () => button('3Dテスト移動').click());
     expect(host.querySelector('.semantic-detail')?.textContent).toContain('save call');
-    await act(async () => button('分類2D').click());
+    await act(async () => button('2D').click());
     expect(host.querySelector('.semantic-flow-2d')!.getAttribute('data-camera-scale')).toBe(camera2D);
-    await act(async () => button('一覧3D').click()); expect(host.querySelector('[data-camera-zoom]')?.getAttribute('data-camera-zoom')).toBe('0.72');
+    await act(async () => button('3D').click()); expect(host.querySelector('[data-camera-zoom]')?.getAttribute('data-camera-zoom')).toBe('0.72');
     expect(host.querySelector('.semantic-detail')?.textContent).toContain('save call');
   });
   it('offers Runtime 3D without discarding source entries and explains filtered-out selections', async () => {
@@ -116,7 +130,7 @@ describe('semantic Analyzer exploration', () => {
     expect(host.querySelector('.semantic-flow-notice')?.textContent).toContain('run'); expect(host.querySelector('.semantic-detail h3')?.textContent).toBe('run');
     await act(async () => button('フィルターを解除して表示').click()); expect(host.querySelector('.semantic-flow-notice')).toBeNull();
     await act(async () => host.querySelector<HTMLAnchorElement>('a[href="/analyzer/runtime-flow"]')!.click());
-    expect(host.querySelector('.semantic-object-list')).toBeNull(); await act(async () => button('一覧3D').click());
+    expect(host.querySelector('.semantic-object-list')).toBeNull(); await act(async () => button('3D').click());
     expect(host.querySelector('[data-graph="runtime-flow"]')?.textContent).toContain('run');
   });
   it('retains Runtime model fields and navigates to the same Data Model using the source layer', async () => {
@@ -172,16 +186,16 @@ describe('semantic Analyzer exploration', () => {
     await act(async () => host.querySelector<HTMLAnchorElement>('a[href="/analyzer/architecture-map"]')!.click());
     const apiGroup = [...host.querySelectorAll<HTMLButtonElement>('.semantic-object-list > button')].find(element => element.querySelector('strong')?.textContent === 'API')!;
     await act(async () => apiGroup.click()); await act(async () => button('Runtime Flow ↗').click());
-    expect(host.querySelector('.semantic-flow-2d')?.getAttribute('data-node-count')).toBe('2');
-    expect(host.querySelector('.semantic-flow-2d')?.getAttribute('data-edge-count')).toBe('1');
+    expectFiltered(2, 1);
     await choose('run'); await search('run');
     await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="Zoom in"]')!.click());
     const camera = () => { const canvas = host.querySelector('.semantic-flow-2d')!; return ['data-camera-x', 'data-camera-y', 'data-camera-scale'].map(name => canvas.getAttribute(name)); };
     const before = camera();
     await act(async () => host.querySelector<HTMLButtonElement>('[aria-controls="semantic-flow-settings"]')!.click());
     await act(async () => button('フィルターを解除').click());
-    expect(host.querySelector('.semantic-flow-2d')?.getAttribute('data-node-count')).toBe('4');
-    expect(host.querySelector('.semantic-flow-2d')?.getAttribute('data-edge-count')).toBe('3');
+    expectFiltered(4, 3);
+    expect(host.querySelector('.semantic-flow-2d')?.getAttribute('data-explorer-center')).toBe('run');
+    expect(host.querySelector('.semantic-flow-2d')?.getAttribute('data-node-count')).toBe('3');
     expect(host.querySelector('[aria-controls="semantic-flow-settings"]')?.textContent).toBe('詳細設定');
     expect(host.querySelector<HTMLInputElement>('input[type="search"]')!.value).toBe('run');
     expect(host.querySelector('.semantic-detail h3')?.textContent).toBe('run'); expect(camera()).toEqual(before);
@@ -195,11 +209,11 @@ describe('semantic Analyzer exploration', () => {
     await act(async () => host.querySelector<HTMLButtonElement>('[aria-controls="semantic-flow-settings"]')!.click());
     const checkbox = [...host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].find(input => input.parentElement?.textContent === 'Test・生成定義を含む')!;
     await act(async () => checkbox.click());
-    expect(host.querySelector('.semantic-flow-2d')?.getAttribute('data-node-count')).toBe('3');
-    await choose('test-helper'); await search('test');
+    expectFiltered(3, 1);
+    await choose('test-helper', 'test helper'); await search('test');
     const before = host.querySelector('.semantic-flow-2d')!.getAttribute('data-camera-scale');
     await act(async () => button('フィルターを解除').click());
-    expect(checkbox.checked).toBe(false); expect(host.querySelector('.semantic-flow-2d')?.getAttribute('data-node-count')).toBe('2');
+    expect(checkbox.checked).toBe(false); expectFiltered(2, 1);
     expect(host.querySelector('.semantic-detail h3')?.textContent).toBe('test helper');
     expect(host.querySelector('.semantic-flow-notice')?.textContent).toContain('現在のフィルターで非表示');
     expect(host.querySelector<HTMLInputElement>('input[type="search"]')!.value).toBe('test');

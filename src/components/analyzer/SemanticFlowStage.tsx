@@ -1,56 +1,88 @@
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import type { AnalyzerViewSession } from '../../analyzer/session';
 import type { SemanticGraph } from '../../analyzer/semantic/types';
+import { explorerRelations, type SemanticExplorerModel } from '../../analyzer/semantic/semanticExplorer';
 import { useSpatialFlowMotion, type SpatialParticleMode } from './useSpatialFlowMotion';
 import { SpatialParticleControl } from './SpatialParticleControl';
 import { SemanticFlow2D, type FlowCameraCommand } from './SemanticFlow2D';
 import { SemanticFlowLegend } from './SemanticFlowLegend';
 import { semanticFlowDirectionLanguage } from './semanticFlowLanguage';
+import { SemanticExplorerNavigation, type SemanticExplorerNavigationActions } from './SemanticExplorerNavigation';
 
 const SemanticFlow3D = lazy(() => import('./SemanticFlow3D').then(module => ({ default: module.SemanticFlow3D })));
 
-export function SemanticFlowStage({ graph, mode, selectedIds, selectedEdgeId, matchIds, focus, cameras, onCamera, onMode, particleMode, onParticleMode, onSelect, onSelectEdge, onClear, isFullscreen, onFullscreen, onUnavailable }: {
-  graph: SemanticGraph; mode: '2d' | '3d'; selectedIds: ReadonlySet<string>; selectedEdgeId?: string; matchIds: ReadonlySet<string>;
-  focus?: { nonce: number; ids: string[] }; cameras: AnalyzerViewSession['flowCameras'];
+export function SemanticFlowStage({ graph, explorer, navigation, mode, direction, selectedIds, selectedEdgeId, matchIds, focus, cameras, onCamera, onMode, particleMode, onParticleMode, onSelect, onSelectEdge, onClear, isFullscreen, onFullscreen, onUnavailable }: {
+  graph: SemanticGraph; explorer?: SemanticExplorerModel; navigation?: SemanticExplorerNavigationActions; mode: '2d' | '3d'; direction?: 'both' | 'incoming' | 'outgoing'; selectedIds: ReadonlySet<string>; selectedEdgeId?: string; matchIds: ReadonlySet<string>;
+  focus?: { nonce: number; ids: string[]; mode?: '2d' | '3d' }; cameras: AnalyzerViewSession['flowCameras'];
   onCamera: (mode: '2d' | '3d', camera: NonNullable<AnalyzerViewSession['flowCameras']>['2d' | '3d']) => void;
   onMode: (mode: '2d' | '3d') => void; particleMode?: SpatialParticleMode; onParticleMode: (mode: SpatialParticleMode) => void;
   onSelect: (id: string) => void; onSelectEdge: (id: string) => void; onClear: () => void;
   isFullscreen: boolean; onFullscreen: () => void; onUnavailable: () => void;
 }) {
   const [element, setElement] = useState<HTMLDivElement | null>(null);
-  const controls = useRef<HTMLDivElement>(null), [controlsHeight, setControlsHeight] = useState(40);
+  const controls = useRef<HTMLDivElement>(null), navigationElement = useRef<HTMLDivElement>(null);
+  const [controlsHeight, setControlsHeight] = useState(40), [navigationHeight, setNavigationHeight] = useState(80);
+  const hasNavigation = Boolean(navigation);
   useLayoutEffect(() => {
-    const target = controls.current; if (!target || typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(() => { const height = target.getBoundingClientRect().height; if (height > 0) setControlsHeight(height); });
-    observer.observe(target); return () => observer.disconnect();
-  }, []);
+    if (typeof ResizeObserver === 'undefined') return;
+    const measure = () => {
+      const controlHeight = controls.current?.getBoundingClientRect().height, locationHeight = navigationElement.current?.getBoundingClientRect().height;
+      if (controlHeight && controlHeight > 0) setControlsHeight(controlHeight);
+      if (locationHeight && locationHeight > 0) setNavigationHeight(locationHeight);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    if (controls.current) observer.observe(controls.current); if (navigationElement.current) observer.observe(navigationElement.current);
+    return () => observer.disconnect();
+  }, [hasNavigation, navigation?.visitId, mode]);
   const flow = useSpatialFlowMotion(element);
   const { mode: currentParticleMode, setMode: setParticleMode } = flow;
-  const [help, setHelp] = useState(false), [command, setCommand] = useState<FlowCameraCommand>();
-  const nonce = useRef(0), previousFocus = useRef(focus?.nonce);
+  const [help, setHelp] = useState(false);
+  const commandContext = useMemo(() => ({ visitId: navigation?.visitId, mode }), [navigation?.visitId, mode]);
+  const [commandState, setCommandState] = useState<{ context: object; command: FlowCameraCommand }>();
+  const command = commandState?.context === commandContext ? commandState.command : undefined;
+  const nonce = useRef(0), previousFocus = useRef<number | undefined>(undefined);
   useEffect(() => { if (particleMode && currentParticleMode !== particleMode) setParticleMode(particleMode); }, [particleMode, currentParticleMode, setParticleMode]);
-  const run = useCallback((kind: FlowCameraCommand['kind'], ids?: string[]) => setCommand({ kind, ids, nonce: ++nonce.current }), []);
-  useEffect(() => { if (focus && focus.nonce !== previousFocus.current) { previousFocus.current = focus.nonce; run('focus', focus.ids); } }, [focus, run]);
+  const run = useCallback((kind: FlowCameraCommand['kind'], ids?: string[]) => setCommandState({ context: commandContext, command: { kind, ids, nonce: ++nonce.current } }), [commandContext]);
+  useEffect(() => {
+    if (focus && (!focus.mode || focus.mode === mode) && focus.nonce !== previousFocus.current) { previousFocus.current = focus.nonce; run('focus', focus.ids); }
+  }, [focus, run, mode]);
   const motion = useMemo(() => ({ enabled: flow.enabled, reduced: flow.reduced, visible: flow.visible }), [flow.enabled, flow.reduced, flow.visible]);
-  const properties = { graph, selectedIds, selectedEdgeId, matchIds, motion, command, onSelect, onSelectEdge, onClear, overlayTop: controlsHeight + 116 };
-  return <div ref={setElement} className="analyzer-graph-stage analyzer-spatial-graph-stage semantic-flow-stage" data-mode={mode} style={{ '--flow-controls-height': `${controlsHeight}px` } as CSSProperties}>
+  const localGraph = useMemo(() => navigation?.location.centerId ? explorerRelations(graph, navigation.location.centerId, navigation.location.depth, 'both') : graph,
+    [graph, navigation?.location.centerId, navigation?.location.depth]);
+  const overlayTop = controlsHeight + (navigation ? navigationHeight + 36 : 24);
+  const properties = { graph, explorer, direction, selectedIds, selectedEdgeId, matchIds, motion, command, onSelect, onSelectEdge, onClear, overlayTop };
+  const cameraApplicable = mode === '3d' || !navigation || Boolean(navigation.location.centerId);
+  const cameraTitle = cameraApplicable ? undefined : 'この階層のブロックはスクロールで移動します';
+  return <div ref={setElement} className="analyzer-graph-stage analyzer-spatial-graph-stage semantic-flow-stage" data-mode={mode} data-visit-id={navigation?.visitId}
+    style={{ '--flow-controls-height': `${controlsHeight}px` } as CSSProperties}>
     <div ref={controls} className="analyzer-stage-controls" aria-label="グラフ操作">
-      <div className="semantic-flow-mode" role="group" aria-label="表示モード"><button type="button" aria-pressed={mode === '2d'} onClick={() => onMode('2d')}>分類2D</button><button type="button" aria-pressed={mode === '3d'} onClick={() => onMode('3d')}>一覧3D</button></div>
-      <button type="button" onClick={() => run('fit')} title="現在の表示対象全体を収める">Fit</button>
-      <button type="button" onClick={() => run('reset')} title="現在のモードのカメラを初期位置へ戻す">Reset</button>
-      <button type="button" aria-label="Zoom in" onClick={() => run('zoom-in')}>+</button><button type="button" aria-label="Zoom out" onClick={() => run('zoom-out')}>−</button>
-      <button type="button" disabled={!selectedIds.size && !selectedEdgeId} onClick={() => run('focus', selectedEdgeId ? graph.edges.filter(edge => edge.id === selectedEdgeId).flatMap(edge => [edge.source, edge.target]) : [...selectedIds])}>選択へ移動</button>
+      <div className="semantic-flow-mode" role="group" aria-label="表示モード"><button type="button" aria-pressed={mode === '2d'} onClick={() => onMode('2d')}>2D</button><button type="button" aria-pressed={mode === '3d'} onClick={() => onMode('3d')}>3D</button></div>
+      <button type="button" disabled={!cameraApplicable} onClick={() => run('fit')} title={cameraTitle ?? '現在の関係図全体を収める'}>Fit</button>
+      <button type="button" disabled={!cameraApplicable} onClick={() => run('reset')} title={cameraTitle ?? '現在の図のカメラを初期位置へ戻す'}>Reset</button>
+      <button type="button" disabled={!cameraApplicable} aria-label="Zoom in" title={cameraTitle} onClick={() => run('zoom-in')}>+</button><button type="button" disabled={!cameraApplicable} aria-label="Zoom out" title={cameraTitle} onClick={() => run('zoom-out')}>−</button>
+      <button type="button" disabled={!selectedIds.size && !selectedEdgeId} onClick={() => {
+        if (mode === '2d' && navigation && (!navigation.location.centerId || [...selectedIds].some(id => !localGraph.nodes.some(node => node.id === id))
+          || selectedEdgeId && !localGraph.edges.some(edge => edge.id === selectedEdgeId))) navigation.onRevealSelection();
+        else run('focus', selectedEdgeId ? graph.edges.filter(edge => edge.id === selectedEdgeId).flatMap(edge => [edge.source, edge.target]) : [...selectedIds]);
+      }}>選択へ移動</button>
       <SpatialParticleControl mode={flow.mode} onChange={next => { flow.setMode(next); onParticleMode(next); }} onOpen={() => setHelp(false)} />
       <button type="button" aria-label={isFullscreen ? '全画面を終了' : '全画面表示'} aria-pressed={isFullscreen} onClick={onFullscreen}>{isFullscreen ? '↙' : '⛶'}</button>
       <button type="button" className="analyzer-help-button" aria-label="グラフ操作ヘルプ" aria-expanded={help} onClick={() => setHelp(!help)}>?</button>
     </div>
-    {help && <div className="analyzer-stage-help" role="dialog" aria-label="グラフ操作ヘルプ"><strong>{mode === '2d' ? '分類2D' : '一覧3D'}</strong>
-      <p>{mode === '2d' ? 'ドラッグと矢印キーで移動。分類を選ぶと展開します。' : 'ドラッグで回転、右ドラッグで移動。点やラベルから対象を選択できます。'}ホイールと＋ / −で拡大縮小。検索は候補を強調し、候補を選ぶと対象へ移動します。Fitは全体を収め、Resetはカメラを初期位置へ戻します。</p>
-      <p>薄い領域はソースの場所や実行グループ、横方向は関係のつながりを表します。{mode === '2d' ? '全体図の明るい枠が表示範囲です。全体図のクリックや矢印キーでも移動できます。' : '領域名を選ぶとそのまとまりへ移動します。点を指すと名前とソースの場所、選択すると関係する対象の名前を優先して表示します。'}</p>
+    {explorer && navigation && <div ref={navigationElement} className="semantic-explorer-navigation-position" style={{ top: controlsHeight + 24 }}>
+      <SemanticExplorerNavigation explorer={explorer} navigation={navigation} mode={mode} graph={graph} localGraph={localGraph} selectedIds={selectedIds} selectedEdgeId={selectedEdgeId} />
+    </div>}
+    {help && <div className="analyzer-stage-help" role="dialog" aria-label="グラフ操作ヘルプ"><strong>{mode === '2d' ? '2Dエクスプローラー' : '3D全体図'}</strong>
+      <p>{mode === '2d' ? 'ブロックをクリック・Enterで開き、パンくずや「親へ」で所属階層を移動します。「戻る」とブラウザの戻る・進むは訪問した場所を復元します。関係図の対象はクリックで選択し、「この要素を中心に見る」で中心を切り替えます。関係図はドラッグと矢印キーで移動、ホイールと＋ / −で拡大縮小できます。' : 'ドラッグで回転、右ドラッグで移動。点やラベルから対象を選択できます。ホイールと＋ / −で拡大縮小できます。'}</p>
+      <p>検索入力はプロジェクト全体の候補を強調します。候補を選ぶと対象の場所へ移動します。2Dと3Dの切り替えは各モードの場所を復元し、明示的な相互ジャンプは選んだ対象へ移動します。</p>
       <p>{semanticFlowDirectionLanguage(graph.view).help}</p><button type="button" onClick={() => setHelp(false)}>ヘルプを閉じる</button></div>}
-    {graph.nodes.length ? mode === '2d' ? <SemanticFlow2D key="2d" {...properties} camera={cameras?.['2d']} onCamera={camera => onCamera('2d', camera)} />
-      : <Suspense fallback={<p className="semantic-flow-loading" role="status">一覧3Dを準備中…</p>}><SemanticFlow3D key="3d" {...properties} camera={cameras?.['3d']} onCamera={camera => onCamera('3d', camera)} onUnavailable={onUnavailable} onFocusRegion={ids => run('focus', ids)} /></Suspense>
-      : <div className="semantic-empty-result"><h3>表示する対象がありません</h3><p>フィルターまたは表示データを変更してください。</p></div>}
-    <SemanticFlowLegend view={graph.view} />
+    {mode === '2d' ? <SemanticFlow2D key={navigation?.visitId ?? '2d'} {...properties} graph={localGraph} location={navigation?.location} visitId={navigation?.visitId}
+      scrollTop={navigation?.scrollTop} onScroll={navigation?.onScroll} onOpenScope={navigation?.onOpenScope} onOpenNode={navigation?.onOpenNode}
+      camera={cameras?.['2d']} onCamera={camera => onCamera('2d', camera)} />
+      : graph.nodes.length ? <Suspense fallback={<p className="semantic-flow-loading" role="status">3D全体図を準備中…</p>}><SemanticFlow3D key={navigation?.visitId ?? '3d'} {...properties}
+        camera={cameras?.['3d']} onCamera={camera => onCamera('3d', camera)} onUnavailable={onUnavailable} onFocusRegion={ids => run('focus', ids)} /></Suspense>
+        : <div className="semantic-empty-result"><h3>表示する対象がありません</h3><p>フィルターまたは表示データを変更してください。</p></div>}
+    {cameraApplicable && <SemanticFlowLegend view={graph.view} />}
   </div>;
 }

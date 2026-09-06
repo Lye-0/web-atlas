@@ -1,12 +1,14 @@
 import type { SemanticNode } from './types';
 import type { SemanticPosition } from './presentation';
+import { explorerRegionIdentity, type SemanticExplorerModel } from './semanticExplorer';
 
 export interface SemanticRegionIdentity { id: string; label: string; kind: 'directory' | 'group' }
 export interface SemanticMapRect { x: number; y: number; width: number; height: number }
-export interface SemanticFlowRegion extends SemanticRegionIdentity, SemanticMapRect { z: number; count: number; nodeIds: string[] }
+export interface SemanticFlowRegion extends SemanticRegionIdentity, SemanticMapRect { z: number; depth?: number; count: number; nodeIds: string[] }
 
 /** Source locations come from recorded paths; runtime-only objects retain their known group. */
 export function semanticRegionIdentity(node: SemanticNode): SemanticRegionIdentity {
+  if (node.kind === 'external') return { id: 'group:unresolved-calls', label: '定義先が未特定の呼び出し', kind: 'group' };
   const paths = node.path ? [node.path] : node.attributes.overview && Array.isArray(node.attributes.files) ? node.attributes.files : [];
   const directories = paths.map(path => path.replaceAll('\\', '/').replace(/^\.\//, '').split('/').slice(0, -1));
   if (directories.length) {
@@ -20,23 +22,24 @@ export function semanticRegionIdentity(node: SemanticNode): SemanticRegionIdenti
   return { id: `group:${node.group}`, label: node.group || '所属情報なし', kind: 'group' };
 }
 
-export function semanticFlowRegions(positions: readonly SemanticPosition[], mode: '2d' | '3d'): SemanticFlowRegion[] {
+export function semanticFlowRegions(positions: readonly SemanticPosition[], mode: '2d' | '3d', explorer?: SemanticExplorerModel): SemanticFlowRegion[] {
   const groups = new Map<string, { identity: SemanticRegionIdentity; positions: SemanticPosition[] }>();
   for (const position of positions) {
-    const identity = semanticRegionIdentity(position.node), group = groups.get(identity.id) ?? { identity, positions: [] };
+    const identity = explorer ? explorerRegionIdentity(explorer, position.node.id) : semanticRegionIdentity(position.node);
+    const group = groups.get(identity.id) ?? { identity, positions: [] };
     group.positions.push(position); groups.set(identity.id, group);
   }
   return [...groups.values()].map(({ identity, positions: members }) => {
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity;
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
     const ids = new Set<string>();
     for (const point of members) {
-      minX = Math.min(minX, point.x); maxX = Math.max(maxX, point.x); minY = Math.min(minY, point.y); maxY = Math.max(maxY, point.y); minZ = Math.min(minZ, point.z);
+      minX = Math.min(minX, point.x); maxX = Math.max(maxX, point.x); minY = Math.min(minY, point.y); maxY = Math.max(maxY, point.y); minZ = Math.min(minZ, point.z); maxZ = Math.max(maxZ, point.z);
       const originals = point.node.attributes.overview && Array.isArray(point.node.attributes.members) ? point.node.attributes.members : [point.node.id];
       for (const id of originals) ids.add(id);
     }
-    const horizontal = mode === '2d' ? 132 : 72, above = mode === '2d' ? 64 : 40, below = mode === '2d' ? 48 : 50;
+    const horizontal = mode === '2d' ? 132 : 18, above = mode === '2d' ? 64 : 18, below = mode === '2d' ? 48 : 18;
     return { ...identity, x: minX - horizontal, y: minY - above, width: maxX - minX + horizontal * 2, height: maxY - minY + above + below,
-      z: minZ - 20, count: ids.size, nodeIds: members.map(point => point.node.id) };
+      z: minZ - 20, depth: maxZ - minZ + 40, count: ids.size, nodeIds: members.map(point => point.node.id) };
   });
 }
 

@@ -15,6 +15,7 @@ import { AnalyzerEmptyOrbit } from '../components/analyzer/AnalyzerEmptyOrbit';
 import { useWorkspaceFullscreen } from '../components/analyzer/useWorkspaceFullscreen';
 import { analyzerRoutes } from '../utils/routes';
 import { semanticTraceCache as traceCache } from '../analyzer/semantic/traceCache';
+import { semanticNavigationContext } from '../analyzer/semantic/navigation';
 import FlowAnalyzerPage from './FlowAnalyzerPage';
 import './semantic-analyzer.css';
 
@@ -91,6 +92,13 @@ function LegacySemanticAnalyzerPage({ view }: { view: SemanticViewId }) {
   const jump = (targetView: SemanticViewId, node: SemanticNode) => {
     const layer = targetView === 'data-model' ? 'source' : options.layer;
     const targetGraph = projectSemanticView(analysis ?? emptyAnalysis, targetView, traces, layer);
+    if (targetView === 'runtime-flow' || targetView === 'function-call-flow') {
+      const context = semanticNavigationContext(targetGraph, node);
+      updateView(targetView, { selectedNodeId: context.target?.id, selectedEdgeId: undefined, detailOpen: Boolean(context.target), search: context.search,
+        semantic: { ...defaults, layer, members: context.members, auxiliary: options.auxiliary } });
+      navigate(analyzerRoutes[targetView], { state: { semanticExplorerJump: { targetId: context.target?.id } } });
+      return;
+    }
     if (Array.isArray(node.attributes.members)) {
       const ids = new Set(node.attributes.members); const files = new Set(Array.isArray(node.attributes.files) ? node.attributes.files : []);
       const members = targetGraph.nodes.filter(item => ids.has(item.id) || typeof item.attributes.owner === 'string' && ids.has(item.attributes.owner) || item.path && files.has(item.path)).map(item => item.id);

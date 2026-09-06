@@ -1,6 +1,7 @@
 import { OrthographicCamera, Vector3 } from 'three';
 import { describe, expect, it, vi } from 'vitest';
-import { FlowLabelLayer, hitSemanticFlowPoint, projectSemanticFlowLabels, type FlowLabelPlacement } from './semanticFlowLabels';
+import { FlowLabelLayer, hitSemanticFlowEdge, hitSemanticFlowPoint, projectSemanticFlowLabels, type FlowLabelPlacement } from './semanticFlowLabels';
+import { semanticFlowEdgePaths } from '../../analyzer/semantic/flowPresentation';
 import type { SemanticPosition } from '../../analyzer/semantic/presentation';
 import type { SemanticFlowRegion } from '../../analyzer/semantic/flowRegions';
 
@@ -93,6 +94,7 @@ describe('semantic 3D label synchronization', () => {
     const layer = new FlowLabelLayer(() => {}), button = document.createElement('button'), line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
     layer.update([{ ...placement('run', 250, 300), hovered: true, pointX: 200, pointY: 300, width: 120 }]);
     layer.attach('run', button); layer.attachLeader('run', line);
+    expect(button.style.width).toBe('120px');
     expect(layer.hoverAt(210, 300)).toBe('run'); expect(layer.hoverAt(300, 300)).toBe('run'); expect(layer.hoverAt(800, 300)).toBeUndefined();
     expect(line.getAttribute('x1')).toBe('200'); expect(line.getAttribute('x2')).toBe('259');
     layer.update([{ ...placement('run', 260, 320), hovered: true, pointX: 210, pointY: 320, width: 120 }]);
@@ -104,5 +106,52 @@ describe('semantic 3D label synchronization', () => {
     const camera = sceneCamera(), size = { width: 1000, height: 800 };
     expect(hitSemanticFlowPoint(camera, size, [positioned('back'), positioned('front', 0, 0, 50)], 500, 400)).toBe('front');
     expect(hitSemanticFlowPoint(camera, size, [positioned('run')], 800, 400)).toBeUndefined();
+  });
+
+  it('reserves a direct neighbour label before a competing region name', () => {
+    const neighbour = positioned('callee', 0, 158);
+    const competingRegion = { ...region, nodeIds: [], x: 0, y: 0, width: 100, height: 120 };
+    const labels = projectSemanticFlowLabels(sceneCamera(), { width: 1000, height: 800 }, .2, [neighbour], new Set(), new Set(), {
+      regions: [competingRegion], relatedIds: new Set(['callee']),
+    });
+    expect(labels[0]!.id).toBe('callee');
+    expect(labels[0]!.x).toBeCloseTo(500);
+    if (labels[1]) expect(labels[1]!.x).not.toBeCloseTo(500);
+  });
+
+  it('selects the displayed canonical curve without turning blank space into an edge', () => {
+    const positions = [positioned('caller', -200), positioned('callee', 200)];
+    const paths = semanticFlowEdgePaths({ view: 'function-call-flow', nodes: positions.map(item => item.node), edges: [{
+      id: 'call-site-1', source: 'caller', target: 'callee', kind: 'calls', label: 'callee()', confidence: 'source', evidence: [], views: ['function-call-flow'],
+    }] }, positions, new Set(['caller']), undefined, '3d');
+    const midpoint = paths[0]!.points[24]!;
+    expect(hitSemanticFlowEdge(sceneCamera(), { width: 1000, height: 800 }, paths, 500 + midpoint.x, 400 - midpoint.y)).toBe('call-site-1');
+    expect(hitSemanticFlowEdge(sceneCamera(), { width: 1000, height: 800 }, paths, 500, 700)).toBeUndefined();
+  });
+
+  it('leaves room for the enlarged selected dot on both sides of its label', () => {
+    for (const x of [0, 450]) {
+      const label = projectSemanticFlowLabels(sceneCamera(), { width: 1000, height: 800 }, 3, [positioned('run', x)], new Set(['run']), new Set())[0]!;
+      const left = label.x + 17, right = left + label.width!;
+      expect(left >= label.pointX! + 16.99 || right <= label.pointX! - 16.99).toBe(true);
+      const layer = new FlowLabelLayer(() => {}), button = document.createElement('button');
+      layer.update([label]); layer.attach('run', button);
+      expect(button.style.transform).toContain('translate(17px, -50%)');
+    }
+  });
+
+  it('retains visible names and their label sides through small camera and zoom movements', () => {
+    const camera = sceneCamera(), size = { width: 1000, height: 800 };
+    const positions = [positioned('run', -240), positioned('other', 0), positioned('target', 240)];
+    const first = projectSemanticFlowLabels(camera, size, .8, positions, new Set(['run']), new Set());
+    camera.position.x += .5; camera.lookAt(.5, 0, 0);
+    const next = projectSemanticFlowLabels(camera, size, .69, positions, new Set(['run']), new Set(), { previous: first });
+    expect(next.map(label => label.id)).toEqual(first.map(label => label.id));
+    for (const label of next) {
+      const previous = first.find(item => item.id === label.id)!;
+      // Viewport clamping may absorb a subpixel camera movement at the edge.
+      expect(Math.abs((label.x - label.pointX!) - (previous.x - previous.pointX!))).toBeLessThan(1);
+      expect(Math.abs((label.y - label.pointY!) - (previous.y - previous.pointY!))).toBeLessThan(1);
+    }
   });
 });

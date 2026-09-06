@@ -2,6 +2,8 @@ import { analyzerDirectionColors, analyzerEdgeDirection } from '../edgeDirection
 import { semanticDepths, semanticOverviewId, summarizeSemanticGraph, type SemanticPosition } from './presentation';
 import type { SemanticEdge, SemanticGraph, SemanticNode } from './types';
 import { semanticRegionIdentity } from './flowRegions';
+import { layoutSemanticCloud } from './flowCloud';
+import type { SemanticExplorerModel } from './semanticExplorer';
 
 export interface FlowPoint { x: number; y: number; z: number }
 export interface FlowEdgePath { edge: SemanticEdge; points: FlowPoint[]; svgPath: string; color: string; selected: boolean; direction?: 'incoming' | 'outgoing' | 'internal' }
@@ -23,7 +25,8 @@ export function semanticMemberIds(node: SemanticNode): string[] {
 }
 
 /** SCC depth follows source→target; grouping never invents or reverses a relationship. */
-export function layoutSemanticFlow(graph: SemanticGraph, mode: '2d' | '3d'): SemanticPosition[] {
+export function layoutSemanticFlow(graph: SemanticGraph, mode: '2d' | '3d', explorer?: SemanticExplorerModel): SemanticPosition[] {
+  if (mode === '3d') return layoutSemanticCloud(graph, explorer);
   const depths = semanticDepths(graph);
   const groups = new Map<string, { label: string; stages: Map<number, SemanticNode[]>; columns: number; rows: number; offset: number }>();
   for (const node of graph.nodes) {
@@ -35,9 +38,9 @@ export function layoutSemanticFlow(graph: SemanticGraph, mode: '2d' | '3d'): Sem
   const widths = new Map<number, number>(); let offset = 0;
   for (const [, group] of ordered) {
     const maximum = Math.max(1, ...[...group.stages.values()].map(nodes => nodes.length));
-    group.columns = mode === '2d' ? Math.max(1, Math.ceil(Math.sqrt(maximum / 6))) : Math.ceil(Math.sqrt(maximum));
-    group.rows = mode === '2d' ? Math.ceil(maximum / group.columns) : group.columns;
-    group.offset = offset; offset += group.rows * (mode === '2d' ? 86 : 50) + (mode === '2d' ? 96 : 110);
+    group.columns = Math.max(1, Math.ceil(Math.sqrt(maximum / 6)));
+    group.rows = Math.ceil(maximum / group.columns);
+    group.offset = offset; offset += group.rows * 86 + 96;
     for (const [depth, nodes] of group.stages) widths.set(depth, Math.max(widths.get(depth) ?? 0, Math.min(group.columns, nodes.length) * 242 + 86));
   }
   const stageX = new Map<number, number>(); let x = 0;
@@ -46,8 +49,7 @@ export function layoutSemanticFlow(graph: SemanticGraph, mode: '2d' | '3d'): Sem
   for (const [, group] of ordered) for (const [depth, nodes] of [...group.stages].sort(([a], [b]) => a - b)) {
     nodes.sort((a, b) => (a.path ?? '').localeCompare(b.path ?? '') || (a.line ?? 0) - (b.line ?? 0) || a.id.localeCompare(b.id));
     nodes.forEach((node, index) => {
-      if (mode === '3d') result.push({ node, x: depth * 250, y: -group.offset - (index % group.rows) * 50, z: Math.floor(index / group.rows) * 50 });
-      else result.push({ node, x: stageX.get(depth)! + index % group.columns * 242, y: group.offset + Math.floor(index / group.columns) * 86, z: 0 });
+      result.push({ node, x: stageX.get(depth)! + index % group.columns * 242, y: group.offset + Math.floor(index / group.columns) * 86, z: 0 });
     });
   }
   return result;
