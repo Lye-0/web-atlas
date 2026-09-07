@@ -6,6 +6,7 @@ import type { SemanticGraph } from '../../analyzer/semantic/types';
 import { explorerEdgeVisible, layoutExplorerRelations, type ExplorerLocation, type SemanticExplorerModel } from '../../analyzer/semantic/semanticExplorer';
 import { SemanticExplorerBlocks } from './SemanticExplorerBlocks';
 import { semanticFlowPlot } from './semanticFlowViewport';
+import { semanticNodeDisplays } from './semanticFlowDisplay';
 
 export type FlowCamera2D = NonNullable<NonNullable<AnalyzerViewSession['flowCameras']>['2d']>;
 export interface FlowCameraCommand { kind: 'fit' | 'reset' | 'focus' | 'zoom-in' | 'zoom-out'; nonce: number; ids?: string[] }
@@ -36,11 +37,12 @@ function SemanticLocalFlow2D({ graph, selectedIds, selectedEdgeId, matchIds, com
   const root = useRef<SVGSVGElement>(null);
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [camera, setCamera] = useState<FlowCamera2D>(savedCamera ?? { x: 100, y: 100, scale: 1 });
-  const initialized = useRef(Boolean(savedCamera));
+  const [initialized, setInitialized] = useState(Boolean(savedCamera));
   const previousSize = useRef(viewport);
   const lastCommand = useRef<number | undefined>(undefined);
   const centerId = location?.centerId ?? graph.nodes[0]?.id ?? '';
   const positions = useMemo(() => layoutExplorerRelations(graph, centerId), [graph, centerId]);
+  const displays = useMemo(() => semanticNodeDisplays(graph.nodes), [graph.nodes]);
   const paths = useMemo(() => semanticFlowEdgePaths(graph, positions, selectedIds, selectedEdgeId, '2d'), [graph, positions, selectedIds, selectedEdgeId]);
   const shownPaths = useMemo(() => paths.filter(path => explorerEdgeVisible(path.edge, selectedIds, direction, selectedEdgeId)), [paths, selectedIds, direction, selectedEdgeId]);
   const active = useMemo(() => shownPaths.filter(path => path.selected), [shownPaths]);
@@ -51,13 +53,21 @@ function SemanticLocalFlow2D({ graph, selectedIds, selectedEdgeId, matchIds, com
   const commit = useCallback((update: FlowCamera2D | ((current: FlowCamera2D) => FlowCamera2D)) => {
     setCamera(current => typeof update === 'function' ? update(current) : update);
   }, []);
-  useEffect(() => { if (initialized.current) callbacks.current.onCamera(camera); }, [camera]);
+  useEffect(() => { if (initialized) callbacks.current.onCamera(camera); }, [camera, initialized]);
   useLayoutEffect(() => {
-    const element = root.current; if (!element || typeof ResizeObserver === 'undefined') return;
+    const element = root.current; if (!element) return;
+    let disposed = false;
+    const measure = ({ width, height }: { width: number; height: number }) => {
+      if (!disposed && width > 0 && height > 0) setViewport(current => current.width === width && current.height === height ? current : { width, height });
+    };
+    // The local graph is synchronous. Measure its new SVG before paint instead of
+    // rendering against a 0×0 viewport until the first asynchronous resize delivery.
+    measure(element.getBoundingClientRect());
+    if (typeof ResizeObserver === 'undefined') return () => { disposed = true; };
     const observer = new ResizeObserver(([entry]) => {
-      if (entry && entry.contentRect.width > 0 && entry.contentRect.height > 0) setViewport({ width: entry.contentRect.width, height: entry.contentRect.height });
+      if (entry) measure(entry.contentRect);
     });
-    observer.observe(element); return () => observer.disconnect();
+    observer.observe(element); return () => { disposed = true; observer.disconnect(); };
   }, []);
   const fit = useCallback((ids?: string[]) => {
     const targets = ids?.length ? positions.filter(position => ids.includes(position.node.id) || semanticMemberIds(position.node).some(id => ids.includes(id))) : positions;
@@ -74,8 +84,7 @@ function SemanticLocalFlow2D({ graph, selectedIds, selectedEdgeId, matchIds, com
   }, [positions, shownPaths, viewport, overlayTop, commit]);
   useLayoutEffect(() => {
     if (viewport.width <= 0 || viewport.height <= 0) return;
-    if (!initialized.current && positions.length) {
-      initialized.current = true;
+    if (!initialized && positions.length) {
       const plot = semanticFlowPlot(viewport.width, viewport.height, overlayTop);
       let initial: FlowCamera2D = { x: viewport.width / 2, y: plot.centerY, scale: Math.min(1.1, Math.max(.85, (viewport.width - 40) / 880)) };
       if (positions.length <= 12) {
@@ -86,24 +95,25 @@ function SemanticLocalFlow2D({ graph, selectedIds, selectedEdgeId, matchIds, com
         if (scale >= .8) initial = { x: viewport.width / 2 - (minX + maxX) / 2 * scale, y: plot.centerY - (minY + maxY) / 2 * scale, scale };
       }
       commit(initial);
+      setInitialized(true);
     }
     else if (previousSize.current.width > 0 && (viewport.width !== previousSize.current.width || viewport.height !== previousSize.current.height)) {
       const previous = previousSize.current;
       commit(current => ({ ...current, x: current.x + (viewport.width - previous.width) / 2, y: current.y + (viewport.height - previous.height) / 2 }));
     }
     previousSize.current = viewport;
-  }, [positions, paths, viewport, commit, overlayTop, centerId]);
+  }, [positions, paths, viewport, commit, overlayTop, centerId, initialized]);
   const zoom = useCallback((factor: number, x = viewport.width / 2, y = viewport.height / 2) => commit(current => {
     const scale = Math.max(.000001, Math.min(5, current.scale * factor));
     return { scale, x: x - (x - current.x) * scale / current.scale, y: y - (y - current.y) * scale / current.scale };
   }), [commit, viewport]);
   useEffect(() => {
-    if (!command || command.nonce === lastCommand.current) return;
+    if (!command || command.nonce === lastCommand.current || viewport.width <= 0 || viewport.height <= 0 || !initialized) return;
     lastCommand.current = command.nonce;
     if (command.kind === 'fit' || command.kind === 'reset') fit();
     else if (command.kind === 'focus') fit(command.ids);
     else zoom(command.kind === 'zoom-in' ? 1.2 : 1 / 1.2);
-  }, [command, fit, zoom]);
+  }, [command, fit, zoom, viewport, initialized]);
   useEffect(() => {
     const element = root.current; if (!element) return;
     const wheel = (event: WheelEvent) => { event.preventDefault(); const rect = element.getBoundingClientRect(); zoom(Math.exp(-event.deltaY * .0015), event.clientX - rect.left, event.clientY - rect.top); };
@@ -123,8 +133,10 @@ function SemanticLocalFlow2D({ graph, selectedIds, selectedEdgeId, matchIds, com
     frame = requestAnimationFrame(animate); return () => cancelAnimationFrame(frame);
   }, [active, motion.enabled, motion.visible, particleSpacing]);
   const drag = useRef<{ x: number; y: number; startX: number; startY: number; moved: boolean } | undefined>(undefined);
-  const visibleNodes = positions.filter(point => point.x * camera.scale + camera.x > -220 && point.x * camera.scale + camera.x < viewport.width + 220 && point.y * camera.scale + camera.y > -100 && point.y * camera.scale + camera.y < viewport.height + 100);
-  return <svg ref={root} className="semantic-flow-2d" role="application" tabIndex={0} aria-label="2D関係図。矢印キーで移動、HomeでFit。対象のクリックは選択、中心の変更は明示操作で行います。"
+  const ready = viewport.width > 0 && viewport.height > 0 && (initialized || !positions.length);
+  const visibleNodes = ready ? positions.filter(point => point.x * camera.scale + camera.x > -220 && point.x * camera.scale + camera.x < viewport.width + 220 && point.y * camera.scale + camera.y > -100 && point.y * camera.scale + camera.y < viewport.height + 100) : [];
+  return <><svg ref={root} className="semantic-flow-2d" role="application" tabIndex={0} aria-label="2D関係図。矢印キーで移動、HomeでFit。対象のクリックは選択、中心の変更は明示操作で行います。"
+    aria-busy={!ready && positions.length > 0} data-render-state={ready ? positions.length ? 'ready' : 'empty' : 'measuring'}
     data-camera-x={camera.x} data-camera-y={camera.y} data-camera-scale={camera.scale} data-node-count={graph.nodes.length} data-edge-count={graph.edges.length} data-explorer-center={centerId}
     onPointerDown={event => {
       if (event.button !== 0) return;
@@ -150,26 +162,27 @@ function SemanticLocalFlow2D({ graph, selectedIds, selectedEdgeId, matchIds, com
       else if (event.key === 'Escape') { event.preventDefault(); onClear(); }
     }}>
     <defs>{['#82c6e2', '#dfb785', '#afcbbd', '#496660'].map(color => <marker key={color} id={`flow-arrow-${color.slice(1)}`} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse" markerUnits="strokeWidth"><path d="M 0 0 L 10 5 L 0 10 z" fill={color} /></marker>)}</defs>
-    <g transform={`translate(${camera.x} ${camera.y}) scale(${camera.scale})`}>
+    <g transform={`translate(${camera.x} ${camera.y}) scale(${camera.scale})`} visibility={ready ? undefined : 'hidden'}>
       <g data-flow-layer="edge-targets">{shownPaths.map(path => <path key={path.edge.id} data-edge-hit-id={path.edge.id} d={path.svgPath} className="semantic-flow-edge-hit" role="button" tabIndex={path.selected ? 0 : -1} aria-label={`${path.edge.label}の根拠を表示`}
           onClick={event => { event.stopPropagation(); if (!drag.current?.moved) onSelectEdge(path.edge.id); drag.current = undefined; }}
           onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelectEdge(path.edge.id); } }} />
       )}</g>
       <g data-flow-layer="nodes">{visibleNodes.map(point => {
         const members = semanticMemberIds(point.node), selected = members.some(id => selectedIds.has(id));
+        const display = displays.get(point.node.id)!;
         const matching = members.filter(id => matchIds.has(id)).length;
         const detail = camera.scale > .4 || selected || (matching > 0 && visibleNodes.length < 100);
         return <g key={point.node.id} transform={`translate(${point.x} ${point.y})`} role="button" tabIndex={0}
-          aria-label={`${point.node.label}, ${point.node.path ?? point.node.group}${point.node.line ? `:${point.node.line}` : ''}${point.node.attributes.overview ? `、${members.length}件を展開` : ''}`} aria-pressed={selected}
+          aria-label={`${display.title}, ${point.node.kind === 'external' ? '呼び出し箇所の一例: ' : ''}${display.location}${point.node.attributes.overview ? `、${members.length}件を展開` : ''}`} aria-pressed={selected}
           className={`semantic-flow-node${selected ? ' is-selected' : ''}${matching ? ' is-match' : ''}${selectedNodes.has(point.node.id) ? ' is-connected' : ''}`}
           data-node-id={point.node.id} data-member-count={members.length} onClick={event => { event.stopPropagation(); if (!drag.current?.moved) onSelect(point.node.id); drag.current = undefined; }}
           onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); onSelect(point.node.id); } }}>
-          <title>{point.node.label}{'\n'}{point.node.kind === 'external' ? '呼び出し箇所: ' : ''}{point.node.path ?? point.node.group}{point.node.line ? `:${point.node.line}` : ''}</title>
+          <title>{display.tooltip}</title>
           <rect x={-106} y={-30} width={212} height={60} rx={7} />
           {selected && <rect className="semantic-flow-selection-ring" x={-111} y={-35} width={222} height={70} rx={10} />}
           {point.node.id === centerId && <text x={-106} y={-42} className="semantic-explorer-center-mark">中心</text>}
-          {detail ? <foreignObject x={-94} y={-23} width={188} height={48} pointerEvents="none"><div className="semantic-explorer-node-copy"><strong>{point.node.label}</strong>
-            <small>{point.node.kind === 'external' ? '呼び出し箇所: ' : ''}{point.node.path ?? point.node.group}{point.node.line ? `:${point.node.line}` : ''}</small></div></foreignObject>
+          {detail ? <foreignObject x={-94} y={-23} width={188} height={48} pointerEvents="none"><div className="semantic-explorer-node-copy"><strong>{display.title}</strong>
+            <small>{display.location}</small></div></foreignObject>
             : <circle r={8} className="semantic-flow-node-dot" />}
         </g>;
       })}</g>
@@ -181,5 +194,6 @@ function SemanticLocalFlow2D({ graph, selectedIds, selectedEdgeId, matchIds, com
         d={path.svgPath} fill="none" stroke={path.color} strokeWidth={motion.reduced ? 5 : 7} strokeLinecap="round"
         strokeDasharray={`0 ${particleSpacing}`} strokeDashoffset={-spatialFlowPhase(path.edge.id) * particleSpacing} />)}</g>
     </g>
-  </svg>;
+  </svg>{!ready && positions.length > 0 && <p className="semantic-flow-loading" role="status">関係を表示しています…</p>}
+    {positions.length === 0 && <div className="semantic-empty-result"><h3>表示する対象がありません</h3><p>フィルターまたは表示データを変更してください。</p></div>}</>;
 }

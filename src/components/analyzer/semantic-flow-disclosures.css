@@ -1,0 +1,14 @@
+.semantic-flow-disclosures { position:absolute; z-index:4; left:12px; bottom:64px; display:grid; gap:6px; max-width:min(330px,calc(100% - 24px)); font-size:11px; color:#d7e7dc; }
+.semantic-flow-disclosures details { background:#11231df2; border:1px solid #4c6a5f; border-radius:5px; }
+.semantic-flow-disclosures summary { cursor:pointer; padding:8px 10px; }
+.semantic-flow-aggregate-symbol { color:#edcc94; font-size:14px; line-height:1; }
+.semantic-flow-disclosure-body { max-height:240px; overflow:auto; padding:0 10px 10px; overscroll-behavior:contain; }
+.semantic-flow-disclosure-body p { margin:0 0 8px; line-height:1.6; }
+.semantic-flow-disclosure-body ul { padding:0; margin:8px 0; list-style:none; display:grid; gap:5px; }
+.semantic-flow-disclosure-body button { border:1px solid #4c6a5f; border-radius:4px; padding:7px; background:#163126; color:inherit; text-align:left; cursor:pointer; }
+.semantic-flow-disclosure-body li button { width:100%; display:grid; gap:3px; }
+.semantic-flow-disclosure-body :is(strong,small) { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%; }
+.semantic-flow-disclosure-body small { color:#b8d1c2; margin-top:4px; }
+.semantic-flow-disclosure-pages { display:flex; justify-content:space-between; gap:6px; }
+.semantic-flow-disclosure-body button:disabled { opacity:.4; cursor:default; }
+.semantic-flow-3d-labels button.is-aggregate { border-style:dashed; border-color:#d3b77c; color:#edcc94; }

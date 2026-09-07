@@ -97,6 +97,47 @@ describe('Flow explorer locations and visits', () => {
     await search('client.unknown'); expect(host.querySelector('[role="option"]')?.textContent).toContain('呼び出し箇所: src/api/run.ts:2');
   });
 
+  it('shows semantic module and compact callee search names only in 2D while keeping canonical matching, selection and query', async () => {
+    const initializer: SemanticNode = { ...node('module:canonical', 'scripts/build-extension.mjs'), label: '<module>', line: undefined, endLine: undefined, evidence: [], attributes: { initializer: true } };
+    const callee = "records.filter((record) => record.fullName.startsWith('refs/heads/')).map";
+    const call: SemanticNode = { ...node('call:canonical', 'src/git/parsers/refParser.ts'), label: callee, kind: 'external', confidence: 'unresolved', line: 5, attributes: { callee } };
+    const displayAnalysis: SemanticAnalysis = { ...analysis, nodes: [...analysis.nodes, initializer, call], edges: [...analysis.edges,
+      { ...analysis.edges[0]!, id: 'module-call', source: initializer.id, target: call.id },
+    ] };
+    const before = JSON.stringify(displayAnalysis);
+    vi.mocked(getSemanticAnalysis).mockImplementation(() => ({ promise: Promise.resolve(displayAnalysis), unsubscribe: () => {} }));
+    await act(async () => root.render(<MemoryRouter initialEntries={['/analyzer/function-call-flow']}><AnalyzerSessionProvider><Harness project={{ ...store, scannedAt: 'display-search', sources: {
+      ...store.sources, [initializer.path!]: 'await build();', [call.path!]: callee,
+    } }} /></AnalyzerSessionProvider></MemoryRouter>));
+    const query = () => host.querySelector<HTMLInputElement>('input[type="search"]')!.value;
+    const option = () => host.querySelector<HTMLButtonElement>('[role="option"]')!;
+    await search('<module>');
+    expect(option().querySelector('strong')?.textContent).toBe('ファイル直下の処理');
+    expect(option().querySelector('small')?.textContent).toBe('scripts/build-extension.mjs');
+    expect(option().title).toContain('ファイル直下の処理\nscripts/build-extension.mjs');
+    await click(option());
+    expect(center()).toBe(initializer.id); expect(query()).toBe('<module>');
+    expect(option().getAttribute('aria-selected')).toBe('true');
+    expect(host.querySelector('.semantic-detail h3')?.textContent).toBe('<module>');
+    await search('refs/heads/');
+    expect(center()).toBe(initializer.id);
+    expect(option().querySelector('strong')?.textContent).toBe('records.filter(...).map(...)');
+    expect(option().querySelector('small')?.textContent).toBe('呼び出し箇所: src/git/parsers/refParser.ts:5');
+    expect(option().title).not.toContain('record.fullName');
+    await click(option());
+    expect(center()).toBe(call.id); expect(query()).toBe('refs/heads/');
+    expect(option().getAttribute('aria-selected')).toBe('true');
+    expect(host.querySelector('.semantic-detail h3')?.textContent).toBe(callee);
+    await click(button('3D'));
+    expect(query()).toBe('refs/heads/');
+    expect(option().querySelector('strong')?.textContent).toBe(callee);
+    expect(option().getAttribute('aria-selected')).toBe('true');
+    await click(button('2D'));
+    expect(center()).toBe(call.id); expect(query()).toBe('refs/heads/');
+    expect(option().querySelector('strong')?.textContent).toBe('records.filter(...).map(...)');
+    expect(JSON.stringify(displayAnalysis)).toBe(before);
+  });
+
   it('restores mode-specific places while explicit jumps carry the same selected ID and 3D keeps the whole filter', async () => {
     await openRunFile(); await openBlock('run');
     await click(button('3D上で位置を見る'));

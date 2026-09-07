@@ -1,9 +1,9 @@
-import { act } from 'react';
+import { act, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SemanticGraph } from '../../analyzer/semantic/types';
 import { SemanticFlow2D } from './SemanticFlow2D';
-import { layoutExplorerRelations } from '../../analyzer/semantic/semanticExplorer';
+import { buildSemanticExplorer, explorerLocationForNode, layoutExplorerRelations } from '../../analyzer/semantic/semanticExplorer';
 import { semanticFlowEdgePaths } from '../../analyzer/semantic/flowPresentation';
 
 const graph: SemanticGraph = { view: 'function-call-flow', nodes: ['a', 'b', 'c'].map(id => ({ id, label: id, kind: 'function', group: 'Source', path: `src/${id}.ts`, confidence: 'source', evidence: [], attributes: {} })),
@@ -127,5 +127,141 @@ describe('semantic 2D drawing and selection layers', () => {
       expect((point.x - 111) * scale + x).toBeGreaterThanOrEqual(0); expect((point.x + 111) * scale + x).toBeLessThanOrEqual(841);
       expect((point.y - 35) * scale + y).toBeGreaterThanOrEqual(160); expect((point.y + 35) * scale + y).toBeLessThanOrEqual(618 - 76);
     }
+  });
+});
+
+describe('local relation entry readiness', () => {
+  let host: HTMLDivElement, root: Root;
+  let measured = { width: 0, height: 0 };
+  const observers: { callback: ResizeObserverCallback; target?: Element; disconnect: ReturnType<typeof vi.fn> }[] = [];
+  const onCamera = vi.fn();
+  const show = (visitId: string, centerId = 'a', extras: Partial<ComponentProps<typeof SemanticFlow2D>> = {}) => act(async () => root.render(
+    <SemanticFlow2D graph={graph} visitId={visitId} location={{ scopeId: 'file', centerId, depth: 1, direction: 'both' }} selectedIds={new Set([centerId])} matchIds={new Set()}
+      motion={{ enabled: false, reduced: false, visible: true }} onCamera={onCamera} onSelect={() => {}} onSelectEdge={() => {}} onClear={() => {}} {...extras} />,
+  ));
+  const deliver = (index: number, width = 1000, height = 700) => act(async () => {
+    const observer = observers[index]!;
+    observer.callback([{ target: observer.target, contentRect: { width, height } } as ResizeObserverEntry], observer as unknown as ResizeObserver);
+  });
+  const camera = () => ['data-camera-x', 'data-camera-y', 'data-camera-scale'].map(name => Number(host.querySelector('.semantic-flow-2d')!.getAttribute(name)));
+  beforeEach(() => {
+    measured = { width: 0, height: 0 }; observers.length = 0;
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    vi.spyOn(SVGElement.prototype, 'getBoundingClientRect').mockImplementation(() => ({ ...measured, x: 0, y: 0, top: 0, left: 0, right: measured.width, bottom: measured.height, toJSON: () => ({}) }));
+    vi.stubGlobal('ResizeObserver', class {
+      entry: typeof observers[number];
+      constructor(callback: ResizeObserverCallback) { this.entry = { callback, disconnect: vi.fn() }; observers.push(this.entry); }
+      observe(target: Element) { this.entry.target = target; }
+      disconnect() { this.entry.disconnect(); }
+    });
+    vi.stubGlobal('requestAnimationFrame', vi.fn(() => 1)); vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    host = document.createElement('div'); document.body.append(host); root = createRoot(host);
+  });
+  afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.clearAllMocks(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+
+  it('draws the first relation frame using actual dimensions before any resize delivery', async () => {
+    measured = { width: 841, height: 618 };
+    await show('first');
+    expect(observers).toHaveLength(1);
+    expect(host.querySelector('.semantic-flow-2d')!.getAttribute('data-render-state')).toBe('ready');
+    expect(host.querySelector('[role="status"]')).toBeNull();
+    expect(host.querySelectorAll('[data-node-id]')).toHaveLength(3);
+    expect(camera()).not.toEqual([100, 100, 1]);
+    expect(onCamera).toHaveBeenCalledTimes(1);
+    expect(onCamera).toHaveBeenLastCalledWith({ x: camera()[0], y: camera()[1], scale: camera()[2] });
+  });
+
+  it('explains a genuinely unmeasured nonempty graph and never persists its placeholder camera', async () => {
+    await show('deferred');
+    const svg = host.querySelector('.semantic-flow-2d')!;
+    expect(svg.getAttribute('aria-busy')).toBe('true');
+    expect(svg.getAttribute('data-node-count')).toBe('3');
+    expect(host.querySelectorAll('[data-node-id]')).toHaveLength(0);
+    expect(host.querySelector('[role="status"]')?.textContent).toBe('関係を表示しています…');
+    expect(onCamera).not.toHaveBeenCalled();
+    await deliver(0);
+    expect(svg.getAttribute('aria-busy')).toBe('false');
+    expect(host.querySelectorAll('[data-node-id]')).toHaveLength(3);
+    expect(host.querySelector('[role="status"]')).toBeNull();
+    expect(onCamera).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores an old visit resize result during rapid center changes', async () => {
+    await show('first', 'a');
+    await show('second', 'b');
+    await show('third', 'c');
+    expect(observers).toHaveLength(3);
+    expect(observers[0]!.disconnect).toHaveBeenCalledOnce(); expect(observers[1]!.disconnect).toHaveBeenCalledOnce();
+    await deliver(0); await deliver(1);
+    expect(host.querySelector('.semantic-flow-2d')!.getAttribute('data-explorer-center')).toBe('c');
+    expect(host.querySelector('[role="status"]')).not.toBeNull();
+    expect(onCamera).not.toHaveBeenCalled();
+    await deliver(2);
+    const latest = camera();
+    await deliver(0, 2000, 1400);
+    expect(camera()).toEqual(latest);
+    expect(host.querySelector('.semantic-flow-2d')!.getAttribute('data-explorer-center')).toBe('c');
+    expect(onCamera).toHaveBeenCalledTimes(1);
+  });
+
+  it('applies a pending focus once dimensions and initial camera are ready', async () => {
+    const command = { kind: 'focus' as const, nonce: 1, ids: ['c'] };
+    await show('focus', 'a', { command });
+    await deliver(0);
+    const [x, , scale] = camera() as [number, number, number];
+    const target = layoutExplorerRelations(graph, 'a').find(point => point.node.id === 'c')!;
+    expect(scale).toBe(1.45);
+    expect(target.x * scale + x).toBeCloseTo(500);
+    const focused = camera();
+    await show('focus', 'a', { command, selectedIds: new Set(['b']) });
+    expect(camera()).toEqual(focused);
+  });
+
+  it('restores saved panning without automatic Fit even when the saved view contains no nodes', async () => {
+    measured = { width: 1000, height: 700 };
+    const saved = { x: -10000, y: -10000, scale: .73 };
+    await show('restored', 'a', { camera: saved });
+    expect(camera()).toEqual([saved.x, saved.y, saved.scale]);
+    expect(host.querySelector('.semantic-flow-2d')!.getAttribute('data-render-state')).toBe('ready');
+    expect(host.querySelectorAll('[data-node-id]')).toHaveLength(0);
+    expect(host.querySelector('[role="status"]')).toBeNull();
+    await deliver(0);
+    expect(camera()).toEqual([saved.x, saved.y, saved.scale]);
+  });
+
+  it('distinguishes an empty filtered result from pending measurement', async () => {
+    await show('empty', 'a', { graph: { ...graph, nodes: [], edges: [] } });
+    expect(host.querySelector('[role="status"]')).toBeNull();
+    expect(host.querySelector('.semantic-empty-result h3')?.textContent).toBe('表示する対象がありません');
+    expect(onCamera).not.toHaveBeenCalled();
+  });
+
+  it('uses human display names in both file blocks and relation cards while selection still receives canonical IDs', async () => {
+    measured = { width: 1000, height: 700 };
+    const path = 'scripts/build-extension.mjs';
+    const initializer = { ...graph.nodes[0]!, id: 'function:scripts/build-extension.mjs:0:<module>', label: '<module>', path, attributes: { initializer: true } };
+    const callee = 'plugins.filter(plugin => { return plugin.enabled && plugin.matches({ phase: "build" }); }).map';
+    const external = { ...graph.nodes[1]!, id: 'external:recorded', label: callee, kind: 'external' as const, confidence: 'unresolved' as const, path, line: 5, attributes: { callee } };
+    const displayGraph: SemanticGraph = { ...graph, nodes: [initializer, external], edges: [{ ...graph.edges[0]!, source: initializer.id, target: external.id }] };
+    const before = JSON.stringify(displayGraph), explorer = buildSemanticExplorer(displayGraph, new Set([path]));
+    const initializerLocation = explorerLocationForNode(explorer, initializer.id), onOpenNode = vi.fn(), onSelect = vi.fn();
+    await show('file-labels', initializer.id, { graph: displayGraph, explorer, location: { ...initializerLocation, centerId: undefined }, onOpenNode });
+    const block = host.querySelector('[data-node-open-id]')!;
+    expect(block.querySelector('strong')?.textContent).toBe('ファイル直下の処理');
+    expect(block.querySelector('small')?.textContent).toBe(path);
+    expect(block.getAttribute('title')).toContain('元の表示名: <module>');
+    await act(async () => block.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    expect(onOpenNode).toHaveBeenLastCalledWith(initializer.id);
+    await show('call-labels', initializer.id, { graph: displayGraph, explorer, location: initializerLocation, onSelect });
+    const cards = [...host.querySelectorAll('[data-node-id]')];
+    const center = cards.find(card => card.getAttribute('data-node-id') === initializer.id)!;
+    const call = cards.find(card => card.getAttribute('data-node-id') === external.id)!;
+    expect(center.querySelector('strong')?.textContent).toBe('ファイル直下の処理');
+    expect(call.querySelector('strong')?.textContent).toBe('plugins.filter(...).map(...)');
+    expect(call.querySelector('small')?.textContent).toBe(`${path}:5`);
+    expect(call.querySelector('title')?.textContent).toContain(callee);
+    await act(async () => call.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    expect(onSelect).toHaveBeenLastCalledWith(external.id);
+    expect(JSON.stringify(displayGraph)).toBe(before);
   });
 });

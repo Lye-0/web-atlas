@@ -1,6 +1,7 @@
 import { explorerBreadcrumbs, explorerChildren, explorerEdgeVisible, explorerRegionIdentity, type ExplorerLocation, type SemanticExplorerModel } from '../../analyzer/semantic/semanticExplorer';
 import type { SemanticGraph } from '../../analyzer/semantic/types';
 import { semanticRelationLabel } from './semanticFlowLanguage';
+import { semanticNodeDisplay } from './semanticFlowDisplay';
 
 export interface SemanticExplorerNavigationActions {
   location: ExplorerLocation; visitId: string; scrollTop: number; canBack: boolean;
@@ -15,6 +16,8 @@ export function SemanticExplorerNavigation({ explorer, navigation, mode, graph, 
   const location = navigation.location, selectedId = [...selectedIds][0], selected = selectedId ? explorer.nodes.get(selectedId) : undefined;
   const owner = selectedId ? explorer.owners.get(selectedId) : undefined;
   const center = location.centerId ? explorer.nodes.get(location.centerId) : undefined;
+  const centerDisplay = center ? semanticNodeDisplay(center) : undefined;
+  const selectedDisplay = selected ? semanticNodeDisplay(selected) : undefined;
   const scope = explorer.scopes.get(location.scopeId), visibleIds = new Set(graph.nodes.map(node => node.id));
   const children = mode === '2d' && !center ? explorerChildren(explorer, location, visibleIds) : [];
   const displayedIds = center ? new Set(localGraph.nodes.map(node => node.id)) : new Set(scope?.memberIds ?? []);
@@ -31,15 +34,15 @@ export function SemanticExplorerNavigation({ explorer, navigation, mode, graph, 
         <button type="button" onClick={navigation.onProject} disabled={!center && location.scopeId === 'project'}>プロジェクトへ</button>
       </div><nav className="semantic-explorer-breadcrumb" aria-label="2Dの現在地">{explorerBreadcrumbs(explorer, location).map((item, index) => <span key={item.id}>
         {index > 0 && <span aria-hidden="true">›</span>}<button type="button" onClick={() => navigation.onOpenScope(item.id)} aria-current={!center && item.id === location.scopeId ? 'page' : undefined}>{item.label}</button>
-      </span>)}{center && <span><span aria-hidden="true">›</span><strong aria-current="page">{center.label}</strong></span>}</nav>
+      </span>)}{center && <span><span aria-hidden="true">›</span><strong aria-current="page" title={centerDisplay?.tooltip}>{centerDisplay?.title}</strong></span>}</nav>
         {center && <span className="semantic-explorer-local-count" title="現在の局所図の関係総数。線の方向は選択対象を基準に適用し、対象と配置は維持します。">{localGraph.nodes.length.toLocaleString()}対象 / 関係総数 {localGraph.edges.length.toLocaleString()}{location.direction !== 'both' && selectedIds.size > 0 ? ` · 表示${visibleEdges.toLocaleString()}本` : ''}</span>}
       </div>
       {!center && <div className="semantic-explorer-caption"><span>{scope?.label ?? 'プロジェクト'}の直下 · {children.length.toLocaleString()}件</span><small>クリック・Enterで開く · スクロールで同じ階層を移動</small></div>}
     </> : <div className="semantic-explorer-caption"><strong>プロジェクト全体の3D</strong><span>{regionCount.toLocaleString()}所属 · {graph.nodes.length.toLocaleString()}対象 · {graph.edges.length.toLocaleString()}関係</span></div>}
     {explorer.view === 'runtime-flow' && (mode === '3d' || scope?.id === 'project') && explorer.runtimeMode !== 'grounded' && <p className="semantic-explorer-runtime-note">{mode === '3d' ? '実行環境未判定・所属別表示の対象は、記録されたディレクトリ・ファイル・所属でまとまります。' : '実行環境未判定・所属別表示の対象は、ディレクトリとファイルから探索できます。'}</p>}
     {(selected || mode === '2d' && (center || selectedEdge)) && <div className={`semantic-explorer-selection${mode === '2d' && center ? ' is-relation' : ''}`}>
-      {selected ? <span className="semantic-explorer-selected-path" title={`${selected.label} · ${owner?.filePath ?? (selected.kind === 'external' ? '定義先未特定' : selected.group)}${selected.line ? `:${selected.line}` : ''}`}>{outside ? '現在の場所の外で選択: ' : '選択: '}<strong>{selected.label}</strong>{owner?.filePath ? ` · ${owner.filePath}${selected.line ? `:${selected.line}` : ''}` : selected.kind === 'external' ? ' · 定義先未特定' : ` · ${selected.group}`}</span>
-        : <span className="semantic-explorer-selected-path">{selectedEdge ? `${outsideEdge && center ? '現在の関係図の外で選択' : '関係を選択'}: ${semanticRelationLabel(selectedEdge)}` : `中心: ${center?.label} · 対象をクリックして選択`}</span>}
+      {selected ? <span className="semantic-explorer-selected-path" title={mode === '2d' ? selectedDisplay?.tooltip : `${selected.label} · ${owner?.filePath ?? (selected.kind === 'external' ? '定義先未特定' : selected.group)}${selected.line ? `:${selected.line}` : ''}`}>{outside ? '現在の場所の外で選択: ' : '選択: '}<strong>{mode === '2d' ? selectedDisplay?.title : selected.label}</strong>{owner?.filePath ? ` · ${owner.filePath}${selected.line ? `:${selected.line}` : ''}` : selected.kind === 'external' ? ' · 定義先未特定' : ` · ${selected.group}`}</span>
+        : <span className="semantic-explorer-selected-path">{selectedEdge ? `${outsideEdge && center ? '現在の関係図の外で選択' : '関係を選択'}: ${semanticRelationLabel(selectedEdge)}` : `中心: ${centerDisplay?.title} · 対象をクリックして選択`}</span>}
       <div className="semantic-explorer-selection-actions">
         {outside && <button type="button" onClick={navigation.onRevealSelection}>選択した要素へ移動</button>}
         {outsideEdge && <button type="button" onClick={navigation.onRevealSelection}>この関係を表示</button>}

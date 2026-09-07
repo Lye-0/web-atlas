@@ -1,6 +1,6 @@
 import { OrthographicCamera, Vector3 } from 'three';
 import { describe, expect, it, vi } from 'vitest';
-import { FlowLabelLayer, hitSemanticFlowEdge, hitSemanticFlowPoint, projectSemanticFlowLabels, type FlowLabelPlacement } from './semanticFlowLabels';
+import { FlowLabelLayer, hitSemanticFlowEdge, hitSemanticFlowPoint, projectSemanticFlowLabels, semanticFlowConnectionNotices, type FlowLabelPlacement } from './semanticFlowLabels';
 import { semanticFlowEdgePaths } from '../../analyzer/semantic/flowPresentation';
 import type { SemanticPosition } from '../../analyzer/semantic/presentation';
 import type { SemanticFlowRegion } from '../../analyzer/semantic/flowRegions';
@@ -11,6 +11,60 @@ const region: SemanticFlowRegion = { id: 'directory:src/git', kind: 'directory',
 const sceneCamera = () => { const camera = new OrthographicCamera(-500, 500, 400, -400, .1, 1000); camera.position.set(0, 0, 100); camera.lookAt(0, 0, 0); return camera; };
 
 describe('semantic 3D label synchronization', () => {
+  it('keeps a few direct endpoints ahead of unrelated names in a dense point cloud', () => {
+    const positions = [positioned('caller', -240), positioned('Math.abs', 0, 5), positioned('Math.min', 28, -10),
+      ...Array.from({ length: 60 }, (_, index) => positioned(`other-${index}`, (index % 10) * 13 - 45, Math.floor(index / 10) * 13 - 35))];
+    const labels = projectSemanticFlowLabels(sceneCamera(), { width: 1000, height: 800 }, .1, positions, new Set(['caller']), new Set(), { relatedIds: new Set(['caller', 'Math.abs', 'Math.min']), regions: [region] });
+    expect(labels.slice(0, 3).map(label => label.id)).toEqual(['caller', 'Math.abs', 'Math.min']);
+    for (const label of labels.slice(0, 3)) {
+      const inset = label.selected ? 17 : 9, height = label.selected ? 46 : 28;
+      const left = label.x + inset, right = left + label.width!;
+      expect(left >= label.pointX! + inset || right <= label.pointX! - inset || label.y - height / 2 >= label.pointY! + inset || label.y + height / 2 <= label.pointY! - inset).toBe(true);
+    }
+  });
+
+  it('reserves both selected-edge names before hover, irrespective of input order', () => {
+    const positions = [positioned('hover', 20), positioned('target', 30), positioned('source')];
+    const context = { priorityIds: new Set(['source', 'target']), relatedIds: new Set(['source', 'target']) };
+    const first = projectSemanticFlowLabels(sceneCamera(), { width: 1000, height: 800 }, .1, positions, new Set(), new Set(), context);
+    const hovered = projectSemanticFlowLabels(sceneCamera(), { width: 1000, height: 800 }, .1, positions, new Set(), new Set(), { ...context, hoveredIds: new Set(['hover']), previous: first });
+    expect(hovered.slice(0, 2).map(label => label.id)).toEqual(['source', 'target']);
+    for (const label of hovered.slice(0, 2)) expect({ x: label.x, y: label.y }).toEqual({ x: first.find(item => item.id === label.id)!.x, y: first.find(item => item.id === label.id)!.y });
+  });
+
+  it('distinguishes offscreen connections from labels culled in view without moving the camera', () => {
+    const camera = sceneCamera(), before = camera.position.toArray(), size = { width: 1000, height: 800 };
+    const positions = [positioned('visible'), positioned('crowded', 10), positioned('outside', 1100), positioned('behind-toolbar', 0, 350)];
+    const notices = semanticFlowConnectionNotices(camera, size, positions, new Set(positions.map(item => item.node.id)), [placement('visible')]);
+    expect(notices).toEqual([{ id: 'crowded', status: 'unlabelled' }, { id: 'outside', status: 'offscreen' }, { id: 'behind-toolbar', status: 'offscreen' }]);
+    expect(camera.position.toArray()).toEqual(before);
+  });
+
+  it('reserves measured disclosures and keeps covered connections reachable in the remaining list', () => {
+    const camera = sceneCamera(), size = { width: 1000, height: 800 };
+    const obstacles = [{ left: 280, top: 520, width: 330, height: 100 }];
+    const positions = [positioned('beside-control', -240, -140), positioned('behind-control', -180, -170)];
+    const relatedIds = new Set(positions.map(item => item.node.id));
+    const labels = projectSemanticFlowLabels(camera, size, 1, positions, new Set(), new Set(), { relatedIds, obstacles });
+    expect(labels.map(label => label.id)).toEqual(['beside-control']);
+    const label = labels[0]!, left = label.x + 9;
+    expect(left + label.width! <= 280 || label.y + 14 <= 520 || label.y - 14 >= 620 || left >= 610).toBe(true);
+    expect(semanticFlowConnectionNotices(camera, size, positions, relatedIds, labels, 148, obstacles)).toEqual([{ id: 'behind-control', status: 'unlabelled' }]);
+  });
+
+  it('leaves room for the aggregate ring at maximum point scale, including the mounted label and leader', () => {
+    for (const x of [0, 450]) {
+      const item = positioned('aggregate', x); item.node.attributes = { displayAggregate: true, targetCount: 120 };
+      const label = projectSemanticFlowLabels(sceneCamera(), { width: 1000, height: 800 }, 8, [item], new Set(), new Set())[0]!;
+      const left = label.x + 17, right = left + label.width!;
+      expect(left >= label.pointX! + 17 || right <= label.pointX! - 17 || label.y - 23 >= label.pointY! + 17 || label.y + 23 <= label.pointY! - 17).toBe(true);
+      const layer = new FlowLabelLayer(() => {}), button = document.createElement('button'), leader = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      layer.update([label]); layer.attach('aggregate', button); layer.attachLeader('aggregate', leader);
+      expect(button.style.transform).toContain('translate(17px, -50%)');
+      expect(Number(leader.getAttribute('x2'))).toBeGreaterThanOrEqual(left);
+      expect(Number(leader.getAttribute('x2'))).toBeLessThanOrEqual(right);
+    }
+  });
   it('projects the current camera before the renderer refreshes its world matrix', () => {
     const camera = new OrthographicCamera(-5, 5, 4, -4, .1, 1000);
     camera.position.set(0, 0, 10); camera.lookAt(0, 0, 0); camera.updateMatrixWorld();

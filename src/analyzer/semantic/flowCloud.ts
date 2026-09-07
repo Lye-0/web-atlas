@@ -50,6 +50,11 @@ function fileCloud(nodes: SemanticNode[], identity: string): Cloud {
   return { points, size: [radius * 2, radius * 2, radius * 2] };
 }
 
+/** One display group, retaining canonical node references and input ordering. */
+export function layoutSemanticCloudGroup(nodes: readonly SemanticNode[], identity: string): SemanticPosition[] {
+  return fileCloud([...nodes], identity).points;
+}
+
 export function layoutSemanticCloud(graph: SemanticGraph, explorer?: SemanticExplorerModel): SemanticPosition[] {
   const groups = new Map<string, Map<string, SemanticNode[]>>();
   for (const node of graph.nodes) {

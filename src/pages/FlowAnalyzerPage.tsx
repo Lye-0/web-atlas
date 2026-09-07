@@ -16,6 +16,7 @@ import { SearchResultStrip } from '../components/analyzer/SearchResultStrip';
 import { SemanticFlowStage } from '../components/analyzer/SemanticFlowStage';
 import { SemanticFlowDetail } from '../components/analyzer/SemanticFlowDetail';
 import { semanticFlowDirectionLanguage } from '../components/analyzer/semanticFlowLanguage';
+import { semanticNodeDisplays } from '../components/analyzer/semanticFlowDisplay';
 import { useWorkspaceFullscreen } from '../components/analyzer/useWorkspaceFullscreen';
 import { useSemanticExplorerNavigation } from '../components/analyzer/useSemanticExplorerNavigation';
 import { analyzerRoutes } from '../utils/routes';
@@ -62,6 +63,7 @@ export default function FlowAnalyzerPage({ view }: { view: 'runtime-flow' | 'fun
     const ids = new Set(nodes.map(node => node.id)); return { view, nodes, edges: graph.edges.filter(edge => ids.has(edge.source) && ids.has(edge.target)) };
   }, [graph, view, options.scope, options.kind, options.confidence, options.auxiliary, options.members]);
   const results = useMemo(() => searchSemanticNodes(filtered.nodes, session.search), [filtered.nodes, session.search]);
+  const searchDisplays = useMemo(() => flow.mode === '2d' ? semanticNodeDisplays(graph.nodes) : undefined, [graph.nodes, flow.mode]);
   const matchIds = useMemo(() => new Set(results.map(result => result.id)), [results]);
   const knownFiles = useMemo(() => new Set([...(store?.files.map(file => file.relativePath) ?? []), ...Object.keys(store?.sources ?? {}), ...Object.keys(store?.semanticSources ?? {})]), [store]);
   const explorer = useMemo(() => buildSemanticExplorer(graph, knownFiles), [graph, knownFiles]);
@@ -155,7 +157,11 @@ export default function FlowAnalyzerPage({ view }: { view: 'runtime-flow' | 'fun
       {notice && <p className="semantic-flow-notice" role="status">{notice}<button type="button" onClick={() => setNotice('')}>閉じる</button></p>}
       {unavailable3D && <p className="semantic-flow-notice" role="status">この環境では3D描画を継続できません。検索・選択を保持して2Dエクスプローラーを表示しています。<button type="button" onClick={() => changeMode('3d')}>3Dを再試行</button></p>}
       {hiddenSelection && <p className="semantic-flow-notice" role="status">選択中の「{selected?.label ?? selectedEdge?.label}」は現在のフィルターで非表示です。<button type="button" onClick={restoreSelection}>フィルターを解除して表示</button><button type="button" onClick={clearSelection}>選択解除</button></p>}
-      <SearchResultStrip query={session.search} items={results.map(result => ({ id: result.id, label: result.label, subtitle: `${result.node.kind === 'external' ? '呼び出し箇所: ' : ''}${result.path ?? result.node.group}${result.node.line ? `:${result.node.line}` : ''}`, reason: result.match.reason }))} selectedId={selected?.id} onSelect={id => navigation.jumpMode(flow.mode, id)} loading={Boolean(store && !analysis && !error)} />
+      <SearchResultStrip query={session.search} items={results.map(result => {
+        const display = searchDisplays?.get(result.id);
+        const location = display?.location ?? `${result.path ?? result.node.group}${result.node.line ? `:${result.node.line}` : ''}`;
+        return { id: result.id, label: display?.title ?? result.label, subtitle: `${result.node.kind === 'external' ? '呼び出し箇所: ' : ''}${location}`, reason: result.match.reason };
+      })} selectedId={selected?.id} onSelect={id => navigation.jumpMode(flow.mode, id)} loading={Boolean(store && !analysis && !error)} />
       <div ref={fullscreen.root} className={`analyzer-workspace semantic-flow-workspace${session.detailOpen && (selected || selectedEdge) ? ' has-detail' : ''}${fullscreen.isFullscreen ? ' is-fullscreen' : ''}`}
         role={fullscreen.isFullscreen ? 'dialog' : undefined} aria-modal={fullscreen.isFullscreen || undefined} aria-label={fullscreen.isFullscreen ? `${view} 全画面表示` : undefined} onKeyDownCapture={fullscreen.onKeyDownCapture}>
         {store ? <SemanticFlowStage key={`${view}:${state.scanVersion}`} graph={filtered} explorer={explorer} mode={flow.mode} direction={options.direction} selectedIds={selectedIds} selectedEdgeId={selectedEdge?.id} matchIds={matchIds} focus={focus}
