@@ -1,4 +1,9 @@
 import type { AnalyzerSourceFile } from './types';
+import { semanticLanguage } from './semantic/languages';
+
+export function isAnalyzerSemanticSourcePath(path: string): boolean {
+  return !isExcludedPath(path) && !isSensitivePath(path) && Boolean(semanticLanguage(path));
+}
 
 const excludedDirectories = new Set([
   '.git',

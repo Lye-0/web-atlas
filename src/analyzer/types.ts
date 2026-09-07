@@ -1,4 +1,4 @@
-export type AnalyzerViewId = 'architecture' | 'workspace' | 'command' | 'dependencies' | 'module-dependency';
+export type AnalyzerViewId = 'architecture' | 'workspace' | 'command' | 'dependencies' | 'module-dependency' | import('./semantic/types').SemanticViewId;
 
 export type AnalyzerFactKind =
   | 'project'
@@ -324,6 +324,7 @@ export interface AnalyzerProjectStore {
   relations: AnalyzerRelation[];
   evidence: AnalyzerEvidence[];
   sources: Record<string, string>;
+  semanticSources?: Record<string, string>;
   warnings: AnalyzerWarning[];
   scannedAt: string;
 }
@@ -466,6 +467,11 @@ export const analyzerViewLabels: Record<AnalyzerViewId, string> = {
   command: 'Command Flow',
   dependencies: 'Package Dependency',
   'module-dependency': 'Module Dependency',
+  'runtime-flow': 'Runtime Flow',
+  'function-call-flow': 'Function Call Flow',
+  'data-flow': 'Data Flow',
+  'data-model': 'Data Model',
+  'architecture-map': 'Architecture Map',
 };
 
 export const relationLabels: Record<AnalyzerRelationKind, string> = {

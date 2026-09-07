@@ -2,14 +2,16 @@ import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { buildSpatialFlowData, SPATIAL_FLOW_PATHS_PER_BATCH, type SpatialFlowPath, type SpatialFlowState } from '../../analyzer/spatialFlow';
 import type { SpatialCameraModel } from '../../analyzer/spatialCoordinates';
+type FlowCameraViewport = Pick<SpatialCameraModel, 'scale' | 'viewportWidth' | 'viewportHeight'>;
 
-function FlowBatch({ paths, stateRef, cameraRef }: {
+function FlowBatch({ paths, stateRef, cameraRef, spacing }: {
   paths: readonly SpatialFlowPath[];
   stateRef: { current: SpatialFlowState };
-  cameraRef: { current: SpatialCameraModel };
+  cameraRef: { current: FlowCameraViewport };
+  spacing?: number;
 }) {
   const resources = useMemo(() => {
-    const data = buildSpatialFlowData(paths);
+    const data = buildSpatialFlowData(paths, spacing);
     const texture = new THREE.DataTexture(data.samples, data.width, data.height, THREE.RGBAFormat, THREE.FloatType);
     texture.minFilter = texture.magFilter = THREE.NearestFilter;
     texture.needsUpdate = true;
@@ -36,17 +38,25 @@ function FlowBatch({ paths, stateRef, cameraRef }: {
       uniforms: {
         paths: { value: texture }, textureWidth: { value: data.width }, distance: { value: 0 },
         viewport: { value: new THREE.Vector2(1, 1) }, reduced: { value: 0 }, cameraScale: { value: 1 },
+        particleSpacing: { value: spacing ?? 0 },
       },
       transparent: true, depthWrite: false, depthTest: true, blending: THREE.AdditiveBlending,
       vertexShader: `
         uniform sampler2D paths; uniform float textureWidth; uniform float distance;
         uniform vec2 viewport; uniform float reduced; uniform float cameraScale;
+        uniform float particleSpacing;
         attribute vec4 pathInfo; attribute float phaseOffset; attribute vec3 flowColor;
         varying vec2 particleUv; varying vec3 particleColor; varying float fade;
         vec4 samplePath(float index) { return texture2D(paths, vec2((index + .5) / textureWidth, pathInfo.x)); }
         void main() {
           float progress = fract(distance / pathInfo.y + phaseOffset);
           float travelled = progress * pathInfo.y;
+          if (particleSpacing > 0.) {
+            float interval = particleSpacing * (reduced > .5 ? 2. : 1.);
+            float order = reduced > .5 ? floor(pathInfo.w / 2.) : pathInfo.w;
+            travelled = mod(distance + phaseOffset * interval, interval) + order * interval;
+            progress = travelled / pathInfo.y;
+          }
           // Binary search cumulative distance: match the tube's actual segment centres at uniform speed.
           float lo = 0.; float hi = pathInfo.z - 1.;
           for (int i = 0; i < 12; i++) {
@@ -71,6 +81,7 @@ function FlowBatch({ paths, stateRef, cameraRef }: {
           gl_Position = clip;
           particleUv = uv; particleColor = flowColor;
           fade = smoothstep(0., .035, progress) * (1. - smoothstep(.965, 1., progress)) * mix(1., .7, reduced);
+          if (particleSpacing > 0.) fade = smoothstep(0., 8., travelled) * (1. - smoothstep(max(0., pathInfo.y - 8.), pathInfo.y, travelled)) * mix(1., .7, reduced);
           if (reduced > .5 && mod(pathInfo.w, 2.) > .5) fade = 0.;
         }`,
       fragmentShader: `
@@ -87,7 +98,7 @@ function FlowBatch({ paths, stateRef, cameraRef }: {
         }`,
     });
     return { geometry, material, texture };
-  }, [paths]);
+  }, [paths, spacing]);
   useEffect(() => () => {
     resources.geometry.dispose(); resources.material.dispose(); resources.texture.dispose();
   }, [resources]);
@@ -100,13 +111,14 @@ function FlowBatch({ paths, stateRef, cameraRef }: {
     }} />;
 }
 
-export function SpatialFlowParticles({ paths, stateRef, cameraRef, active }: {
+export function SpatialFlowParticles({ paths, stateRef, cameraRef, active, spacing }: {
   paths: readonly SpatialFlowPath[];
   stateRef: { current: SpatialFlowState };
-  cameraRef: { current: SpatialCameraModel };
+  cameraRef: { current: FlowCameraViewport };
   active: boolean;
+  spacing?: number;
 }) {
   const batches = useMemo(() => Array.from({ length: Math.ceil(paths.length / SPATIAL_FLOW_PATHS_PER_BATCH) }, (_, i) =>
     paths.slice(i * SPATIAL_FLOW_PATHS_PER_BATCH, (i + 1) * SPATIAL_FLOW_PATHS_PER_BATCH)), [paths]);
-  return <group visible={active}>{batches.map((batch, i) => <FlowBatch key={i} paths={batch} stateRef={stateRef} cameraRef={cameraRef} />)}</group>;
+  return <group visible={active}>{batches.map((batch, i) => <FlowBatch key={i} paths={batch} stateRef={stateRef} cameraRef={cameraRef} spacing={spacing} />)}</group>;
 }

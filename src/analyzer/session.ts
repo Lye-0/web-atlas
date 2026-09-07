@@ -1,6 +1,7 @@
 import type { AnalyzerGraphTransform } from './camera';
 import type { DirectoryHandleLike } from './fileDiscovery';
 import type { AnalyzerFilter, AnalyzerProjectStore, AnalyzerSemanticRegion, AnalyzerViewId, AnalyzerViewModel } from './types';
+import type { ExplorerSession } from './semantic/semanticExplorerState';
 
 export interface AnalyzerViewSession {
   selectedNodeId?: string;
@@ -12,6 +13,14 @@ export interface AnalyzerViewSession {
   entryScriptId?: string;
   detailOpen: boolean;
   camera?: AnalyzerGraphTransform;
+  semantic?: { scope: string; kind: string; confidence: string; layer: 'source' | 'observed' | 'combined'; depth: number; direction: 'both' | 'incoming' | 'outgoing'; orbit: boolean; overview: boolean; page: number; auxiliary?: boolean; members?: string[] };
+  semanticCamera?: { position: [number, number, number]; target: [number, number, number]; zoom: number };
+  flow?: { mode: '2d' | '3d'; expandedGroupIds: string[]; particleMode?: 'normal' | 'reduced' | 'off' };
+  explorer?: ExplorerSession;
+  flowCameras?: {
+    '2d'?: { x: number; y: number; scale: number };
+    '3d'?: { position: [number, number, number]; target: [number, number, number]; zoom: number };
+  };
 }
 
 export interface AnalyzerSessionState {
@@ -20,6 +29,7 @@ export interface AnalyzerSessionState {
   activeView: AnalyzerViewId;
   views: Record<AnalyzerViewId, AnalyzerViewSession>;
   scanVersion: number;
+  showFlowGroupBounds?: boolean;
 }
 
 export type AnalyzerViewSessionUpdate = Partial<AnalyzerViewSession> | ((current: AnalyzerViewSession) => AnalyzerViewSession);
@@ -27,9 +37,10 @@ export type AnalyzerViewSessionUpdate = Partial<AnalyzerViewSession> | ((current
 export type AnalyzerSessionAction =
   | { type: 'replaceProject'; store: AnalyzerProjectStore; folderHandle?: DirectoryHandleLike }
   | { type: 'setActiveView'; view: AnalyzerViewId }
+  | { type: 'setFlowGroupBounds'; visible: boolean }
   | { type: 'updateView'; view: AnalyzerViewId; update: AnalyzerViewSessionUpdate };
 
-export const analyzerViewIds: AnalyzerViewId[] = ['architecture', 'workspace', 'command', 'dependencies', 'module-dependency'];
+export const analyzerViewIds: AnalyzerViewId[] = ['architecture', 'workspace', 'command', 'dependencies', 'module-dependency', 'runtime-flow', 'function-call-flow', 'data-flow', 'data-model', 'architecture-map'];
 
 export function createInitialAnalyzerViewSession(): AnalyzerViewSession {
   return {
@@ -45,6 +56,7 @@ export function createInitialAnalyzerSessionState(): AnalyzerSessionState {
     activeView: 'architecture',
     views: Object.fromEntries(analyzerViewIds.map((view) => [view, createInitialAnalyzerViewSession()])) as Record<AnalyzerViewId, AnalyzerViewSession>,
     scanVersion: 0,
+    showFlowGroupBounds: true,
   };
 }
 
@@ -152,12 +164,15 @@ export function analyzerSessionReducer(state: AnalyzerSessionState, action: Anal
       activeView: 'architecture',
       views: Object.fromEntries(analyzerViewIds.map((view) => [view, createInitialAnalyzerViewSession()])) as Record<AnalyzerViewId, AnalyzerViewSession>,
       scanVersion: state.scanVersion + 1,
+      showFlowGroupBounds: state.showFlowGroupBounds ?? true,
     };
   }
 
   if (action.type === 'setActiveView') {
     return action.view === state.activeView ? state : { ...state, activeView: action.view };
   }
+
+  if (action.type === 'setFlowGroupBounds') return (state.showFlowGroupBounds ?? true) === action.visible ? state : { ...state, showFlowGroupBounds: action.visible };
 
   const currentView = state.views[action.view];
   const nextView = typeof action.update === 'function'

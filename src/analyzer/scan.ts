@@ -1,5 +1,5 @@
 import { findCanonicalStackByPackageName, getStack } from '../data';
-import { isAnalyzerSourcePath, isAnalyzerUsageSourcePath, normalizeRelativePath } from './fileDiscovery';
+import { isAnalyzerSourcePath, isAnalyzerUsageSourcePath, isAnalyzerSemanticSourcePath, normalizeRelativePath } from './fileDiscovery';
 import { makeEvidence, makeFileEvidence, maskSensitiveSource, type OffsetRange } from './evidence';
 import { moduleDirectoryId, moduleIdForPath, resolveModuleGraph } from './moduleResolver';
 import {
@@ -41,6 +41,7 @@ import type {
   WorkspacePatternFact,
 } from './types';
 import { packageIdForPath, scriptIdFor } from './types';
+import { maskSemanticSource } from './semantic/sourceMask';
 
 export const ANALYZER_MAX_CONFIG_SIZE = 1024 * 1024;
 
@@ -204,7 +205,7 @@ function isUsageSourceFile(file: AnalyzerSourceFile): boolean {
 }
 
 async function loadSources(files: AnalyzerSourceFile[], builder: AnalyzerStoreBuilder): Promise<LoadedSource[]> {
-  const candidates = files.filter((file) => isConfigFile(file) || isUsageSourceFile(file)).sort((a, b) => a.relativePath.localeCompare(b.relativePath));
+  const candidates = files.filter((file) => isConfigFile(file) || isUsageSourceFile(file) || isAnalyzerSemanticSourcePath(file.relativePath)).sort((a, b) => a.relativePath.localeCompare(b.relativePath));
   const loaded = await Promise.all(candidates.map(async (file): Promise<LoadedSource | undefined> => {
     if (file.size > ANALYZER_MAX_CONFIG_SIZE) {
       addWarning(builder, `Skipped oversized analyzer input (${Math.round(file.size / 1024)} KB)`, file.relativePath, 'file-size-guard');
@@ -1149,7 +1150,7 @@ export async function scanProjectFiles(files: AnalyzerSourceFile[]): Promise<Ana
 
   loadedSources.forEach((loaded) => {
     processConfigTechnology(builder, loaded);
-    if (!isConfigFile(loaded.file)) processSourceImports(builder, loaded);
+    if (!isConfigFile(loaded.file) && isUsageSourceFile(loaded.file)) processSourceImports(builder, loaded);
     if (loaded.file.name.toLowerCase().startsWith('wrangler.')) processWrangler(builder, loaded, packageStates);
     processFirebase(builder, loaded, packageStates);
     processDotnet(builder, loaded);
@@ -1167,5 +1168,5 @@ export async function scanProjectFiles(files: AnalyzerSourceFile[]): Promise<Ana
     });
   }
 
-  return builder.build(files);
+  return { ...builder.build(files), semanticSources: Object.fromEntries(loadedSources.map(({ file, source }) => [file.relativePath, maskSemanticSource(source)])) };
 }

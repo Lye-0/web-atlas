@@ -1,0 +1,70 @@
+import { confidenceLabels, type SemanticNode, type SemanticRelationSource, type SemanticViewId } from '../../analyzer/semantic/types';
+
+export type SemanticFlowLanguageView = SemanticViewId | 'module-dependency';
+
+export function semanticFlowDirectionLanguage(view: SemanticFlowLanguageView) {
+  if (view === 'module-dependency') return {
+    incoming: 'import元', outgoing: 'import先', caption: '矢印・粒子は import する側から読み込まれる側へ',
+    help: '矢印と粒子は、importするファイルから読み込まれるファイルへ向かいます。青は選択対象がimportする先、琥珀色は選択対象をimportする元、緑は選択範囲内の依存です。粒子は依存の向きを示し、実行順や実行時間は表しません。',
+  };
+  if (view === 'function-call-flow') return {
+    incoming: '呼び出し元', outgoing: '呼び出し先', caption: '矢印・粒子は呼び出しや登録などの関係の向き',
+    help: '呼び出しの線は呼ぶ側から呼び出される側へ、コールバックの線は渡す側から渡される関数へ向かいます。実行記録の線は親子関係やソースとの対応を示します。青は選択対象から出る関係、琥珀色は入る関係、緑は選択範囲内の関係です。配置や粒子の速度は実際の実行順・時間を表しません。',
+  };
+  return {
+    incoming: '関係元', outgoing: '関係先', caption: '矢印・粒子は処理・登録・読み書きなどの関係の向き',
+    help: '呼び出し、イベント登録、リクエスト、読み書きなどの関係を元から先へ示します。読み取りはデータ側から処理側へ向かいます。実行記録の線は親子関係やソースとの対応を示します。青は選択対象から出る関係、琥珀色は入る関係、緑は選択範囲内の関係です。配置や粒子の速度は実際の実行順・時間を表しません。',
+  };
+}
+
+export const isUnresolvedCallNode = (node?: SemanticNode) => node?.kind === 'external' && node.confidence === 'unresolved';
+
+export function semanticNodeConfidence(node: SemanticNode) {
+  if (isUnresolvedCallNode(node)) return '呼び出し先の定義を未特定';
+  if (node.kind === 'request' && node.confidence === 'unresolved') return '送信先URLを未特定';
+  return confidenceLabels[node.confidence];
+}
+
+export function semanticRelationConfidence(edge: SemanticRelationSource) {
+  if (edge.confidence === 'unresolved') return edge.kind === 'calls'
+    ? edge.evidence.length ? '呼び出し式あり・定義先未特定' : '呼び出し先の定義を未特定'
+    : '関係の一部を未特定';
+  return confidenceLabels[edge.confidence];
+}
+
+export function semanticNodeExplanation(node: SemanticNode) {
+  if (isUnresolvedCallNode(node)) {
+    const confirmed = node.evidence.length ? '呼び出し式はソースにあります。' : '';
+    return confirmed + (Array.isArray(node.attributes.candidates) && node.attributes.candidates.length > 1
+      ? '定義の候補が複数あり、呼び出し先を一つに絞れていません。Evidenceから呼び出し箇所を確認できます。'
+      : '読み込んだソースから、対応する関数の定義を特定できていません。Evidenceから呼び出し箇所を確認できます。');
+  }
+  if (node.kind === 'request' && node.confidence === 'unresolved') return '送信先URLを特定できていません。Evidenceのリクエスト箇所で、URLに使われている値を確認できます。';
+  if (node.confidence === 'unresolved') return '読み込んだ情報では、この対象に関する情報を確定できません。EvidenceとMetadataを確認してください。';
+  return undefined;
+}
+
+export function semanticRelationExplanation(edge: SemanticRelationSource, target?: SemanticNode) {
+  if (edge.confidence !== 'unresolved') return undefined;
+  if (edge.kind === 'calls') return (edge.evidence.length ? 'この呼び出し式はソースで確認できています。' : '')
+    + (Array.isArray(target?.attributes.candidates) && target.attributes.candidates.length > 1
+      ? '定義の候補が複数あり、呼び出し先を一つに絞れていません。'
+      : '対応する関数の定義を、読み込んだソースから特定できていません。');
+  return '関係の一部を確定できていません。元の関係とEvidenceで、確認できている範囲を調べられます。';
+}
+
+export function semanticRelationLabel(edge: SemanticRelationSource) {
+  switch (edge.kind) {
+    case 'callback': return 'コールバックとして渡す';
+    case 'handles': return '担当する処理';
+    case 'runtime-entry': return '実行の入口';
+    case 'requests': return 'リクエストを送る';
+    case 'uses-resource': return 'リソースを利用';
+    case 'observed-child': return '実行記録の親子関係';
+    case 'observed-at': return '実行記録とソースの対応';
+    case 'log-event': return 'ログの記録';
+    case 'processing-path': return edge.label.replaceAll('callback', 'コールバック');
+    case 'executes': return ({ database: 'データベース操作', storage: 'ストレージ操作', auth: '認証処理', 'ORM operation': 'データベース操作' } as Record<string, string>)[edge.label] ?? edge.label;
+    default: return edge.label;
+  }
+}

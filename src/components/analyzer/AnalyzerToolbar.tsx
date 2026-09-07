@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import { analyzerRoutes } from '../../utils/routes';
 import { analyzerViewLabels, type AnalyzerFilter, type AnalyzerViewCounts, type AnalyzerViewId, type PackageScriptFact } from '../../analyzer';
+import { AnalyzerSearchControl } from './AnalyzerViewChrome';
 
 export type { AnalyzerFilter } from '../../analyzer';
 
@@ -19,6 +20,12 @@ interface AnalyzerToolbarProps {
 }
 
 const viewPaths: Record<AnalyzerViewId, string> = analyzerRoutes;
+
+export function AnalyzerViewTabs() {
+  return <nav className="analyzer-view-tabs" aria-label="Analyzer views">
+    {(Object.keys(analyzerViewLabels) as AnalyzerViewId[]).map(viewId => <NavLink key={viewId} to={viewPaths[viewId]} className={({ isActive }) => `analyzer-view-tab${isActive ? ' is-active' : ''}`}>{analyzerViewLabels[viewId]}</NavLink>)}
+  </nav>;
+}
 
 function filterOptions(view: AnalyzerViewId): Array<{ value: AnalyzerFilter; label: string }> {
   if (view === 'architecture') return [
@@ -67,29 +74,10 @@ export function AnalyzerToolbar({
   const options = filterOptions(view);
   return (
     <div className="analyzer-toolbar">
-      <nav className="analyzer-view-tabs" aria-label="Analyzer views">
-        {(Object.keys(analyzerViewLabels) as AnalyzerViewId[]).map((viewId) => (
-          <NavLink
-            key={viewId}
-            to={viewPaths[viewId]}
-            className={({ isActive }) => `analyzer-view-tab${isActive ? ' is-active' : ''}`}
-          >
-            {analyzerViewLabels[viewId]}
-          </NavLink>
-        ))}
-      </nav>
+      <AnalyzerViewTabs />
 
       <div className="analyzer-control-row">
-        <label className="analyzer-search-control">
-          <span>Search</span>
-          <input
-            type="search"
-            value={search}
-            onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="Node / package / path"
-            aria-label="Analyzer Nodeを検索"
-          />
-        </label>
+        <AnalyzerSearchControl value={search} onChange={onSearchChange} />
         <label className="analyzer-filter-control">
           <span>Filter</span>
           <select value={filter} onChange={(event) => onFilterChange(event.target.value as AnalyzerFilter)} aria-label="Analyzer Nodeを絞り込む">

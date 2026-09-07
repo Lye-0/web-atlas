@@ -1,0 +1,14 @@
+.semantic-flow-direction-legend { position:absolute; z-index:3; left:12px; bottom:12px; max-width:min(420px,calc(100% - 24px)); padding:7px 10px; border:1px solid var(--line); border-radius:6px; background:#101a1bea; color:var(--muted); font-size:.65rem; line-height:1.5; pointer-events:none; }
+.semantic-flow-direction-row { display:flex; align-items:center; flex-wrap:wrap; gap:5px 9px; }
+.semantic-flow-direction-row > strong { padding:1px 5px; border:1px solid var(--line); border-radius:3px; color:var(--text-soft); font-size:inherit; font-weight:500; }
+.semantic-flow-direction-row > span { white-space:nowrap; }
+.semantic-flow-direction-legend > p { display:flex; flex-wrap:wrap; gap:2px 9px; margin:4px 0 0; font-size:.58rem; }
+.semantic-flow-direction-legend.is-inline { position:static; max-width:none; margin-top:10px; }
+.semantic-flow-resolution-note { margin:0 16px 14px; padding:9px 10px; border-left:2px solid var(--warm); background:rgba(216,186,145,.04); color:var(--text-soft); font-size:.71rem; line-height:1.7; }
+.semantic-flow-resolution-note p { margin:0; }
+.semantic-flow-detail .semantic-flow-resolution-note small { display:block; margin-top:4px; color:var(--muted); font-size:.66rem; }
+.semantic-flow-detail .semantic-flow-source-info { margin:9px 0 0; }
+.semantic-flow-detail .semantic-flow-source-info > summary { color:var(--subtle); font-size:.67rem; }
+.semantic-flow-detail .semantic-flow-source-info > dl { padding-top:8px; }
+.semantic-flow-detail .semantic-flow-call-site { flex-basis:100%; color:var(--subtle); font-size:.62rem; overflow-wrap:anywhere; }
+@media(max-width:700px) { .semantic-flow-direction-legend { left:8px; bottom:8px; max-width:calc(100% - 16px); font-size:.62rem; padding:6px 8px; }.semantic-flow-direction-legend > p { font-size:.56rem; } }

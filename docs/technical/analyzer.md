@@ -1,4 +1,4 @@
-# Analyzer / Phase 2A
+# Analyzer
 
 ## Purpose
 
@@ -19,7 +19,7 @@ Project Folder
   -> deterministic SVG / DOM graph or Three.js Spatial Atlas renderer
 ```
 
-解析対象は構造情報を持つ設定ファイルと、Canonical Stackのimportおよびlocal Module Dependencyを確認するためのJS/TS系source fileに限定しています。source fileは保守的な静的import検出にだけ使い、一般的なsource検索・AST解析・function/data-flow解析は行いません。`.git`、依存・生成物、`.env`、秘密情報用拡張子は除外し、入力ファイルにはサイズ上限（1 MiB）も設けています。
+設定ファイルと対応言語のソースを読み込みます。View 1〜5は従来の設定・import・Module Factを使い、View 6〜10は遅延起動するWorkerで構文木を解析します。`.git`、依存・ビルド出力のディレクトリ、`.env`、秘密情報用拡張子を除外し、入力ファイルには1 MiBの上限を設けています。
 
 Graphは新しい可視化ライブラリへ依存せず、[`src/analyzer/layout.ts`](../../src/analyzer/layout.ts) のView別の決定的なlayoutと、[`src/components/analyzer/AnalyzerGraphStage.tsx`](../../src/components/analyzer/AnalyzerGraphStage.tsx) のSVG/DOM rendererで構成しています。Stack Mapは `Project Node → Semantic Region → Stack Usage Node` のcompact gridです。Semantic RegionはNodeやSummaryとは別の選択可能な意味的コンテナで、heading・boundary ports・child Node IDs・Evidenceを持ちます。Region surfaceはrouting上のpass-through、Region headingと内部のStack Usage Nodeはhard obstacleです。Stack Mapは子Nodeを先に配置してRegion boundsを確定し、その後にProjectとRegionをglobal layoutへ配置します。Workspaceはcolumn flow、Commandはexecution rankとbranch lane、Dependencyは責務ごとのlaneで配置します。Relation edgeは [`src/analyzer/edgeRouting.ts`](../../src/analyzer/edgeRouting.ts) が現在のlayoutに基づくFact Node・Collapsed Summary Card・Summary heading / control・Region heading・重要labelだけをhard obstacleとして受け取り、Cluster surface・Expanded Summary surface・Semantic Region surfaceは通過可能なまま、clearance付きの決定的なorthogonal routeを計算します。既存のreadability-aware routing、fan-out bus、Summary、camera、sessionの契約は維持します。
 
@@ -78,9 +78,9 @@ Parserは値とsource rangeを返し、detectorがFact・Evidence・Relationを�
 
 ## Views
 
-Analyzer shellには次の5つのprojectorがあります。
+Analyzer shellは10個のViewを持ちます。View 1〜5のprojectorとrendererは以下の構成を維持しています。
 
-1. **Stack Map** — 既存の`architecture` route / session IDを互換性のため維持しつつ、表示上の意味を `Project Node → Scope Semantic Region → Stack Usage Node` として表現します。Scope RegionはNode / Summaryから独立したselectable containerで、heading・top/right/bottom/leftのboundary port・child Stack Usage・Evidenceを持ちます。ProjectからRegionへの`contains` Edgeは正式なGraph Edgeですが、Region内部のvisual containmentはEdgeへ変換しません。Scopeはworkspace package / application root、workspace patternから導出したroot、Vite/TypeScript等のexplicit config boundary、known runtime config root、solution root、standalone runtime project rootだけをknown root候補とします。Stack Mapはsource import・config/runtime Usage EvidenceをDeclaration Evidenceより優先し、UsageがあるStackを宣言元rootへ重複配置せず、Declaration EvidenceはUsage Nodeのsupporting collectionへ保持します。UsageのないStackはDeclarationのknown Scope、最後にProject Toolingへfallbackします。任意のEvidence directoryはScopeへ昇格させず、`.kilo`などの補助directoryも独立表示しません。nested `.csproj`は既知のApplication / solution rootへ集約し、独立したruntime projectだけをstandalone Scopeとして残します。各RegionにはDictionaryのcanonical Stack Usageだけを配置し、Stack Usageが0件のScopeは表示しません。同じStackが複数ScopeでUsage Evidenceを持つ場合は、Scopeごとの別Usageとして表示します。子Nodeを先に配置してRegion boundsを確定し、ProjectとRegionを重ならないglobal layoutへ置きます。Architecture Map（将来のSubsystem / Module関係を扱うView）とは分離し、Stack Mapへ内部実装や細かいpackage dependencyを混ぜません。
+1. **Stack Map** — 既存の`architecture` route / session IDを互換性のため維持しつつ、表示上の意味を `Project Node → Scope Semantic Region → Stack Usage Node` として表現します。Scope RegionはNode / Summaryから独立したselectable containerで、heading・top/right/bottom/leftのboundary port・child Stack Usage・Evidenceを持ちます。ProjectからRegionへの`contains` Edgeは正式なGraph Edgeですが、Region内部のvisual containmentはEdgeへ変換しません。Scopeはworkspace package / application root、workspace patternから導出したroot、Vite/TypeScript等のexplicit config boundary、known runtime config root、solution root、standalone runtime project rootだけをknown root候補とします。Stack Mapはsource import・config/runtime Usage EvidenceをDeclaration Evidenceより優先し、UsageがあるStackを宣言元rootへ重複配置せず、Declaration EvidenceはUsage Nodeのsupporting collectionへ保持します。UsageのないStackはDeclarationのknown Scope、最後にProject Toolingへfallbackします。任意のEvidence directoryはScopeへ昇格させず、`.kilo`などの補助directoryも独立表示しません。nested `.csproj`は既知のApplication / solution rootへ集約し、独立したruntime projectだけをstandalone Scopeとして残します。各RegionにはDictionaryのcanonical Stack Usageだけを配置し、Stack Usageが0件のScopeは表示しません。同じStackが複数ScopeでUsage Evidenceを持つ場合は、Scopeごとの別Usageとして表示します。子Nodeを先に配置してRegion boundsを確定し、ProjectとRegionを重ならないglobal layoutへ置きます。Architecture Map（Subsystemと責務間の関係を扱うView）とは分離し、Stack Mapへ内部実装や細かいpackage dependencyを混ぜません。
 2. **Workspace Flow** — pnpm config、patterns、member packageの`uses-config`、`declares`、`matches`を主線として表示します。ProjectからRoot Packageへの`contains`だけを追加し、Root Packageはworkspace pattern matchにはしません。member packageへの`contains`やdependency graphは主グラフへ混ぜず、Detailでは選択方向に応じて`contained-by` / `config-for`などのinverse labelを表示します。
 3. **Command Flow** — rootの`dev`（なければrootの最初のscript）をentryとし、初期状態はCOMMON laneのUser Command → entry script → concurrentlyとbranch summaryまでに抑えます。`concurrently`より右側のbranchだけをAUTH / API / WEBなどの独立したY laneへ割り当て、各lane内はexecution rankの左から右へ進めます。Branch summaryを展開すると、そのbranchの`pnpm --filter`、package script、CLI、nested commandを表示します。`pnpm run`、`--filter`、`pnpm exec`、CLI、`&&` / `||` / `;`、`concurrently`のEvidenceを保持し、主線は`resolves-to`、`executes`、`starts`、`uses`、`expands-to`に限定します。`&&`で連結されたcommandはFact上のoperatorを保持したままPresentationでは同一scriptからのfan-outとして表示し、`concurrently`のparallel branch（`starts` + `metadata.parallel`）とは内部意味を混同しません。terminal CLIはexecutableとsubcommandを分離して判定し、`wrangler dev` / `deploy`だけがCloudflare Workersを`starts`します。`wrangler d1`はCloudflare D1 resourceへ`uses`し、`wrangler types`はWorkersへ`uses`します。`vite` / `vitest` / `tsc` / `drizzle-kit`は明示的なexecutable → Dictionary stack mappingでのみCanonical Stackへ終端し、`pnpm run build`からViteへ直接つなぎません。Command Flow上のCanonical Technology / Runtime / Resource Nodeは、store全体の代表Evidenceではなく、現在のCommand → target relationのEvidence、続いて同じpackage / scopeのEvidenceを優先して表示します。Stack MapのScope attributionは変更しません。execution rankをx座標、COMMON / branch laneを薄い背景bandとして使い、Workspace Package自体はGraph Nodeにせずscript metadata / laneへ寄せます。unknown commandは警告付きで残し、cycleは警告とedgeを残します。
 4. **Package Dependency** — workspace package、直接のdependency declarationから解決されたDictionary technology、未登録のExternal Packageをdirect dependency edgeで表示します。packageManager由来だけのpnpmは含めません。Externalは閉じた状態ではExternal Summaryとsourceごとのbundle edgeを表示します。External dependencyのsourceが1つだけなら、Summaryを展開した時点でsource Summaryを挟まずpackage Nodeを直接表示します。sourceが複数なら従来どおりsource Summaryをcompact rowで表示し、個別展開でそのsourceのpackageだけを表示します。Shared ExternalはNodeを重複させません。Global toggleは全source groupを一括展開 / 折りたたみます。展開されたExternalはsource packageごとの縦groupへ配置され、External同士のedgeや横方向のchainに見える配置を作りません。External Packagesのtop-level headingはCluster titleと重ねず、source SummaryのNested Region headingは深度に応じて内側へ配置します。検索・type filter・detail選択時は該当detailと1-hop contextを一時表示します。
@@ -106,29 +106,28 @@ Analyzer shellには次の5つのprojectorがあります。
 `spatialRepository.test.ts`は1,200 Moduleの合成データで包含とincident保持を検証します。任意の実Repositoryを読み取り専用で検証する場合は、PowerShellで`$env:WEB_ATLAS_VALIDATION_REPOS='C:/path/to/repo-a;C:/path/to/repo-b'`を設定して`pnpm test`を実行します。未指定時は外部Repository検証のみskipします。`spatialBridge.test.ts`は端点・高さ・交差・viewport clippingを検証します。`AnalyzerSpatialGraphStage.test.tsx`は連続ズーム、Fitとtimerの競合、Wheel、keyboard、Far選択、画面外の相手への接続維持を実コンポーネントで検証します。`AnalyzerPage.test.tsx`は検索からの選択・解除と、Detailからの両端FitをSession込みで検証します。WebGLの描画と実機の操作性は別途browserで確認します。
 
 
-Current Viewsは次の5つです。
+Current Viewsとroute IDは次の10個です。
 
 ```text
-1. Stack Map
-2. Workspace Flow
-3. Command Flow
-4. Package Dependency
-5. Module Dependency
+1. Stack Map           /analyzer/architecture
+2. Workspace Flow      /analyzer/workspace
+3. Command Flow        /analyzer/command
+4. Package Dependency  /analyzer/dependencies
+5. Module Dependency   /analyzer/module-dependency
+6. Runtime Flow        /analyzer/runtime-flow
+7. Function Call Flow  /analyzer/function-call-flow
+8. Data Flow           /analyzer/data-flow
+9. Data Model          /analyzer/data-model
+10. Architecture Map   /analyzer/architecture-map
 ```
 
-Future Viewsとして、次を予約しています。`Runtime Flow`以降の下記Viewはまだ実装しません。
-
-```text
-6. Runtime Flow
-7. Function Call Flow
-8. Data Flow
-9. Data Model
-10. Architecture Map
-```
-
-Stack MapはEvidence-backedな主要StackのScope帰属を示し、Architecture Mapは将来、Repository AccessやLayout EngineなどのSubsystem / Module構造を示すViewです。Package Dependencyは低レベルの直接dependency宣言を示すため、両者を同じNode一覧や関係線として扱いません。
+Stack Mapは主要StackのScope帰属、Architecture Mapは配置とソース上の関係から分類した責務・Subsystemを示します。Package Dependencyは直接dependency宣言を示し、それぞれ別の投影を使用します。
 
 全ViewでNode search、type filter、Node / Semantic Region / Edge選択、detail panel、Evidence previewを利用できます。Stack MapではRegion検索時に親Regionと内部Stack Usageを保持し、Stack Usage検索時にも所属Regionを残します。Regionを選択するとRegion全体へFocusし、Projectとの正式なEdgeをrelated highlightします。Stack Mapで高degree Nodeを選ぶと、1-hopをprimary、2-hopをsecondary、3-hop以降をdeepとしてemphasisします。
+
+## View 6–10 semantic analysis
+
+Runtime Flow以降は独立したWorker解析・投影・Three.js rendererを使用します。言語とFrameworkの対応範囲、関数・データ・モデルの意味、実行Trace、確度、スケーリングと操作の契約は[Semantic Analyzer](semantic-analyzer.md)を参照してください。
 
 ## Analyzer session / Dictionary link
 
@@ -140,7 +139,7 @@ Module DependencyのFar / Medium / Nearは保存済みcameraのscaleから決定
 
 Dictionaryへの導線は、Fact / Resourceが保持する検証済みの`dictionaryStackId`を [`src/analyzer/projectors.ts`](../../src/analyzer/projectors.ts) でcanonical Stackへ解決し、Detail Panelのtitle自体をReact Routerの内部Linkとして描画します。Project、workspace/package、command、Summary、未登録・曖昧なNodeはplain titleのままです。Link移動でもAnalyzer Session Storeのscan result、selection、Detail、View別cameraは失われず、Browser Back / ForwardとDictionary各routeからのAnalyzer復帰で同じ作業状態を再利用します。
 
-## Semantic zoom / 2.5D presentation
+## View 1–4 semantic zoom / 2.5D presentation
 
 Graphの拡大率は [`src/analyzer/zoom.ts`](../../src/analyzer/zoom.ts) で3段階に量子化しています。`scale < 0.55` はFar、`0.55 <= scale <= 0.95` はMedium、`scale > 0.95` はNearです。Nearでも全Nodeを詳細化せず、Evidence付きNodeはcompact hintまでに留め、3〜5行のcompact previewはSelected時だけ遅延展開します。SelectedのEvidence previewはFar / Mediumでも保持します。Hoverはborder / surface / shadowのvisual feedbackだけを与え、Nodeの高さやlayoutを変更しません。これにより、全Nodeを同時に詳細化せず、既存のView layoutとRelationモデルを変更しないまま操作対象の周辺だけを詳しく表示します。
 
@@ -163,37 +162,18 @@ Analyzer routeではHeader / Footerも`Analyzer` / `Local Evidence Graph`へ切�
 
 解析はlocal browser session内で完結し、network upload、Cloudflare Worker/D1 call、AI inferenceは実装していません。選択フォルダ以外のfilesystemも読みません。
 
-Phase 2Aでは次を対象外とします。
+次は解析の対象外です。
 
-- JavaScript/TypeScript ASTによるfunction/data-flow解析
 - lockfileからのtransitive dependency解決
 - package installやbuildの実行
-- source code全体の一般検索
-- 未確認のsemantic relationの推測
 - production/remote dataの取得
+- 対象アプリの起動・計測・計装、ログの自動収集
+- 完全な型検査、動的dispatch・reflection・macro展開・heap alias・全経路の実行順序の確定
 
 BrowserのFile System Access APIがない場合はdirectory file inputを使います。Browserのpermission、symlink、巨大binaryなどの挙動はBrowserごとの差があります。
 
 ## Validation
 
-合成fixtureは [`src/analyzer/analyzer.test.ts`](../../src/analyzer/analyzer.test.ts) にあり、parser range、workspace解決、Dictionary matching、D1/B2/Firebase/.NET detection、command recursion/concurrently/cycle、forward / inverse relation label、COMMON / branch summary / lane、view scope、visible / total count、masking、Semantic Zoom、exact Evidence range hint、Summary Card / Summary GroupのPresentation metadata・count・共通bounds・展開Summaryの内側Node非表示、heading専用領域とmember gap、heading visual bounds / overhang、直前Blockとのcollision、Nested Regionの親子間隔、Stack Map初期projection / canonical Stack Usage、Scope normalization、nested Evidenceのknown root帰属、nested `.csproj`のApplication集約、standalone runtime Scope、hidden / config directoryの非Scope化、empty Scope pruning、同一Scope・同一StackのEvidence merge、Vitest / pnpm保持とroot propagation防止、high-degree depth emphasis / Summary detailの連続配置、execution layout、single-source Externalのflat presentation、multi-source External / Shared Externalのgrouping、collapsed search、Summary headingを含むFit bounds、Declaration / Usage / Scope Evidenceの役割、source importのsubpath正規化、config-bound Vite / TypeScript attribution、single-packageの複数Usage Scope、Declaration-only fallback、root duplicate防止を検証します。 [`src/analyzer/edgeRouting.test.ts`](../../src/analyzer/edgeRouting.test.ts) はhard / soft obstacle分類、Fact Node・Collapsed Summary・headingの迂回、orthogonal routeのboundary port、collinear / short-zigzag簡略化、角丸描画、交差 penalty、Node外周のsoft keep-out、連続遮蔽の非線形penalty、alternative corridor、source / target terminal leg、shared trunkのreadability cost、sibling targetを含む同一source fan-out、target group boundsを使った構造的な専用busとbranch、individual Edgeの独立reroute防止、target group外側のbus clearance、target group内部candidateの回避、branchのsibling obstacle、dynamic bounds、corridor unavailable時のgeneric fallback、選択Presentationによるgeometry不変、x-monotonicity、個別Edge ID保持、Stack MapのProject → top-level Region fan-out、Nested Region除外、sibling-border-follow回避、Region boundary port終端を検証します。 [`src/analyzer/edgePresentation.test.ts`](../../src/analyzer/edgePresentation.test.ts) は選択Edgeをforeground内の最後に配置する優先順位とNode選択時のconnected edge順序を検証します。 [`src/data/stackLookup.test.ts`](../../src/data/stackLookup.test.ts) はpackage / alias / ambiguous lookup、[`src/components/analyzer/AnalyzerDetailPanel.test.tsx`](../../src/components/analyzer/AnalyzerDetailPanel.test.tsx) はstable IDによるtitle Linkとplain title、[`src/analyzer/session.test.ts`](../../src/analyzer/session.test.ts) はactive view、View別Session / camera / folder handle保持、Projection後のstable ID再解決、新規Project時のresetを検証します。Cameraのsaved/initial-fit判定は [`src/analyzer/analyzer.test.ts`](../../src/analyzer/analyzer.test.ts) で検証します。
-Fan-out diagnosticsは`AnalyzerEdgeRoutingOptions.onFanoutDiagnostic`を使って、方向候補別のside gap・Bus成立数、候補単位のObstacle reject理由、Bus成立時の選択方向 / 座標、corridor不足・候補無効時のgeneric fallback理由を検証します。
+`pnpm test`、`pnpm typecheck`、`pnpm lint`、`pnpm build`で検証します。Tab 1–5のFact・import解決・routing・spatial layout・操作・Sessionの回帰は、`src/analyzer/*.test.ts`と既存のAnalyzerコンポーネントテストで維持します。View 6–10の実WASM解析・投影・Trace・UI回帰は`src/analyzer/semantic/*.test.ts`と`src/pages/SemanticAnalyzerPage.test.tsx`で検証します。
 
-Stack MapのPhase 4 / 4.1回帰は、usage-only directoryの非昇格、explicit nested compilation boundary、nearest promoted parent、Projectのtop-level Region接続、Region hierarchyのacyclic性、recursive bounds / Fit、nested Regionのsearch / filter保持、子Usage / child config Evidenceの親Scope漏洩防止、親子独立Usage、共有Declarationの扱いを検証します。
-
-Semantic Regionの回帰は [`src/analyzer/analyzer.test.ts`](../../src/analyzer/analyzer.test.ts) と [`src/analyzer/session.test.ts`](../../src/analyzer/session.test.ts) で、Scope Nodeを生成しないこと、Regionのchild IDs / boundary ports / Project → top-level Region endpoint、parent / child Region ID、Region検索・filter・選択、Region boundsとrecursiveな子Region / 子Node配置、Fit bounds、旧`stack-scope:*` / `scope:*`選択のRegion移行を検証します。Region surfaceがpass-throughで、headingとchild Nodeだけがrouting obstacleになる契約は [`src/analyzer/edgeRouting.test.ts`](../../src/analyzer/edgeRouting.test.ts) のRegionケースで維持します。
-
-実装時の検証結果:
-
-- `pnpm test`: 9 test files / 98 tests passed（Stack MapのProject → Scope / Stack Usage投影・Scope normalization・Desktop Application集約・empty Scope pruning・root tooling分離、Declaration / Usage / Scope Evidence、source import、config-bound Vite / Vitest / TypeScript attribution、single-packageの複数Usage Scope、Scope Promotion / usage-only非昇格 / nested Region hierarchy / recursive bounds / search-filter保持、Workspace FlowのRoot Package contains、Analyzerの既存回帰、Edge Routingの39 tests、Readability-aware RoutingとStructural Fan-out Route Composition、Geometry-aware Fan-out Direction Selection、Project → top-level Region fan-out、Semantic Regionのmodel / layout / endpoint / obstacle / session回帰を含む）
-- `pnpm typecheck`: passed
-- `pnpm lint`: passed
-- `pnpm build`: passed（Vite production bundle。Three.js lazy chunkのサイズ警告あり）
-- `pnpm exec wrangler deploy --dry-run`: passed（No bindings found、dry-runで終了）
-- Analyzer fixture projection: Stack MapはProject → Scope / Area → Stack Usageの階層、scopeごとのcanonical Stack Usage、root toolingの分離、1000×600 viewportのFitを確認。Commandは5 visible / 10 total、collapsed時はCOMMON + 2 branchの3 laneを確認。Dependencyはsingle-source時にExternal Summary → package detailを確認し、multi-source時はExternal Summary → source Summary → package detail、Shared Externalの単一Node表示を確認
-- Browser smoke: `http://127.0.0.1:5173/analyzer/architecture` の未選択状態で、Analyzer Header / Footer、Folder picker、Detail panel非表示、console error / warningなしを前回確認。今回の再確認では`agent-browser` CLIが環境に存在せず、Summary同期・group collapse・Detail camera補正を含むGraphデータ入りの操作確認は未実施
-- Responsive viewport check: 1600 / 1440 / 1280 / 1100 / 1024 / 768 / 390pxは今回未実施
-- `vehicle-management`の実フォルダ選択、各View、全幅の視覚確認はread-only Manual QAとして今回未実施
-- `vehicle-management` はread-only QA対象であり、今回も変更していません
-
-既存Dictionaryのcanonical ID・`packageNames`・Map scopeは変更せず、AnalyzerからDictionary detailへ既存stack routeを再利用しています。Repository memoryの既存Dictionary契約も実装前に再確認済みです。
+`WEB_ATLAS_VALIDATION_REPOS`を指定すると、任意の実Repositoryを読み取り専用で検証します。指定がない通常のテストでは、この外部入力検証のみskipします。`vehicle-management`と`git-lines`は許可された検証入力であり、解析側からコードを変更・実行しません。実際のWebGL描画・ファイル選択・View間の移動は別途ブラウザで確認します。

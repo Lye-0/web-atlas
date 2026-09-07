@@ -1,0 +1,14 @@
+.analyzer-search-strip { display:grid; grid-template-columns:88px 28px minmax(0,1fr) 28px; align-items:center; gap:8px; height:86px; min-width:0; max-width:100%; }
+.analyzer-search-summary { color:var(--muted); font-size:.73rem; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.analyzer-search-results.analyzer-search-result-row { position:relative; display:block; flex-wrap:nowrap; min-width:0; height:86px; overflow-x:auto; overflow-y:hidden; padding:5px 0 9px; overscroll-behavior-x:contain; scrollbar-width:thin; scrollbar-color:#54766b transparent; }
+.analyzer-search-result-track { position:relative; flex:none; height:66px; }
+.analyzer-search-result-row .analyzer-search-result-track button { position:absolute; top:0; display:flex; flex-direction:column; justify-content:center; align-items:stretch; gap:3px; min-width:0; max-width:none; height:66px; padding:7px 10px; box-sizing:border-box; overflow:hidden; }
+.analyzer-search-result-row button :is(strong,small,span) { display:block; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.analyzer-search-result-row button strong { font-size:.79rem; line-height:1.2; }.analyzer-search-result-row button small { font-size:.68rem; line-height:1.2; }.analyzer-search-result-row button span { color:var(--muted); font-size:.61rem; line-height:1.2; }
+.analyzer-search-result-row button[aria-selected=true] { border-color:var(--accent); box-shadow:inset 3px 0 var(--accent); }
+.analyzer-search-result-row button:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+.analyzer-search-hint { height:66px; margin:0; display:flex; align-items:center; color:var(--subtle); font-size:.76rem; line-height:1.5; white-space:nowrap; }
+.analyzer-strip-scroll { height:40px; min-width:28px; padding:0; border:1px solid var(--line); border-radius:5px; background:var(--surface); color:var(--text); font-size:22px; cursor:pointer; }
+.analyzer-strip-scroll:disabled { opacity:.3; cursor:default; }.analyzer-strip-scroll:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.analyzer-search-control input:focus-visible,.analyzer-filter-control select:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+@media(max-width:700px) { .analyzer-search-strip { grid-template-columns:68px 24px minmax(0,1fr) 24px; gap:5px; }.analyzer-strip-scroll { min-width:24px; }.analyzer-search-summary { font-size:.67rem; } }

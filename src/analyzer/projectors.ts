@@ -1696,7 +1696,8 @@ export function projectAnalyzerView(store: AnalyzerProjectStore, view: AnalyzerV
   if (view === 'workspace') return projectWorkspace(store);
   if (view === 'command') return projectCommand(store, entryScriptId);
   if (view === 'module-dependency') return projectModuleDependency(store);
-  return projectDependencies(store);
+  if (view === 'dependencies') return projectDependencies(store);
+  throw new Error(`${view} requires the asynchronous semantic analysis and projectSemanticView`);
 }
 
 export function factDictionaryStackId(fact: AnalyzerFact | AnalyzerViewNode | undefined): string | undefined {
@@ -1716,6 +1717,7 @@ export function viewTitle(view: AnalyzerViewModel['view']): string {
 }
 
 export function viewNodeSearchText(node: AnalyzerViewNode): string {
+  if (node.type === 'module') return [node.label, node.metadata.modulePath, node.metadata.directoryPath, node.metadata.packageName, node.metadata.packagePath].filter(value => typeof value === 'string').join(' ').toLowerCase();
   return [node.label, node.subtitle, ...Object.values(node.metadata).flatMap((value) => Array.isArray(value) ? value : value === undefined ? [] : [String(value)])]
     .join(' ')
     .toLowerCase();

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildSpatialFlowData, SPATIAL_FLOW_MAX_PARTICLES_PER_PATH } from './spatialFlow';
+import { buildSpatialFlowData, SPATIAL_FLOW_MAX_PARTICLES_PER_PATH, SPATIAL_FLOW_PARTICLE_SPACING } from './spatialFlow';
 
 describe('spatial flow paths', () => {
   it('retains source-to-target order, tube height, cumulative distance and direction color', () => {
@@ -35,5 +35,18 @@ describe('spatial flow paths', () => {
       const data = buildSpatialFlowData([{ id: 'edge', points: [{ x: 0, y: 0, z: 0 }, { x: length!, y: 0, z: 0 }], color: '#82c6e2' }]);
       expect(data.particles).toHaveLength(expected!);
     }
+  });
+
+  it('allocates fixed-spacing semantic particles along the full arc without the legacy per-path cap', () => {
+    for (const [length, expected] of [[100, 2], [500, 10], [10000, 200]]) {
+      // Include a corner so allocation follows arc length, not endpoint distance.
+      const points = [{ x: 0, y: 0, z: 0 }, { x: length! / 2, y: 0, z: 0 }, { x: length! / 2, y: length! / 2, z: 0 }];
+      const data = buildSpatialFlowData([{ id: 'edge', points, color: '#82c6e2' }], SPATIAL_FLOW_PARTICLE_SPACING);
+      expect(data.particles).toHaveLength(expected!);
+      expect(data.particles.every(particle => particle.length === length)).toBe(true);
+      expect(new Set(data.particles.map(particle => particle.offset)).size).toBe(1);
+      expect(data.particles.at(-1)!.index).toBe(expected! - 1);
+    }
+    expect(buildSpatialFlowData([{ id: 'zero', points: [], color: '#fff' }], SPATIAL_FLOW_PARTICLE_SPACING).particles).toEqual([]);
   });
 });

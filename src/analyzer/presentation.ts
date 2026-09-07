@@ -6,6 +6,7 @@ import type {
   AnalyzerViewNode,
   AnalyzerPresentationGroup,
 } from './types';
+import { matchAnalyzerSearch, moduleSearchDocument } from './search';
 
 export interface AnalyzerPresentationOptions {
   expandedPresentationIds: ReadonlySet<string>;
@@ -67,6 +68,7 @@ export function presentationOwnsNode(view: AnalyzerViewModel, presentationId: st
 
 export function nodeMatchesSearch(node: AnalyzerViewNode, search: string): boolean {
   if (!search.trim()) return true;
+  if (node.type === 'module') return Boolean(matchAnalyzerSearch(moduleSearchDocument(node), search));
   const haystack = [node.label, node.subtitle, ...Object.values(node.metadata).flatMap((value) => Array.isArray(value) ? value : value === undefined ? [] : [String(value)])]
     .join(' ')
     .toLowerCase();
@@ -75,6 +77,7 @@ export function nodeMatchesSearch(node: AnalyzerViewNode, search: string): boole
 
 export function regionMatchesSearch(region: AnalyzerSemanticRegion, search: string): boolean {
   if (!search.trim()) return true;
+  if (region.id.startsWith('module-region:')) return Boolean(matchAnalyzerSearch({ names: [region.label], paths: [region.subtitle ?? '', String(region.metadata.directoryPath ?? region.metadata.packagePath ?? '')] }, search));
   const haystack = [
     region.label,
     region.subtitle,
