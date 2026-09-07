@@ -3,6 +3,7 @@
 .semantic-explorer-navigation { padding:9px 12px; border:1px solid var(--line); border-radius:6px; background:#0d1716f2; }
 .semantic-explorer-navigation-row { display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px; }
 .semantic-explorer-history,.semantic-explorer-selection-actions { display:flex; align-items:center; flex-wrap:wrap; gap:5px; }
+.semantic-explorer-selection-actions { margin-left:auto; }
 .semantic-explorer-navigation button { padding:4px 7px; border:1px solid var(--line); border-radius:4px; background:transparent; color:var(--text-soft); font-size:.67rem; line-height:1.45; }
 .semantic-explorer-navigation button:disabled { opacity:.38; cursor:default; }
 .semantic-explorer-breadcrumb { display:flex; flex-wrap:wrap; gap:3px 5px; min-width:0; font-size:.72rem; }
