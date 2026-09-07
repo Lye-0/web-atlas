@@ -44,6 +44,24 @@ function viewModel(): AnalyzerViewModel {
 }
 
 describe('Analyzer session store', () => {
+  it('retains the shared 3D bounds preference across flow views and projects without changing view state', () => {
+    let state = withProject();
+    expect(state.showFlowGroupBounds).toBe(true);
+    state = analyzerSessionReducer(state, { type: 'updateView', view: 'function-call-flow', update: { search: 'callback', selectedNodeId: 'stable-id', camera: { x: 12, y: 18, scale: .8 } } });
+    const views = state.views, store = state.store;
+    state = analyzerSessionReducer(state, { type: 'setFlowGroupBounds', visible: false });
+    expect(state.showFlowGroupBounds).toBe(false); expect(state.views).toBe(views); expect(state.store).toBe(store);
+    state = analyzerSessionReducer(state, { type: 'setActiveView', view: 'runtime-flow' });
+    expect(state.showFlowGroupBounds).toBe(false); expect(state.views).toBe(views);
+    state = analyzerSessionReducer(state, { type: 'setActiveView', view: 'function-call-flow' });
+    expect(state.showFlowGroupBounds).toBe(false); expect(state.views).toBe(views);
+    state = analyzerSessionReducer(state, { type: 'replaceProject', store: projectStore('second') });
+    expect(state.showFlowGroupBounds).toBe(false);
+    const replacementViews = state.views;
+    state = analyzerSessionReducer(state, { type: 'setFlowGroupBounds', visible: true });
+    expect(state.showFlowGroupBounds).toBe(true); expect(state.views).toBe(replacementViews);
+  });
+
   it('starts at Stack Map and restores the active view without touching other view sessions', () => {
     let state = createInitialAnalyzerSessionState();
     expect(state.activeView).toBe('architecture');

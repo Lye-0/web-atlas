@@ -6,11 +6,13 @@ import { AnalyzerSessionProvider, useAnalyzerSession, type AnalyzerProjectStore 
 import { getSemanticAnalysis } from '../analyzer/semantic/client';
 import type { SemanticAnalysis, SemanticNode } from '../analyzer/semantic/types';
 import { AnalyzerPage } from './AnalyzerPage';
+import type { SemanticFlowHoverHandler, SemanticFlowHoverTarget } from '../analyzer/semantic/flowRelationInteraction';
 
 vi.mock('../analyzer/semantic/client', () => ({ getSemanticAnalysis: vi.fn(), cancelSemanticAnalysis: vi.fn() }));
-vi.mock('../components/analyzer/SemanticFlow3D', () => ({ SemanticFlow3D: ({ graph, camera, command, onCamera }: { graph: { nodes: { id: string }[] }; camera?: { zoom: number }; command?: { kind: string; ids?: string[] }; onCamera: (camera: unknown) => void }) =>
-  <div data-cloud-count={graph.nodes.length} data-cloud-zoom={camera?.zoom ?? ''} data-cloud-command={command ? `${command.kind}:${command.ids?.join(',')}` : ''}>
+vi.mock('../components/analyzer/SemanticFlow3D', () => ({ SemanticFlow3D: ({ graph, camera, command, onCamera, showGroupBounds, hoverTarget, onHoverTarget }: { graph: { nodes: { id: string }[] }; camera?: { zoom: number }; command?: { kind: string; ids?: string[] }; onCamera: (camera: unknown) => void; showGroupBounds?: boolean; hoverTarget?: SemanticFlowHoverTarget; onHoverTarget?: SemanticFlowHoverHandler }) =>
+  <div data-cloud-count={graph.nodes.length} data-cloud-zoom={camera?.zoom ?? ''} data-cloud-command={command ? `${command.kind}:${command.ids?.join(',')}` : ''} data-cloud-bounds={String(showGroupBounds)} data-cloud-hover={hoverTarget?.id ?? ''}>
     <button type="button" onClick={() => onCamera({ position: [20, 30, 40], target: [1, 2, 3], zoom: .73 })}>3Dカメラを保存</button>
+    <button type="button" onClick={() => onHoverTarget?.({ kind: 'node', id: 'save' }, { source: 'test-graph', modality: 'pointer' })}>3D相手ホバー</button>
   </div> }));
 
 const node = (id: string, path: string): SemanticNode => ({ id, label: id, kind: 'function', path, line: 2, endLine: 3, group: 'API', confidence: 'source', evidence: [{ path, start: 0, end: 15, line: 2, endLine: 3, description: `${id} declaration` }], attributes: {} });
@@ -153,6 +155,42 @@ describe('Flow explorer locations and visits', () => {
     expect(Number(camera()[2])).toBeLessThanOrEqual(1.05);
     await click(button('定義へ移動')); expect(center()).toBeUndefined();
     expect(host.querySelector('[data-node-open-id="save"]')).not.toBeNull();
+  });
+
+  it('keeps bounds off across tabs 6/7 and changes only the bounds prop while a counterpart is highlighted', async () => {
+    await openRunFile(); await openBlock('run'); await search('run'); await click(button('3D'));
+    const bounds = () => host.querySelector<HTMLButtonElement>('[aria-label="分類の囲い"]')!;
+    expect(bounds().getAttribute('aria-pressed')).toBe('true');
+    await click(button('3Dカメラを保存')); await click(button('3D相手ホバー'));
+    const cloud = () => host.querySelector('[data-cloud-count]')!;
+    const before = cloud().outerHTML, detail = host.querySelector('.semantic-detail h3')?.textContent;
+    await click(bounds());
+    expect(bounds().getAttribute('aria-pressed')).toBe('false');
+    expect(cloud().outerHTML).toBe(before.replace('data-cloud-bounds="true"', 'data-cloud-bounds="false"'));
+    expect(host.querySelector<HTMLInputElement>('input[type="search"]')?.value).toBe('run');
+    expect(host.querySelector('.semantic-detail h3')?.textContent).toBe(detail);
+    await act(async () => host.querySelector<HTMLAnchorElement>('a[href="/analyzer/runtime-flow"]')!.click());
+    expect(bounds()).toBeNull();
+    await click(button('3D'));
+    expect(bounds().getAttribute('aria-pressed')).toBe('false');
+    expect(cloud().getAttribute('data-cloud-hover')).toBe('');
+    await act(async () => host.querySelector<HTMLAnchorElement>('a[href="/analyzer/function-call-flow"]')!.click());
+    expect(bounds().getAttribute('aria-pressed')).toBe('false');
+    expect(cloud().getAttribute('data-cloud-zoom')).toBe('0.73');
+    expect(cloud().getAttribute('data-cloud-hover')).toBe('');
+    await click(button('2D')); expect(bounds()).toBeNull(); expect(center()).toBe('run');
+  });
+
+  it('does not revive a removed counterpart hover after Parent and Back retain the same selected object', async () => {
+    await openRunFile(); await openBlock('run');
+    const peer = host.querySelector('[data-node-id="save"]')!;
+    await act(async () => { peer.dispatchEvent(new MouseEvent('pointerover', { bubbles: true })); peer.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, buttons: 0 })); });
+    expect(host.querySelector('[data-edge-id="calls-save"]')?.getAttribute('data-flow-emphasized')).toBe('true');
+    await click(button('親へ'));
+    expect(center()).toBeUndefined(); expect(host.querySelector('.semantic-detail h3')?.textContent).toBe('run');
+    await click(button('戻る'));
+    expect(center()).toBe('run'); expect(host.querySelector('.semantic-detail h3')?.textContent).toBe('run');
+    expect(host.querySelector('[data-edge-id="calls-save"]')?.getAttribute('data-flow-emphasized')).toBeNull();
   });
 
   it('uses grounded Runtime entries and the explicit membership fallback with the same drilldown operations', async () => {

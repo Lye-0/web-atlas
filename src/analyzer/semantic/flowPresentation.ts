@@ -70,13 +70,15 @@ function curve(a: FlowPoint, b: FlowPoint, bend: number | undefined, mode: '2d' 
   const length = Math.hypot(dx, dy, dz);
   if (length < .01) {
     const side = (bend ?? 0) < 0 ? 1 : -1, extra = Math.abs(bend ?? 0);
-    const start = mode === '2d' ? { x: a.x + 110, y: a.y + side * 10, z: a.z } : { x: a.x + 8, y: a.y, z: a.z };
-    const end = mode === '2d' ? { x: a.x + 42, y: a.y + side * 34, z: a.z } : { x: a.x, y: a.y + side * 8, z: a.z };
+    const start = mode === '2d' ? { x: a.x + 110, y: a.y + side * 10, z: a.z } : { x: a.x, y: a.y, z: a.z };
+    const end = mode === '2d' ? { x: a.x + 42, y: a.y + side * 34, z: a.z } : { x: b.x, y: b.y, z: b.z };
     const c1 = { x: a.x + (mode === '2d' ? 200 : 58) + extra, y: start.y, z: a.z };
     const c2 = { x: a.x + (mode === '2d' ? 164 : 48), y: a.y + side * ((mode === '2d' ? 112 : 56) + extra), z: a.z };
     return cubicCurve(start, c1, c2, end);
   }
-  const boundary = mode === '2d' ? 1 / Math.max(Math.abs(dx / length) / 106, Math.abs(dy / length) / 30) + 4 : 7;
+  // 3D dots use screen-pixel sizes: a world-space trim leaves a zoom-dependent gap.
+  // Center endpoints share the dots' exact transform; label placement is independent.
+  const boundary = mode === '2d' ? 1 / Math.max(Math.abs(dx / length) / 106, Math.abs(dy / length) / 30) + 4 : 0;
   const normalLength = Math.hypot(dx, dy);
   const normal = normalLength > .0001 ? { x: -dy / normalLength, y: dx / normalLength, z: 0 }
     : { x: dz >= 0 ? 1 : -1, y: 0, z: 0 };

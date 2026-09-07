@@ -12,9 +12,9 @@ const graph: SemanticGraph = { view: 'function-call-flow', nodes: ['a', 'b', 'c'
 describe('semantic 2D drawing and selection layers', () => {
   let host: HTMLDivElement, root: Root;
   let screenSize = { width: 1000, height: 700 };
-  const onSelect = vi.fn(), onSelectEdge = vi.fn(), onClear = vi.fn();
-  const render = (motion = { enabled: true, reduced: false, visible: true }) => act(async () => root.render(<SemanticFlow2D graph={graph} selectedIds={new Set(['a'])} matchIds={new Set()} camera={{ x: 130, y: 180, scale: .7 }}
-    motion={motion} onCamera={() => {}} onSelect={onSelect} onSelectEdge={onSelectEdge} onClear={onClear} />));
+  const onSelect = vi.fn(), onSelectEdge = vi.fn(), onClear = vi.fn(), onCamera = vi.fn(), onHoverTarget = vi.fn();
+  const render = (motion = { enabled: true, reduced: false, visible: true }, extras: Partial<ComponentProps<typeof SemanticFlow2D>> = {}) => act(async () => root.render(<SemanticFlow2D graph={graph} selectedIds={new Set(['a'])} matchIds={new Set()} camera={{ x: 130, y: 180, scale: .7 }}
+    motion={motion} onCamera={onCamera} onSelect={onSelect} onSelectEdge={onSelectEdge} onClear={onClear} onHoverTarget={onHoverTarget} {...extras} />));
   beforeEach(async () => {
     screenSize = { width: 1000, height: 700 };
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -76,6 +76,42 @@ describe('semantic 2D drawing and selection layers', () => {
     expect(onSelectEdge).toHaveBeenLastCalledWith('a-c');
     await act(async () => edge.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true })));
     expect(onSelectEdge).toHaveBeenCalledTimes(2); expect(onClear).not.toHaveBeenCalled();
+  });
+
+  it('isolates peer relations with paint alone while every card, curve, port, marker and camera stays fixed', async () => {
+    const nodeGeometry = () => [...host.querySelectorAll('[data-node-id]')].map(item => ({ id: item.getAttribute('data-node-id'), transform: item.getAttribute('transform'),
+      rects: [...item.querySelectorAll('rect')].map(rect => ['x', 'y', 'width', 'height', 'rx'].map(name => rect.getAttribute(name))),
+      caption: [...item.querySelectorAll('foreignObject')].map(rect => ['x', 'y', 'width', 'height'].map(name => rect.getAttribute(name))),
+    }));
+    const lineGeometry = () => new Map([...host.querySelectorAll('[data-edge-id]')].map(item => [item.getAttribute('data-edge-id'), ['d', 'stroke-width', 'marker-end', 'stroke'].map(name => item.querySelector('path')!.getAttribute(name))]));
+    const beforeNodes = nodeGeometry(), beforeLines = lineGeometry(), markers = host.querySelector('defs')!.innerHTML;
+    for (const item of beforeNodes) { expect(item.rects[0]).toEqual(['-106', '-30', '212', '60', '7']); expect(item.caption[0]).toEqual(['-94', '-23', '188', '48']); }
+    onCamera.mockClear();
+    await render(undefined, { hoverTarget: { kind: 'node', id: 'b' } });
+    expect(nodeGeometry()).toEqual(beforeNodes); expect(lineGeometry()).toEqual(beforeLines); expect(host.querySelector('defs')!.innerHTML).toBe(markers);
+    expect(host.querySelectorAll('[data-edge-id]')).toHaveLength(3);
+    expect(host.querySelector('[data-edge-id="a-b"]')?.getAttribute('data-flow-emphasized')).toBe('true');
+    expect(host.querySelector('[data-edge-id="a-c"]')?.getAttribute('opacity')).toBe('0.18');
+    expect(host.querySelector('[data-node-id="b"]')?.getAttribute('data-flow-role')).toBe('outgoing');
+    expect(host.querySelector('[data-node-id="b"] small')?.textContent).toContain('呼び出し先');
+    await render({ enabled: false, reduced: false, visible: true }, { hoverTarget: { kind: 'edge', id: 'a-c' }, direction: 'outgoing' });
+    expect(nodeGeometry()).toEqual(beforeNodes); expect(host.querySelector('defs')!.innerHTML).toBe(markers);
+    for (const [id, geometry] of lineGeometry()) expect(geometry).toEqual(beforeLines.get(id));
+    expect(host.querySelector('[data-flow-particle]')).toBeNull(); expect(onCamera).not.toHaveBeenCalled();
+    expect(onSelect).not.toHaveBeenCalled(); expect(onSelectEdge).not.toHaveBeenCalled();
+  });
+
+  it('publishes exact node and edge IDs with independently releasable pointer and focus owners', async () => {
+    const b = host.querySelector('[data-node-id="b"]')!, edge = host.querySelector('[data-edge-hit-id="a-c"]')!;
+    await act(async () => { b.dispatchEvent(new MouseEvent('pointerover', { bubbles: true })); b.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, buttons: 0 })); });
+    expect(onHoverTarget).toHaveBeenLastCalledWith({ kind: 'node', id: 'b' }, { source: '2d-node:b', modality: 'pointer' });
+    await act(async () => edge.dispatchEvent(new FocusEvent('focusin', { bubbles: true })));
+    expect(onHoverTarget).toHaveBeenLastCalledWith({ kind: 'edge', id: 'a-c' }, { source: '2d-edge:a-c', modality: 'focus' });
+    await act(async () => b.dispatchEvent(new MouseEvent('pointerout', { bubbles: true })));
+    expect(onHoverTarget).toHaveBeenLastCalledWith(undefined, { source: '2d-node:b', modality: 'pointer' });
+    await act(async () => edge.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
+    expect(onHoverTarget).toHaveBeenLastCalledWith(undefined, { source: '2d-edge:a-c', modality: 'focus' });
+    expect(onSelect).not.toHaveBeenCalled(); expect(onSelectEdge).not.toHaveBeenCalled();
   });
 
   it('pans the local diagram independently of selection and fits back from empty space', async () => {
@@ -258,7 +294,7 @@ describe('local relation entry readiness', () => {
     const call = cards.find(card => card.getAttribute('data-node-id') === external.id)!;
     expect(center.querySelector('strong')?.textContent).toBe('ファイル直下の処理');
     expect(call.querySelector('strong')?.textContent).toBe('plugins.filter(...).map(...)');
-    expect(call.querySelector('small')?.textContent).toBe(`${path}:5`);
+    expect(call.querySelector('small')?.textContent).toBe(`呼び出し先 · ${path}:5`);
     expect(call.querySelector('title')?.textContent).toContain(callee);
     await act(async () => call.dispatchEvent(new MouseEvent('click', { bubbles: true })));
     expect(onSelect).toHaveBeenLastCalledWith(external.id);

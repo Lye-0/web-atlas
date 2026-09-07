@@ -2,13 +2,16 @@ import { Vector3, type Camera } from 'three';
 import type { SemanticPosition } from '../../analyzer/semantic/presentation';
 import type { SemanticFlowRegion } from '../../analyzer/semantic/flowRegions';
 import type { FlowEdgePath } from '../../analyzer/semantic/flowPresentation';
+import { semanticFlowRoleLabel, type SemanticFlowNodeRole } from '../../analyzer/semantic/flowRelationInteraction';
+import type { SemanticViewId } from '../../analyzer/semantic/types';
+import type { SemanticNodeDisplay } from './semanticFlowDisplay';
 import { semanticFlowPlot } from './semanticFlowViewport';
 
-export interface FlowLabelContent { id: string; label: string; path: string; selected: boolean; match: boolean; hovered?: boolean; related?: boolean; region?: boolean; aggregate?: boolean }
-export interface FlowLabelPlacement extends FlowLabelContent { x: number; y: number; pointX?: number; pointY?: number; width?: number }
+export interface FlowLabelContent { id: string; label: string; path: string; selected: boolean; match: boolean; hovered?: boolean; related?: boolean; region?: boolean; aggregate?: boolean; role?: SemanticFlowNodeRole; roleLabel?: string; disambiguation?: string; tooltip?: string; emphasized?: boolean; dimmed?: boolean }
+export interface FlowLabelPlacement extends FlowLabelContent { x: number; y: number; pointX?: number; pointY?: number; width?: number; height?: number }
 export interface FlowConnectionNotice { id: string; status: 'offscreen' | 'unlabelled' }
 export interface FlowLabelObstacle { left: number; top: number; width: number; height: number }
-interface LabelContext { regions?: readonly SemanticFlowRegion[]; relatedIds?: ReadonlySet<string>; hoveredIds?: ReadonlySet<string>; priorityIds?: ReadonlySet<string>; overlayTop?: number; previous?: readonly FlowLabelPlacement[]; obstacles?: readonly FlowLabelObstacle[] }
+interface LabelContext { regions?: readonly SemanticFlowRegion[]; relatedIds?: ReadonlySet<string>; hoveredIds?: ReadonlySet<string>; priorityIds?: ReadonlySet<string>; overlayTop?: number; previous?: readonly FlowLabelPlacement[]; obstacles?: readonly FlowLabelObstacle[]; roles?: ReadonlyMap<string, SemanticFlowNodeRole>; displays?: ReadonlyMap<string, SemanticNodeDisplay>; view?: SemanticViewId; emphasisIds?: ReadonlySet<string>; relationKinds?: ReadonlyMap<string, ReadonlySet<string>> }
 const coversPoint = (obstacle: FlowLabelObstacle, x: number, y: number) => x >= obstacle.left && x <= obstacle.left + obstacle.width && y >= obstacle.top && y <= obstacle.top + obstacle.height;
 const labelInset = (label: FlowLabelContent) => label.selected || label.aggregate ? 17 : 9;
 
@@ -84,8 +87,12 @@ export function projectSemanticFlowLabels(camera: Camera, size: { width: number;
   };
   const budget = Math.max(6, Math.min(24, Math.floor(size.width * size.height / 28000)));
   const place = (label: FlowLabelContent, px: number, py: number, force: boolean) => {
-    const width = Math.min(size.width < 700 ? 175 : 225, label.selected || label.hovered ? 225 : Math.min(220, Math.max(90, [...label.label].reduce((sum, char) => sum + (char.charCodeAt(0) > 255 ? 12 : 6.7), 16))));
-    const height = label.region || label.selected || label.hovered || label.aggregate ? 46 : 28;
+    const measureText = (text: string) => [...text].reduce((sum, char) => sum + (char.charCodeAt(0) > 255 ? 12 : 6.7), 16);
+    // Hover must not grow a mounted hit box: a left-side label would then cover
+    // its own dot and be relocated out from under the stationary pointer.
+    const width = Math.min(size.width < 700 ? 175 : 225, label.selected ? 225 : Math.min(220, Math.max(90, measureText(label.label), measureText(label.disambiguation ?? ''), measureText(label.roleLabel ?? ''))));
+    // Each supplemental row has a fixed 16px line box in the mounted label.
+    const height = (label.region || label.selected || label.aggregate ? 46 : 28) + (label.disambiguation ? 16 : 0) + (label.roleLabel ? 16 : 0);
     const inset = labelInset(label);
     const prior = previous.get(label.id);
     const choices = [...(prior?.selected === label.selected && prior.pointX !== undefined && prior.pointY !== undefined ? [[prior.x - prior.pointX, prior.y - prior.pointY]] : []),
@@ -107,26 +114,34 @@ export function projectSemanticFlowLabels(camera: Camera, size: { width: number;
     }
     if (!fallback || !force && fallback.overlap > 0) return false;
     occupied.push({ left: fallback.left, top: fallback.top, width, height });
-    labels.push({ ...label, x: fallback.x, y: fallback.y, pointX: px, pointY: py, width });
+    labels.push({ ...label, x: fallback.x, y: fallback.y, pointX: px, pointY: py, width, height });
     return true;
   };
-  const nodeLabel = (item: SemanticPosition): FlowLabelContent => ({ id: item.node.id, label: item.node.label, path: item.node.attributes.displayAggregate === true ? `表示上の集約 · ${Number(item.node.attributes.targetCount).toLocaleString()}対象` : `${item.node.kind === 'external' ? '定義先未特定 · 呼び出し箇所 ' : ''}${item.node.path ?? item.node.group}${item.node.line ? `:${item.node.line}` : ''}`,
-    selected: selectedIds.has(item.node.id), match: matchIds.has(item.node.id), ...(item.node.attributes.displayAggregate === true ? { aggregate: true } : {}), ...(context.hoveredIds?.has(item.node.id) ? { hovered: true } : {}), ...(context.relatedIds?.has(item.node.id) ? { related: true } : {}) });
+  const nodeLabel = (item: SemanticPosition): FlowLabelContent => {
+    const display = context.displays?.get(item.node.id), role = context.roles?.get(item.node.id);
+    return { id: item.node.id, label: item.node.label, path: item.node.attributes.displayAggregate === true ? `表示上の集約 · ${Number(item.node.attributes.targetCount).toLocaleString()}対象` : `${item.node.kind === 'external' ? '定義先未特定 · 呼び出し箇所 ' : ''}${display?.location ?? `${item.node.path ?? item.node.group}${item.node.line ? `:${item.node.line}` : ''}`}`,
+      ...(display ? { disambiguation: display.disambiguation, tooltip: display.tooltip } : {}),
+      ...(role ? { role, roleLabel: semanticFlowRoleLabel(role, context.view ?? 'runtime-flow', context.relationKinds?.get(item.node.id)) } : {}),
+      ...(context.emphasisIds?.size ? { emphasized: context.emphasisIds.has(item.node.id), dimmed: !context.emphasisIds.has(item.node.id) } : {}),
+      selected: selectedIds.has(item.node.id), match: matchIds.has(item.node.id), ...(item.node.attributes.displayAggregate === true ? { aggregate: true } : {}), ...(context.hoveredIds?.has(item.node.id) ? { hovered: true } : {}), ...(context.relatedIds?.has(item.node.id) ? { related: true } : {}) };
+  };
   const required = (id: string) => selectedIds.has(id) || context.priorityIds?.has(id);
-  const important = (id: string) => required(id) || context.hoveredIds?.has(id);
+  const transient = (id: string) => context.hoveredIds?.has(id) || context.emphasisIds?.has(id);
+  const important = (id: string) => required(id) || transient(id);
   // Reserve both explicitly selected endpoints before hover can consume space.
   for (const item of projected.filter(p => required(p.item.node.id)).sort((a, b) => Number(selectedIds.has(b.item.node.id)) - Number(selectedIds.has(a.item.node.id)) || a.item.node.id.localeCompare(b.item.node.id))) place(nodeLabel(item.item), item.x, item.y, true);
   let nodeCount = 0, relatedAttempts = 0;
   const stableOrder = (a: typeof projected[number], b: typeof projected[number]) => Number(previous.has(b.item.node.id)) - Number(previous.has(a.item.node.id)) || a.item.node.id.localeCompare(b.item.node.id);
+  for (const item of projected.filter(p => !required(p.item.node.id) && transient(p.item.node.id)).sort(stableOrder)) place(nodeLabel(item.item), item.x, item.y, true);
   const relatedVisible = projected.filter(p => !important(p.item.node.id) && context.relatedIds?.has(p.item.node.id)).sort(stableOrder);
   for (const item of relatedVisible) {
     if (nodeCount >= budget || relatedAttempts++ >= budget * 8) break;
     if (place(nodeLabel(item.item), item.x, item.y, relatedVisible.length <= 3)) nodeCount++;
   }
-  for (const item of projected.filter(p => !required(p.item.node.id) && context.hoveredIds?.has(p.item.node.id)).sort(stableOrder)) place(nodeLabel(item.item), item.x, item.y, false);
   for (const item of projected.filter(p => p.item.node.attributes.displayAggregate === true && !important(p.item.node.id))) place(nodeLabel(item.item), item.x, item.y, false);
   let regionCount = 0;
   const projectedById = new Map(projected.map(item => [item.item.node.id, item]));
+  const nodesById = new Map(ordered.map(item => [item.node.id, item.node]));
   for (const region of [...context.regions ?? []].sort((a, b) => Number(previous.has(`flow-region:${b.id}`)) - Number(previous.has(`flow-region:${a.id}`)) || b.count - a.count || a.label.localeCompare(b.label))) {
     if (regionCount >= 16) break;
     const members = region.nodeIds.flatMap(id => { const p = projectedById.get(id); return p ? [{ x: p.x, y: p.y, z: 0 }] : []; });
@@ -135,7 +150,8 @@ export function projectSemanticFlowLabels(camera: Camera, size: { width: number;
     }));
     const minX = Math.min(...corners.map(p => p.x)), maxX = Math.max(...corners.map(p => p.x)), minY = Math.min(...corners.map(p => p.y)), maxY = Math.max(...corners.map(p => p.y));
     if (maxX < 0 || minX > size.width || maxY < 0 || minY > size.height || corners.every(p => p.z < -1 || p.z > 1)) continue;
-    if (place({ id: `flow-region:${region.id}`, label: region.label, path: `${region.count.toLocaleString()}対象`, selected: false, match: false, region: true }, Math.max(12, minX), Math.max(top, minY - 38), false)) regionCount++;
+    const unresolvedGroup = region.nodeIds.length > 0 && region.nodeIds.every(id => nodesById.get(id)?.kind === 'external');
+    if (place({ id: `flow-region:${region.id}`, label: region.label, path: `${unresolvedGroup ? '表示上の集約 · ' : ''}${region.count.toLocaleString()}対象`, selected: false, match: false, region: true }, Math.max(12, minX), Math.max(top, minY - 38), false)) regionCount++;
   }
   let considered = 0;
   const regionCounts = new Map<string, number>(), regionAttempts = new Map<string, number>();
@@ -172,6 +188,7 @@ export class FlowLabelLayer {
     if (position) {
       element.style.transform = `translate3d(${position.x}px, ${position.y}px, 0) translate(${labelInset(position)}px, -50%)`;
       if (position.width !== undefined) element.style.width = `${position.width}px`;
+      if (position.height !== undefined) element.style.height = `${position.height}px`;
     }
     const leader = this.leaders.get(id);
     if (leader) {
@@ -202,7 +219,7 @@ export class FlowLabelLayer {
     for (const label of this.placements.values()) if (label.hovered && !label.region && label.pointX !== undefined && label.pointY !== undefined) {
       // Keep the name while the pointer travels from its dot to the offset label.
       if (x >= Math.min(label.pointX - 13, label.x + 1) && x <= Math.max(label.pointX + 13, label.x + (label.width ?? 225) + 17)
-        && y >= Math.min(label.pointY - 13, label.y - 30) && y <= Math.max(label.pointY + 13, label.y + 30)) return label.id;
+        && y >= Math.min(label.pointY - 13, label.y - Math.max(30, (label.height ?? 0) / 2)) && y <= Math.max(label.pointY + 13, label.y + Math.max(30, (label.height ?? 0) / 2))) return label.id;
     }
     return undefined;
   };
@@ -213,9 +230,9 @@ export class FlowLabelLayer {
     for (const [id, element] of this.elements) this.place(id, element);
     if (next.length === this.content.length && next.every((label, index) => {
       const previous = this.content[index]!;
-      return label.id === previous.id && label.label === previous.label && label.path === previous.path && label.selected === previous.selected && label.match === previous.match && Boolean(label.hovered) === Boolean(previous.hovered) && Boolean(label.related) === Boolean(previous.related) && Boolean(label.region) === Boolean(previous.region) && Boolean(label.aggregate) === Boolean(previous.aggregate);
+      return label.id === previous.id && label.label === previous.label && label.path === previous.path && label.selected === previous.selected && label.match === previous.match && Boolean(label.hovered) === Boolean(previous.hovered) && Boolean(label.related) === Boolean(previous.related) && Boolean(label.region) === Boolean(previous.region) && Boolean(label.aggregate) === Boolean(previous.aggregate) && label.role === previous.role && label.roleLabel === previous.roleLabel && label.disambiguation === previous.disambiguation && label.tooltip === previous.tooltip && Boolean(label.emphasized) === Boolean(previous.emphasized) && Boolean(label.dimmed) === Boolean(previous.dimmed);
     })) return;
-    this.content = next.map(({ id, label, path, selected, match, hovered, related, region, aggregate }) => ({ id, label, path, selected, match, ...(hovered ? { hovered } : {}), ...(related ? { related } : {}), ...(region ? { region } : {}), ...(aggregate ? { aggregate } : {}) }));
+    this.content = next.map(({ id, label, path, selected, match, hovered, related, region, aggregate, role, roleLabel, disambiguation, tooltip, emphasized, dimmed }) => ({ id, label, path, selected, match, ...(hovered ? { hovered } : {}), ...(related ? { related } : {}), ...(region ? { region } : {}), ...(aggregate ? { aggregate } : {}), ...(role ? { role, roleLabel } : {}), ...(disambiguation ? { disambiguation } : {}), ...(tooltip ? { tooltip } : {}), ...(emphasized ? { emphasized } : {}), ...(dimmed ? { dimmed } : {}) }));
     this.publish(this.content);
   };
 

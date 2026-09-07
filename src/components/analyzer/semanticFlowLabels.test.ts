@@ -11,6 +11,58 @@ const region: SemanticFlowRegion = { id: 'directory:src/git', kind: 'directory',
 const sceneCamera = () => { const camera = new OrthographicCamera(-500, 500, 400, -400, .1, 1000); camera.position.set(0, 0, 100); camera.lookAt(0, 0, 0); return camera; };
 
 describe('semantic 3D label synchronization', () => {
+  it.each(['selected node', 'selected edge'])('keeps a 220×60 left-side label hit box fixed on hover and unhover beside %s priorities', selection => {
+    const positions = [positioned('source', -100, -100), positioned('edge-end', -300, 100), positioned('peer', 300)];
+    positions[2]!.node.label = 'callback L163';
+    const selected = new Set(selection === 'selected node' ? ['source'] : []);
+    const context = { relatedIds: new Set(['source', 'edge-end', 'peer']), priorityIds: new Set(selection === 'selected edge' ? ['source', 'edge-end'] : []),
+      roles: new Map([['source', selection === 'selected node' ? 'selected' as const : 'source' as const], ['edge-end', 'target' as const], ['peer', 'outgoing' as const]]),
+      displays: new Map([['peer', { title: 'callback L163', location: 'webview/src/components/GraphSvg.tsx:163', disambiguation: '範囲 12419–12451 · GraphSvg.tsx:163', tooltip: 'callback L163\nwebview/src/components/GraphSvg.tsx:163\nID: peer' }]]),
+      view: 'function-call-flow' as const, relationKinds: new Map([['peer', new Set(['callback'])]]),
+    };
+    const camera = sceneCamera(), size = { width: 1000, height: 800 };
+    const before = projectSemanticFlowLabels(camera, size, 1, positions, selected, new Set(), context);
+    const hover = projectSemanticFlowLabels(camera, size, 1, positions, selected, new Set(), { ...context, previous: before, hoveredIds: new Set(['peer']), emphasisIds: new Set(['source', 'peer']) });
+    const after = projectSemanticFlowLabels(camera, size, 1, positions, selected, new Set(), { ...context, previous: hover });
+    const box = (labels: FlowLabelPlacement[], id: string) => { const label = labels.find(item => item.id === id)!; return { x: label.x, y: label.y, width: label.width, height: label.height }; };
+    const initial = before.find(label => label.id === 'peer')!;
+    expect(initial.width).toBe(220); expect(initial.height).toBe(60);
+    expect(initial.x + 9 + initial.width!).toBeLessThanOrEqual(initial.pointX! - 9);
+    for (const id of ['source', ...(selection === 'selected edge' ? ['edge-end'] : []), 'peer']) {
+      expect(box(hover, id)).toEqual(box(before, id)); expect(box(after, id)).toEqual(box(before, id));
+    }
+    expect(hover.find(label => label.id === 'peer')).toMatchObject({ hovered: true, emphasized: true, roleLabel: 'コールバック先', tooltip: context.displays.get('peer')!.tooltip });
+    const layer = new FlowLabelLayer(() => {}), button = document.createElement('button');
+    layer.update(before); layer.attach('peer', button); const transform = button.style.transform;
+    layer.update(hover); expect(button.style.transform).toBe(transform); expect(button.style.width).toBe('220px'); expect(button.style.height).toBe('60px');
+    layer.update(after); expect(button.style.transform).toBe(transform);
+  });
+
+  it('reserves and mounts role and identity rows at their complete height without covering the dot or another label', () => {
+    const positions = [positioned('source'), positioned('target', 20), positioned('hover', 30)];
+    const labels = projectSemanticFlowLabels(sceneCamera(), { width: 1000, height: 800 }, .1, positions, new Set(), new Set(), {
+      priorityIds: new Set(['source', 'target']), hoveredIds: new Set(['hover']), roles: new Map([['source', 'source'], ['target', 'target']]),
+      displays: new Map(positions.map(point => [point.node.id, { title: point.node.label, location: 'src/same.ts:163', tooltip: point.node.id, disambiguation: `same.ts · 範囲 ${point.node.id === 'source' ? '12419–12454' : '12457–12501'}` }])),
+    });
+    expect(labels.slice(0, 2).map(label => label.id)).toEqual(['source', 'target']);
+    for (const label of labels.slice(0, 2)) {
+      expect(label.height).toBe(60);
+      const button = document.createElement('button'), layer = new FlowLabelLayer(() => {});
+      layer.update([label]); layer.attach(label.id, button); expect(button.style.height).toBe('60px');
+    }
+    const [a, b] = labels;
+    expect(Math.abs(a!.y - b!.y) >= (a!.height! + b!.height!) / 2 || a!.x + a!.width! <= b!.x || b!.x + b!.width! <= a!.x).toBe(true);
+  });
+
+  it('keeps relation hover endpoints before the general neighbour budget while selected endpoints remain first', () => {
+    const positions = [positioned('selected', -300), ...Array.from({ length: 35 }, (_, index) => positioned(`peer-${index}`, index % 5 * 50 - 100, Math.floor(index / 5) * 35 - 120))];
+    const labels = projectSemanticFlowLabels(sceneCamera(), { width: 1000, height: 800 }, .1, positions, new Set(['selected']), new Set(), {
+      relatedIds: new Set(positions.map(point => point.node.id)), emphasisIds: new Set(['selected', 'peer-34']),
+    });
+    expect(labels.slice(0, 2).map(label => label.id)).toEqual(['selected', 'peer-34']);
+    expect(labels[1]!.emphasized).toBe(true); expect(labels.slice(2).every(label => label.dimmed)).toBe(true);
+  });
+
   it('keeps a few direct endpoints ahead of unrelated names in a dense point cloud', () => {
     const positions = [positioned('caller', -240), positioned('Math.abs', 0, 5), positioned('Math.min', 28, -10),
       ...Array.from({ length: 60 }, (_, index) => positioned(`other-${index}`, (index % 10) * 13 - 45, Math.floor(index / 10) * 13 - 35))];
@@ -135,7 +187,8 @@ describe('semantic 3D label synchronization', () => {
     expect(labels.filter(label => !label.region).map(label => label.id).sort()).toEqual(['hover', 'run', 'target']);
     expect(labels.find(label => label.id === 'hover')?.path).toBe('src/git/hover.ts');
     const run = labels.find(label => label.id === 'run')!, hover = labels.find(label => label.id === 'hover')!;
-    expect(Math.abs(run.y - hover.y) >= 46 || Math.abs(run.x - hover.x) >= 225).toBe(true);
+    const runLeft = run.x + 17, hoverLeft = hover.x + 9;
+    expect(Math.abs(run.y - hover.y) >= (run.height! + hover.height!) / 2 || runLeft + run.width! <= hoverLeft || hoverLeft + hover.width! <= runLeft).toBe(true);
   });
 
   it('shows the currently visible region even after more than sixteen offscreen regions', () => {
@@ -202,7 +255,7 @@ describe('semantic 3D label synchronization', () => {
       priorityIds: new Set(kind === 'edge endpoint' ? [node.node.id] : []),
     });
     expect(labels).toHaveLength(1);
-    const label = labels[0]!, left = label.x + 9, right = left + label.width!, height = label.hovered ? 46 : 28;
+    const label = labels[0]!, left = label.x + 9, right = left + label.width!, height = label.height!;
     const dx = Math.max(left - label.pointX!, label.pointX! - right, 0);
     const dy = Math.max(label.y - height / 2 - label.pointY!, label.pointY! - label.y - height / 2, 0);
     expect(Math.hypot(dx, dy)).toBeGreaterThanOrEqual(8.99);

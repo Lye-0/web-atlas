@@ -11,11 +11,11 @@ const relation = (id: string, source = 'run', target = 'save'): SemanticEdge => 
 
 describe('Semantic flow detail exploration', () => {
   let host: HTMLDivElement, root: Root;
-  const onSelect = vi.fn(), onSelectEdge = vi.fn(), onClose = vi.fn(), onJump = vi.fn();
+  const onSelect = vi.fn(), onSelectEdge = vi.fn(), onClose = vi.fn(), onJump = vi.fn(), onHoverTarget = vi.fn();
   const nodes = new Map(['run', 'save', 'caller', ...Array.from({ length: 8 }, (_, index) => `peer-${index}`)].map(id => [id, node(id)]));
   const render = async (props: Partial<ComponentProps<typeof SemanticFlowDetail>>) => act(async () => root.render(
     <SemanticFlowDetail key={props.node?.id ?? props.edge?.id ?? 'empty'} nodes={nodes} edges={[]} sources={{ 'src/service.ts': Array.from({ length: 90 }, (_, index) => `source row ${index + 1}`).join('\n') }} view="function-call-flow"
-      onSelect={onSelect} onSelectEdge={onSelectEdge} onClose={onClose} onJump={onJump} {...props} />,
+      onSelect={onSelect} onSelectEdge={onSelectEdge} onClose={onClose} onJump={onJump} onHoverTarget={onHoverTarget} {...props} />,
   ));
   const section = (name: string) => [...host.querySelectorAll<HTMLDetailsElement>('.analyzer-detail-accordion')].find(item => item.querySelector(':scope > summary > span')?.textContent === name)!;
   const open = async (item: HTMLDetailsElement) => act(async () => { item.open = true; item.dispatchEvent(new Event('toggle')); });
@@ -64,6 +64,58 @@ describe('Semantic flow detail exploration', () => {
       expect(entries).toContainEqual(['Confidence', edge.confidence]);
       expect(entries).toContainEqual(['元の表示名', edge.label]);
     }
+  });
+
+  it('uses counterpart IDs for grouped hover and individual IDs for relation focus, releasing unmounted rows', async () => {
+    const edges = [relation('one'), relation('two'), relation('three', 'run', 'caller')];
+    await render({ node: nodes.get('run'), edges });
+    const peer = host.querySelector<HTMLButtonElement>('[data-flow-detail-node-id="save"]')!;
+    await act(async () => { peer.dispatchEvent(new MouseEvent('pointerover', { bubbles: true })); peer.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, buttons: 0 })); });
+    expect(onHoverTarget).toHaveBeenLastCalledWith({ kind: 'node', id: 'save' }, { source: expect.stringContaining('detail-node:save'), modality: 'pointer' });
+    const group = host.querySelector<HTMLElement>('[data-flow-detail-group-id="save"]')!;
+    await act(async () => group.focus());
+    expect(onHoverTarget).toHaveBeenLastCalledWith({ kind: 'node', id: 'save' }, { source: expect.stringContaining('detail-group:save'), modality: 'focus' });
+    await open(group.parentElement as HTMLDetailsElement);
+    const individual = host.querySelector<HTMLButtonElement>('[data-flow-detail-edge-id="two"]')!;
+    await act(async () => individual.focus());
+    expect(onHoverTarget).toHaveBeenLastCalledWith({ kind: 'edge', id: 'two' }, { source: expect.stringContaining('detail-edge:two'), modality: 'focus' });
+    const owner = onHoverTarget.mock.calls.at(-1)![1];
+    onHoverTarget.mockClear();
+    await act(async () => { const details = group.parentElement as HTMLDetailsElement; details.open = false; details.dispatchEvent(new Event('toggle')); });
+    expect(onHoverTarget).toHaveBeenCalledWith(undefined, owner);
+    expect(onSelect).not.toHaveBeenCalled(); expect(onSelectEdge).not.toHaveBeenCalled(); expect(onJump).not.toHaveBeenCalled();
+  });
+
+  it('does not replace a keyboard-focused counterpart when scrolling only generates pointer entry on another row', async () => {
+    await render({ node: nodes.get('run'), edges: [relation('one'), relation('two', 'run', 'caller')] });
+    const focused = host.querySelector<HTMLButtonElement>('[data-flow-detail-node-id="save"]')!, underPointer = host.querySelector<HTMLButtonElement>('[data-flow-detail-node-id="caller"]')!;
+    await act(async () => focused.focus());
+    expect(onHoverTarget).toHaveBeenLastCalledWith({ kind: 'node', id: 'save' }, { source: expect.stringContaining('detail-node:save'), modality: 'focus' });
+    onHoverTarget.mockClear();
+    await act(async () => underPointer.dispatchEvent(new MouseEvent('pointerover', { bubbles: true })));
+    expect(onHoverTarget).not.toHaveBeenCalled(); expect(document.activeElement).toBe(focused);
+    await act(async () => underPointer.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, buttons: 0 })));
+    expect(onHoverTarget).toHaveBeenCalledExactlyOnceWith({ kind: 'node', id: 'caller' }, { source: expect.stringContaining('detail-node:caller'), modality: 'pointer' });
+    expect(onSelect).not.toHaveBeenCalled(); expect(document.activeElement).toBe(focused);
+  });
+
+  it('distinguishes same-file same-line counterparts with acquired ranges and retains their exact selection', async () => {
+    const first = { ...node('first'), label: 'callback L163', path: 'src/GraphSvg.tsx', line: 163, endLine: 163, evidence: [{ ...evidence('callback first', 163), path: 'src/GraphSvg.tsx', start: 12419, end: 12454 }] };
+    const second = { ...first, id: 'second', evidence: [{ ...first.evidence[0]!, description: 'callback second', start: 12457, end: 12501 }] };
+    const localNodes = new Map(nodes); localNodes.set(first.id, first); localNodes.set(second.id, second);
+    const edges = [relation('callback-1', 'run', 'first'), relation('callback-2', 'run', 'second')];
+    const before = JSON.stringify([...localNodes]);
+    await render({ node: nodes.get('run'), nodes: localNodes, edges });
+    const firstButton = host.querySelector<HTMLButtonElement>('[data-flow-detail-node-id="first"]')!;
+    const secondButton = host.querySelector<HTMLButtonElement>('[data-flow-detail-node-id="second"]')!;
+    expect(firstButton.querySelector('strong')?.textContent).toBe('callback L163'); expect(secondButton.querySelector('strong')?.textContent).toBe('callback L163');
+    expect(firstButton.querySelector('small')?.textContent).toMatch(/^範囲 12419–12454/);
+    expect(secondButton.querySelector('small')?.textContent).toMatch(/^範囲 12457–12501/);
+    expect(secondButton.title).toContain('ID: second');
+    await click(secondButton); expect(onSelect).toHaveBeenLastCalledWith('second');
+    await render({ node: second, nodes: localNodes, edges }); await open(section('基本情報'));
+    expect(section('基本情報').textContent).toContain('src/GraphSvg.tsx: 12457–12501');
+    expect(JSON.stringify([...localNodes])).toBe(before);
   });
 
   it('defers auxiliary content and restores the compact state when selection changes', async () => {

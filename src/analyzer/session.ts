@@ -29,6 +29,7 @@ export interface AnalyzerSessionState {
   activeView: AnalyzerViewId;
   views: Record<AnalyzerViewId, AnalyzerViewSession>;
   scanVersion: number;
+  showFlowGroupBounds?: boolean;
 }
 
 export type AnalyzerViewSessionUpdate = Partial<AnalyzerViewSession> | ((current: AnalyzerViewSession) => AnalyzerViewSession);
@@ -36,6 +37,7 @@ export type AnalyzerViewSessionUpdate = Partial<AnalyzerViewSession> | ((current
 export type AnalyzerSessionAction =
   | { type: 'replaceProject'; store: AnalyzerProjectStore; folderHandle?: DirectoryHandleLike }
   | { type: 'setActiveView'; view: AnalyzerViewId }
+  | { type: 'setFlowGroupBounds'; visible: boolean }
   | { type: 'updateView'; view: AnalyzerViewId; update: AnalyzerViewSessionUpdate };
 
 export const analyzerViewIds: AnalyzerViewId[] = ['architecture', 'workspace', 'command', 'dependencies', 'module-dependency', 'runtime-flow', 'function-call-flow', 'data-flow', 'data-model', 'architecture-map'];
@@ -54,6 +56,7 @@ export function createInitialAnalyzerSessionState(): AnalyzerSessionState {
     activeView: 'architecture',
     views: Object.fromEntries(analyzerViewIds.map((view) => [view, createInitialAnalyzerViewSession()])) as Record<AnalyzerViewId, AnalyzerViewSession>,
     scanVersion: 0,
+    showFlowGroupBounds: true,
   };
 }
 
@@ -161,12 +164,15 @@ export function analyzerSessionReducer(state: AnalyzerSessionState, action: Anal
       activeView: 'architecture',
       views: Object.fromEntries(analyzerViewIds.map((view) => [view, createInitialAnalyzerViewSession()])) as Record<AnalyzerViewId, AnalyzerViewSession>,
       scanVersion: state.scanVersion + 1,
+      showFlowGroupBounds: state.showFlowGroupBounds ?? true,
     };
   }
 
   if (action.type === 'setActiveView') {
     return action.view === state.activeView ? state : { ...state, activeView: action.view };
   }
+
+  if (action.type === 'setFlowGroupBounds') return (state.showFlowGroupBounds ?? true) === action.visible ? state : { ...state, showFlowGroupBounds: action.visible };
 
   const currentView = state.views[action.view];
   const nextView = typeof action.update === 'function'

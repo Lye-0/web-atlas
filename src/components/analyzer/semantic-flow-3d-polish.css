@@ -1,0 +1,10 @@
+.semantic-flow-3d-labels button { box-sizing: border-box; align-content: center; gap: 0; }
+.semantic-flow-3d-labels button > :is(strong, small, .semantic-flow-3d-role) { min-height: 16px; line-height: 16px; }
+.semantic-flow-3d-labels .semantic-flow-3d-role { font-size: 9px; color: #c2d6ca; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.semantic-flow-3d-labels button[data-flow-role='outgoing'] { border-left: 3px solid #82c6e2; }
+.semantic-flow-3d-labels button[data-flow-role='incoming'] { border-left: 3px solid #dfb785; }
+.semantic-flow-3d-labels button[data-flow-role='both'] { border-left: 3px solid #dfb785; border-right: 3px solid #82c6e2; }
+.semantic-flow-3d-labels button:is([data-flow-role='source'], [data-flow-role='target'], [data-flow-role='source-target']) { border-left: 3px solid #b6cbbf; }
+.semantic-flow-3d-labels button.is-emphasized { outline: 1px solid #d1e6db; outline-offset: 1px; z-index: 2; }
+.semantic-flow-3d-labels button.is-dimmed { opacity: .42; }
+.semantic-flow-3d-labels button.is-dimmed:focus-visible { opacity: 1; }

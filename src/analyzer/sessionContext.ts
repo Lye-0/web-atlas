@@ -7,6 +7,7 @@ export interface AnalyzerSessionContextValue {
   state: AnalyzerSessionState;
   replaceProject: (store: AnalyzerProjectStore, folderHandle?: DirectoryHandleLike) => void;
   setActiveView: (view: AnalyzerViewId) => void;
+  setFlowGroupBounds: (visible: boolean) => void;
   updateView: (view: AnalyzerViewId, update: AnalyzerViewSessionUpdate) => void;
 }
 

@@ -1,9 +1,10 @@
-import type { SemanticNode } from '../../analyzer/semantic/types';
+import { kindLabels, type SemanticNode } from '../../analyzer/semantic/types';
 
 export interface SemanticNodeDisplay {
   title: string;
   location: string;
   tooltip: string;
+  disambiguation?: string;
 }
 
 /** Elide nested arguments/bodies without assigning a meaning or a definition to the callee. */
@@ -70,5 +71,49 @@ export function semanticNodeDisplays(nodes: Iterable<SemanticNode>): ReadonlyMap
   for (const members of collisions.values()) if (members.length > 1) [...members].sort((a, b) => a.id.localeCompare(b.id)).forEach((node, index) => {
     displays.get(node.id)!.location += ` · 対象 ${index + 1}`;
   });
+  const names = new Map<string, SemanticNode[]>();
+  for (const node of items) {
+    const name = displays.get(node.id)!.title, named = names.get(name) ?? [];
+    named.push(node); names.set(name, named);
+  }
+  for (const named of names.values()) {
+    if (named.length < 2) continue;
+    const paths = new Map(named.map(node => [node.id, (node.path ?? node.evidence[0]?.path)?.replaceAll('\\', '/')]).filter((item): item is [string, string] => Boolean(item[1])));
+    const suffixCounts = new Map<string, number>();
+    for (const path of new Set(paths.values())) {
+      const parts = path.split('/');
+      for (let length = 1; length <= parts.length; length++) { const suffix = parts.slice(-length).join('/'); suffixCounts.set(suffix, (suffixCounts.get(suffix) ?? 0) + 1); }
+    }
+    const rows = new Map<string, string>();
+    for (const node of named) {
+      const path = paths.get(node.id), line = node.line ?? node.evidence[0]?.line;
+      if (path) {
+        const parts = path.split('/'); let suffix = path;
+        for (let length = 1; length <= parts.length; length++) { const candidate = parts.slice(-length).join('/'); if (suffixCounts.get(candidate) === 1) { suffix = candidate; break; } }
+        rows.set(node.id, `${suffix}${line ? `:${line}` : ''}`);
+      } else rows.set(node.id, `${kindLabels[node.kind]}${node.group ? ` · ${node.group}` : ''}`);
+      const display = displays.get(node.id)!;
+      if (!display.tooltip.includes(`ID: ${node.id}`)) display.tooltip += `\nID: ${node.id}`;
+    }
+    const groupRows = () => {
+      const grouped = new Map<string, SemanticNode[]>();
+      for (const node of named) { const row = rows.get(node.id)!; const members = grouped.get(row) ?? []; members.push(node); grouped.set(row, members); }
+      return grouped;
+    };
+    const duplicateRows = groupRows();
+    for (const same of duplicateRows.values()) if (same.length > 1) for (const node of same) {
+      const evidence = node.evidence[0];
+      // Put the distinguishing range first, where a narrow label cannot ellipsize it away.
+      if (evidence) rows.set(node.id, `範囲 ${evidence.start}–${evidence.end} · ${rows.get(node.id)}`);
+    }
+    const remaining = groupRows();
+    for (const same of remaining.values()) if (same.length > 1) for (const node of same) {
+      let length = 8;
+      while (length < node.id.length && same.some(other => other.id !== node.id && other.id.slice(-length) === node.id.slice(-length))) length++;
+      const id = node.id.length > length ? `…${node.id.slice(-length)}` : node.id;
+      rows.set(node.id, `ID ${id} · ${rows.get(node.id)}`);
+    }
+    for (const node of named) displays.get(node.id)!.disambiguation = rows.get(node.id);
+  }
   return displays;
 }

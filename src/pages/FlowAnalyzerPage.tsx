@@ -17,6 +17,7 @@ import { SemanticFlowStage } from '../components/analyzer/SemanticFlowStage';
 import { SemanticFlowDetail } from '../components/analyzer/SemanticFlowDetail';
 import { semanticFlowDirectionLanguage } from '../components/analyzer/semanticFlowLanguage';
 import { semanticNodeDisplays } from '../components/analyzer/semanticFlowDisplay';
+import { useSemanticFlowHover } from '../components/analyzer/useSemanticFlowHover';
 import { useWorkspaceFullscreen } from '../components/analyzer/useWorkspaceFullscreen';
 import { useSemanticExplorerNavigation } from '../components/analyzer/useSemanticExplorerNavigation';
 import { analyzerRoutes } from '../utils/routes';
@@ -28,7 +29,7 @@ const defaultOrbitFlow: NonNullable<AnalyzerViewSession['flow']> = { mode: '3d',
 const emptyAnalysis: SemanticAnalysis = { nodes: [], edges: [], coverage: [], warnings: [], stats: { files: 0, functions: 0, models: 0, unresolved: 0, elapsedMs: 0 } };
 
 export default function FlowAnalyzerPage({ view }: { view: 'runtime-flow' | 'function-call-flow' }) {
-  const { state, updateView, setActiveView, replaceProject } = useAnalyzerSession(), navigate = useNavigate();
+  const { state, updateView, setActiveView, setFlowGroupBounds, replaceProject } = useAnalyzerSession(), navigate = useNavigate();
   const store = state.store, session = state.views[view], options = session.semantic ?? semanticFlowDefaults;
   const flow = session.flow ?? (options.orbit ? defaultOrbitFlow : defaultFlow);
   const [loaded, setLoaded] = useState<{ store: AnalyzerProjectStore; analysis: SemanticAnalysis }>();
@@ -63,13 +64,15 @@ export default function FlowAnalyzerPage({ view }: { view: 'runtime-flow' | 'fun
     const ids = new Set(nodes.map(node => node.id)); return { view, nodes, edges: graph.edges.filter(edge => ids.has(edge.source) && ids.has(edge.target)) };
   }, [graph, view, options.scope, options.kind, options.confidence, options.auxiliary, options.members]);
   const results = useMemo(() => searchSemanticNodes(filtered.nodes, session.search), [filtered.nodes, session.search]);
-  const searchDisplays = useMemo(() => flow.mode === '2d' ? semanticNodeDisplays(graph.nodes) : undefined, [graph.nodes, flow.mode]);
+  const searchDisplays = useMemo(() => semanticNodeDisplays(graph.nodes), [graph.nodes]);
   const matchIds = useMemo(() => new Set(results.map(result => result.id)), [results]);
   const knownFiles = useMemo(() => new Set([...(store?.files.map(file => file.relativePath) ?? []), ...Object.keys(store?.sources ?? {}), ...Object.keys(store?.semanticSources ?? {})]), [store]);
   const explorer = useMemo(() => buildSemanticExplorer(graph, knownFiles), [graph, knownFiles]);
   const navigation = useSemanticExplorerNavigation({ view, scanVersion: state.scanVersion, session, explorer, edges: graph.edges, ready: Boolean(analysis), updateView, onFocus: requestFocus });
   const explorerLocation = useMemo(() => ({ ...navigation.location, direction: options.direction }), [navigation.location, options.direction]);
   const selectedIds = useMemo(() => new Set(selected ? [selected.id] : []), [selected]);
+  const hoverContext = useMemo(() => ({ view, scanVersion: state.scanVersion, mode: flow.mode, visitId: navigation.visitId, selectedId: selected?.id, selectedEdgeId: selectedEdge?.id, graph: filtered, direction: options.direction }), [view, state.scanVersion, flow.mode, navigation.visitId, selected?.id, selectedEdge?.id, filtered, options.direction]);
+  const { hoverTarget, onHoverTarget, clearHover } = useSemanticFlowHover(hoverContext);
   const filteredIds = useMemo(() => new Set(filtered.nodes.map(node => node.id)), [filtered.nodes]);
   const currentChildren = useMemo(() => explorerChildren(explorer, explorerLocation, filteredIds), [explorer, explorerLocation, filteredIds]);
   const hiddenSelection = Boolean(selected && !filteredIds.has(selected.id) || selectedEdge && (!filteredIds.has(selectedEdge.source) || !filteredIds.has(selectedEdge.target)));
@@ -158,9 +161,9 @@ export default function FlowAnalyzerPage({ view }: { view: 'runtime-flow' | 'fun
       {unavailable3D && <p className="semantic-flow-notice" role="status">この環境では3D描画を継続できません。検索・選択を保持して2Dエクスプローラーを表示しています。<button type="button" onClick={() => changeMode('3d')}>3Dを再試行</button></p>}
       {hiddenSelection && <p className="semantic-flow-notice" role="status">選択中の「{selected?.label ?? selectedEdge?.label}」は現在のフィルターで非表示です。<button type="button" onClick={restoreSelection}>フィルターを解除して表示</button><button type="button" onClick={clearSelection}>選択解除</button></p>}
       <SearchResultStrip query={session.search} items={results.map(result => {
-        const display = searchDisplays?.get(result.id);
+        const display = searchDisplays.get(result.id);
         const location = display?.location ?? `${result.path ?? result.node.group}${result.node.line ? `:${result.node.line}` : ''}`;
-        return { id: result.id, label: display?.title ?? result.label, subtitle: `${result.node.kind === 'external' ? '呼び出し箇所: ' : ''}${location}`, reason: result.match.reason };
+        return { id: result.id, label: flow.mode === '2d' ? display?.title ?? result.label : result.label, subtitle: `${result.node.kind === 'external' ? '呼び出し箇所: ' : ''}${display?.disambiguation ?? location}`, reason: result.match.reason };
       })} selectedId={selected?.id} onSelect={id => navigation.jumpMode(flow.mode, id)} loading={Boolean(store && !analysis && !error)} />
       <div ref={fullscreen.root} className={`analyzer-workspace semantic-flow-workspace${session.detailOpen && (selected || selectedEdge) ? ' has-detail' : ''}${fullscreen.isFullscreen ? ' is-fullscreen' : ''}`}
         role={fullscreen.isFullscreen ? 'dialog' : undefined} aria-modal={fullscreen.isFullscreen || undefined} aria-label={fullscreen.isFullscreen ? `${view} 全画面表示` : undefined} onKeyDownCapture={fullscreen.onKeyDownCapture}>
@@ -171,11 +174,14 @@ export default function FlowAnalyzerPage({ view }: { view: 'runtime-flow' | 'fun
             onScroll: navigation.saveScroll, onRevealSelection: revealSelection }}
           cameras={session.flowCameras ?? (options.orbit && session.semanticCamera ? { '3d': session.semanticCamera } : undefined)} onCamera={saveCamera} onMode={changeMode}
           particleMode={flow.particleMode} onParticleMode={particleMode => updateView(view, { flow: { ...flow, particleMode } })}
+          showGroupBounds={state.showFlowGroupBounds ?? true} onGroupBounds={setFlowGroupBounds}
+          hoverTarget={hoverTarget} onHoverTarget={onHoverTarget}
           onSelect={selectNode} onSelectEdge={selectEdge} onClear={clearSelection} isFullscreen={fullscreen.isFullscreen} onFullscreen={() => void fullscreen.toggle()}
           onUnavailable={() => { setUnavailable3D(true); navigation.changeMode('2d'); }} />
           : <div className="semantic-empty"><p>プロジェクトフォルダを選択すると、構造と関係を解析します。</p><p>ソースはブラウザ内で読み取り、外部へ送信しません。</p></div>}
         {store && session.detailOpen && (selected || selectedEdge) && <SemanticFlowDetail key={selected?.id ?? selectedEdge?.id} node={selected} edge={selectedEdge} nodes={allNodes} edges={graph.edges} sources={store.semanticSources ?? store.sources} view={view}
-          onSelect={selectNode} onSelectEdge={selectEdge} onClose={() => updateView(view, current => recordExplorerSelection(current, { selectedNodeId: current.selectedNodeId, selectedEdgeId: current.selectedEdgeId, detailOpen: false }))} onJump={jump} />}
+          hoverTarget={hoverTarget} onHoverTarget={onHoverTarget}
+          onSelect={selectNode} onSelectEdge={selectEdge} onClose={() => { clearHover(); updateView(view, current => recordExplorerSelection(current, { selectedNodeId: current.selectedNodeId, selectedEdgeId: current.selectedEdgeId, detailOpen: false })); }} onJump={jump} />}
       </div>
       {analysis && <details className="semantic-coverage"><summary>解析範囲 · {analysis.stats.files.toLocaleString()} files · 解析全体で定義先が未特定の呼び出し {analysis.stats.unresolved.toLocaleString()}箇所 · {(analysis.stats.elapsedMs / 1000).toFixed(1)}秒</summary>
         <p>ソースで確認＝構文上の宣言・関係。推定＝名前・設定・callback契約からの対応付け。実測＝読み込んだ実行記録。未解決＝静的に呼び出し先を確定できない関係。イベント登録と実際の実行は区別されます。</p>

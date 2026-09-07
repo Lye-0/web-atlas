@@ -75,8 +75,8 @@ describe('flow search and presentation contracts', () => {
     const path = semanticFlowEdgePaths(single, positions, new Set(['a']), undefined, mode)[0]!;
     const reverseSelection = semanticFlowEdgePaths(single, positions, new Set(['b']), undefined, mode)[0]!;
     expect(path.svgPath).toContain(' C'); expect(path.svgPath).not.toContain(' L');
-    expect(path.points[0]!.x).toBeCloseTo(mode === '2d' ? 110 : 7);
-    expect(path.points.at(-1)!.x).toBeCloseTo(mode === '2d' ? 890 : 993);
+    expect(path.points[0]!.x).toBeCloseTo(mode === '2d' ? 110 : 0);
+    expect(path.points.at(-1)!.x).toBeCloseTo(mode === '2d' ? 890 : 1000);
     expect(path.points[0]!.y).toBe(0); expect(path.points.at(-1)!.y).toBe(0);
     expect(Math.max(...path.points.map(point => point.y))).toBeGreaterThan(20);
     expect(path.points).toEqual(reverseSelection.points); expect(path.edge.id).toBe('direct');

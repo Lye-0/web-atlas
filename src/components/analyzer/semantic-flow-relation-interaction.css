@@ -1,0 +1,6 @@
+.semantic-flow-node .semantic-flow-2d-role { font-weight: 600; color: #c8dbd0; }
+.semantic-flow-node[data-flow-role='outgoing'] .semantic-flow-2d-role { color: #82c6e2; }
+.semantic-flow-node[data-flow-role='incoming'] .semantic-flow-2d-role { color: #dfb785; }
+.semantic-flow-node[data-flow-role='both'] .semantic-flow-2d-role { color: #e5d0ab; text-decoration: underline; text-decoration-color: #82c6e2; }
+.semantic-flow-detail [data-flow-emphasized='true'] { outline: 1px solid #bbd8ca; outline-offset: 1px; }
+.semantic-flow-detail .semantic-flow-detail-identity { color: #c4d6cb; }

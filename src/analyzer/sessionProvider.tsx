@@ -13,9 +13,12 @@ export function AnalyzerSessionProvider({ children }: { children: ReactNode }) {
   const setActiveView = useCallback((view: AnalyzerViewId) => {
     dispatch({ type: 'setActiveView', view });
   }, []);
+  const setFlowGroupBounds = useCallback((visible: boolean) => {
+    dispatch({ type: 'setFlowGroupBounds', visible });
+  }, []);
   const updateView = useCallback((view: AnalyzerViewId, update: AnalyzerViewSessionUpdate) => {
     dispatch({ type: 'updateView', view, update });
   }, []);
 
-  return <analyzerSessionContext.Provider value={{ state, replaceProject, setActiveView, updateView }}>{children}</analyzerSessionContext.Provider>;
+  return <analyzerSessionContext.Provider value={{ state, replaceProject, setActiveView, setFlowGroupBounds, updateView }}>{children}</analyzerSessionContext.Provider>;
 }

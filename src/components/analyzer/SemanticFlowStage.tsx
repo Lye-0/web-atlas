@@ -8,16 +8,19 @@ import { SemanticFlow2D, type FlowCameraCommand } from './SemanticFlow2D';
 import { SemanticFlowLegend } from './SemanticFlowLegend';
 import { semanticFlowDirectionLanguage } from './semanticFlowLanguage';
 import { SemanticExplorerNavigation, type SemanticExplorerNavigationActions } from './SemanticExplorerNavigation';
+import type { SemanticFlowHoverHandler, SemanticFlowHoverTarget } from '../../analyzer/semantic/flowRelationInteraction';
 
 const SemanticFlow3D = lazy(() => import('./SemanticFlow3D').then(module => ({ default: module.SemanticFlow3D })));
 
-export function SemanticFlowStage({ graph, explorer, navigation, mode, direction, selectedIds, selectedEdgeId, matchIds, focus, cameras, onCamera, onMode, particleMode, onParticleMode, onSelect, onSelectEdge, onClear, isFullscreen, onFullscreen, onUnavailable }: {
+export function SemanticFlowStage({ graph, explorer, navigation, mode, direction, selectedIds, selectedEdgeId, matchIds, focus, cameras, onCamera, onMode, particleMode, onParticleMode, onSelect, onSelectEdge, onClear, isFullscreen, onFullscreen, onUnavailable, hoverTarget, onHoverTarget, showGroupBounds = true, onGroupBounds }: {
   graph: SemanticGraph; explorer?: SemanticExplorerModel; navigation?: SemanticExplorerNavigationActions; mode: '2d' | '3d'; direction?: 'both' | 'incoming' | 'outgoing'; selectedIds: ReadonlySet<string>; selectedEdgeId?: string; matchIds: ReadonlySet<string>;
   focus?: { nonce: number; ids: string[]; mode?: '2d' | '3d' }; cameras: AnalyzerViewSession['flowCameras'];
   onCamera: (mode: '2d' | '3d', camera: NonNullable<AnalyzerViewSession['flowCameras']>['2d' | '3d']) => void;
   onMode: (mode: '2d' | '3d') => void; particleMode?: SpatialParticleMode; onParticleMode: (mode: SpatialParticleMode) => void;
   onSelect: (id: string) => void; onSelectEdge: (id: string) => void; onClear: () => void;
   isFullscreen: boolean; onFullscreen: () => void; onUnavailable: () => void;
+  hoverTarget?: SemanticFlowHoverTarget; onHoverTarget?: SemanticFlowHoverHandler;
+  showGroupBounds?: boolean; onGroupBounds?: (visible: boolean) => void;
 }) {
   const [element, setElement] = useState<HTMLDivElement | null>(null);
   const controls = useRef<HTMLDivElement>(null), navigationElement = useRef<HTMLDivElement>(null);
@@ -51,7 +54,7 @@ export function SemanticFlowStage({ graph, explorer, navigation, mode, direction
   const localGraph = useMemo(() => navigation?.location.centerId ? explorerRelations(graph, navigation.location.centerId, navigation.location.depth, 'both') : graph,
     [graph, navigation?.location.centerId, navigation?.location.depth]);
   const overlayTop = controlsHeight + (navigation ? navigationHeight + 36 : 24);
-  const properties = { graph, explorer, direction, selectedIds, selectedEdgeId, matchIds, motion, command, onSelect, onSelectEdge, onClear, overlayTop };
+  const properties = { graph, explorer, direction, selectedIds, selectedEdgeId, matchIds, motion, command, onSelect, onSelectEdge, onClear, overlayTop, hoverTarget, onHoverTarget, showGroupBounds };
   const cameraApplicable = mode === '3d' || !navigation || Boolean(navigation.location.centerId);
   const cameraTitle = cameraApplicable ? undefined : 'この階層のブロックはスクロールで移動します';
   return <div ref={setElement} className="analyzer-graph-stage analyzer-spatial-graph-stage semantic-flow-stage" data-mode={mode} data-visit-id={navigation?.visitId}
@@ -67,6 +70,7 @@ export function SemanticFlowStage({ graph, explorer, navigation, mode, direction
         else run('focus', selectedEdgeId ? graph.edges.filter(edge => edge.id === selectedEdgeId).flatMap(edge => [edge.source, edge.target]) : [...selectedIds]);
       }}>選択へ移動</button>
       <SpatialParticleControl mode={flow.mode} onChange={next => { flow.setMode(next); onParticleMode(next); }} onOpen={() => setHelp(false)} />
+      {mode === '3d' && <button type="button" className="semantic-flow-bounds-toggle" aria-label="分類の囲い" aria-pressed={showGroupBounds} onClick={() => onGroupBounds?.(!showGroupBounds)}>分類の囲い：{showGroupBounds ? 'ON' : 'OFF'}</button>}
       <button type="button" aria-label={isFullscreen ? '全画面を終了' : '全画面表示'} aria-pressed={isFullscreen} onClick={onFullscreen}>{isFullscreen ? '↙' : '⛶'}</button>
       <button type="button" className="analyzer-help-button" aria-label="グラフ操作ヘルプ" aria-expanded={help} onClick={() => setHelp(!help)}>?</button>
     </div>
