@@ -3,10 +3,10 @@ id: rm-20260908-semantic-view-field-conservation
 topic: analyzer-flow
 type: constraint
 status: active
-maturity: candidate
+maturity: reused
 created: 2026-09-08
 last_verified: 2026-09-08
-source_commit: "536f801a62695feb6d90529babf5401895f3508e"
+source_commit: "f97bafe59bb72d7af596504bbc0de319a84cb625"
 related_files:
   - src/analyzer/semantic/analyze.ts
   - src/analyzer/semantic/project.ts
@@ -58,3 +58,9 @@ Do not apply:
 2. snapshot取得がrefinement前で、レコードの後続変更から隔離され、6/7だけに適用されることを確認する。
 3. `pnpm exec vitest run src/analyzer/semantic/dataRefinement.test.ts src/pages/SemanticAnalyzerPage.test.tsx`を実行する。
 4. 比較入力を同一に固定し、6/7の既存表示項目と8/9の正しい構造が同時に保たれるか確認する。UIや入力が変わった後へ過去のPASSを流用しない。
+
+## Reuse Evidence
+
+Data Flow／Data Modelの表示精緻化と全5つの3D集約を追加する後続作業で、変更対象外の6/7 Fieldsを保全基準に含めた。最終実装に対し固定した両実入力でcanonical nodes・edges・Evidence・fieldsと6/7のrefinement前Fieldsを別々に比較し、一致を確認した。表示集約用graphの導入はこのsnapshot境界を変更していない。
+
+記録時のHEADに対する未コミット実装を検証した。現在のコードと入力を再確認してから再利用する。

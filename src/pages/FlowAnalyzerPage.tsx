@@ -6,7 +6,7 @@ import { confidenceLabels, kindLabels, semanticQuestions, type SemanticAnalysis,
 import { projectSemanticView } from '../analyzer/semantic/project';
 import { buildSemanticExplorer, explorerChildren } from '../analyzer/semantic/semanticExplorer';
 import { recordExplorerCamera, recordExplorerSelection } from '../analyzer/semantic/semanticExplorerState';
-import { searchSemanticNodes } from '../analyzer/semantic/search';
+import { matchingSemanticFields, searchSemanticNodes } from '../analyzer/semantic/search';
 import { semanticTraceCache } from '../analyzer/semantic/traceCache';
 import { importExecutionTrace } from '../analyzer/semantic/traces';
 import { adaptDataExecutionTrace, importDataExecutionTrace } from '../analyzer/semantic/dataTrace';
@@ -18,6 +18,7 @@ import { SemanticFlowStage } from '../components/analyzer/SemanticFlowStage';
 import { SemanticFlowDetail } from '../components/analyzer/SemanticFlowDetail';
 import { semanticFlowDirectionLanguage } from '../components/analyzer/semanticFlowLanguage';
 import { semanticNodeDisplays } from '../components/analyzer/semanticFlowDisplay';
+import { modelChoiceId } from '../components/analyzer/modelChoiceDisplay';
 import { useSemanticFlowHover } from '../components/analyzer/useSemanticFlowHover';
 import { useWorkspaceFullscreen } from '../components/analyzer/useWorkspaceFullscreen';
 import { useSemanticExplorerNavigation } from '../components/analyzer/useSemanticExplorerNavigation';
@@ -30,7 +31,7 @@ const defaultOrbitFlow: NonNullable<AnalyzerViewSession['flow']> = { mode: '3d',
 const emptyAnalysis: SemanticAnalysis = { nodes: [], edges: [], coverage: [], warnings: [], stats: { files: 0, functions: 0, models: 0, unresolved: 0, elapsedMs: 0 } };
 
 export default function FlowAnalyzerPage({ view }: { view: SemanticExplorerViewId }) {
-  const { state, updateView, setActiveView, setFlowGroupBounds, replaceProject } = useAnalyzerSession(), navigate = useNavigate();
+  const { state, updateView, setActiveView, setFlowGroupBounds, setAutoAggregation, replaceProject } = useAnalyzerSession(), navigate = useNavigate();
   const store = state.store, session = state.views[view], options = session.semantic ?? semanticFlowDefaults;
   const flow = session.flow ?? (options.orbit ? defaultOrbitFlow : defaultFlow);
   const [loaded, setLoaded] = useState<{ store: AnalyzerProjectStore; analysis: SemanticAnalysis }>();
@@ -188,8 +189,16 @@ export default function FlowAnalyzerPage({ view }: { view: SemanticExplorerViewI
       <SearchResultStrip query={session.search} items={results.map(result => {
         const display = searchDisplays.get(result.id);
         const location = display?.location ?? `${result.path ?? result.node.group}${result.node.line ? `:${result.node.line}` : ''}`;
-        return { id: result.id, label: flow.mode === '2d' ? display?.title ?? result.label : result.label, subtitle: `${result.node.kind === 'external' ? '呼び出し箇所: ' : ''}${display?.disambiguation ?? location}`, reason: result.match.reason };
-      })} selectedId={selected?.id} onSelect={id => navigation.jumpMode(flow.mode, id)} loading={Boolean(store && !analysis && !error)} />
+        return { id: result.id, label: flow.mode === '2d' || view === 'data-flow' ? display?.title ?? result.label : result.label, subtitle: `${display?.dataRole ? `${display.dataRole} · ` : ''}${result.node.kind === 'external' ? '呼び出し箇所: ' : ''}${display?.disambiguation ?? location}`, reason: result.match.reason };
+      })} selectedId={selected?.id} onSelect={id => {
+        const node = byId.get(id), fields = node?.model ? matchingSemanticFields(node, session.search) : [];
+        if (node?.model?.choices && fields.length) {
+          const matching = new Set(fields.map(field => field.id));
+          const choiceIds = node.model.choices.flatMap((choice, index) => choice.fields?.some(field => matching.has(field.id)) ? [modelChoiceId(node, index)] : []);
+          updateView(view, current => ({ ...current, modelOpenChoiceIds: [...new Set([...current.modelOpenChoiceIds ?? [], ...choiceIds])] }));
+        }
+        navigation.jumpMode(flow.mode, id, fields.length === 1 ? fields[0]!.id : undefined);
+      }} loading={Boolean(store && !analysis && !error)} />
       <div ref={fullscreen.root} className={`analyzer-workspace semantic-flow-workspace${session.detailOpen && (selected || selectedEdge) ? ' has-detail' : ''}${fullscreen.isFullscreen ? ' is-fullscreen' : ''}`}
         role={fullscreen.isFullscreen ? 'dialog' : undefined} aria-modal={fullscreen.isFullscreen || undefined} aria-label={fullscreen.isFullscreen ? `${view} 全画面表示` : undefined} onKeyDownCapture={fullscreen.onKeyDownCapture}>
         {store ? <SemanticFlowStage key={`${view}:${state.scanVersion}`} graph={filtered} explorer={explorer} mode={flow.mode} direction={options.direction} selectedIds={selectedIds} selectedEdgeId={selectedEdge?.id} matchIds={matchIds} focus={focus}
@@ -200,11 +209,14 @@ export default function FlowAnalyzerPage({ view }: { view: SemanticExplorerViewI
           cameras={session.flowCameras ?? (options.orbit && session.semanticCamera ? { '3d': session.semanticCamera } : undefined)} onCamera={saveCamera} onMode={changeMode}
           particleMode={flow.particleMode} onParticleMode={particleMode => updateView(view, { flow: { ...flow, particleMode } })}
           showGroupBounds={state.showFlowGroupBounds ?? true} onGroupBounds={setFlowGroupBounds}
+          autoAggregation={state.autoAggregation ?? true} onAutoAggregation={setAutoAggregation} aggregationState={session.aggregation} onAggregationState={aggregation => updateView(view, { aggregation })} totalNodeCount={graph.nodes.length}
+          fineExpandedScopeIds={session.dataFineExpandedScopeIds ?? []} onFineExpandedScopeIds={dataFineExpandedScopeIds => updateView(view, { dataFineExpandedScopeIds })}
           hoverTarget={hoverTarget} onHoverTarget={onHoverTarget}
           onSelect={selectNode} onSelectEdge={selectEdge} onClear={clearSelection} isFullscreen={fullscreen.isFullscreen} onFullscreen={() => void fullscreen.toggle()}
           onUnavailable={() => { setUnavailable3D(true); navigation.changeMode('2d'); }} />
           : <div className="semantic-empty"><p>プロジェクトフォルダを選択すると、構造と関係を解析します。</p><p>ソースはブラウザ内で読み取り、外部へ送信しません。</p></div>}
         {store && session.detailOpen && (selected || selectedEdge) && <SemanticFlowDetail key={selected?.id ?? selectedEdge?.id} node={selected} edge={selectedEdge} nodes={allNodes} edges={graph.edges} sources={store.semanticSources ?? store.sources} view={view}
+          openChoiceIds={session.modelOpenChoiceIds} onOpenChoiceIds={modelOpenChoiceIds => updateView(view, { modelOpenChoiceIds })}
           fieldId={session.semanticFieldId} onField={semanticFieldId => updateView(view, current => recordExplorerSelection(current, { selectedNodeId: current.selectedNodeId, selectedEdgeId: current.selectedEdgeId, detailOpen: current.detailOpen, semanticFieldId }))}
           hoverTarget={hoverTarget} onHoverTarget={onHoverTarget}
           onSelect={selectNode} onSelectEdge={selectEdge} onClose={() => { clearHover(); updateView(view, current => recordExplorerSelection(current, { selectedNodeId: current.selectedNodeId, selectedEdgeId: current.selectedEdgeId, detailOpen: false })); }} onJump={jump} />}

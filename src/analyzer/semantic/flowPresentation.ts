@@ -104,7 +104,7 @@ export function semanticFlowEdgePaths(graph: SemanticGraph, positions: readonly 
   return graph.edges.flatMap(edge => {
     const source = edge.provenance?.edges[0]?.source ?? edge.source;
     const target = edge.provenance?.edges.at(-1)?.target ?? edge.target;
-    const direction = analyzerEdgeDirection(source, target, selection);
+    const direction = analyzerEdgeDirection(source, target, selection) ?? analyzerEdgeDirection(edge.source, edge.target, selection);
     const selected = Boolean(direction || edge.id === selectedEdgeId || edge.provenance?.edges.some(item => item.id === selectedEdgeId));
     if (selectedOnly && !selected) return [];
     const a = byId.get(edge.source), b = byId.get(edge.target); if (!a || !b) return [];

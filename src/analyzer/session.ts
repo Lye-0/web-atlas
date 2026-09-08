@@ -6,6 +6,9 @@ import type { ExplorerSession } from './semantic/semanticExplorerState';
 export interface AnalyzerViewSession {
   selectedNodeId?: string;
   semanticFieldId?: string;
+  modelOpenChoiceIds?: string[];
+  dataFineExpandedScopeIds?: string[];
+  aggregation?: { expandedGroupIds: string[]; collapsedGroupIds: string[]; activeGroupIds?: string[]; expandedRegionIds?: string[]; unresolved?: 'expanded' | 'collapsed' };
   selectedRegionId?: string;
   selectedEdgeId?: string;
   search: string;
@@ -31,6 +34,7 @@ export interface AnalyzerSessionState {
   views: Record<AnalyzerViewId, AnalyzerViewSession>;
   scanVersion: number;
   showFlowGroupBounds?: boolean;
+  autoAggregation?: boolean;
 }
 
 export type AnalyzerViewSessionUpdate = Partial<AnalyzerViewSession> | ((current: AnalyzerViewSession) => AnalyzerViewSession);
@@ -39,6 +43,7 @@ export type AnalyzerSessionAction =
   | { type: 'replaceProject'; store: AnalyzerProjectStore; folderHandle?: DirectoryHandleLike }
   | { type: 'setActiveView'; view: AnalyzerViewId }
   | { type: 'setFlowGroupBounds'; visible: boolean }
+  | { type: 'setAutoAggregation'; enabled: boolean }
   | { type: 'updateView'; view: AnalyzerViewId; update: AnalyzerViewSessionUpdate };
 
 export const analyzerViewIds: AnalyzerViewId[] = ['architecture', 'workspace', 'command', 'dependencies', 'module-dependency', 'runtime-flow', 'function-call-flow', 'data-flow', 'data-model', 'architecture-map'];
@@ -58,6 +63,7 @@ export function createInitialAnalyzerSessionState(): AnalyzerSessionState {
     views: Object.fromEntries(analyzerViewIds.map((view) => [view, createInitialAnalyzerViewSession()])) as Record<AnalyzerViewId, AnalyzerViewSession>,
     scanVersion: 0,
     showFlowGroupBounds: true,
+    autoAggregation: true,
   };
 }
 
@@ -166,6 +172,7 @@ export function analyzerSessionReducer(state: AnalyzerSessionState, action: Anal
       views: Object.fromEntries(analyzerViewIds.map((view) => [view, createInitialAnalyzerViewSession()])) as Record<AnalyzerViewId, AnalyzerViewSession>,
       scanVersion: state.scanVersion + 1,
       showFlowGroupBounds: state.showFlowGroupBounds ?? true,
+      autoAggregation: state.autoAggregation ?? true,
     };
   }
 
@@ -174,6 +181,7 @@ export function analyzerSessionReducer(state: AnalyzerSessionState, action: Anal
   }
 
   if (action.type === 'setFlowGroupBounds') return (state.showFlowGroupBounds ?? true) === action.visible ? state : { ...state, showFlowGroupBounds: action.visible };
+  if (action.type === 'setAutoAggregation') return (state.autoAggregation ?? true) === action.enabled ? state : { ...state, autoAggregation: action.enabled };
 
   const currentView = state.views[action.view];
   const nextView = typeof action.update === 'function'

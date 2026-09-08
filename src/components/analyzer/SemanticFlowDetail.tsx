@@ -9,11 +9,13 @@ import { isUnresolvedCallNode, semanticFlowDirectionLanguage, semanticNodeConfid
 import './semantic-flow-language.css';
 import './semantic-flow-relation-interaction.css';
 import { SemanticModelStructure } from './SemanticModelStructure';
+import { SemanticExpression } from './SemanticExpression';
 
 interface Props {
   node?: SemanticNode; edge?: SemanticEdge; nodes: ReadonlyMap<string, SemanticNode>; edges: SemanticEdge[]; sources: Record<string, string>;
   view: SemanticExplorerViewId; onSelect: (id: string) => void; onSelectEdge: (id: string) => void; onClose: () => void; onJump: (id: string, targetView: SemanticViewId, fieldId?: string) => void;
   fieldId?: string; onField?: (id?: string) => void;
+  openChoiceIds?: readonly string[]; onOpenChoiceIds?: (ids: string[]) => void;
   hoverTarget?: SemanticFlowHoverTarget; onHoverTarget?: SemanticFlowHoverHandler;
 }
 type DetailInteraction = Pick<Props, 'hoverTarget' | 'onHoverTarget'> & { displays: ReadonlyMap<string, SemanticNodeDisplay> };
@@ -63,7 +65,7 @@ function NodeLink({ id, nodes, onSelect, interaction }: { id: string; nodes: Pro
   const bindings = useSemanticFlowHoverBindings<HTMLButtonElement>(interaction.onHoverTarget, { kind: 'node', id }, `detail-node:${id}`);
   return <button type="button" className="analyzer-module-connection-name" onClick={() => onSelect(id)} {...bindings}
     data-flow-detail-node-id={id} data-flow-emphasized={interaction.hoverTarget?.kind === 'node' && interaction.hoverTarget.id === id || undefined} title={display?.tooltip}>
-    <strong>{node?.label ?? id}</strong>{(display?.disambiguation || nodePath(node)) && <small>{isUnresolvedCallNode(node) ? '呼び出し箇所の一例: ' : ''}{display?.disambiguation ?? nodePath(node)}</small>}
+    <strong>{node?.data ? display?.title ?? node.label : node?.label ?? id}</strong>{display?.dataRole && <small>{display.dataRole}</small>}{(display?.disambiguation || nodePath(node)) && <small>{isUnresolvedCallNode(node) ? '呼び出し箇所の一例: ' : ''}{display?.disambiguation ?? nodePath(node)}</small>}
   </button>;
 }
 
@@ -121,7 +123,7 @@ export function SemanticFlowEvidence({ items, sources, autoOpenSingle = true }: 
     {unique.length > limit && <button type="button" className="analyzer-detail-show-more" onClick={() => setLimit(limit + 20)}>根拠をさらに表示（残り{unique.length - limit}件）</button>}</div>;
 }
 
-export function SemanticFlowDetail({ node, edge, nodes, edges, sources, view, onSelect, onSelectEdge, onClose, onJump, hoverTarget, onHoverTarget, fieldId, onField }: Props) {
+export function SemanticFlowDetail({ node, edge, nodes, edges, sources, view, onSelect, onSelectEdge, onClose, onJump, hoverTarget, onHoverTarget, fieldId, onField, openChoiceIds, onOpenChoiceIds }: Props) {
   const displays = useMemo(() => {
     const related = new Set([...(node ? [node.id] : []), ...edges.filter(item => item.source === node?.id || item.target === node?.id).flatMap(item => [item.source, item.target]),
       ...(edge ? [edge.source, edge.target, ...edge.provenance?.edges.flatMap(item => [item.source, item.target]) ?? []] : [])]);
@@ -143,18 +145,19 @@ export function SemanticFlowDetail({ node, edge, nodes, edges, sources, view, on
     <header className="analyzer-module-detail-header">
       <div className="analyzer-detail-heading-top"><span className="analyzer-node-type">{node ? isUnresolvedCallNode(node) ? '呼び出し先' : kindLabels[node.kind] : '関係'}</span>
         <button type="button" className="analyzer-detail-close" aria-label="詳細を閉じる" onClick={onClose}>閉じる</button></div>
-      <h3>{node?.label ?? semanticRelationLabel(edge!)}</h3>
+      <h3>{node ? view === 'data-flow' ? displays.get(node.id)?.title ?? node.label : node.label : semanticRelationLabel(edge!)}</h3>
+      {node?.data && <p>{displays.get(node.id)?.dataRole} · {String(node.attributes.ownerName ?? node.group)}</p>}
       {nodePath(node) && <p className="analyzer-module-detail-path">{isUnresolvedCallNode(node) ? '呼び出し箇所の一例: ' : ''}{nodePath(node)}</p>}
       {node && displays.get(node.id)?.disambiguation && <p className="semantic-flow-detail-identity">{displays.get(node.id)!.disambiguation}</p>}
       <div className="analyzer-module-detail-meta"><span className="semantic-confidence">{node ? semanticNodeConfidence(node) : semanticRelationConfidence(edge!)}</span></div>
     </header>
     {view === 'data-flow' && node?.confidence === 'observed' && <div className="semantic-flow-resolution-note" role="note"><p>{node.attributes.valueRecorded === false ? '観測された入力・出力の名前です。実値は記録されていません。' : '読み込んだ観測イベントです。静的に可能な経路と区別して表示しています。'}</p>{typeof node.attributes.sourceBinding === 'string' && <p>{node.attributes.sourceBinding}</p>}</div>}
-    {node?.model && view === 'data-model' && <SemanticModelStructure node={node} fieldId={fieldId} onField={id => onField?.(id)} onSelect={onSelect} onJump={onJump} evidence={items => <SemanticFlowEvidence items={items} sources={sources} />} />}
+    {node?.model && view === 'data-model' && <SemanticModelStructure node={node} fieldId={fieldId} onField={id => onField?.(id)} openChoiceIds={openChoiceIds} onOpenChoiceIds={onOpenChoiceIds} onSelect={onSelect} onJump={onJump} evidence={items => <SemanticFlowEvidence items={items} sources={sources} />} />}
     {node?.data && view === 'data-flow' && <Section title="値・操作の内容" initiallyOpen><Info entries={[
       ['種類', ({ declaration: '変数の宣言・初期値', assignment: '再代入', use: '値の利用箇所', 'property-read': '項目の読み取り', 'property-write': '項目への設定', argument: '実引数', parameter: '仮引数', return: '戻り値・return箇所', termination: '値を指定せずに終了', 'call-result': 'この呼び出しの結果', operation: '操作・加工', literal: 'リテラル・関数の値', unknown: '由来未解決の値' })[node.data.role]],
       ['所属', node.attributes.ownerName], ['項目の経路', node.data.propertyPath?.join('.')], ['引数位置', node.data.argumentIndex !== undefined ? `第${node.data.argumentIndex + 1}引数` : undefined],
       ['経路', node.data.conditional ? '条件付きの可能な経路（実行を観測していません）' : undefined], ['追跡状態', node.data.resolution === 'unresolved' ? '未解決' : node.data.resolution === 'partial' ? '部分的に展開' : undefined],
-    ]} /><pre className="semantic-data-expression">{node.data.expression}</pre>{node.data.reasons?.map((reason, index) => <p key={index}>{reason}</p>)}
+    ]} /><SemanticExpression text={node.data.expression} />{node.data.reasons?.map((reason, index) => <p key={index}>{reason}</p>)}
       {node.attributes.contextualSummary && Array.isArray(node.attributes.sourceMembers) && <details><summary>集約した定義の対象 {node.attributes.sourceMembers.length}件</summary><ExpandableList items={node.attributes.sourceMembers} render={id => <li key={id}><NodeLink id={id} nodes={nodes} onSelect={onSelect} interaction={interaction} /></li>} /></details>}
     </Section>}
     {explanation && <div className="semantic-flow-resolution-note" role="note" aria-label="確認できている範囲"><p>{explanation}</p>

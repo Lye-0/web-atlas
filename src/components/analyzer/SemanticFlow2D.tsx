@@ -22,6 +22,14 @@ export interface SemanticFlowRenderProps {
   hoverTarget?: SemanticFlowHoverTarget;
   onHoverTarget?: SemanticFlowHoverHandler;
   showGroupBounds?: boolean;
+  autoAggregation?: boolean;
+  aggregationState?: AnalyzerViewSession['aggregation'];
+  onAggregationState?: (state: NonNullable<AnalyzerViewSession['aggregation']>) => void;
+  explicitPathNodeIds?: ReadonlySet<string>;
+  explicitPathEdgeIds?: ReadonlySet<string>;
+  totalNodeCount?: number;
+  fineExpandedScopeIds?: readonly string[];
+  onFineExpandedScopeIds?: (ids: string[]) => void;
   onSelect: (id: string) => void; onSelectEdge: (id: string) => void; onClear: () => void;
 }
 
@@ -33,13 +41,14 @@ interface Explorer2DProps extends SemanticFlowRenderProps {
 export function SemanticFlow2D(props: Explorer2DProps) {
   const visibleIds = useMemo(() => new Set(props.graph.nodes.map(node => node.id)), [props.graph.nodes]);
   if (props.explorer && props.location && !props.location.centerId) return <SemanticExplorerBlocks explorer={props.explorer} location={props.location} visibleIds={visibleIds}
+    fineExpandedScopeIds={props.fineExpandedScopeIds} onFineExpandedScopeIds={props.onFineExpandedScopeIds}
     matchIds={props.matchIds} selectedIds={props.selectedIds} visitId={props.visitId ?? ''} scrollTop={props.scrollTop ?? 0} overlayTop={props.overlayTop ?? 150}
     focusIds={props.command?.kind === 'focus' ? props.command.ids : undefined} focusNonce={props.command?.nonce}
     onScroll={props.onScroll ?? (() => {})} onOpenScope={props.onOpenScope ?? (() => {})} onOpenNode={props.onOpenNode ?? (() => {})} />;
   return <SemanticLocalFlow2D key={props.visitId ?? props.location?.centerId} {...props} />;
 }
 
-function SemanticLocalFlow2D({ graph, selectedIds, selectedEdgeId, matchIds, command, motion, overlayTop, location, direction = 'both', camera: savedCamera, onCamera, onSelect, onSelectEdge, onClear, hoverTarget, onHoverTarget }: Explorer2DProps) {
+function SemanticLocalFlow2D({ graph, selectedIds, selectedEdgeId, matchIds, command, motion, overlayTop, location, direction = 'both', camera: savedCamera, onCamera, onSelect, onSelectEdge, onClear, hoverTarget, onHoverTarget, explicitPathNodeIds, explicitPathEdgeIds }: Explorer2DProps) {
   const root = useRef<SVGSVGElement>(null);
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [camera, setCamera] = useState<FlowCamera2D>(savedCamera ?? { x: 100, y: 100, scale: 1 });
@@ -181,14 +190,14 @@ function SemanticLocalFlow2D({ graph, selectedIds, selectedEdgeId, matchIds, com
       <g data-flow-layer="nodes">{visibleNodes.map(point => {
         const members = semanticMemberIds(point.node), selected = members.some(id => selectedIds.has(id));
         const display = displays.get(point.node.id)!;
-        const role = roles.get(point.node.id), roleLabel = role ? semanticFlowRoleLabel(role, graph.view, kinds.get(point.node.id)) : undefined;
+        const role = roles.get(point.node.id), roleLabel = display.dataRole ?? (role ? semanticFlowRoleLabel(role, graph.view, kinds.get(point.node.id)) : undefined);
         const matching = members.filter(id => matchIds.has(id)).length;
         const detail = camera.scale > .4 || selected || (matching > 0 && visibleNodes.length < 100);
         return <g key={point.node.id} transform={`translate(${point.x} ${point.y})`} role="button" tabIndex={0}
           aria-label={`${display.title}, ${roleLabel ? `${roleLabel}, ` : ''}${point.node.kind === 'external' ? '呼び出し箇所の一例: ' : ''}${display.location}${point.node.attributes.overview ? `、${members.length}件を展開` : ''}`} aria-pressed={selected}
           className={`semantic-flow-node${selected ? ' is-selected' : ''}${matching ? ' is-match' : ''}${selectedNodes.has(point.node.id) ? ' is-connected' : ''}`}
           data-node-id={point.node.id} data-member-count={members.length} onClick={event => { event.stopPropagation(); if (!drag.current?.moved) onSelect(point.node.id); drag.current = undefined; }}
-          data-flow-role={role} data-flow-emphasized={emphasis.nodeIds.has(point.node.id) || undefined} opacity={emphasis.edgeIds.size && !emphasis.nodeIds.has(point.node.id) ? .35 : undefined}
+          data-flow-role={role} data-flow-emphasized={emphasis.nodeIds.has(point.node.id) || undefined} opacity={emphasis.edgeIds.size && !emphasis.nodeIds.has(point.node.id) ? explicitPathNodeIds?.has(point.node.id) ? .75 : .35 : undefined}
           {...semanticFlowHoverBindings<SVGGElement>(onHoverTarget, { kind: 'node', id: point.node.id }, `2d-node:${point.node.id}`)}
           onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); onSelect(point.node.id); } }}>
           <title>{display.tooltip}{roleLabel ? `\n${roleLabel}` : ''}</title>
@@ -200,8 +209,8 @@ function SemanticLocalFlow2D({ graph, selectedIds, selectedEdgeId, matchIds, com
             : <circle r={8} className="semantic-flow-node-dot" />}
         </g>;
       })}</g>
-      <g data-flow-layer="edges" pointerEvents="none">{shownPaths.map(path => <g key={path.edge.id} data-edge-id={path.edge.id} data-source={path.edge.source} data-target={path.edge.target} data-direction={path.direction ?? ''} data-flow-emphasized={emphasis.edgeIds.has(path.edge.id) || undefined} opacity={emphasis.edgeIds.size && !emphasis.edgeIds.has(path.edge.id) ? .18 : undefined}>
-        <path d={path.svgPath} fill="none" stroke={path.color} strokeWidth={path.selected ? 2.6 : 1.2} opacity={path.selected ? 1 : .4} markerEnd={`url(#flow-arrow-${path.color.slice(1)})`} />
+      <g data-flow-layer="edges" pointerEvents="none">{shownPaths.map(path => <g key={path.edge.id} data-edge-id={path.edge.id} data-source={path.edge.source} data-target={path.edge.target} data-direction={path.direction ?? ''} data-flow-emphasized={emphasis.edgeIds.has(path.edge.id) || undefined} opacity={emphasis.edgeIds.size && !emphasis.edgeIds.has(path.edge.id) ? explicitPathEdgeIds?.has(path.edge.id) ? .7 : .18 : undefined}>
+        <path d={path.svgPath} fill="none" stroke={path.color} strokeWidth={path.selected ? 2.6 : graph.view === 'data-flow' && (location?.depth ?? 1) > 1 ? 1.9 : 1.2} opacity={path.selected ? 1 : graph.view === 'data-flow' && (location?.depth ?? 1) > 1 ? .85 : .4} markerEnd={`url(#flow-arrow-${path.color.slice(1)})`} />
       </g>)}</g>
       {/* Round zero-length dashes keep exact arc spacing without a DOM node per dot. */}
       <g data-flow-layer="particles" pointerEvents="none">{motion.enabled && motion.visible && active.map(path => <path key={path.edge.id} data-flow-particle data-particle-edge-id={path.edge.id} data-phase={spatialFlowPhase(path.edge.id)}

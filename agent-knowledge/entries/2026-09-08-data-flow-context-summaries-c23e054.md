@@ -3,10 +3,10 @@ id: rm-20260908-data-flow-context-summaries
 topic: analyzer-flow
 type: pattern
 status: active
-maturity: candidate
+maturity: reused
 created: 2026-09-08
 last_verified: 2026-09-08
-source_commit: "536f801a62695feb6d90529babf5401895f3508e"
+source_commit: "f97bafe59bb72d7af596504bbc0de319a84cb625"
 related_files:
   - src/analyzer/semantic/dataFlow.ts
   - src/analyzer/semantic/types.ts
@@ -57,3 +57,9 @@ Do not apply:
 2. `pnpm exec vitest run src/analyzer/semantic/tabs89IndependentAccuracy.test.ts src/analyzer/semantic/dataRefinement.test.ts`を実行する。
 3. 集約後も原定義、各return、原関係とEvidenceが残り、集約IDと原IDを混同していないことを確認する。
 4. 大きい入力では解析時間・出力サイズとブラウザ操作を別々に測る。canonicalな対象の黙った削除で性能PASSにしない。
+
+## Reuse Evidence
+
+共通3Dの表示上の集約を追加する後続作業で、既存のcall-site文脈・原定義・解析上の処理集約を変更しない境界として利用した。最終固定実入力のcanonical nodes・edges・provenance・Evidence保全と既存の文脈分離テストを再確認した。新しい表示ownerの接続は正規探索へ渡していない。この表示投影固有の境界はrm-20260908-display-owner-traversal-boundaryに分けて記録した。
+
+記録時のHEADに対する未コミット実装を検証した。現在のコードと入力を再確認してから再利用する。

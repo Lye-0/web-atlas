@@ -1,16 +1,19 @@
-.semantic-data-structure { padding:16px; border-bottom:1px solid var(--line); min-width:0; font-size:.8rem; }
+.semantic-data-structure { padding:16px; border-bottom:1px solid var(--line); min-width:0; font-size:.8rem; container-type:inline-size; container-name:model-detail; }
 .semantic-data-structure h4 { margin:14px 0 8px; font-size:.86rem; }
 .semantic-data-kind { display:flex; flex-wrap:wrap; gap:6px 10px; margin:0; }
 .semantic-data-kind span { color:var(--text-muted); }
 .semantic-data-kind [data-expansion="unexpanded"], .semantic-data-kind [data-expansion="partial"] { color:var(--warm); }
 .semantic-data-reasons { padding-left:18px; line-height:1.65; }
 .semantic-data-expression { padding:10px; background:var(--surface-soft); overflow:auto; white-space:pre; font-size:.78rem; line-height:1.6; max-height:340px; }
-.semantic-data-table-scroll { max-width:100%; overflow:auto; }
+.semantic-data-table-scroll { max-width:100%; min-width:0; }
 .semantic-data-fields { width:100%; border-collapse:collapse; font-size:.78rem; }
 .semantic-data-fields th, .semantic-data-fields td { text-align:left; vertical-align:top; border-bottom:1px solid var(--line); padding:8px 6px; line-height:1.55; }
-.semantic-data-fields th:first-child { min-width:95px; }
-.semantic-data-fields td:nth-child(2) { min-width:130px; max-width:260px; overflow-wrap:anywhere; }
-.semantic-data-fields td:nth-child(3) { min-width:100px; }
+.semantic-data-fields th:first-child { width:26%; }
+.semantic-data-fields td:nth-child(2) { width:42%; }
+.semantic-data-fields td:nth-child(3) { width:32%; }
+.semantic-data-fields { table-layout:fixed; }
+.semantic-data-type { display:block; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:pre-wrap; overflow-wrap:normal; word-break:normal; }
+.semantic-data-type-full > summary { font-size:.72rem; }
 .semantic-data-fields button { text-align:left; overflow-wrap:anywhere; color:var(--accent); min-height:32px; }
 .semantic-data-fields tr[data-selected] { background:var(--surface-soft); }
 .semantic-data-field-detail { border:1px solid var(--line); padding:10px; margin-top:12px; min-width:0; overflow-wrap:anywhere; }
@@ -20,3 +23,24 @@
 .semantic-data-structure details { margin:10px 0; }
 .semantic-data-structure summary { cursor:pointer; line-height:1.6; }
 .semantic-data-constraints code, .semantic-data-choices > li > code { display:block; white-space:pre-wrap; overflow-wrap:anywhere; }
+.semantic-data-choice > summary { padding:7px 0; }
+.semantic-data-choice > summary > span { font-weight:550; }
+.semantic-data-choice > summary small { display:block; color:var(--text-muted); margin-left:16px; }
+.semantic-data-choices > li { padding:0; }
+.semantic-data-choice-body { padding:0 0 10px; min-width:0; }
+.semantic-expression-block { min-width:0; max-width:100%; }
+.semantic-expression-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; color:var(--text-muted); font-size:.75rem; }
+.semantic-expression-heading button { min-height:32px; padding:4px 8px; }
+.semantic-expression-block .semantic-data-expression { margin-top:4px; }
+@container model-detail (max-width: 520px) {
+  .semantic-data-fields, .semantic-data-fields tbody, .semantic-data-fields tr, .semantic-data-fields th, .semantic-data-fields td { display:block; width:auto; }
+  .semantic-data-fields thead { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+  .semantic-data-fields tr { padding:10px 0; border-bottom:1px solid var(--line); }
+  .semantic-data-fields :is(th,td) { border:0; padding:3px 0; min-width:0; }
+  .semantic-data-fields th:first-child, .semantic-data-fields td:nth-child(2), .semantic-data-fields td:nth-child(3) { width:100%; }
+  .semantic-data-fields td::before { content:attr(data-field-label) '：'; color:var(--text-muted); }
+  .semantic-data-fields td:nth-child(2) { display:flex; flex-wrap:wrap; gap:0 4px; }
+  .semantic-data-fields td:nth-child(2) > code { flex:1 1 130px; }
+  .semantic-data-fields td:nth-child(2) > details { flex-basis:100%; }
+  .semantic-data-fields th button { min-height:34px; padding:0; }
+}

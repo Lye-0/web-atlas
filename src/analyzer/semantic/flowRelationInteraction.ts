@@ -22,8 +22,8 @@ export function semanticFlowNodeRoles(graph: SemanticGraph, selectedIds: Readonl
   for (const edge of graph.edges) {
     const source = edge.provenance?.edges[0]?.source ?? edge.source;
     const target = edge.provenance?.edges.at(-1)?.target ?? edge.target;
-    if (selectedIds.has(source)) merge(edge.target, 'outgoing');
-    if (selectedIds.has(target)) merge(edge.source, 'incoming');
+    if (selectedIds.has(source) || selectedIds.has(edge.source)) merge(edge.target, 'outgoing');
+    if (selectedIds.has(target) || selectedIds.has(edge.target)) merge(edge.source, 'incoming');
   }
   for (const node of graph.nodes) if (selectedIds.has(node.id)) roles.set(node.id, 'selected');
   return roles;
@@ -33,7 +33,7 @@ export function semanticFlowNodeRelationKinds(graph: SemanticGraph, selectedIds:
   const kinds = new Map<string, Set<string>>();
   for (const edge of graph.edges) {
     const source = edge.provenance?.edges[0]?.source ?? edge.source, target = edge.provenance?.edges.at(-1)?.target ?? edge.target;
-    if (selectedEdgeId ? edge.id !== selectedEdgeId && !edge.provenance?.edges.some(item => item.id === selectedEdgeId) : !selectedIds.has(source) && !selectedIds.has(target)) continue;
+    if (selectedEdgeId ? edge.id !== selectedEdgeId && !edge.provenance?.edges.some(item => item.id === selectedEdgeId) : !selectedIds.has(source) && !selectedIds.has(target) && !selectedIds.has(edge.source) && !selectedIds.has(edge.target)) continue;
     for (const id of [edge.source, edge.target]) {
       const values = kinds.get(id) ?? new Set<string>(); values.add(edge.kind); kinds.set(id, values);
     }
@@ -67,7 +67,7 @@ export function resolveSemanticFlowHover(graph: SemanticGraph, selectedIds: Read
     const matches = hoverTarget.kind === 'edge'
       ? edge.id === hoverTarget.id || Boolean(edge.provenance?.edges.some(original => original.id === hoverTarget.id))
       : selectedEdgeId ? selectedEdge && (edge.source === hoverTarget.id || edge.target === hoverTarget.id)
-        : edge.source === hoverTarget.id && selectedIds.has(target) || edge.target === hoverTarget.id && selectedIds.has(source);
+        : edge.source === hoverTarget.id && (selectedIds.has(target) || selectedIds.has(edge.target)) || edge.target === hoverTarget.id && (selectedIds.has(source) || selectedIds.has(edge.source));
     if (matches) { edgeIds.add(edge.id); nodeIds.add(edge.source); nodeIds.add(edge.target); }
   }
   return { edgeIds, nodeIds };

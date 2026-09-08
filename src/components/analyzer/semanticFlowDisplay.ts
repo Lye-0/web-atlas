@@ -5,6 +5,57 @@ export interface SemanticNodeDisplay {
   location: string;
   tooltip: string;
   disambiguation?: string;
+  dataRole?: string;
+}
+
+/** Source syntax only; the complete expression remains on the canonical node. */
+export function compactDataExpression(expression: string): string {
+  const closing: Record<string, string> = { '(': ')', '[': ']', '{': '}' };
+  const stack: string[] = [];
+  let result = '', quote = '', escaped = false, comment: 'line' | 'block' | undefined;
+  const source = expression.trim();
+  for (let index = 0; index < source.length; index++) {
+    const char = source[index]!, next = source[index + 1];
+    if (comment) {
+      if (comment === 'line' && char === '\n') { comment = undefined; if (!stack.length) result += ' '; }
+      else if (comment === 'block' && char === '*' && next === '/') { comment = undefined; index++; if (!stack.length) result += ' '; }
+      continue;
+    }
+    if (quote) {
+      if (!stack.length) result += char;
+      if (escaped) escaped = false;
+      else if (char === '\\') escaped = true;
+      else if (char === quote) quote = '';
+      continue;
+    }
+    if (char === '/' && (next === '/' || next === '*')) { comment = next === '/' ? 'line' : 'block'; index++; continue; }
+    if (char === '"' || char === "'" || char === '`') { quote = char; if (!stack.length) result += char; continue; }
+    if (closing[char]) { if (!stack.length) result += `${char}…${closing[char]}`; stack.push(closing[char]!); }
+    else if (stack.length) { if (char === stack.at(-1)) stack.pop(); }
+    else result += char;
+  }
+  const text = result.replace(/\s+/g, ' ').trim();
+  return text.length > 76 ? `${text.slice(0, 73)}…` : text;
+}
+
+export function semanticDataRole(node: SemanticNode): string | undefined {
+  const data = node.data; if (!data) return undefined;
+  const owner = typeof node.attributes.ownerName === 'string' ? node.attributes.ownerName : undefined;
+  const argument = data.argumentIndex === undefined ? '' : `・第${data.argumentIndex + 1}引数`;
+  if (data.role === 'parameter') return `${owner ? `${owner}の` : ''}仮引数${argument}`;
+  if (data.role === 'argument') return `実引数${argument}`;
+  if (data.role === 'use') return `${node.line ? `${node.line}行目の` : ''}使用箇所`;
+  return ({ declaration: '宣言した値', assignment: '代入した値', 'property-read': '項目の取得', 'property-write': '項目への設定',
+    return: node.id.startsWith('context-return:') ? '関数の戻り口' : '値を返す', termination: '値を指定せず終了',
+    'call-result': '処理結果', operation: '操作', literal: '式中の定数・値', unknown: '未解決の値' } as const)[data.role];
+}
+
+/** Named declarations/results stay at the entrance; source occurrences remain searchable. */
+export function isFineDataExpression(node: SemanticNode): boolean {
+  const role = node.data?.role;
+  return role === 'literal' || role === 'use' || role === 'argument' || role === 'property-read' || role === 'unknown'
+    || role === 'operation' && typeof node.attributes.callee !== 'string' && !/^await\b/.test(node.data?.expression.trim() ?? '')
+      && node.attributes.contextualSummary !== true;
 }
 
 /** Elide nested arguments/bodies without assigning a meaning or a definition to the callee. */
@@ -43,11 +94,17 @@ function compactCallee(callee: string) {
 export function semanticNodeDisplay(node: SemanticNode): SemanticNodeDisplay {
   const initializer = node.kind === 'function' && node.attributes.initializer === true;
   const callee = (node.kind === 'external' || node.kind === 'operation') && typeof node.attributes.callee === 'string' ? node.attributes.callee : undefined;
-  const title = initializer ? 'ファイル直下の処理' : callee ? compactCallee(callee) : node.label;
+  const data = node.data;
+  const dataTitle = data && (data.role === 'operation' || data.role === 'call-result' || data.role === 'return' || data.role === 'property-read' || data.role === 'property-write')
+    ? data.role === 'call-result' ? `${compactDataExpression(data.expression)} の結果`
+      : node.id.startsWith('context-return:') || node.attributes.contextualSummary === true ? node.label
+        : compactDataExpression(data.expression) : undefined;
+  const title = initializer ? 'ファイル直下の処理' : callee ? compactCallee(callee) : dataTitle ?? node.label;
   const path = node.path ?? node.evidence[0]?.path ?? node.group;
   const line = node.line ?? node.evidence[0]?.line;
   const location = `${path}${line ? `:${line}` : ''}`;
-  return { title, location, tooltip: `${title}\n${node.kind === 'external' ? '呼び出し箇所の一例: ' : ''}${location}\n元の表示名: ${node.label}${callee && callee !== node.label ? `\n呼び出し式: ${callee}` : ''}` };
+  const dataRole = semanticDataRole(node);
+  return { title, location, dataRole, tooltip: `${title}${dataRole ? `\n${dataRole}` : ''}\n${node.kind === 'external' ? '呼び出し箇所の一例: ' : ''}${location}\n元の表示名: ${node.label}${callee && callee !== node.label ? `\n呼び出し式: ${callee}` : ''}${data ? `\n完全な式: ${data.expression}\n所属: ${String(node.attributes.ownerName ?? node.group)}` : ''}` };
 }
 
 /** Distinct objects can share a shortened title and even a source line; expose their recorded ranges. */

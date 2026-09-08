@@ -6,7 +6,11 @@ import type { AnalyzerViewSession } from '../../analyzer/session';
 import { semanticFlowEdgePaths } from '../../analyzer/semantic/flowPresentation';
 import { resolveSemanticFlowHover, semanticFlowNodeRoles, semanticFlowNodeRelationKinds, type SemanticFlowHoverHandler, type SemanticFlowHoverTarget } from '../../analyzer/semantic/flowRelationInteraction';
 import type { SemanticPosition } from '../../analyzer/semantic/presentation';
-import { buildUnresolvedFlowPresentation, visibleUnresolvedFlowPositions } from '../../analyzer/semantic/flowUnresolvedPresentation';
+import { buildUnresolvedFlowPresentation } from '../../analyzer/semantic/flowUnresolvedPresentation';
+import { projectAutoAggregation, stableAggregationRepresentation, type AutoAggregationResult, type AggregationProjection, type AggregationGroup } from '../../analyzer/autoAggregation';
+import { projectAggregatedSemanticFlow, semanticAggregationInput } from '../../analyzer/semantic/flowAutoAggregation';
+import { confidenceLabels, type SemanticGraph } from '../../analyzer/semantic/types';
+import { AutoAggregationPanel, type AggregationInspection, type AggregationGroupMode } from './AutoAggregationPanel';
 import { semanticFlowRegions, semanticRegionIdentity } from '../../analyzer/semantic/flowRegions';
 import { explorerRegionIdentity, type SemanticExplorerModel } from '../../analyzer/semantic/semanticExplorer';
 import { SPATIAL_FLOW_PARTICLE_SPACING, SPATIAL_FLOW_SPEED, type SpatialFlowState } from '../../analyzer/spatialFlow';
@@ -24,19 +28,24 @@ import './semantic-flow-3d-polish.css';
 type CameraState = NonNullable<AnalyzerViewSession['semanticCamera']>;
 interface Props extends SemanticFlowRenderProps { explorer?: SemanticExplorerModel; direction?: 'both' | 'incoming' | 'outgoing'; camera?: CameraState; onCamera: (camera: CameraState) => void; onUnavailable: () => void; onFocusRegion?: (ids: string[]) => void }
 
-function Scene({ graph, explorer, positions, labelObstacles, direction = 'both', selectedIds, selectedEdgeId, matchIds, command, motion, overlayTop, camera: savedCamera, onCamera, onSelect, onSelectEdge, onClear, onUnavailable, onLabels, onConnections, hoveredIds, onHover, hoverAt, hoverTarget, showGroupBounds = true }: Props & {
+function Scene({ graph: sourceGraph, renderGraph, explorer, positions, allPositions, onProjection, labelObstacles, direction = 'both', selectedIds, selectedEdgeId, matchIds, command, motion, overlayTop, camera: savedCamera, onCamera, onSelect, onSelectEdge, onClear, onUnavailable, onLabels, onConnections, hoveredIds, onHover, hoverAt, hoverTarget, showGroupBounds = true, explicitPathEdgeIds }: Props & {
   positions: SemanticPosition[]; labelObstacles: readonly FlowLabelObstacle[]; onConnections: (notices: FlowConnectionNotice[]) => void;
   onLabels: (labels: FlowLabelPlacement[]) => void; hoveredIds: ReadonlySet<string>; onHover: (id?: string, edgeId?: string) => void; hoverAt: (x: number, y: number) => string | undefined;
+  renderGraph: SemanticGraph; allPositions: SemanticPosition[]; onProjection: (projection: AggregationProjection) => void;
 }) {
+  const graph = renderGraph;
   const { camera, gl, size, invalidate } = useThree();
   const controls = useRef<OrbitControls | null>(null);
   const callbacks = useRef({ onCamera, onSelect, onSelectEdge, onClear, onUnavailable, onLabels, onConnections, onHover, hoverAt });
   useEffect(() => { callbacks.current = { onCamera, onSelect, onSelectEdge, onClear, onUnavailable, onLabels, onConnections, onHover, hoverAt }; }, [onCamera, onSelect, onSelectEdge, onClear, onUnavailable, onLabels, onConnections, onHover, hoverAt]);
   useEffect(() => () => callbacks.current.onLabels([]), []);
-  const regions = useMemo(() => semanticFlowRegions(positions.filter(point => point.node.attributes.displayAggregate !== true), '3d', explorer), [positions, explorer]);
+  const regions = useMemo(() => semanticFlowRegions(allPositions, '3d', explorer), [allPositions, explorer]);
   const priorityIds = useMemo(() => new Set(graph.edges.filter(edge => edge.id === selectedEdgeId).flatMap(edge => [edge.source, edge.target])), [graph.edges, selectedEdgeId]);
-  const paths = useMemo(() => semanticFlowEdgePaths(graph, positions, selectedIds, selectedEdgeId, '3d', true)
-    .filter(path => direction === 'both' || !path.direction || path.direction === 'internal' || path.direction === direction), [graph, positions, selectedIds, selectedEdgeId, direction]);
+  const pathGraph = useMemo(() => ({ ...graph, edges: graph.edges.filter(edge => edge.id === selectedEdgeId || selectedIds.has(edge.source) || selectedIds.has(edge.target)
+    || explicitPathEdgeIds?.has(edge.id) || edge.provenance?.edges.some(original => original.id === selectedEdgeId || explicitPathEdgeIds?.has(original.id) || selectedIds.has(original.source) || selectedIds.has(original.target))) }), [graph, selectedIds, selectedEdgeId, explicitPathEdgeIds]);
+  const paths = useMemo(() => semanticFlowEdgePaths(pathGraph, positions, selectedIds, selectedEdgeId, '3d')
+    .filter(path => direction === 'both' || !path.direction || path.direction === 'internal' || path.direction === direction)
+    .map(path => !path.selected && explicitPathEdgeIds?.has(path.edge.id) ? { ...path, color: '#83a997' } : path), [pathGraph, positions, selectedIds, selectedEdgeId, direction, explicitPathEdgeIds]);
   const shownGraph = useMemo(() => ({ ...graph, edges: paths.map(path => path.edge) }), [graph, paths]);
   const emphasis = useMemo(() => resolveSemanticFlowHover(shownGraph, selectedIds, selectedEdgeId, hoverTarget), [shownGraph, selectedIds, selectedEdgeId, hoverTarget]);
   const roles = useMemo(() => semanticFlowNodeRoles(shownGraph, selectedIds, selectedEdgeId), [shownGraph, selectedIds, selectedEdgeId]);
@@ -86,7 +95,7 @@ function Scene({ graph, explorer, positions, labelObstacles, direction = 'both',
   const edgeAsset = useMemo(() => {
     const vertices: number[] = [], colors: number[] = [], arrowVertices: number[] = [], previous: number[] = [], corners: number[] = [], arrowColors: number[] = [];
     for (const path of paths) {
-      const color = new THREE.Color(path.color).multiplyScalar(emphasis.edgeIds.size && !emphasis.edgeIds.has(path.edge.id) ? .18 : 1).toArray();
+      const color = new THREE.Color(path.color).multiplyScalar(emphasis.edgeIds.size && !emphasis.edgeIds.has(path.edge.id) ? explicitPathEdgeIds?.has(path.edge.id) ? .7 : .18 : 1).toArray();
       for (let index = 1; index < path.points.length; index++) {
         const a = path.points[index - 1]!, b = path.points[index]!;
         vertices.push(a.x, a.y, a.z, b.x, b.y, b.z); colors.push(...color, ...color);
@@ -103,7 +112,7 @@ function Scene({ graph, explorer, positions, labelObstacles, direction = 'both',
       fragmentShader: 'varying vec3 tint; void main(){gl_FragColor=vec4(tint,1.);\n#include <colorspace_fragment>\n}' });
     const arrows = new THREE.Mesh(arrowGeometry, arrowMaterial); arrows.frustumCulled = false; arrows.renderOrder = 2;
     return { object, geometry, material, arrows, arrowGeometry, arrowMaterial };
-  }, [paths, emphasis]);
+  }, [paths, emphasis, explicitPathEdgeIds]);
   useEffect(() => () => { edgeAsset.geometry.dispose(); edgeAsset.material.dispose(); edgeAsset.arrowGeometry.dispose(); edgeAsset.arrowMaterial.dispose(); }, [edgeAsset]);
   const boundaryAsset = useMemo(() => {
     const vertices = regions.flatMap(region => semanticFlowRegionWire(region).flatMap(point => [point.x, point.y, point.z]));
@@ -113,10 +122,16 @@ function Scene({ graph, explorer, positions, labelObstacles, direction = 'both',
     return { object, geometry, material };
   }, [regions]);
   useEffect(() => () => { boundaryAsset.geometry.dispose(); boundaryAsset.material.dispose(); }, [boundaryAsset]);
+  const publishProjection = useCallback(() => {
+    camera.updateMatrixWorld();
+    onProjection({ matrix: new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse).toArray(), width: size.width, height: size.height, zoom: (camera as THREE.OrthographicCamera).zoom });
+  }, [camera, onProjection, size.width, size.height]);
+  useLayoutEffect(() => { if (initialized.current) publishProjection(); }, [publishProjection, overlayTop]);
   const save = useCallback(() => {
     const control = controls.current; if (!control) return;
     callbacks.current.onCamera({ position: camera.position.toArray(), target: control.target.toArray(), zoom: (camera as THREE.OrthographicCamera).zoom });
-  }, [camera]);
+    publishProjection();
+  }, [camera, publishProjection]);
   useEffect(() => {
     const control = new OrbitControls(camera, gl.domElement); controls.current = control;
     control.enableDamping = false; control.screenSpacePanning = true; control.minZoom = .000001; control.maxZoom = 8;
@@ -136,7 +151,7 @@ function Scene({ graph, explorer, positions, labelObstacles, direction = 'both',
   const fit = useCallback((ids?: string[], reset = false) => {
     const control = controls.current; if (!control) return;
     const requestedIds = new Set(ids);
-    const targets = requestedIds.size ? positions.filter(point => requestedIds.has(point.node.id)) : positions;
+    const targets = requestedIds.size ? [...allPositions, ...positions.filter(point => point.node.attributes.displayAggregate === true)].filter(point => requestedIds.has(point.node.id)) : allPositions;
     if (!targets.length) return;
     const targetIds = new Set(targets.map(point => point.node.id));
     const fitPoints = [...targets, ...(!ids || ids.length > 1 ? paths.filter(path => !ids || targetIds.has(path.edge.source) && targetIds.has(path.edge.target)).flatMap(path => path.points) : [])];
@@ -149,15 +164,15 @@ function Scene({ graph, explorer, positions, labelObstacles, direction = 'both',
     const cam = camera as THREE.OrthographicCamera;
     cam.zoom = Math.min((size.width - 70) / (viewBox.x + 80), plotHeight / (viewBox.y + 80), ids?.length === 1 ? 3 : 2);
     cam.updateProjectionMatrix(); control.update(); labelDirty.current = true; save(); invalidate();
-  }, [positions, paths, camera, size, plotHeight, save, invalidate]);
+  }, [positions, allPositions, paths, camera, size, plotHeight, save, invalidate]);
   useEffect(() => {
     if (initialized.current || !positions.length || !controls.current) return;
     initialized.current = true;
     if (initialCamera.current) {
       const saved = initialCamera.current, cam = camera as THREE.OrthographicCamera;
-      camera.position.fromArray(saved.position); controls.current.target.fromArray(saved.target); cam.zoom = saved.zoom; cam.updateProjectionMatrix(); controls.current.update(); invalidate();
+      camera.position.fromArray(saved.position); controls.current.target.fromArray(saved.target); cam.zoom = saved.zoom; cam.updateProjectionMatrix(); controls.current.update(); publishProjection(); invalidate();
     } else fit(undefined, true);
-  }, [positions, camera, fit, invalidate]);
+  }, [positions, camera, fit, invalidate, publishProjection]);
   useEffect(() => {
     if (!command || command.nonce === lastCommand.current) return;
     lastCommand.current = command.nonce;
@@ -196,7 +211,7 @@ function Scene({ graph, explorer, positions, labelObstacles, direction = 'both',
     (edgeAsset.arrowMaterial.uniforms.viewport!.value as THREE.Vector2).set(size.width, size.height);
     cameraRef.current = { scale: zoom, viewportWidth: size.width, viewportHeight: size.height };
     if (labelDirty.current) {
-      const labels = projectSemanticFlowLabels(camera, size, zoom, labelOrder, selectedIds, matchIds, { regions, relatedIds: connected, priorityIds, hoveredIds, overlayTop, previous: previousLabels.current, obstacles: labelObstacles, roles, relationKinds, displays, view: graph.view, emphasisIds: emphasis.nodeIds });
+      const labels = projectSemanticFlowLabels(camera, size, zoom, labelOrder, selectedIds, matchIds, { regions, relatedIds: connected, priorityIds, hoveredIds, overlayTop, previous: previousLabels.current, obstacles: labelObstacles, roles, relationKinds, displays, view: sourceGraph.view, emphasisIds: emphasis.nodeIds });
       previousLabels.current = labels;
       callbacks.current.onLabels(labels);
       callbacks.current.onConnections(semanticFlowConnectionNotices(camera, size, positions, new Set([...connected, ...priorityIds].filter(id => !selectedIds.has(id))), labels, overlayTop, labelObstacles));
@@ -220,15 +235,24 @@ export function SemanticFlow3D(props: Props) {
   const [labels, setLabels] = useState<FlowLabelContent[]>([]);
   const [labelLayer] = useState(() => new FlowLabelLayer(setLabels));
   const [hoveredId, setHoveredId] = useState<string>(), [focusedId, setFocusedId] = useState<string>();
-  const [expanded, setExpanded] = useState(false), [aggregateOpen, setAggregateOpen] = useState(false), [connectionsOpen, setConnectionsOpen] = useState(false), [memberPage, setMemberPage] = useState(0);
+  const [aggregateOpen, setAggregateOpen] = useState(false), [connectionsOpen, setConnectionsOpen] = useState(false), [memberPage, setMemberPage] = useState(0);
+  const [localAggregation, setLocalAggregation] = useState<NonNullable<AnalyzerViewSession['aggregation']>>({ expandedGroupIds: [], collapsedGroupIds: [] });
+  const aggregationState = props.aggregationState ?? localAggregation, changeAggregation = props.onAggregationState ?? setLocalAggregation;
+  const expanded = aggregationState.unresolved === 'expanded';
+  const [inspection, setInspection] = useState<AggregationInspection>();
+  const [projection, setProjection] = useState<AggregationProjection>({ width: 1000, height: 700, zoom: props.camera?.zoom ?? 1 });
+  const onProjection = useCallback((next: AggregationProjection) => setProjection(previous => previous.zoom === next.zoom && previous.width === next.width && previous.height === next.height
+    && previous.matrix?.every((value, index) => value === next.matrix?.[index]) ? previous : next), []);
+  const previousActive = useRef<ReadonlySet<string>>(new Set(aggregationState.activeGroupIds));
+  const previousRepresentation = useRef<AutoAggregationResult | undefined>(undefined);
   const [connections, setConnections] = useState<FlowConnectionNotice[]>([]);
   const disclosures = useRef<HTMLDivElement>(null);
   const [labelObstacles, setLabelObstacles] = useState<FlowLabelObstacle[]>([]);
   const presentation = useMemo(() => buildUnresolvedFlowPresentation(props.graph, props.explorer), [props.graph, props.explorer]);
-  const positions = useMemo(() => visibleUnresolvedFlowPositions(presentation, props.selectedIds, props.selectedEdgeId, expanded), [presentation, props.selectedIds, props.selectedEdgeId, expanded]);
+  const allPositions = useMemo(() => [...presentation.regular, ...presentation.individual], [presentation]);
+  const aggregationInput = useMemo(() => semanticAggregationInput(props.graph, allPositions, props.explorer), [props.graph, allPositions, props.explorer]);
   const byId = useMemo(() => new Map(props.graph.nodes.map(node => [node.id, node])), [props.graph.nodes]);
   const onConnections = useCallback((next: FlowConnectionNotice[]) => setConnections(previous => previous.length === next.length && previous.every((item, index) => item.id === next[index]!.id && item.status === next[index]!.status) ? previous : next), []);
-  const aggregateId = presentation.aggregate?.node.id;
   useLayoutEffect(() => {
     const element = disclosures.current, parent = element?.parentElement; if (!element || !parent) return;
     let disposed = false;
@@ -246,11 +270,7 @@ export function SemanticFlow3D(props: Props) {
     if (typeof ResizeObserver === 'undefined') return () => { disposed = true; };
     const observer = new ResizeObserver(measure); observer.observe(element); observer.observe(parent);
     return () => { disposed = true; observer.disconnect(); };
-  }, [aggregateOpen, connectionsOpen, connections.length, presentation.members.length]);
-  const selectPoint = (id: string) => {
-    if (id === aggregateId) { setExpanded(value => !value); setAggregateOpen(true); }
-    else props.onSelect(id);
-  };
+  }, [aggregateOpen, connectionsOpen, connections.length, presentation.members.length, inspection]);
   const clearHoverTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const focusedIdRef = useRef<string | undefined>(undefined);
   const focusOwner = useRef<{ id: string; handler?: SemanticFlowHoverHandler } | undefined>(undefined);
@@ -281,6 +301,56 @@ export function SemanticFlow3D(props: Props) {
   }, [releasePointer]);
   const hoverTarget = useMemo(() => props.onHoverTarget ? props.hoverTarget : focusedId ? { kind: 'node' as const, id: focusedId } : localHoverTarget, [props.onHoverTarget, props.hoverTarget, focusedId, localHoverTarget]);
   const hoveredIds = useMemo(() => new Set([hoveredId, focusedId, hoverTarget?.kind === 'node' ? hoverTarget.id : undefined].filter((id): id is string => Boolean(id))), [hoveredId, focusedId, hoverTarget]);
+  const expandedIds = useMemo(() => new Set(aggregationState.expandedGroupIds), [aggregationState.expandedGroupIds]);
+  const collapsedIds = useMemo(() => new Set(aggregationState.collapsedGroupIds), [aggregationState.collapsedGroupIds]);
+  const protectedIds = useMemo(() => {
+    const ids = new Set([...props.selectedIds, ...hoveredIds, ...props.explicitPathNodeIds ?? [], ...(props.command?.kind === 'focus' ? props.command.ids ?? [] : [])]);
+    for (const edge of props.graph.edges) if (edge.id === props.selectedEdgeId || hoverTarget?.kind === 'edge' && edge.id === hoverTarget.id || props.explicitPathEdgeIds?.has(edge.id)) { ids.add(edge.source); ids.add(edge.target); }
+    if (expanded) for (const node of presentation.members) ids.add(node.id);
+    return ids;
+  }, [props.selectedIds, props.selectedEdgeId, props.graph.edges, props.explicitPathNodeIds, props.explicitPathEdgeIds, props.command, hoveredIds, hoverTarget, expanded, presentation.members]);
+  const manualUnresolved = useMemo<AggregationGroup | undefined>(() => presentation.aggregate ? {
+    id: 'unresolved-calls', label: '呼び出し箇所別の未特定呼び出し（手動範囲）', memberIds: presentation.members.map(node => node.id), minimumMembers: 1,
+    x: presentation.aggregate.x, y: presentation.aggregate.y, z: presentation.aggregate.z,
+  } : undefined, [presentation]);
+  const manualGroups = useMemo(() => [...aggregationInput.groups.filter(group => collapsedIds.has(group.id)), ...(aggregationState.unresolved === 'collapsed' && manualUnresolved ? [manualUnresolved] : [])], [aggregationInput.groups, collapsedIds, aggregationState.unresolved, manualUnresolved]);
+  const aggregation = useMemo(() => stableAggregationRepresentation(projectAutoAggregation({ ...aggregationInput, enabled: props.autoAggregation !== false, protectedIds, expandedGroupIds: expandedIds,
+    manualGroups, projection, previousActiveGroupIds: previousActive.current, matchIds: props.matchIds }), previousRepresentation.current), [aggregationInput, props.autoAggregation, protectedIds, expandedIds, manualGroups, projection, props.matchIds]);
+  useEffect(() => { previousRepresentation.current = aggregation; }, [aggregation]);
+  useEffect(() => {
+    // A restored camera's real projection arrives after Canvas initialization. The
+    // placeholder scale must not overwrite its stored hysteresis decision.
+    if (props.autoAggregation === false || !projection.matrix || projection.width <= 0 || projection.height <= 0) return;
+    previousActive.current = aggregation.activeGroupIds;
+    const saved = aggregationState.activeGroupIds ?? [];
+    if (saved.length !== aggregation.activeGroupIds.size || saved.some(id => !aggregation.activeGroupIds.has(id))) changeAggregation({ ...aggregationState, activeGroupIds: [...aggregation.activeGroupIds] });
+  }, [aggregation.activeGroupIds, props.autoAggregation, projection, aggregationState, changeAggregation]);
+  const { ownerById, individualIds, aggregates } = aggregation;
+  const displayed = useMemo(() => projectAggregatedSemanticFlow(props.graph, allPositions, { ownerById, individualIds, aggregates }), [props.graph, allPositions, ownerById, individualIds, aggregates]);
+  const positions = displayed.positions;
+  const originalRelations = useMemo(() => props.graph.edges.map(edge => ({ ...edge, confidence: confidenceLabels[edge.confidence],
+    evidenceCount: new Set(edge.evidence.map(item => JSON.stringify([item.path, item.start, item.end, item.description]))).size,
+    siteCount: new Set(edge.evidence.map(item => JSON.stringify([item.path, item.start, item.end]))).size })), [props.graph.edges]);
+  const displays = useMemo(() => semanticNodeDisplays(props.graph.nodes), [props.graph.nodes]);
+  const selectPoint = (id: string) => {
+    const aggregate = aggregation.aggregates.find(group => group.id === id);
+    if (aggregate) setInspection({ kind: 'group', id: aggregate.groupId });
+    else props.onSelect(id);
+  };
+  const selectRelation = (id: string) => {
+    const relation = displayed.relations.find(edge => edge.id === id);
+    if (relation?.aggregated) setInspection({ kind: 'relation', id });
+    else props.onSelectEdge(id);
+  };
+  const groupMode = (id: string, mode: AggregationGroupMode) => {
+    if (id === 'unresolved-calls') { changeAggregation({ ...aggregationState, unresolved: mode === 'auto' ? undefined : mode }); return; }
+    changeAggregation({ ...aggregationState, expandedGroupIds: [...aggregationState.expandedGroupIds.filter(value => value !== id), ...(mode === 'expanded' ? [id] : [])],
+      collapsedGroupIds: [...aggregationState.collapsedGroupIds.filter(value => value !== id), ...(mode === 'collapsed' ? [id] : [])] });
+  };
+  const displaySelectedIds = useMemo(() => {
+    const aggregate = inspection?.kind === 'group' ? aggregation.aggregates.find(group => group.groupId === inspection.id) : undefined;
+    return aggregate ? new Set([...props.selectedIds, aggregate.id]) : props.selectedIds;
+  }, [props.selectedIds, inspection, aggregation.aggregates]);
   useEffect(() => {
     clearTimeout(clearHoverTimer.current); clearHoverTimer.current = undefined;
     releaseFocus(); releasePointer(); setHoveredId(undefined); setLocalHoverTarget(undefined);
@@ -296,10 +366,10 @@ export function SemanticFlow3D(props: Props) {
   }, [labels, releaseFocus, releasePointer]);
   const regionNodes = useMemo(() => {
     const map = new Map<string, string[]>();
-    for (const { node } of positions) { if (node.attributes.displayAggregate === true) continue; const identity = props.explorer ? explorerRegionIdentity(props.explorer, node.id) : semanticRegionIdentity(node);
+    for (const { node } of allPositions) { const identity = props.explorer ? explorerRegionIdentity(props.explorer, node.id) : semanticRegionIdentity(node);
       const id = `flow-region:${identity.id}`, nodes = map.get(id) ?? []; nodes.push(node.id); map.set(id, nodes); }
     return map;
-  }, [positions, props.explorer]);
+  }, [allPositions, props.explorer]);
   const selected = props.graph.nodes.find(node => props.selectedIds.has(node.id));
   const selectedRegion = selected ? props.explorer ? explorerRegionIdentity(props.explorer, selected.id) : semanticRegionIdentity(selected) : undefined;
   const description = props.graph.view === 'runtime-flow' && props.explorer?.runtimeMode !== 'grounded'
@@ -310,21 +380,27 @@ export function SemanticFlow3D(props: Props) {
     owner?.handler?.(undefined, { source: `3d-focus:${owner.id}`, modality: 'focus' });
   }; }, [labelLayer, releasePointer]);
   return <div className="semantic-flow-3d" data-node-count={props.graph.nodes.length} data-edge-count={props.graph.edges.length} data-display-point-count={positions.length} data-unresolved-target-count={presentation.members.length} data-unresolved-expanded={expanded} data-group-bounds={props.showGroupBounds !== false}>
-    <FlowGraphBoundary onUnavailable={props.onUnavailable}><Canvas orthographic frameloop="demand" dpr={[1, 1.7]} camera={{ position: [600, 450, 2200], zoom: 1, near: .1, far: 1000000 }} gl={{ antialias: true, alpha: true }}><Scene {...props} hoverTarget={hoverTarget} positions={positions} labelObstacles={labelObstacles} onSelect={selectPoint} onConnections={onConnections} onLabels={labelLayer.update} hoveredIds={hoveredIds} onHover={onHover} hoverAt={labelLayer.hoverAt} /></Canvas></FlowGraphBoundary>
-    <svg className="semantic-flow-label-leaders" aria-hidden="true">{labels.filter(label => !label.region).map(label => <line key={label.id} ref={element => labelLayer.attachLeader(label.id, element)} />)}</svg>
-    <div className="semantic-flow-3d-labels">{labels.map(label => <button key={label.id} ref={element => labelLayer.attach(label.id, element)} type="button"
-      data-flow-label-id={label.id} data-flow-role={label.role} data-flow-emphasized={label.emphasized || undefined} className={`${label.selected ? 'is-selected' : ''}${label.match ? ' is-match' : ''}${label.hovered ? ' is-hovered' : ''}${label.related ? ' is-related' : ''}${label.region ? ' is-region' : ''}${label.id === aggregateId ? ' is-aggregate' : ''}${label.emphasized ? ' is-emphasized' : ''}${label.dimmed ? ' is-dimmed' : ''}`} aria-pressed={label.region ? undefined : label.id === aggregateId ? expanded : label.selected} title={`${label.tooltip ?? `${label.label}\n${label.path}`}${label.roleLabel ? `\n${label.roleLabel}` : ''}`}
+    <FlowGraphBoundary onUnavailable={props.onUnavailable}><Canvas orthographic frameloop="demand" dpr={[1, 1.7]} camera={{ position: [600, 450, 2200], zoom: 1, near: .1, far: 1000000 }} gl={{ antialias: true, alpha: true }}><Scene {...props} selectedIds={displaySelectedIds} hoverTarget={hoverTarget} positions={positions} renderGraph={displayed.graph} allPositions={allPositions} onProjection={onProjection} labelObstacles={labelObstacles} onSelect={selectPoint} onSelectEdge={selectRelation} onConnections={onConnections} onLabels={labelLayer.update} hoveredIds={hoveredIds} onHover={onHover} hoverAt={labelLayer.hoverAt} /></Canvas></FlowGraphBoundary>
+    <svg className="semantic-flow-label-leaders" aria-hidden="true">{labels.filter(label => !label.region && (aggregation.individualIds.has(label.id) || aggregation.aggregates.some(group => group.id === label.id))).map(label => <line key={label.id} ref={element => labelLayer.attachLeader(label.id, element)} />)}</svg>
+    <div className="semantic-flow-3d-labels">{labels.filter(label => label.region || aggregation.individualIds.has(label.id) || aggregation.aggregates.some(group => group.id === label.id)).map(label => <button key={label.id} ref={element => labelLayer.attach(label.id, element)} type="button"
+      data-flow-label-id={label.id} data-flow-role={label.role} data-flow-emphasized={label.emphasized || undefined} className={`${label.selected ? 'is-selected' : ''}${label.match ? ' is-match' : ''}${label.hovered ? ' is-hovered' : ''}${label.related ? ' is-related' : ''}${label.region ? ' is-region' : ''}${label.aggregate ? ' is-aggregate' : ''}${label.emphasized ? ' is-emphasized' : ''}${label.dimmed ? ' is-dimmed' : ''}`} aria-pressed={label.region ? undefined : label.selected} title={`${label.tooltip ?? `${label.label}\n${label.path}`}${label.roleLabel ? `\n${label.roleLabel}` : ''}`}
       aria-label={label.region ? `${label.label}の領域へ移動 · ${label.path}` : undefined}
       onPointerMove={event => { if (!label.region && event.buttons === 0) onHover(label.id, undefined, label.id); }} onPointerLeave={() => onHover()} onFocus={() => { if (!label.region) { focusedIdRef.current = label.id; focusOwner.current = { id: label.id, handler: props.onHoverTarget }; setFocusedId(label.id); props.onHoverTarget?.({ kind: 'node', id: label.id }, { source: `3d-focus:${label.id}`, modality: 'focus' }); } }} onBlur={() => releaseFocus(label.id)}
-      onClick={() => label.region ? props.onFocusRegion?.(regionNodes.get(label.id) ?? []) : selectPoint(label.id)}><strong>{label.label}</strong>{label.roleLabel && <span className="semantic-flow-3d-role">{label.roleLabel}</span>}{label.disambiguation && <small className="semantic-flow-3d-disambiguation">{label.disambiguation}</small>}{(label.region || label.selected || label.id === aggregateId) && <small>{label.region ? `所属 · ${label.path}` : label.path}</small>}</button>)}</div>
+      onClick={() => label.region ? props.onFocusRegion?.(regionNodes.get(label.id) ?? []) : selectPoint(label.id)}><strong>{label.label}</strong>{label.roleLabel && <span className="semantic-flow-3d-role">{label.roleLabel}</span>}{label.disambiguation && <small className="semantic-flow-3d-disambiguation">{label.disambiguation}</small>}{(label.region || label.selected || label.aggregate) && <small>{label.region ? `所属 · ${label.path}` : label.path}</small>}</button>)}</div>
     <div className="semantic-flow-disclosures" ref={disclosures}>
+      <AutoAggregationPanel enabled={props.autoAggregation !== false} totalCount={props.totalNodeCount} counts={aggregation.counts} groups={manualUnresolved ? [...aggregationInput.groups, manualUnresolved] : aggregationInput.groups} aggregates={aggregation.aggregates}
+        ownerById={aggregation.ownerById}
+        expandedIds={expandedIds} collapsedIds={collapsedIds} inspection={inspection} onInspection={setInspection} onGroupMode={groupMode} relations={displayed.relations} originalRelations={originalRelations}
+        nodeLabel={id => ({ title: displays.get(id)?.title ?? id, subtitle: [displays.get(id)?.dataRole, displays.get(id)?.location].filter(Boolean).join(' · ') })}
+        onSelectNode={id => { setInspection(undefined); props.onSelect(id); props.onFocusRegion?.([id]); }} onSelectRelation={id => { setInspection(undefined); props.onSelectEdge(id); }} />
       {presentation.aggregate && <details open={aggregateOpen} onToggle={event => setAggregateOpen(event.currentTarget.open)} className="semantic-flow-unresolved-control">
         <summary><span className="semantic-flow-aggregate-symbol" aria-hidden="true">○</span> 表示上の集約 · 定義先未特定 {presentation.members.length.toLocaleString()}対象</summary>
         {aggregateOpen && <div className="semantic-flow-disclosure-body">
           <p>呼び出し式は確認できていますが、Analyzerが呼び出し先の関数定義を特定できていません。</p>
           <p>現在の絞り込み内: {presentation.members.length.toLocaleString()}対象 · {presentation.relationCount.toLocaleString()}関係<br />その呼び出し関係の根拠: {presentation.callSiteCount.toLocaleString()}箇所</p>
-          <button type="button" onClick={() => setExpanded(value => !value)}>{expanded ? '集約表示へ戻す' : 'すべての対象を点で展開'}</button>
-          <small>{expanded ? 'すべての対象を個別表示中' : '選択した関係の対象は個別表示します'}</small>
+          <button type="button" onClick={() => changeAggregation({ ...aggregationState, unresolved: expanded ? 'collapsed' : 'expanded' })}>{expanded ? '集約表示へ戻す' : 'すべての対象を点で展開'}</button>
+          <button type="button" onClick={() => changeAggregation({ ...aggregationState, unresolved: undefined })}>自動表示に戻す</button>
+          <small>{expanded ? 'すべての対象を個別表示中' : aggregationState.unresolved === 'collapsed' ? '手動折りたたみ中。選択・経路の対象は個別表示します。' : '自動省略の設定と密度に従って表示します。'}</small>
           <ul>{presentation.members.slice(Math.min(memberPage, Math.max(0, Math.ceil(presentation.members.length / 20) - 1)) * 20, (Math.min(memberPage, Math.max(0, Math.ceil(presentation.members.length / 20) - 1)) + 1) * 20).map(node => <li key={node.id}>
             <button type="button" onClick={() => { setAggregateOpen(false); setConnectionsOpen(false); props.onSelect(node.id); props.onFocusRegion?.([node.id]); }} title={`${node.label}\n${node.path ?? ''}:${node.line ?? ''}`}><strong>{node.label}</strong><small>呼び出し箇所: {node.path ?? '位置情報なし'}{node.line ? `:${node.line}` : ''}</small></button>
           </li>)}</ul>
@@ -334,7 +410,7 @@ export function SemanticFlow3D(props: Props) {
       {connections.length > 0 && <details open={connectionsOpen} onToggle={event => setConnectionsOpen(event.currentTarget.open)} className="semantic-flow-connection-notices">
         <summary>関係の両端・接続先 ほか{connections.length}対象{connections.some(item => item.status === 'offscreen') ? ` · 画面外 ${connections.filter(item => item.status === 'offscreen').length}対象` : ''}</summary>
         <div className="semantic-flow-disclosure-body"><ul>{connections.map(item => <li key={item.id}><button type="button" onClick={() => { setConnectionsOpen(false); setAggregateOpen(false); props.onFocusRegion?.([item.id]); }} title={byId.get(item.id)?.label}>
-          <strong>{byId.get(item.id)?.label ?? item.id}</strong><small>{item.status === 'offscreen' ? '画面外' : 'ラベルを省略'} · この対象へ移動</small>
+          <strong>{displays.get(item.id)?.title ?? displayed.graph.nodes.find(node => node.id === item.id)?.label ?? item.id}</strong><small>{item.status === 'offscreen' ? '画面外' : 'ラベルを省略'} · この対象へ移動</small>
         </button></li>)}</ul></div>
       </details>}
     </div>

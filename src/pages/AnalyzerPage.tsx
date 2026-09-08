@@ -39,7 +39,7 @@ export function AnalyzerPage() {
 function LegacyAnalyzerPage() {
   const location = useLocation();
   const view = viewFromPath(location.pathname);
-  const { state: session, replaceProject, setActiveView, updateView } = useAnalyzerSession();
+  const { state: session, replaceProject, setActiveView, updateView, setAutoAggregation, setFlowGroupBounds } = useAnalyzerSession();
   const store = session.store;
   const fullscreen = useWorkspaceFullscreen(view === 'module-dependency' && Boolean(store));
   const storedViewState = session.views[view];
@@ -372,7 +372,11 @@ function LegacyAnalyzerPage() {
             {view === 'module-dependency' ? (
               <Suspense fallback={<div className="analyzer-graph-stage analyzer-spatial-graph-stage"><div className="analyzer-graph-empty">Loading spatial renderer…</div></div>}>
                 <AnalyzerSpatialGraphStage
+                  key={`${view}:${session.scanVersion}`}
                   view={model}
+                  autoAggregation={session.autoAggregation ?? true} onAutoAggregation={setAutoAggregation}
+                  aggregationState={viewState.aggregation} onAggregationState={aggregation => updateView(view, { aggregation })}
+                  showGroupBounds={session.showFlowGroupBounds ?? true} onGroupBounds={setFlowGroupBounds}
                   selectedNodeId={selectedNodeId}
                   selectedRegionId={selectedRegionId}
                   selectedEdgeId={selectedEdgeId}

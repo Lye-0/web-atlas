@@ -7,7 +7,7 @@
 ### Flowの共有ホバーは入力元と表示寿命を区別する
 - id: `rm-20260907-flow-hover-input-ownership`
 - type: `pattern`
-- maturity: `candidate`
+- maturity: `reused`
 - tags: `hover`, `focus`, `stable-id`, `input-ownership`, `lifecycle`, `3d`
 - files: `src/components/analyzer/useSemanticFlowHover.ts`, `src/components/analyzer/semanticFlowHoverBindings.ts`, `src/components/analyzer/SemanticFlow3D.tsx` …
 - memory: `agent-knowledge/entries/2026-09-07-flow-hover-input-ownership-fcd28d0.md`
@@ -15,15 +15,23 @@
 ### Data Flowの呼び出し文脈と原定義を、集約しても分離する
 - id: `rm-20260908-data-flow-context-summaries`
 - type: `pattern`
-- maturity: `candidate`
+- maturity: `reused`
 - tags: `data-flow`, `call-site`, `stable-id`, `provenance`, `bounded-expansion`
 - files: `src/analyzer/semantic/dataFlow.ts`, `src/analyzer/semantic/types.ts`, `src/analyzer/semantic/tabs89IndependentAccuracy.test.ts` …
 - memory: `agent-knowledge/entries/2026-09-08-data-flow-context-summaries-c23e054.md`
 
+### 表示集合の接続を元グラフの到達可能性へ流さない
+- id: `rm-20260908-display-owner-traversal-boundary`
+- type: `constraint`
+- maturity: `candidate`
+- tags: `3d`, `display-owner`, `traversal`, `provenance`
+- files: `src/analyzer/autoAggregation.ts`, `src/analyzer/autoAggregation.test.ts`, `src/analyzer/semantic/flowAutoAggregation.ts` …
+- memory: `agent-knowledge/entries/2026-09-08-display-owner-traversal-boundary-c619ab.md`
+
 ### 共通Viewの保全確認には、詳細が読むFieldsも含める
 - id: `rm-20260908-semantic-view-field-conservation`
 - type: `constraint`
-- maturity: `candidate`
+- maturity: `reused`
 - tags: `shared-ui`, `view-adapter`, `regression`, `fields`, `projection`
 - files: `src/analyzer/semantic/analyze.ts`, `src/analyzer/semantic/project.ts`, `src/analyzer/semantic/types.ts` …
 - memory: `agent-knowledge/entries/2026-09-08-semantic-view-field-conservation-c23e054.md`
@@ -41,10 +49,36 @@
 ### モデルの定義式を確認できても、最終構造の展開済みとは限らない
 - id: `rm-20260908-model-definition-expansion`
 - type: `constraint`
-- maturity: `candidate`
+- maturity: `reused`
 - tags: `data-model`, `derived-type`, `expansion`, `union`, `evidence`
 - files: `src/analyzer/semantic/dataModels.ts`, `src/analyzer/semantic/dataCompiler.ts`, `src/analyzer/semantic/types.ts` …
 - memory: `agent-knowledge/entries/2026-09-08-model-definition-expansion-c23e054.md`
+
+## analyzer-spatial
+
+### 細かな所属の密度だけでは、大規模な重なりを見逃す
+- id: `rm-20260908-aggregation-fragmented-density`
+- type: `failure`
+- maturity: `candidate`
+- tags: `density`, `hierarchy`, `3d`, `performance`, `projected-span`
+- files: `src/analyzer/autoAggregation.ts`, `src/analyzer/autoAggregation.test.ts`, `src/analyzer/semantic/flowAutoAggregation.ts` …
+- memory: `agent-knowledge/entries/2026-09-08-aggregation-fragmented-density-a9f18c.md`
+
+### 共有の自動設定とView別の密度履歴を、初期投影で混ぜない
+- id: `rm-20260908-aggregation-view-history-initialization`
+- type: `failure`
+- maturity: `candidate`
+- tags: `session`, `hysteresis`, `camera`, `initialization`, `3d`
+- files: `src/analyzer/session.ts`, `src/analyzer/session.test.ts`, `src/analyzer/autoAggregation.ts` …
+- memory: `agent-knowledge/entries/2026-09-08-aggregation-view-history-initialization-640bed.md`
+
+### Moduleの全座標を確定してから手動表示を投影する
+- id: `rm-20260908-module-layout-before-visibility`
+- type: `failure`
+- maturity: `candidate`
+- tags: `3d`, `coordinates`, `manual-collapse`, `conservation`
+- files: `src/components/analyzer/AnalyzerSpatialGraphStage.tsx`, `src/components/analyzer/moduleAggregationControls.test.tsx`, `src/analyzer/moduleAutoAggregation.ts` …
+- memory: `agent-knowledge/entries/2026-09-08-module-layout-before-visibility-91d52a.md`
 
 ## deployment
 

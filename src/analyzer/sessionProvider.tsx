@@ -16,9 +16,12 @@ export function AnalyzerSessionProvider({ children }: { children: ReactNode }) {
   const setFlowGroupBounds = useCallback((visible: boolean) => {
     dispatch({ type: 'setFlowGroupBounds', visible });
   }, []);
+  const setAutoAggregation = useCallback((enabled: boolean) => {
+    dispatch({ type: 'setAutoAggregation', enabled });
+  }, []);
   const updateView = useCallback((view: AnalyzerViewId, update: AnalyzerViewSessionUpdate) => {
     dispatch({ type: 'updateView', view, update });
   }, []);
 
-  return <analyzerSessionContext.Provider value={{ state, replaceProject, setActiveView, setFlowGroupBounds, updateView }}>{children}</analyzerSessionContext.Provider>;
+  return <analyzerSessionContext.Provider value={{ state, replaceProject, setActiveView, setFlowGroupBounds, setAutoAggregation, updateView }}>{children}</analyzerSessionContext.Provider>;
 }

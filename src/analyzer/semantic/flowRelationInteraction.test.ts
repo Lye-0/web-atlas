@@ -9,6 +9,18 @@ const graph: SemanticGraph = { view: 'function-call-flow', nodes, edges: [
 const selected = new Set(['selected']);
 
 describe('canonical relation interaction', () => {
+  it('retains direct roles, kind and counterpart hover between representatives without changing provenance', () => {
+    const display: SemanticGraph = { view: 'function-call-flow', nodes: ['displayA', 'displayB'].map(id => ({ id, label: 'Display collection', kind: 'subsystem', group: 'Display', confidence: 'source', evidence: [], attributes: { displayAggregate: true } })), edges: [{
+      id: 'display-edge', source: 'displayA', target: 'displayB', kind: 'calls', label: '2 relations', views: ['function-call-flow'], confidence: 'source', evidence: [],
+      provenance: { edges: ['1', '2'].map(id => ({ id: `original${id}`, source: `a${id}`, target: `b${id}`, kind: 'calls', label: 'calls', confidence: 'source', evidence: [] })) },
+    }] };
+    const before = JSON.stringify(display), selection = new Set(['displayA']);
+    expect(semanticFlowNodeRoles(display, selection).get('displayB')).toBe('outgoing');
+    expect(semanticFlowNodeRelationKinds(display, selection).get('displayB')).toEqual(new Set(['calls']));
+    expect(resolveSemanticFlowHover(display, selection, undefined, { kind: 'node', id: 'displayB' }).edgeIds).toEqual(new Set(['display-edge']));
+    expect(JSON.stringify(display)).toBe(before);
+  });
+
   it('keeps reciprocal peers dual-role, incoming orange roles and explicit selected-edge endpoints', () => {
     expect([...semanticFlowNodeRoles(graph, selected)]).toEqual([['peer', 'both'], ['incoming', 'incoming'], ['selected', 'selected']]);
     expect([...semanticFlowNodeRoles(graph, selected, 'out')]).toEqual([['selected', 'source'], ['peer', 'target']]);

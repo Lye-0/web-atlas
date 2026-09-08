@@ -119,9 +119,10 @@ export function projectSemanticFlowLabels(camera: Camera, size: { width: number;
   };
   const nodeLabel = (item: SemanticPosition): FlowLabelContent => {
     const display = context.displays?.get(item.node.id), role = context.roles?.get(item.node.id);
-    return { id: item.node.id, label: item.node.label, path: item.node.attributes.displayAggregate === true ? `表示上の集約 · ${Number(item.node.attributes.targetCount).toLocaleString()}対象` : `${item.node.kind === 'external' ? '定義先未特定 · 呼び出し箇所 ' : ''}${display?.location ?? `${item.node.path ?? item.node.group}${item.node.line ? `:${item.node.line}` : ''}`}`,
+    return { id: item.node.id, label: context.view === 'data-flow' ? display?.title ?? item.node.label : item.node.label, path: item.node.attributes.displayAggregate === true ? `表示上の集約 · ${Number(item.node.attributes.targetCount).toLocaleString()}対象${Number(item.node.attributes.matchingCount) > 0 ? ` · 内部に${Number(item.node.attributes.matchingCount)}件一致` : ''}` : `${item.node.kind === 'external' ? '定義先未特定 · 呼び出し箇所 ' : ''}${display?.location ?? `${item.node.path ?? item.node.group}${item.node.line ? `:${item.node.line}` : ''}`}`,
       ...(display ? { disambiguation: display.disambiguation, tooltip: display.tooltip } : {}),
       ...(role ? { role, roleLabel: semanticFlowRoleLabel(role, context.view ?? 'runtime-flow', context.relationKinds?.get(item.node.id)) } : {}),
+      ...(display?.dataRole ? { roleLabel: display.dataRole } : {}),
       ...(context.emphasisIds?.size ? { emphasized: context.emphasisIds.has(item.node.id), dimmed: !context.emphasisIds.has(item.node.id) } : {}),
       selected: selectedIds.has(item.node.id), match: matchIds.has(item.node.id), ...(item.node.attributes.displayAggregate === true ? { aggregate: true } : {}), ...(context.hoveredIds?.has(item.node.id) ? { hovered: true } : {}), ...(context.relatedIds?.has(item.node.id) ? { related: true } : {}) };
   };
@@ -232,7 +233,7 @@ export class FlowLabelLayer {
       const previous = this.content[index]!;
       return label.id === previous.id && label.label === previous.label && label.path === previous.path && label.selected === previous.selected && label.match === previous.match && Boolean(label.hovered) === Boolean(previous.hovered) && Boolean(label.related) === Boolean(previous.related) && Boolean(label.region) === Boolean(previous.region) && Boolean(label.aggregate) === Boolean(previous.aggregate) && label.role === previous.role && label.roleLabel === previous.roleLabel && label.disambiguation === previous.disambiguation && label.tooltip === previous.tooltip && Boolean(label.emphasized) === Boolean(previous.emphasized) && Boolean(label.dimmed) === Boolean(previous.dimmed);
     })) return;
-    this.content = next.map(({ id, label, path, selected, match, hovered, related, region, aggregate, role, roleLabel, disambiguation, tooltip, emphasized, dimmed }) => ({ id, label, path, selected, match, ...(hovered ? { hovered } : {}), ...(related ? { related } : {}), ...(region ? { region } : {}), ...(aggregate ? { aggregate } : {}), ...(role ? { role, roleLabel } : {}), ...(disambiguation ? { disambiguation } : {}), ...(tooltip ? { tooltip } : {}), ...(emphasized ? { emphasized } : {}), ...(dimmed ? { dimmed } : {}) }));
+    this.content = next.map(({ id, label, path, selected, match, hovered, related, region, aggregate, role, roleLabel, disambiguation, tooltip, emphasized, dimmed }) => ({ id, label, path, selected, match, ...(hovered ? { hovered } : {}), ...(related ? { related } : {}), ...(region ? { region } : {}), ...(aggregate ? { aggregate } : {}), ...(role ? { role } : {}), ...(roleLabel ? { roleLabel } : {}), ...(disambiguation ? { disambiguation } : {}), ...(tooltip ? { tooltip } : {}), ...(emphasized ? { emphasized } : {}), ...(dimmed ? { dimmed } : {}) }));
     this.publish(this.content);
   };
 
