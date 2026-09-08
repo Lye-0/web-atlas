@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { explorerBreadcrumbs, explorerChildren, explorerEdgeVisible, explorerRegionIdentity, type ExplorerLocation, type SemanticExplorerModel } from '../../analyzer/semantic/semanticExplorer';
 import type { SemanticGraph } from '../../analyzer/semantic/types';
 import { semanticRelationLabel } from './semanticFlowLanguage';
@@ -18,14 +19,16 @@ export function SemanticExplorerNavigation({ explorer, navigation, mode, graph, 
   const center = location.centerId ? explorer.nodes.get(location.centerId) : undefined;
   const centerDisplay = center ? semanticNodeDisplay(center) : undefined;
   const selectedDisplay = selected ? semanticNodeDisplay(selected) : undefined;
-  const scope = explorer.scopes.get(location.scopeId), visibleIds = new Set(graph.nodes.map(node => node.id));
+  const scope = explorer.scopes.get(location.scopeId);
+  const visibleIds = useMemo(() => new Set(graph.nodes.map(node => node.id)), [graph.nodes]);
   const children = mode === '2d' && !center ? explorerChildren(explorer, location, visibleIds) : [];
-  const displayedIds = center ? new Set(localGraph.nodes.map(node => node.id)) : new Set(scope?.memberIds ?? []);
+  const displayedIds = useMemo(() => center ? new Set(localGraph.nodes.map(node => node.id)) : new Set(scope?.memberIds ?? []), [center, localGraph.nodes, scope]);
   const outside = mode === '2d' && selected && !displayedIds.has(selected.id);
-  const regionCount = new Set(graph.nodes.map(node => explorerRegionIdentity(explorer, node.id).id)).size;
+  const regionCount = useMemo(() => new Set(graph.nodes.map(node => explorerRegionIdentity(explorer, node.id).id)).size, [graph.nodes, explorer]);
   const selectedEdge = graph.edges.find(edge => edge.id === selectedEdgeId);
   const outsideEdge = mode === '2d' && selectedEdge && (!center || !localGraph.edges.some(edge => edge.id === selectedEdge.id));
-  const visibleEdges = localGraph.edges.filter(edge => explorerEdgeVisible(edge, selectedIds, location.direction, selectedEdgeId)).length;
+  const visibleEdges = mode === '2d' && center && location.direction !== 'both' && selectedIds.size
+    ? localGraph.edges.filter(edge => explorerEdgeVisible(edge, selectedIds, location.direction, selectedEdgeId)).length : localGraph.edges.length;
   return <div className="semantic-explorer-navigation">
     {mode === '2d' ? <>
       <div className="semantic-explorer-navigation-row"><div className="semantic-explorer-history" role="group" aria-label="階層の移動">

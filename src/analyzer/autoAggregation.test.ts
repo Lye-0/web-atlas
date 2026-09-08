@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildAggregationGroups, projectAutoAggregation, projectAggregationRelations, stableAggregationRepresentation, type AggregationPoint } from './autoAggregation';
+import { buildAggregationGroups, prepareAutoAggregation, projectAutoAggregation, projectAggregationRelations, shortAggregationLabels, stableAggregationRepresentation, type AggregationPoint } from './autoAggregation';
 
 const camera = { width: 1200, height: 800, zoom: 1 };
 const points: AggregationPoint[] = Array.from({ length: 80 }, (_, index) => ({ id: `n${index}`, x: index % 10 * 4, y: Math.floor(index / 10) * 4, z: 0,
@@ -7,6 +7,41 @@ const points: AggregationPoint[] = Array.from({ length: 80 }, (_, index) => ({ i
 const groups = buildAggregationGroups(points);
 
 describe('reversible 3D display ownership', () => {
+  it('keeps enough path context to distinguish same-named affiliations in compact labels', () => {
+    const labels = shortAggregationLabels([{ id: 'a', label: 'parse · src/one/util.ts · 仮引数' }, { id: 'b', label: 'parse · src/two/util.ts · 仮引数' }, { id: 'c', label: 'src/git/parsers · 所属の集合' }]);
+    expect(labels.get('a')).toBe('parse · one/util.ts'); expect(labels.get('b')).toBe('parse · two/util.ts'); expect(labels.get('c')).toBe('parsers');
+  });
+  it('reuses only density across pan, selection and query while preserving uncached ownership and history', () => {
+    const prepared = prepareAutoAggregation(points, groups);
+    const matrix = [.002, 0, 0, 0, 0, .0025, 0, 0, 0, 0, .001, 0, 0, 0, 0, 1];
+    let previousActiveGroupIds: ReadonlySet<string> = new Set();
+    let initialMetrics: unknown;
+    for (const enabled of [true, false, true]) for (const pan of [0, .17, -.4]) {
+      const moved = [...matrix]; moved[12] = pan;
+      const options = { points, groups, enabled, projection: { ...camera, matrix: moved }, protectedIds: new Set(['n1']), matchIds: new Set(['n2']), previousActiveGroupIds };
+      const cached = projectAutoAggregation({ ...options, prepared }), plain = projectAutoAggregation(options);
+      expect(cached).toEqual(plain);
+      expect(cached.counts.scope).toBe(80); expect(cached.individualIds.has('n1')).toBe(true);
+      if (enabled) { initialMetrics ??= cached.metrics; expect(cached.metrics).toBe(initialMetrics); }
+      previousActiveGroupIds = cached.activeGroupIds;
+    }
+    const different = points.slice(0, 1);
+    expect(projectAutoAggregation({ points: different, groups: buildAggregationGroups(different), prepared, enabled: true, projection: camera }).counts.scope).toBe(1);
+  });
+
+  it('keeps cached split/merge, query, explicit expansion and manual OFF equivalent to fresh decisions', () => {
+    const prepared = prepareAutoAggregation(points, groups);
+    let history: ReadonlySet<string> = new Set();
+    for (let repeat = 0; repeat < 3; repeat++) for (const zoom of [1, 50, 1]) for (const mode of ['auto', 'protected', 'expanded', 'manual', 'off']) {
+      const options = { points, groups, projection: { ...camera, zoom }, enabled: mode !== 'off', previousActiveGroupIds: history,
+        protectedIds: new Set(mode === 'protected' ? ['n1', 'n42'] : []), expandedGroupIds: new Set(mode === 'expanded' ? ['one'] : []),
+        manualGroups: mode === 'manual' || mode === 'off' ? [groups[0]!] : [], matchIds: new Set(repeat % 2 ? ['n1', 'n40'] : []) };
+      const cached = projectAutoAggregation({ ...options, prepared });
+      expect(cached).toEqual(projectAutoAggregation(options));
+      expect([...cached.individualIds, ...cached.aggregates.flatMap(group => group.memberIds)]).toHaveLength(80);
+      history = cached.activeGroupIds;
+    }
+  });
   it('partitions the scope, removes protected members from counts and keeps source positions intact', () => {
     const snapshot = structuredClone(points);
     const result = projectAutoAggregation({ points, groups, enabled: true, projection: camera, protectedIds: new Set(['n1', 'n42', 'outside']), matchIds: new Set(['n2', 'n3', 'n42']) });
@@ -47,6 +82,14 @@ describe('reversible 3D display ownership', () => {
     expect(stable.metrics.get('one')!.spacing).toBeCloseTo(18);
     const near = projectAutoAggregation({ points, groups, enabled: true, projection: { ...camera, zoom: 50 }, previousActiveGroupIds: dense.activeGroupIds });
     expect(near.counts.individual).toBe(80);
+  });
+
+  it('updates aggregate match counts without rebuilding unchanged canonical ownership', () => {
+    const before = projectAutoAggregation({ points, groups, enabled: true, projection: camera });
+    const next = stableAggregationRepresentation(projectAutoAggregation({ points, groups, enabled: true, projection: camera, matchIds: new Set(['n2']) }), before);
+    expect(next.ownerById).toBe(before.ownerById); expect(next.individualIds).toBe(before.individualIds);
+    expect(next.aggregates[0]!.matchingCount).toBe(1); expect(before.aggregates[0]!.matchingCount).toBe(0);
+    expect(next.counts).toEqual(before.counts);
   });
 
   it('keeps opposite, heterogeneous, uncertain and internal relations separate with their originals', () => {

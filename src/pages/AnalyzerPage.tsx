@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { ANALYZER_DEFAULT_TRANSFORM, ANALYZER_EXTERNAL_SUMMARY_ID, analyzerViewCounts, isCompatibleSpatialCameraTransform, presentationOwnsNode, presentAnalyzerView, projectAnalyzerView, regionMatchesSearch, restoreAnalyzerViewSession, useAnalyzerSession, viewNodeSearchText } from '../analyzer';
 import type { AnalyzerGraphTransform, AnalyzerProjectStore, AnalyzerSemanticRegion, AnalyzerViewCounts, AnalyzerViewId, AnalyzerViewModel, AnalyzerViewNode, AnalyzerViewSession, DirectoryHandleLike } from '../analyzer';
@@ -43,7 +43,8 @@ function LegacyAnalyzerPage() {
   const store = session.store;
   const fullscreen = useWorkspaceFullscreen(view === 'module-dependency' && Boolean(store));
   const storedViewState = session.views[view];
-  const [focusRequest, setFocusRequest] = useState<{ view: AnalyzerViewId; entityId: string; nonce: number; entityIds?: string[] }>();
+  const [focusRequest, setFocusRequest] = useState<{ view: AnalyzerViewId; store: AnalyzerProjectStore | undefined; entityId: string; nonce: number; entityIds?: string[] }>();
+  const focusNonce = useRef(0);
   const [reportedCounts, setReportedCounts] = useState<{ model: AnalyzerViewModel; counts: AnalyzerViewCounts }>();
 
   const model = useMemo(() => store ? projectAnalyzerView(store, view, storedViewState.entryScriptId) : undefined, [store, storedViewState.entryScriptId, view]);
@@ -87,7 +88,7 @@ function LegacyAnalyzerPage() {
   useEffect(() => {
     setFocusRequest(undefined);
     setReportedCounts(undefined);
-  }, [view]);
+  }, [view, store]);
 
   const handleScanned = (nextStore: AnalyzerProjectStore, folderHandle?: DirectoryHandleLike) => {
     replaceProject(nextStore, folderHandle);
@@ -96,8 +97,8 @@ function LegacyAnalyzerPage() {
   };
 
   const requestFocus = useCallback((entityId: string) => {
-    setFocusRequest((current) => ({ view, entityId, nonce: (current?.nonce ?? 0) + 1 }));
-  }, [view]);
+    setFocusRequest({ view, store, entityId, nonce: ++focusNonce.current });
+  }, [view, store]);
 
   const updateCamera = useCallback((update: AnalyzerGraphTransform | ((current: AnalyzerGraphTransform) => AnalyzerGraphTransform)) => {
     updateView(view, (current) => ({
@@ -119,24 +120,16 @@ function LegacyAnalyzerPage() {
   }, [model]);
 
   const selectNode = useCallback((nodeId: string, focus = false) => {
-    const node = model?.nodes.find((candidate) => candidate.id === nodeId);
-    const expanded = new Set(expandedPresentationIds);
-    if (view === 'module-dependency' && expanded.size === 0) {
-      model?.regions?.filter((region) => region.regionKind === 'directory').forEach((region) => expanded.add(region.id));
-    }
-    if (view === 'module-dependency' && node) {
-      const regionPath = node.metadata.regionPath;
-      if (Array.isArray(regionPath)) regionPath.forEach((regionId) => expanded.add(regionId));
-    }
+    // Spatial ownership extracts the selected entity from a closed scope. A
+    // selection must not turn that temporary exception into a directory opening.
     updateView(view, {
       selectedNodeId: nodeId,
       selectedRegionId: undefined,
       selectedEdgeId: undefined,
       detailOpen: true,
-      ...(expanded.size !== expandedPresentationIds.size ? { expandedPresentationIds: expanded } : {}),
     });
-    if (focus) requestFocus(nodeId);
-  }, [expandedPresentationIds, model, requestFocus, updateView, view]);
+    if (focus) requestFocus(nodeId); else setFocusRequest(undefined);
+  }, [requestFocus, updateView, view]);
 
   const selectRegion = useCallback((regionId: string, focus = false) => {
     const expanded = new Set(expandedPresentationIds);
@@ -160,52 +153,30 @@ function LegacyAnalyzerPage() {
       detailOpen: true,
       ...(expanded.size !== expandedPresentationIds.size ? { expandedPresentationIds: expanded } : {}),
     });
-    if (focus) requestFocus(regionId);
+    if (focus) requestFocus(regionId); else setFocusRequest(undefined);
   }, [expandedPresentationIds, model, requestFocus, updateView, view]);
 
   const selectEdge = useCallback((edgeId: string) => {
-    const expanded = new Set(expandedPresentationIds);
-    if (view === 'module-dependency') {
-      if (expanded.size === 0) {
-        model?.regions?.filter((region) => region.regionKind === 'directory').forEach((region) => expanded.add(region.id));
-      }
-      const edge = model?.edges.find((candidate) => candidate.id === edgeId);
-      const regionById = new Map((model?.regions ?? []).map((region) => [region.id, region]));
-      [edge?.sourceId, edge?.targetId].forEach((nodeId) => {
-        const node = model?.nodes.find((candidate) => candidate.id === nodeId);
-        const path = node ? node.metadata.regionPath : [];
-        if (!Array.isArray(path)) return;
-        path.forEach((regionId) => {
-          const region = regionById.get(regionId);
-          if (region?.regionKind === 'directory') expanded.add(regionId);
-        });
-      });
-    }
+    setFocusRequest(undefined);
     updateView(view, {
       selectedEdgeId: edgeId,
       selectedNodeId: undefined,
       selectedRegionId: undefined,
       detailOpen: true,
-      ...(expanded.size !== expandedPresentationIds.size ? { expandedPresentationIds: expanded } : {}),
     });
-  }, [expandedPresentationIds, model, updateView, view]);
+  }, [updateView, view]);
 
   const clearSelection = useCallback(() => {
+    setFocusRequest(undefined);
     updateView(view, { selectedNodeId: undefined, selectedRegionId: undefined, selectedEdgeId: undefined, detailOpen: false });
   }, [updateView, view]);
 
   const focusConnection = useCallback((sourceId: string, targetId: string) => {
     if (view !== 'module-dependency' || !model) return;
-    const expanded = new Set(expandedPresentationIds);
-    if (expanded.size === 0) model.regions?.forEach(region => expanded.add(region.id));
-    for (const id of [sourceId, targetId]) {
-      const path = model.nodes.find(node => node.id === id)?.metadata.regionPath;
-      if (Array.isArray(path)) path.forEach(regionId => expanded.add(regionId));
-    }
     const relation = model.edges.find(edge => edge.sourceId === sourceId && edge.targetId === targetId);
-    updateView(view, { expandedPresentationIds: expanded, ...(relation ? { selectedEdgeId: relation.id, selectedNodeId: undefined, selectedRegionId: undefined, detailOpen: true } : {}) });
-    setFocusRequest(current => ({ view, entityId: sourceId, entityIds: [sourceId, targetId], nonce: (current?.nonce ?? 0) + 1 }));
-  }, [expandedPresentationIds, model, updateView, view]);
+    if (relation) updateView(view, { selectedEdgeId: relation.id, selectedNodeId: undefined, selectedRegionId: undefined, detailOpen: true });
+    setFocusRequest({ view, store, entityId: sourceId, entityIds: [sourceId, targetId], nonce: ++focusNonce.current });
+  }, [model, updateView, view, store]);
 
   const closeDetail = useCallback(() => {
     updateView(view, { detailOpen: false });
@@ -302,7 +273,7 @@ function LegacyAnalyzerPage() {
     else selectNode(result.item.id, true);
   }, [search, searchResults, selectedEdgeId, selectedNodeId, selectedRegionId, selectNode, selectRegion, view]);
 
-  const activeFocusRequest = focusRequest?.view === view ? focusRequest : undefined;
+  const activeFocusRequest = focusRequest?.view === view && focusRequest.store === store ? focusRequest : undefined;
 
   return (
     <div className="page-stack analyzer-page">

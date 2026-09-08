@@ -5,13 +5,15 @@ type: pattern
 status: active
 maturity: reused
 created: 2026-09-08
-last_verified: 2026-09-08
-source_commit: "f97bafe59bb72d7af596504bbc0de319a84cb625"
+last_verified: 2026-09-09
+source_commit: "91b471a8997a50832c1330024f79e06274469e2b"
 related_files:
   - src/analyzer/semantic/dataFlow.ts
   - src/analyzer/semantic/types.ts
   - src/analyzer/semantic/tabs89IndependentAccuracy.test.ts
   - src/components/analyzer/SemanticFlowDetail.tsx
+  - src/components/analyzer/semanticFlowDisplay.ts
+  - src/components/analyzer/semanticFlowDisplay.test.ts
   - docs/technical/tabs-8-9-data-analysis.md
 tags:
   - data-flow
@@ -59,6 +61,8 @@ Do not apply:
 4. 大きい入力では解析時間・出力サイズとブラウザ操作を別々に測る。canonicalな対象の黙った削除で性能PASSにしない。
 
 ## Reuse Evidence
+
+2026-09-09の横断安定化で、parseDate L7の原parameterに加えL25/28/59/62の4呼び出し文脈、原returnに加え各callの戻り口をID/関係で再確認した。同一定義に見えることを理由に生成を重複削除せず、呼び出し行・範囲を表示へ追加した。局所graphではcall nodeが省かれ得るため、表示情報はfull contextのMapを渡す。2実入力5 Viewの全canonical hash一致と実UIの内訳表示で確認した。
 
 共通3Dの表示上の集約を追加する後続作業で、既存のcall-site文脈・原定義・解析上の処理集約を変更しない境界として利用した。最終固定実入力のcanonical nodes・edges・provenance・Evidence保全と既存の文脈分離テストを再確認した。新しい表示ownerの接続は正規探索へ渡していない。この表示投影固有の境界はrm-20260908-display-owner-traversal-boundaryに分けて記録した。
 

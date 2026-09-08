@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 :root {
+  color-scheme: dark;
   --bg: #0a0d0e;
   --surface: #101516;
   --surface-soft: #151c1c;
@@ -14,6 +15,7 @@
   --accent-strong: #d2f0e3;
   --warm: #d8ba91;
   --connector: rgba(143, 172, 163, 0.62);
+  --scrollbar-thumb: #526e63;
   --analyzer-edge-related: #22d3ee;
   --analyzer-edge-selected: #67e8f9;
   --content-width: 1320px;
@@ -26,6 +28,27 @@
 
 * {
   box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+/* Keep native scrolling, with the same quiet treatment in nested panels. */
+@supports not (scrollbar-color: auto) {
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-thumb:hover { background-color: #78978a; }
+  ::-webkit-scrollbar-button { display: none; }
+}
+
+@media (forced-colors: active) {
+  * { scrollbar-width: auto !important; scrollbar-color: auto !important; }
 }
 
 html {
@@ -4331,7 +4354,6 @@ summary:focus-visible {
   overflow: auto;
   border: 1px solid var(--line);
   background: rgba(16, 21, 22, 0.82);
-  scrollbar-color: var(--line) transparent;
   animation: analyzer-detail-in 180ms ease-out both;
 }
 

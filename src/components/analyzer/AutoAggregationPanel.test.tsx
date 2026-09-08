@@ -12,6 +12,15 @@ afterEach(async()=>{await act(async()=>root.unmount());host.remove();vi.restoreA
 const group=(size:number):AggregationGroup=>({id:'stable-scope',label:'scope',x:0,y:0,z:0,minimumMembers:8,memberIds:Array.from({length:size},(_,i)=>`n${i}`)});
 const originalRelations=Array.from({length:45},(_,i)=>({id:`e${i}`,source:`n${i}`,target:`n${(i+1)%45}`,kind:'reads',confidence:'source',label:'read',siteCount:1,evidenceCount:2}));
 const selectNode=vi.fn(),selectEdge=vi.fn();
+it('moves a vanished display collection to its real affiliation and applies explicitly named scope actions',async()=>{
+ const g=group(8),change=vi.fn();
+ await act(async()=>root.render(<AutoAggregationPanel enabled={false} counts={{scope:8,individual:8,automaticMembers:0,automaticGroups:0,manualMembers:0,manualGroups:0,representations:8}} groups={[g]} aggregates={[]} ownerById={new Map(g.memberIds.map(id=>[id,id]))} expandedIds={new Set()} collapsedIds={new Set()} inspection={{kind:'group',id:g.id}} onInspection={vi.fn()} onGroupMode={change} relations={[]} originalRelations={[]} nodeLabel={id=>({title:id})} onSelectNode={selectNode} onSelectRelation={selectEdge}/>));
+ expect(host.textContent).toContain('表示の更新により、所属全体を表示しています');
+ expect(host.textContent).not.toContain('現在の表示集合 0対象');
+ expect(host.querySelectorAll('[data-aggregation-member-id]')).toHaveLength(8);
+ const expand=[...host.querySelectorAll('button')].find(b=>b.textContent==='この所属の8対象を個別表示')!;
+ await act(async()=>expand.click());expect(change).toHaveBeenCalledWith('stable-scope','expanded');
+});
 async function panel(size:number,relationSize=45) {const g=group(size);await act(async()=>root.render(<AutoAggregationPanel enabled={true} counts={{scope:size,individual:0,automaticMembers:size,automaticGroups:1,manualMembers:0,manualGroups:0,representations:1}} groups={[g]} aggregates={[{...g,id:'display:stable-scope',groupId:g.id,mode:'automatic',matchingCount:0,memberIds:[...g.memberIds]}]} expandedIds={new Set()} collapsedIds={new Set()} inspection={{kind:'group',id:g.id}} onInspection={vi.fn()} onGroupMode={vi.fn()} relations={[]} originalRelations={originalRelations.slice(0,relationSize)} nodeLabel={id=>({title:id})} onSelectNode={selectNode} onSelectRelation={selectEdge}/>));}
 async function next(label:string){const holder=host.querySelector(`[aria-label="${label}"]`)!;const button=[...holder.querySelectorAll('button')].find(b=>b.textContent==='次へ')!;await act(async()=>button.click());}
 it('all group members and internal original relations remain accessible past page two',async()=>{

@@ -201,7 +201,7 @@ export default function FlowAnalyzerPage({ view }: { view: SemanticExplorerViewI
       }} loading={Boolean(store && !analysis && !error)} />
       <div ref={fullscreen.root} className={`analyzer-workspace semantic-flow-workspace${session.detailOpen && (selected || selectedEdge) ? ' has-detail' : ''}${fullscreen.isFullscreen ? ' is-fullscreen' : ''}`}
         role={fullscreen.isFullscreen ? 'dialog' : undefined} aria-modal={fullscreen.isFullscreen || undefined} aria-label={fullscreen.isFullscreen ? `${view} 全画面表示` : undefined} onKeyDownCapture={fullscreen.onKeyDownCapture}>
-        {store ? <SemanticFlowStage key={`${view}:${state.scanVersion}`} graph={filtered} explorer={explorer} mode={flow.mode} direction={options.direction} selectedIds={selectedIds} selectedEdgeId={selectedEdge?.id} matchIds={matchIds} focus={focus}
+        {store ? <SemanticFlowStage key={`${view}:${state.scanVersion}`} graph={filtered} explorer={explorer} nodeDisplays={searchDisplays} mode={flow.mode} direction={options.direction} selectedIds={selectedIds} selectedEdgeId={selectedEdge?.id} matchIds={matchIds} focus={focus}
           navigation={{ location: explorerLocation, visitId: navigation.visitId, scrollTop: navigation.scrollTop, canBack: navigation.canBack,
             onBack: navigation.back, onParent: navigation.parent, onProject: navigation.project, onOpenScope: navigation.openScope, onOpenNode: navigation.openNode,
             onCenter: navigation.openNode, onDefinition: navigation.openDefinition, onJumpMode: navigation.jumpMode, onDepth: depth => navigation.changeLocal({ depth, direction: options.direction }),

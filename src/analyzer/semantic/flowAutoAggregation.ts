@@ -1,4 +1,4 @@
-import { buildAggregationGroups, projectAggregationRelations, type AggregationGroupIdentity, type AggregationPoint, type AutoAggregationResult } from '../autoAggregation';
+import { buildAggregationGroups, projectAggregationRelations, shortAggregationLabels, type AggregationGroupIdentity, type AggregationPoint, type AutoAggregationResult, type DisplayAggregationRelation } from '../autoAggregation';
 import type { SemanticPosition } from './presentation';
 import type { SemanticExplorerModel } from './semanticExplorer';
 import { confidenceLabels, kindLabels, type SemanticGraph, type SemanticNode, type SemanticEdge } from './types';
@@ -39,21 +39,45 @@ export function semanticAggregationInput(graph: SemanticGraph, positions: readon
 }
 
 /** The source graph remains separately available for search, paths, detail and Evidence. */
-export function projectAggregatedSemanticFlow(graph: SemanticGraph, allPositions: readonly SemanticPosition[], result: Pick<AutoAggregationResult, 'individualIds' | 'ownerById' | 'aggregates'>) {
+export function projectAggregatedSemanticFlow(graph: SemanticGraph, allPositions: readonly SemanticPosition[], result: Pick<AutoAggregationResult, 'individualIds' | 'ownerById' | 'aggregates'>,
+  relationCache?: { sourceGraph: SemanticGraph; owners: AutoAggregationResult['ownerById']; relations: DisplayAggregationRelation<SemanticEdge>[]; edges: SemanticEdge[] }) {
+  const counts = new Map<number, string>();
+  const formatCount = (count: number) => { let text = counts.get(count); if (text === undefined) { text = count.toLocaleString(); counts.set(count, text); } return text; };
   const positions: SemanticPosition[] = allPositions.filter(point => result.individualIds.has(point.node.id));
   const byId = new Map(graph.nodes.map(node => [node.id, node]));
+  const shortLabels = shortAggregationLabels(result.aggregates);
   for (const group of result.aggregates) {
     const members = group.memberIds.map(id => byId.get(id)!);
     const confidence = members.every(node => node.confidence === 'source') ? 'source' : members.every(node => node.confidence === 'observed') ? 'observed' : members.some(node => node.confidence === 'unresolved') ? 'unresolved' : 'inferred';
-    const node: SemanticNode = { id: group.id, kind: 'subsystem', label: `${group.memberIds.length.toLocaleString()}対象 · ${group.label}`, group: '表示上のまとまり', confidence, evidence: [],
-      attributes: { displayAggregate: true, targetCount: group.memberIds.length, matchingCount: group.matchingCount, aggregationMode: group.mode, groupId: group.groupId } };
+    const node: SemanticNode = { id: group.id, kind: 'subsystem', label: `${formatCount(group.memberIds.length)}対象 · ${group.label}`, group: '表示上のまとまり', confidence, evidence: [],
+      attributes: { displayAggregate: true, shortLabel: shortLabels.get(group.id)!, fullLabel: group.label, targetCount: group.memberIds.length, matchingCount: group.matchingCount, aggregationMode: group.mode, groupId: group.groupId } };
     positions.push({ node, x: group.x, y: group.y, z: group.z });
   }
-  const relations = projectAggregationRelations(graph.edges, result.ownerById);
-  const edges: SemanticEdge[] = relations.map(relation => relation.aggregated ? {
-    ...relation.originals[0]!, id: relation.id, source: relation.source, target: relation.target,
-    label: `${relation.originals.length.toLocaleString()}関係 · ${relation.originals[0]!.label}`,
-    evidence: relation.originals.flatMap(edge => edge.evidence), provenance: { edges: relation.originals },
-  } : relation.originals[0]!);
+  const reuse = relationCache?.sourceGraph === graph && relationCache.owners === result.ownerById ? relationCache : undefined;
+  const relations = reuse?.relations ?? projectAggregationRelations(graph.edges, result.ownerById);
+  const edges: SemanticEdge[] = reuse?.edges ?? relations.map(relation => {
+    const first = relation.originals[0]!;
+    if (!relation.aggregated) return first;
+    const evidence: SemanticEdge['evidence'] = [];
+    for (const edge of relation.originals) for (const item of edge.evidence) evidence.push(item);
+    return { id: relation.id, source: relation.source, target: relation.target, kind: first.kind, confidence: first.confidence, views: first.views,
+      label: `${formatCount(relation.originals.length)}関係 · ${first.label}`, details: first.details,
+      evidence, provenance: { edges: relation.originals } };
+  });
   return { positions, graph: { ...graph, nodes: positions.map(point => point.node), edges }, relations };
+}
+
+/** Keep a few recent representations during split/merge gestures. The cache is
+ * scoped to the immutable canonical graph, never shared across projects. */
+export function createSemanticFlowProjector(graph: SemanticGraph, positions: readonly SemanticPosition[]) {
+  const recent: { owners: AutoAggregationResult['ownerById']; aggregates: AutoAggregationResult['aggregates']; value: ReturnType<typeof projectAggregatedSemanticFlow> }[] = [];
+  return (result: Pick<AutoAggregationResult, 'individualIds' | 'ownerById' | 'aggregates'>) => {
+    const cached = recent.find(item => item.owners === result.ownerById && item.aggregates === result.aggregates);
+    if (cached) return cached.value;
+    const sameOwners = recent.find(item => item.owners === result.ownerById);
+    const value = projectAggregatedSemanticFlow(graph, positions, result, sameOwners ? { sourceGraph: graph, owners: sameOwners.owners, relations: sameOwners.value.relations, edges: sameOwners.value.graph.edges } : undefined);
+    if (recent.length >= 4) recent.shift();
+    recent.push({ owners: result.ownerById, aggregates: result.aggregates, value });
+    return value;
+  };
 }

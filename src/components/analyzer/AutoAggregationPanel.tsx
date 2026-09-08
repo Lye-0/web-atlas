@@ -34,7 +34,7 @@ export function AutoAggregationPanel({ enabled, counts, groups, aggregates, expa
   }, [groups, aggregates, expandedIds, collapsedIds]);
   const group = inspection?.kind === 'group' ? groups.find(group => group.id === inspection.id) : undefined;
   const activeAggregate = group ? aggregates.find(item => item.groupId === group.id) : undefined;
-  const showWholeScope = group?.id === wholeScope?.groupId && wholeScope?.visible;
+  const showWholeScope = Boolean(group && !activeAggregate) || group?.id === wholeScope?.groupId && wholeScope?.visible;
   const inspectedMemberIds = showWholeScope ? group?.memberIds : activeAggregate?.memberIds ?? group?.memberIds;
   const aggregateById = useMemo(() => new Map(aggregates.map(item => [item.id, item])), [aggregates]);
   const membershipCounts = useMemo(() => {
@@ -69,6 +69,7 @@ export function AutoAggregationPanel({ enabled, counts, groups, aggregates, expa
   }} data-auto-aggregation={enabled ? 'on' : 'off'} data-scope-count={counts.scope} data-individual-count={counts.individual} data-auto-member-count={counts.automaticMembers} data-auto-group-count={counts.automaticGroups} data-manual-member-count={counts.manualMembers}>
     <summary>対象 {counts.scope.toLocaleString()} · 個別 {counts.individual.toLocaleString()}{counts.automaticGroups ? ` · 自動 ${counts.automaticGroups.toLocaleString()}組` : ''}{counts.manualMembers ? ` · 手動 ${counts.manualMembers.toLocaleString()}対象` : ''}<span>表示の内訳</span></summary>
     {(open || inspection) && <div className="auto-aggregation-body"><p>自動省略 {enabled ? 'ON' : 'OFF'}。解析結果と検索対象は変わりません。</p>
+      {inspection && !group && !relation && <p role="status">表示の更新により、選択していた集合または集約線は現在の対象範囲から外れました。<button type="button" onClick={() => inspect(undefined)}>現在の集約一覧へ戻る</button></p>}
       <dl className="auto-aggregation-counts"><div><dt>解析全体</dt><dd>{(totalCount ?? counts.scope).toLocaleString()}対象</dd></div><div><dt>現在の対象範囲</dt><dd>{counts.scope.toLocaleString()}対象</dd></div><div><dt>個別表示</dt><dd>{counts.individual.toLocaleString()}対象</dd></div><div><dt>自動集約</dt><dd>{counts.automaticGroups.toLocaleString()}組 · {counts.automaticMembers.toLocaleString()}対象</dd></div><div><dt>手動折りたたみ</dt><dd>{counts.manualGroups.toLocaleString()}組 · {counts.manualMembers.toLocaleString()}対象</dd></div></dl>
       <p className="auto-aggregation-note">個別表示は世界内の点の数です。画面外の点・優先ラベル・選択中心の線は別に描画を調整しています。</p>
       {!group && !relation && <><ul className="auto-aggregation-group-list">{available.slice(currentPage * 12, (currentPage + 1) * 12).map(group => {
@@ -76,10 +77,10 @@ export function AutoAggregationPanel({ enabled, counts, groups, aggregates, expa
         return <li key={group.id}><button type="button" onClick={() => inspect({ kind: 'group', id: group.id })}><strong>{group.label}</strong><small>{aggregate ? `${aggregate.mode === 'automatic' ? '自動集約' : '手動折りたたみ'} ${aggregate.memberIds.length}対象${aggregate.matchingCount ? ` · 内部に${aggregate.matchingCount}件一致` : ''}` : `明示展開 ${group.memberIds.length}対象`}</small></button></li>;
       })}</ul><PageButtons page={groupPage} count={available.length} size={12} onPage={setGroupPage} label="集約の一覧" />{!available.length && <p>現在、自動集約・手動折りたたみはありません。</p>}</>}
       {(group || relation) && <><button type="button" className="auto-aggregation-back" onClick={() => inspect(undefined)}>集約の一覧へ</button>
-        {group && <><h4>{group.label}</h4><p>現在の表示集合 {(activeAggregate?.memberIds.length ?? 0).toLocaleString()}対象。展開・折りたたみは、この所属範囲全体 {group.memberIds.length.toLocaleString()}対象に適用します。</p>
+        {group && <><h4>{group.label}</h4><p>{activeAggregate ? `現在の表示集合 ${activeAggregate.memberIds.length.toLocaleString()}対象。` : '表示の更新により、所属全体を表示しています。現在、この所属を代表する表示集合はありません。'}展開・折りたたみは、この所属範囲全体 {group.memberIds.length.toLocaleString()}対象に適用します。</p>
           {membershipCounts && <p className="auto-aggregation-membership-counts">所属全体の内訳：この集合 {membershipCounts.current} · 個別表示 {membershipCounts.individual} · 別の自動集約 {membershipCounts.otherAuto} · 別の手動折りたたみ {membershipCounts.otherManual}対象</p>}
           {activeAggregate?.breakdown && <dl className="auto-aggregation-counts" aria-label="表示集合の内訳">{Object.entries(activeAggregate.breakdown).map(([label, count]) => <div key={label}><dt>{label}</dt><dd>{count.toLocaleString()}対象</dd></div>)}</dl>}
-          <div className="auto-aggregation-actions"><button type="button" aria-pressed={expandedIds.has(group.id)} onClick={() => onGroupMode(group.id, 'expanded')}>全メンバーを個別表示</button><button type="button" aria-pressed={collapsedIds.has(group.id)} onClick={() => onGroupMode(group.id, 'collapsed')}>集合に折りたたむ</button><button type="button" onClick={() => onGroupMode(group.id, 'auto')}>自動表示に戻す</button></div></>}
+          <div className="auto-aggregation-actions"><button type="button" aria-pressed={expandedIds.has(group.id)} onClick={() => onGroupMode(group.id, 'expanded')}>この所属の{group.memberIds.length.toLocaleString()}対象を個別表示</button><button type="button" aria-pressed={collapsedIds.has(group.id)} onClick={() => onGroupMode(group.id, 'collapsed')}>この所属を手動で折りたたむ</button><button type="button" onClick={() => onGroupMode(group.id, 'auto')}>この所属を自動表示に戻す</button></div></>}
         {relation && <><h4>表示上の集約線 · {relation.originals.length.toLocaleString()}関係</h4><p>方向・種類・確度を分けてまとめています。各行から元の関係を選択できます。</p></>}
         {group && activeAggregate && activeAggregate.memberIds.length !== group.memberIds.length && <button type="button" className="auto-aggregation-back" aria-pressed={Boolean(showWholeScope)} onClick={() => setWholeScope({ groupId: group.id, visible: !showWholeScope })}>{showWholeScope ? 'この集合のメンバーだけを見る' : '所属範囲全体の一覧を見る'}</button>}
         <AggregationContents key={`${inspection?.kind}:${inspection?.id}:${Boolean(showWholeScope)}`} memberIds={inspectedMemberIds} relations={selectedRelations} nodeLabel={nodeLabel} memberStatus={memberStatus} onSelectNode={onSelectNode} onSelectRelation={onSelectRelation} />

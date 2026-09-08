@@ -1,0 +1,2148 @@
+{
+  "unit": "ms",
+  "measurement": "Main-thread RAF intervals and inclusive CPU wrappers; elapsed includes automation transport. 1 warmup plus 3 samples per cell.",
+  "rows": [
+    {
+      "scenario": "git-lines-data-flow",
+      "phase": "before",
+      "mode": "off",
+      "files": [
+        "before-final-git-lines-data-flow-off-1.json",
+        "before-final-git-lines-data-flow-off-2.json",
+        "before-final-git-lines-data-flow-off-3.json"
+      ],
+      "elapsedMs": {
+        "median": 2516.7,
+        "min": 2500.3,
+        "max": 2516.9
+      },
+      "rafMedianMs": {
+        "median": 16.7,
+        "min": 16.7,
+        "max": 16.7
+      },
+      "rafP95Ms": {
+        "median": 83.2,
+        "min": 83.2,
+        "max": 83.3
+      },
+      "rafMaxMs": {
+        "median": 83.4,
+        "min": 83.4,
+        "max": 100.1
+      },
+      "aggregationMs": {
+        "median": 209.8,
+        "min": 209.1,
+        "max": 211.5
+      },
+      "labelMs": {
+        "median": 280.5,
+        "min": 279.1,
+        "max": 282.9
+      },
+      "counts": {
+        "scope": "35303",
+        "individual": "35303",
+        "autoGroups": "0",
+        "autoMembers": "0",
+        "manual": "0"
+      },
+      "environment": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+        "width": 1440,
+        "height": 1000,
+        "dpr": 1
+      }
+    },
+    {
+      "scenario": "git-lines-data-flow",
+      "phase": "before",
+      "mode": "on",
+      "files": [
+        "before-final-git-lines-data-flow-on-1.json",
+        "before-final-git-lines-data-flow-on-2.json",
+        "before-final-git-lines-data-flow-on-3.json"
+      ],
+      "elapsedMs": {
+        "median": 4159.8,
+        "min": 4133.4,
+        "max": 4176.5
+      },
+      "rafMedianMs": {
+        "median": 16.7,
+        "min": 16.7,
+        "max": 16.7
+      },
+      "rafP95Ms": {
+        "median": 399.9,
+        "min": 399.9,
+        "max": 400
+      },
+      "rafMaxMs": {
+        "median": 400.1,
+        "min": 400,
+        "max": 433.3
+      },
+      "aggregationMs": {
+        "median": 1659,
+        "min": 1624.5,
+        "max": 1660.5
+      },
+      "labelMs": {
+        "median": 159.2,
+        "min": 146.9,
+        "max": 168.7
+      },
+      "counts": {
+        "scope": "35303",
+        "individual": "10397",
+        "autoGroups": "845",
+        "autoMembers": "24906",
+        "manual": "0"
+      },
+      "environment": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+        "width": 1440,
+        "height": 1000,
+        "dpr": 1
+      }
+    },
+    {
+      "scenario": "git-lines-data-flow",
+      "phase": "after",
+      "mode": "off",
+      "files": [
+        "final16-git-lines-data-flow-off-1.json",
+        "final16-git-lines-data-flow-off-2.json",
+        "final16-git-lines-data-flow-off-3.json"
+      ],
+      "elapsedMs": {
+        "median": 2366.4,
+        "min": 2230.7,
+        "max": 2433.8
+      },
+      "rafMedianMs": {
+        "median": 16.7,
+        "min": 16.7,
+        "max": 16.7
+      },
+      "rafP95Ms": {
+        "median": 16.8,
+        "min": 16.7,
+        "max": 16.8
+      },
+      "rafMaxMs": {
+        "median": 33.4,
+        "min": 16.8,
+        "max": 50
+      },
+      "aggregationMs": {
+        "median": 0.2,
+        "min": 0.1,
+        "max": 0.2
+      },
+      "labelMs": {
+        "median": 235.1,
+        "min": 190.4,
+        "max": 236
+      },
+      "counts": {
+        "scope": "35303",
+        "individual": "35303",
+        "autoGroups": "0",
+        "autoMembers": "0",
+        "manual": "0"
+      },
+      "environment": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+        "width": 1440,
+        "height": 1000,
+        "dpr": 1
+      }
+    },
+    {
+      "scenario": "git-lines-data-flow",
+      "phase": "after",
+      "mode": "on",
+      "files": [
+        "final16-git-lines-data-flow-on-1.json",
+        "final16-git-lines-data-flow-on-2.json",
+        "final16-git-lines-data-flow-on-3.json"
+      ],
+      "elapsedMs": {
+        "median": 2350.1,
+        "min": 2267.3,
+        "max": 2665.2
+      },
+      "rafMedianMs": {
+        "median": 16.7,
+        "min": 16.7,
+        "max": 16.7
+      },
+      "rafP95Ms": {
+        "median": 16.8,
+        "min": 16.8,
+        "max": 33.3
+      },
+      "rafMaxMs": {
+        "median": 50,
+        "min": 33.4,
+        "max": 50
+      },
+      "aggregationMs": {
+        "median": 0.2,
+        "min": 0.2,
+        "max": 0.6
+      },
+      "labelMs": {
+        "median": 133.1,
+        "min": 121.8,
+        "max": 155
+      },
+      "counts": {
+        "scope": "35303",
+        "individual": "10400",
+        "autoGroups": "845",
+        "autoMembers": "24903",
+        "manual": "0"
+      },
+      "environment": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+        "width": 1440,
+        "height": 1000,
+        "dpr": 1
+      }
+    },
+    {
+      "scenario": "rotation",
+      "phase": "before",
+      "mode": "off",
+      "files": [
+        "before-final-rotation-off-1.json",
+        "before-final-rotation-off-2.json",
+        "before-final-rotation-off-3.json"
+      ],
+      "elapsedMs": {
+        "median": 1216.7,
+        "min": 1167.1,
+        "max": 1249.6
+      },
+      "rafMedianMs": {
+        "median": 16.7,
+        "min": 16.7,
+        "max": 16.7
+      },
+      "rafP95Ms": {
+        "median": 50.1,
+        "min": 50,
+        "max": 50.1
+      },
+      "rafMaxMs": {
+        "median": 66.7,
+        "min": 50,
+        "max": 83.4
+      },
+      "aggregationMs": {
+        "median": 137.1,
+        "min": 127.2,
+        "max": 140.5
+      },
+      "labelMs": {
+        "median": 229.2,
+        "min": 214.6,
+        "max": 252
+      },
+      "counts": {
+        "scope": "35303",
+        "individual": "35303",
+        "autoGroups": "0",
+        "autoMembers": "0",
+        "manual": "0"
+      },
+      "environment": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+        "width": 1440,
+        "height": 1000,
+        "dpr": 1
+      }
+    },
+    {
+      "scenario": "rotation",
+      "phase": "before",
+      "mode": "on",
+      "files": [
+        "before-final-rotation-on-1.json",
+        "before-final-rotation-on-2.json",
+        "before-final-rotation-on-3.json"
+      ],
+      "elapsedMs": {
+        "median": 4117.4,
+        "min": 3250.4,
+        "max": 4348.8
+      },
+      "rafMedianMs": {
+        "median": 16.7,
+        "min": 16.7,
+        "max": 16.7
+      },
+      "rafP95Ms": {
+        "median": 316.6,
+        "min": 316.6,
+        "max": 316.6
+      },
+      "rafMaxMs": {
+        "median": 333.3,
+        "min": 316.7,
+        "max": 383.4
+      },
+      "aggregationMs": {
+        "median": 1215.8,
+        "min": 1199,
+        "max": 1218.3
+      },
+      "labelMs": {
+        "median": 205.3,
+        "min": 167.9,
+        "max": 217.3
+      },
+      "counts": {
+        "scope": "35303",
+        "individual": "10163",
+        "autoGroups": "845",
+        "autoMembers": "25140",
+        "manual": "0"
+      },
+      "environment": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+        "width": 1440,
+        "height": 1000,
+        "dpr": 1
+      }
+    },
+    {
+      "scenario": "rotation",
+      "phase": "after",
+      "mode": "off",
+      "files": [
+        "final16-rotation-off-1.json",
+        "final16-rotation-off-2.json",
+        "final16-rotation-off-3.json"
+      ],
+      "elapsedMs": {
+        "median": 766.1,
+        "min": 716.9,
+        "max": 767.2
+      },
+      "rafMedianMs": {
+        "median": 16.7,
+        "min": 16.7,
+        "max": 16.7
+      },
+      "rafP95Ms": {
+        "median": 16.8,
+        "min": 16.8,
+        "max": 16.8
+      },
+      "rafMaxMs": {
+        "median": 16.8,
+        "min": 16.8,
+        "max": 33.3
+      },
+      "aggregationMs": {
+        "median": 0.1,
+        "min": 0.1,
+        "max": 0.1
+      },
+      "labelMs": {
+        "median": 171.9,
+        "min": 161.5,
+        "max": 198.6
+      },
+      "counts": {
+        "scope": "35303",
+        "individual": "35303",
+        "autoGroups": "0",
+        "autoMembers": "0",
+        "manual": "0"
+      },
+      "environment": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+        "width": 1440,
+        "height": 1000,
+        "dpr": 1
+      }
+    },
+    {
+      "scenario": "rotation",
+      "phase": "after",
+      "mode": "on",
+      "files": [
+        "final16-rotation-on-1.json",
+        "final16-rotation-on-2.json",
+        "final16-rotation-on-3.json"
+      ],
+      "elapsedMs": {
+        "median": 1616.9,
+        "min": 1250.9,
+        "max": 1633
+      },
+      "rafMedianMs": {
+        "median": 16.7,
+        "min": 16.7,
+        "max": 16.7
+      },
+      "rafP95Ms": {
+        "median": 83.3,
+        "min": 66.7,
+        "max": 83.4
+      },
+      "rafMaxMs": {
+        "median": 133.4,
+        "min": 100,
+        "max": 133.4
+      },
+      "aggregationMs": {
+        "median": 169.1,
+        "min": 167.8,
+        "max": 181
+      },
+      "labelMs": {
+        "median": 162.2,
+        "min": 144.5,
+        "max": 188.9
+      },
+      "counts": {
+        "scope": "35303",
+        "individual": "10166",
+        "autoGroups": "845",
+        "autoMembers": "25137",
+        "manual": "0"
+      },
+      "environment": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+        "width": 1440,
+        "height": 1000,
+        "dpr": 1
+      }
+    },
+    {
+      "scenario": "vehicle-management-data-flow",
+      "phase": "before",
+      "mode": "off",
+      "files": [
+        "before-final-vehicle-management-data-flow-off-1.json",
+        "before-final-vehicle-management-data-flow-off-2.json",
+        "before-final-vehicle-management-data-flow-off-3.json"
+      ],
+      "elapsedMs": {
+        "median": 10491.1,
+        "min": 10375.3,
+        "max": 11179.4
+      },
+      "rafMedianMs": {
+        "median": 16.7,
+        "min": 16.7,
+        "max": 16.7
+      },
+      "rafP95Ms": {
+        "median": 600,
+        "min": 583.4,
+        "max": 616.6
+      },
+      "rafMaxMs": {
+        "median": 616.6,
+        "min": 600,
+        "max": 633.3
+      },
+      "aggregationMs": {
+        "median": 1229.1,
+        "min": 1220.2,
+        "max": 1258.3
+      },
+      "labelMs": {
+        "median": 6361.4,
+        "min": 6314.4,
+        "max": 6975.1
+      },
+      "counts": {
+        "scope": "142244",
+        "individual": "142244",
+        "autoGroups": "0",
+        "autoMembers": "0",
+        "manual": "0"
+      },
+      "environment": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+        "width": 1440,
+        "height": 1000,
+        "dpr": 1
+      }
+    },
+    {
+      "scenario": "vehicle-management-data-flow",
+      "phase": "before",
+      "mode": "on",
+      "files": [
+        "before-final-vehicle-management-data-flow-on-1.json",
+        "before-final-vehicle-management-data-flow-on-2.json",
+        "before-final-vehicle-management-data-flow-on-3.json"
+      ],
+      "elapsedMs": {
+        "median": 13255.3,
+        "min": 11260.2,
+        "max": 13292
+      },
+      "rafMedianMs": {
+        "median": 16.7,
+        "min": 16.7,
+        "max": 16.7
+      },
+      "rafP95Ms": {
+        "median": 1300,
+        "min": 1166.7,
+        "max": 1316.7
+      },
+      "rafMaxMs": {
+        "median": 1450,
+        "min": 1300,
+        "max": 1450
+      },
+      "aggregationMs": {
+        "median": 9904.1,
+        "min": 8362.6,
+        "max": 9935.8
+      },
+      "labelMs": {
+        "median": 257.5,
+        "min": 214.3,
+        "max": 263.6
+      },
+      "counts": {
+        "scope": "142244",
+        "individual": "0",
+        "autoGroups": "14",
+        "autoMembers": "142244",
+        "manual": "0"
+      },
+      "environment": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+        "width": 1440,
+        "height": 1000,
+        "dpr": 1
+      }
+    },
+    {
+      "scenario": "vehicle-management-data-flow",
+      "phase": "after",
+      "mode": "off",
+      "files": [
+        "final16-vehicle-management-data-flow-off-1.json",
+        "final16-vehicle-management-data-flow-off-2.json",
+        "final16-vehicle-management-data-flow-off-3.json"
+      ],
+      "elapsedMs": {
+        "median": 5392.1,
+        "min": 4993.3,
+        "max": 5694.6
+      },
+      "rafMedianMs": {
+        "median": 16.7,
+        "min": 16.7,
+        "max": 16.7
+      },
+      "rafP95Ms": {
+        "median": 250,
+        "min": 233.3,
+        "max": 266.8
+      },
+      "rafMaxMs": {
+        "median": 316.6,
+        "min": 299.9,
+        "max": 316.7
+      },
+      "aggregationMs": {
+        "median": 0.2,
+        "min": 0.1,
+        "max": 0.2
+      },
+      "labelMs": {
+        "median": 4083.8,
+        "min": 3713.2,
+        "max": 4364.3
+      },
+      "counts": {
+        "scope": "142244",
+        "individual": "142244",
+        "autoGroups": "0",
+        "autoMembers": "0",
+        "manual": "0"
+      },
+      "environment": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+        "width": 1440,
+        "height": 1000,
+        "dpr": 1
+      }
+    },
+    {
+      "scenario": "vehicle-management-data-flow",
+      "phase": "after",
+      "mode": "on",
+      "files": [
+        "final16-vehicle-management-data-flow-on-1.json",
+        "final16-vehicle-management-data-flow-on-2.json",
+        "final16-vehicle-management-data-flow-on-3.json"
+      ],
+      "elapsedMs": {
+        "median": 2466.7,
+        "min": 2433.6,
+        "max": 2483.3
+      },
+      "rafMedianMs": {
+        "median": 16.7,
+        "min": 16.7,
+        "max": 16.7
+      },
+      "rafP95Ms": {
+        "median": 50,
+        "min": 50,
+        "max": 50
+      },
+      "rafMaxMs": {
+        "median": 66.7,
+        "min": 66.7,
+        "max": 83.3
+      },
+      "aggregationMs": {
+        "median": 2.2,
+        "min": 1.9,
+        "max": 2.2
+      },
+      "labelMs": {
+        "median": 288.7,
+        "min": 280.9,
+        "max": 303
+      },
+      "counts": {
+        "scope": "142244",
+        "individual": "0",
+        "autoGroups": "14",
+        "autoMembers": "142244",
+        "manual": "0"
+      },
+      "environment": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+        "width": 1440,
+        "height": 1000,
+        "dpr": 1
+      }
+    },
+    {
+      "scenario": "small-module-dependency",
+      "phase": "before",
+      "mode": "off",
+      "files": [
+        "before-final-small-module-dependency-off-1.json",
+        "before-final-small-module-dependency-off-2.json",
+        "before-final-small-module-dependency-off-3.json"
+      ],
+      "elapsedMs": {
+        "median": 3038.1,
+        "min": 2850.7,
+        "max": 8099.2
+      },
+      "rafMedianMs": {
+        "median": 16.7,
+        "min": 16.7,
+        "max": 16.7
+      },
+      "rafP95Ms": {
+        "median": 16.9,
+        "min": 16.8,
+        "max": 16.9
+      },
+      "rafMaxMs": {
+        "median": 17.1,
+        "min": 17.1,
+        "max": 17.2
+      },
+      "aggregationMs": {
+        "median": 0.1,
+        "min": 0.1,
+        "max": 0.3
+      },
+      "labelMs": {
+        "median": 0,
+        "min": 0,
+        "max": 0
+      },
+      "counts": {
+        "scope": "2",
+        "individual": "2",
+        "autoGroups": "0",
+        "autoMembers": "0",
+        "manual": "0"
+      },
+      "environment": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+        "width": 1440,
+        "height": 1000,
+        "dpr": 1
+      }
+    },
+    {
+      "scenario": "small-module-dependency",
+      "phase": "before",
+      "mode": "on",
+      "files": [
+        "before-final-small-module-dependency-on-1.json",
+        "before-final-small-module-dependency-on-2.json",
+        "before-final-small-module-dependency-on-3.json"
+      ],
+      "elapsedMs": {
+        "median": 2905.9,
+        "min": 2868.3,
+        "max": 3133.5
+      },
+      "rafMedianMs": {
+        "median": 16.7,
+        "min": 16.7,
+        "max": 16.7
+      },
+      "rafP95Ms": {
+        "median": 16.8,
+        "min": 16.8,
+        "max": 16.8
+      },
+      "rafMaxMs": {
+        "median": 17.1,
+        "min": 16.9,
+        "max": 17.2
+      },
+      "aggregationMs": {
+        "median": 0.5,
+        "min": 0.4,
+        "max": 0.7
+      },
+      "labelMs": {
+        "median": 0,
+        "min": 0,
+        "max": 0
+      },
+      "counts": {
+        "scope": "2",
+        "individual": "2",
+        "autoGroups": "0",
+        "autoMembers": "0",
+        "manual": "0"
+      },
+      "environment": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+        "width": 1440,
+        "height": 1000,
+        "dpr": 1
+      }
+    },
+    {
+      "scenario": "small-module-dependency",
+      "phase": "after",
+      "mode": "off",
+      "files": [
+        "after13-small-module-dependency-off-1.json",
+        "after13-small-module-dependency-off-2.json",
+        "after13-small-module-dependency-off-3.json"
+      ],
+      "elapsedMs": {
+        "median": 2450.3,
+        "min": 2433.9,
+        "max": 2467.3
+      },
+      "rafMedianMs": {
+        "median": 16.7,
+        "min": 16.7,
+        "max": 16.7
+      },
+      "rafP95Ms": {
+        "median": 16.8,
+        "min": 16.8,
+        "max": 16.8
+      },
+      "rafMaxMs": {
+        "median": 16.8,
+        "min": 16.8,
+        "max": 16.9
+      },
+      "aggregationMs": {
+        "median": 0,
+        "min": 0,
+        "max": 0.1
+      },
+      "labelMs": {
+        "median": 0,
+        "min": 0,
+        "max": 0
+      },
+      "counts": {
+        "scope": "2",
+        "individual": "2",
+        "autoGroups": "0",
+        "autoMembers": "0",
+        "manual": "0"
+      },
+      "environment": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+        "width": 1440,
+        "height": 1000,
+        "dpr": 1
+      }
+    },
+    {
+      "scenario": "small-module-dependency",
+      "phase": "after",
+      "mode": "on",
+      "files": [
+        "after13-small-module-dependency-on-1.json",
+        "after13-small-module-dependency-on-2.json",
+        "after13-small-module-dependency-on-3.json"
+      ],
+      "elapsedMs": {
+        "median": 2467.2,
+        "min": 2467,
+        "max": 2484.1
+      },
+      "rafMedianMs": {
+        "median": 16.7,
+        "min": 16.7,
+        "max": 16.7
+      },
+      "rafP95Ms": {
+        "median": 16.8,
+        "min": 16.8,
+        "max": 16.8
+      },
+      "rafMaxMs": {
+        "median": 16.9,
+        "min": 16.8,
+        "max": 16.9
+      },
+      "aggregationMs": {
+        "median": 0.4,
+        "min": 0.3,
+        "max": 0.6
+      },
+      "labelMs": {
+        "median": 0,
+        "min": 0,
+        "max": 0
+      },
+      "counts": {
+        "scope": "2",
+        "individual": "2",
+        "autoGroups": "0",
+        "autoMembers": "0",
+        "manual": "0"
+      },
+      "environment": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+        "width": 1440,
+        "height": 1000,
+        "dpr": 1
+      }
+    },
+    {
+      "scenario": "small-runtime-flow",
+      "phase": "before",
+      "mode": "off",
+      "files": [
+        "before-final-small-runtime-flow-off-1.json",
+        "before-final-small-runtime-flow-off-2.json",
+        "before-final-small-runtime-flow-off-3.json"
+      ],
+      "elapsedMs": {
+        "median": 2433.9,
+        "min": 2433.8,
+        "max": 2469.1
+      },
+      "rafMedianMs": {
+        "median": 16.7,
+        "min": 16.7,
+        "max": 16.7
+      },
+      "rafP95Ms": {
+        "median": 16.8,
+        "min": 16.8,
+        "max": 16.8
+      },
+      "rafMaxMs": {
+        "median": 16.8,
+        "min": 16.8,
+        "max": 16.8
+      },
+      "aggregationMs": {
+        "median": 0,
+        "min": 0,
+        "max": 0.2
+      },
+      "labelMs": {
+        "median": 2.9,
+        "min": 2.5,
+        "max": 3.4
+      },
+      "counts": {
+        "scope": "4",
+        "individual": "4",
+        "autoGroups": "0",
+        "autoMembers": "0",
+        "manual": "0"
+      },
+      "environment": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+        "width": 1440,
+        "height": 1000,
+        "dpr": 1
+      }
+    },
+    {
+      "scenario": "small-runtime-flow",
+      "phase": "before",
+      "mode": "on",
+      "files": [
+        "before-final-small-runtime-flow-on-1.json",
+        "before-final-small-runtime-flow-on-2.json",
+        "before-final-small-runtime-flow-on-3.json"
+      ],
+      "elapsedMs": {
+        "median": 2450.1,
+        "min": 2424.4,
+        "max": 2467.1
+      },
+      "rafMedianMs": {
+        "median": 16.7,
+        "min": 16.7,
+        "max": 16.7
+      },
+      "rafP95Ms": {
+        "median": 16.8,
+        "min": 16.7,
+        "max": 16.8
+      },
+      "rafMaxMs": {
+        "median": 16.8,
+        "min": 16.8,
+        "max": 17.1
+      },
+      "aggregationMs": {
+        "median": 0.5,
+        "min": 0.3,
+        "max": 0.6
+      },
+      "labelMs": {
+        "median": 2.9,
+        "min": 2.8,
+        "max": 3.4
+      },
+      "counts": {
+        "scope": "4",
+        "individual": "4",
+        "autoGroups": "0",
+        "autoMembers": "0",
+        "manual": "0"
+      },
+      "environment": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+        "width": 1440,
+        "height": 1000,
+        "dpr": 1
+      }
+    },
+    {
+      "scenario": "small-runtime-flow",
+      "phase": "after",
+      "mode": "off",
+      "files": [
+        "after13-small-runtime-flow-off-1.json",
+        "after13-small-runtime-flow-off-2.json",
+        "after13-small-runtime-flow-off-3.json"
+      ],
+      "elapsedMs": {
+        "median": 2484.3,
+        "min": 2333.1,
+        "max": 2517.5
+      },
+      "rafMedianMs": {
+        "median": 16.7,
+        "min": 16.7,
+        "max": 16.7
+      },
+      "rafP95Ms": {
+        "median": 16.8,
+        "min": 16.8,
+        "max": 16.8
+      },
+      "rafMaxMs": {
+        "median": 17,
+        "min": 16.9,
+        "max": 17.1
+      },
+      "aggregationMs": {
+        "median": 0,
+        "min": 0,
+        "max": 0.1
+      },
+      "labelMs": {
+        "median": 3.4,
+        "min": 2.9,
+        "max": 3.5
+      },
+      "counts": {
+        "scope": "4",
+        "individual": "4",
+        "autoGroups": "0",
+        "autoMembers": "0",
+        "manual": "0"
+      },
+      "environment": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+        "width": 1440,
+        "height": 1000,
+        "dpr": 1
+      }
+    },
+    {
+      "scenario": "small-runtime-flow",
+      "phase": "after",
+      "mode": "on",
+      "files": [
+        "after13-small-runtime-flow-on-1.json",
+        "after13-small-runtime-flow-on-2.json",
+        "after13-small-runtime-flow-on-3.json"
+      ],
+      "elapsedMs": {
+        "median": 2567.5,
+        "min": 2384.1,
+        "max": 2583.2
+      },
+      "rafMedianMs": {
+        "median": 16.7,
+        "min": 16.7,
+        "max": 16.7
+      },
+      "rafP95Ms": {
+        "median": 16.8,
+        "min": 16.7,
+        "max": 16.8
+      },
+      "rafMaxMs": {
+        "median": 17.1,
+        "min": 16.8,
+        "max": 17.2
+      },
+      "aggregationMs": {
+        "median": 0.5,
+        "min": 0.4,
+        "max": 0.5
+      },
+      "labelMs": {
+        "median": 3.2,
+        "min": 3.2,
+        "max": 3.5
+      },
+      "counts": {
+        "scope": "4",
+        "individual": "4",
+        "autoGroups": "0",
+        "autoMembers": "0",
+        "manual": "0"
+      },
+      "environment": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+        "width": 1440,
+        "height": 1000,
+        "dpr": 1
+      }
+    },
+    {
+      "scenario": "small-function-call-flow",
+      "phase": "before",
+      "mode": "off",
+      "files": [
+        "before-final-small-function-call-flow-off-1.json",
+        "before-final-small-function-call-flow-off-2.json",
+        "before-final-small-function-call-flow-off-3.json"
+      ],
+      "elapsedMs": {
+        "median": 2683.9,
+        "min": 2649.2,
+        "max": 2917.3
+      },
+      "rafMedianMs": {
+        "median": 16.7,
+        "min": 16.7,
+        "max": 16.7
+      },
+      "rafP95Ms": {
+        "median": 16.8,
+        "min": 16.8,
+        "max": 16.8
+      },
+      "rafMaxMs": {
+        "median": 17.1,
+        "min": 17,
+        "max": 17.1
+      },
+      "aggregationMs": {
+        "median": 0.2,
+        "min": 0.1,
+        "max": 0.3
+      },
+      "labelMs": {
+        "median": 3.9,
+        "min": 3.4,
+        "max": 4.3
+      },
+      "counts": {
+        "scope": "6",
+        "individual": "6",
+        "autoGroups": "0",
+        "autoMembers": "0",
+        "manual": "0"
+      },
+      "environment": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+        "width": 1440,
+        "height": 1000,
+        "dpr": 1
+      }
+    },
+    {
+      "scenario": "small-function-call-flow",
+      "phase": "before",
+      "mode": "on",
+      "files": [
+        "before-final-small-function-call-flow-on-1.json",
+        "before-final-small-function-call-flow-on-2.json",
+        "before-final-small-function-call-flow-on-3.json"
+      ],
+      "elapsedMs": {
+        "median": 2853.4,
+        "min": 2786.6,
+        "max": 3017.9
+      },
+      "rafMedianMs": {
+        "median": 16.7,
+        "min": 16.7,
+        "max": 16.7
+      },
+      "rafP95Ms": {
+        "median": 16.8,
+        "min": 16.8,
+        "max": 16.9
+      },
+      "rafMaxMs": {
+        "median": 17.2,
+        "min": 17.1,
+        "max": 17.2
+      },
+      "aggregationMs": {
+        "median": 0.6,
+        "min": 0.6,
+        "max": 0.8
+      },
+      "labelMs": {
+        "median": 4.1,
+        "min": 3.7,
+        "max": 5.1
+      },
+      "counts": {
+        "scope": "6",
+        "individual": "6",
+        "autoGroups": "0",
+        "autoMembers": "0",
+        "manual": "0"
+      },
+      "environment": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+        "width": 1440,
+        "height": 1000,
+        "dpr": 1
+      }
+    },
+    {
+      "scenario": "small-function-call-flow",
+      "phase": "after",
+      "mode": "off",
+      "files": [
+        "after13-small-function-call-flow-off-1.json",
+        "after13-small-function-call-flow-off-2.json",
+        "after13-small-function-call-flow-off-3.json"
+      ],
+      "elapsedMs": {
+        "median": 2484.1,
+        "min": 2467.8,
+        "max": 2501
+      },
+      "rafMedianMs": {
+        "median": 16.7,
+        "min": 16.7,
+        "max": 16.7
+      },
+      "rafP95Ms": {
+        "median": 16.8,
+        "min": 16.8,
+        "max": 16.8
+      },
+      "rafMaxMs": {
+        "median": 16.9,
+        "min": 16.9,
+        "max": 17
+      },
+      "aggregationMs": {
+        "median": 0,
+        "min": 0,
+        "max": 0.1
+      },
+      "labelMs": {
+        "median": 3.9,
+        "min": 3,
+        "max": 4.8
+      },
+      "counts": {
+        "scope": "6",
+        "individual": "6",
+        "autoGroups": "0",
+        "autoMembers": "0",
+        "manual": "0"
+      },
+      "environment": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+        "width": 1440,
+        "height": 1000,
+        "dpr": 1
+      }
+    },
+    {
+      "scenario": "small-function-call-flow",
+      "phase": "after",
+      "mode": "on",
+      "files": [
+        "after13-small-function-call-flow-on-1.json",
+        "after13-small-function-call-flow-on-2.json",
+        "after13-small-function-call-flow-on-3.json"
+      ],
+      "elapsedMs": {
+        "median": 2485.2,
+        "min": 2433.8,
+        "max": 2600.4
+      },
+      "rafMedianMs": {
+        "median": 16.7,
+        "min": 16.7,
+        "max": 16.7
+      },
+      "rafP95Ms": {
+        "median": 16.8,
+        "min": 16.8,
+        "max": 16.8
+      },
+      "rafMaxMs": {
+        "median": 16.9,
+        "min": 16.9,
+        "max": 17.1
+      },
+      "aggregationMs": {
+        "median": 0.2,
+        "min": 0.1,
+        "max": 0.4
+      },
+      "labelMs": {
+        "median": 3.5,
+        "min": 3.3,
+        "max": 3.8
+      },
+      "counts": {
+        "scope": "6",
+        "individual": "6",
+        "autoGroups": "0",
+        "autoMembers": "0",
+        "manual": "0"
+      },
+      "environment": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+        "width": 1440,
+        "height": 1000,
+        "dpr": 1
+      }
+    },
+    {
+      "scenario": "small-data-flow",
+      "phase": "before",
+      "mode": "off",
+      "files": [
+        "before-final-small-data-flow-off-1.json",
+        "before-final-small-data-flow-off-2.json",
+        "before-final-small-data-flow-off-3.json"
+      ],
+      "elapsedMs": {
+        "median": 2433.9,
+        "min": 2433.7,
+        "max": 2467
+      },
+      "rafMedianMs": {
+        "median": 16.7,
+        "min": 16.7,
+        "max": 16.7
+      },
+      "rafP95Ms": {
+        "median": 16.8,
+        "min": 16.8,
+        "max": 16.8
+      },
+      "rafMaxMs": {
+        "median": 16.8,
+        "min": 16.8,
+        "max": 16.8
+      },
+      "aggregationMs": {
+        "median": 0.2,
+        "min": 0.2,
+        "max": 0.5
+      },
+      "labelMs": {
+        "median": 6.5,
+        "min": 5.7,
+        "max": 6.9
+      },
+      "counts": {
+        "scope": "44",
+        "individual": "44",
+        "autoGroups": "0",
+        "autoMembers": "0",
+        "manual": "0"
+      },
+      "environment": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+        "width": 1440,
+        "height": 1000,
+        "dpr": 1
+      }
+    },
+    {
+      "scenario": "small-data-flow",
+      "phase": "before",
+      "mode": "on",
+      "files": [
+        "before-final-small-data-flow-on-1.json",
+        "before-final-small-data-flow-on-2.json",
+        "before-final-small-data-flow-on-3.json"
+      ],
+      "elapsedMs": {
+        "median": 2435.5,
+        "min": 2366.8,
+        "max": 2450.4
+      },
+      "rafMedianMs": {
+        "median": 16.7,
+        "min": 16.7,
+        "max": 16.7
+      },
+      "rafP95Ms": {
+        "median": 16.8,
+        "min": 16.8,
+        "max": 16.8
+      },
+      "rafMaxMs": {
+        "median": 16.9,
+        "min": 16.8,
+        "max": 200
+      },
+      "aggregationMs": {
+        "median": 2.5,
+        "min": 1.8,
+        "max": 2.8
+      },
+      "labelMs": {
+        "median": 6.6,
+        "min": 5.5,
+        "max": 6.8
+      },
+      "counts": {
+        "scope": "44",
+        "individual": "44",
+        "autoGroups": "0",
+        "autoMembers": "0",
+        "manual": "0"
+      },
+      "environment": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+        "width": 1440,
+        "height": 1000,
+        "dpr": 1
+      }
+    },
+    {
+      "scenario": "small-data-flow",
+      "phase": "after",
+      "mode": "off",
+      "files": [
+        "after13-small-data-flow-off-1.json",
+        "after13-small-data-flow-off-2.json",
+        "after13-small-data-flow-off-3.json"
+      ],
+      "elapsedMs": {
+        "median": 2500.1,
+        "min": 2434.3,
+        "max": 2550.7
+      },
+      "rafMedianMs": {
+        "median": 16.7,
+        "min": 16.7,
+        "max": 16.7
+      },
+      "rafP95Ms": {
+        "median": 16.8,
+        "min": 16.8,
+        "max": 16.8
+      },
+      "rafMaxMs": {
+        "median": 16.9,
+        "min": 16.9,
+        "max": 17.1
+      },
+      "aggregationMs": {
+        "median": 0.1,
+        "min": 0.1,
+        "max": 0.2
+      },
+      "labelMs": {
+        "median": 6.6,
+        "min": 6.6,
+        "max": 6.7
+      },
+      "counts": {
+        "scope": "44",
+        "individual": "44",
+        "autoGroups": "0",
+        "autoMembers": "0",
+        "manual": "0"
+      },
+      "environment": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+        "width": 1440,
+        "height": 1000,
+        "dpr": 1
+      }
+    },
+    {
+      "scenario": "small-data-flow",
+      "phase": "after",
+      "mode": "on",
+      "files": [
+        "after13-small-data-flow-on-1.json",
+        "after13-small-data-flow-on-2.json",
+        "after13-small-data-flow-on-3.json"
+      ],
+      "elapsedMs": {
+        "median": 2429.4,
+        "min": 2257,
+        "max": 2583.3
+      },
+      "rafMedianMs": {
+        "median": 16.7,
+        "min": 16.7,
+        "max": 16.7
+      },
+      "rafP95Ms": {
+        "median": 16.8,
+        "min": 16.8,
+        "max": 16.8
+      },
+      "rafMaxMs": {
+        "median": 16.9,
+        "min": 16.8,
+        "max": 33.3
+      },
+      "aggregationMs": {
+        "median": 0.3,
+        "min": 0.3,
+        "max": 0.4
+      },
+      "labelMs": {
+        "median": 6.3,
+        "min": 5.3,
+        "max": 6.6
+      },
+      "counts": {
+        "scope": "44",
+        "individual": "44",
+        "autoGroups": "0",
+        "autoMembers": "0",
+        "manual": "0"
+      },
+      "environment": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+        "width": 1440,
+        "height": 1000,
+        "dpr": 1
+      }
+    },
+    {
+      "scenario": "small-data-model",
+      "phase": "before",
+      "mode": "off",
+      "files": [
+        "before-final-small-data-model-off-1.json",
+        "before-final-small-data-model-off-2.json",
+        "before-final-small-data-model-off-3.json"
+      ],
+      "elapsedMs": {
+        "median": 2734.5,
+        "min": 2684.3,
+        "max": 2892.3
+      },
+      "rafMedianMs": {
+        "median": 16.7,
+        "min": 16.7,
+        "max": 16.7
+      },
+      "rafP95Ms": {
+        "median": 16.8,
+        "min": 16.8,
+        "max": 16.8
+      },
+      "rafMaxMs": {
+        "median": 17.2,
+        "min": 17.1,
+        "max": 17.2
+      },
+      "aggregationMs": {
+        "median": 0.2,
+        "min": 0.2,
+        "max": 0.3
+      },
+      "labelMs": {
+        "median": 3.2,
+        "min": 2.8,
+        "max": 3.4
+      },
+      "counts": {
+        "scope": "2",
+        "individual": "2",
+        "autoGroups": "0",
+        "autoMembers": "0",
+        "manual": "0"
+      },
+      "environment": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+        "width": 1440,
+        "height": 1000,
+        "dpr": 1
+      }
+    },
+    {
+      "scenario": "small-data-model",
+      "phase": "before",
+      "mode": "on",
+      "files": [
+        "before-final-small-data-model-on-1.json",
+        "before-final-small-data-model-on-2.json",
+        "before-final-small-data-model-on-3.json"
+      ],
+      "elapsedMs": {
+        "median": 2701.9,
+        "min": 2634.5,
+        "max": 3001.8
+      },
+      "rafMedianMs": {
+        "median": 16.7,
+        "min": 16.7,
+        "max": 16.7
+      },
+      "rafP95Ms": {
+        "median": 16.8,
+        "min": 16.8,
+        "max": 16.8
+      },
+      "rafMaxMs": {
+        "median": 17.2,
+        "min": 17,
+        "max": 33.3
+      },
+      "aggregationMs": {
+        "median": 0.3,
+        "min": 0.1,
+        "max": 0.4
+      },
+      "labelMs": {
+        "median": 2.8,
+        "min": 2.6,
+        "max": 4.1
+      },
+      "counts": {
+        "scope": "2",
+        "individual": "2",
+        "autoGroups": "0",
+        "autoMembers": "0",
+        "manual": "0"
+      },
+      "environment": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+        "width": 1440,
+        "height": 1000,
+        "dpr": 1
+      }
+    },
+    {
+      "scenario": "small-data-model",
+      "phase": "after",
+      "mode": "off",
+      "files": [
+        "after13-small-data-model-off-1.json",
+        "after13-small-data-model-off-2.json",
+        "after13-small-data-model-off-3.json"
+      ],
+      "elapsedMs": {
+        "median": 2449.9,
+        "min": 2436.5,
+        "max": 2450.7
+      },
+      "rafMedianMs": {
+        "median": 16.7,
+        "min": 16.7,
+        "max": 16.7
+      },
+      "rafP95Ms": {
+        "median": 16.8,
+        "min": 16.7,
+        "max": 16.8
+      },
+      "rafMaxMs": {
+        "median": 16.8,
+        "min": 16.8,
+        "max": 16.9
+      },
+      "aggregationMs": {
+        "median": 0.1,
+        "min": 0,
+        "max": 0.2
+      },
+      "labelMs": {
+        "median": 3,
+        "min": 2.5,
+        "max": 3.3
+      },
+      "counts": {
+        "scope": "2",
+        "individual": "2",
+        "autoGroups": "0",
+        "autoMembers": "0",
+        "manual": "0"
+      },
+      "environment": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+        "width": 1440,
+        "height": 1000,
+        "dpr": 1
+      }
+    },
+    {
+      "scenario": "small-data-model",
+      "phase": "after",
+      "mode": "on",
+      "files": [
+        "after13-small-data-model-on-1.json",
+        "after13-small-data-model-on-2.json",
+        "after13-small-data-model-on-3.json"
+      ],
+      "elapsedMs": {
+        "median": 2448.8,
+        "min": 2433.2,
+        "max": 2450.6
+      },
+      "rafMedianMs": {
+        "median": 16.7,
+        "min": 16.7,
+        "max": 16.7
+      },
+      "rafP95Ms": {
+        "median": 16.8,
+        "min": 16.8,
+        "max": 16.8
+      },
+      "rafMaxMs": {
+        "median": 16.9,
+        "min": 16.8,
+        "max": 16.9
+      },
+      "aggregationMs": {
+        "median": 0.1,
+        "min": 0.1,
+        "max": 0.2
+      },
+      "labelMs": {
+        "median": 2.7,
+        "min": 2.6,
+        "max": 3.6
+      },
+      "counts": {
+        "scope": "2",
+        "individual": "2",
+        "autoGroups": "0",
+        "autoMembers": "0",
+        "manual": "0"
+      },
+      "environment": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+        "width": 1440,
+        "height": 1000,
+        "dpr": 1
+      }
+    }
+  ],
+  "canonical": [
+    {
+      "name": "git-lines",
+      "views": [
+        {
+          "view": "runtime-flow",
+          "nodes": 105,
+          "edges": 98,
+          "nodeHash": "24a4292f3580a63910714698116a04b3a4ade0dc86822371aaada78a448d1384",
+          "edgeHash": "d6e04ab1a1ebc7adbe66ed715ca800d89b9a45abddf39d17c63ed1b010c82cad"
+        },
+        {
+          "view": "function-call-flow",
+          "nodes": 2079,
+          "edges": 3335,
+          "nodeHash": "1461020a396dfc54745cc9e6b9f37e81fc94257d6a024e4010a3e751854601d8",
+          "edgeHash": "93110a440296e97c3d73e022554dc27ac9c057da478dc3f79ce1bf1302877b8c"
+        },
+        {
+          "view": "data-flow",
+          "nodes": 35303,
+          "edges": 37801,
+          "nodeHash": "b3ee2c08344921993bcab3b38dd9d542d68dcf5444a23ea2e6431380385694e3",
+          "edgeHash": "941d21805a53fcea3fe3016f35302f84d3ce88b83d0ebfa02d15322fd00fe3f7"
+        },
+        {
+          "view": "data-model",
+          "nodes": 119,
+          "edges": 132,
+          "nodeHash": "c5493290fa86738d74bfb06bbb769c8f18c35329e11b85d1a0bfef934a263c1c",
+          "edgeHash": "1487caf2a8b1084bcf1f2bbfc0537fc9f11e15c34f91b86fb95e754332b92c8c"
+        },
+        {
+          "view": "architecture-map",
+          "nodes": 3,
+          "edges": 3,
+          "nodeHash": "bd1dc8dbc42c161c59a93b97a4d624bdb1a16da1da17a46796f9cd67b87fdf9c",
+          "edgeHash": "594aeaf054c7401578b382cfa02e1924cb7a28cd4cf5f260dbcbab42d2888915"
+        }
+      ]
+    },
+    {
+      "name": "vehicle-management",
+      "views": [
+        {
+          "view": "runtime-flow",
+          "nodes": 3699,
+          "edges": 7381,
+          "nodeHash": "43638271899e637874a2056b59dd6ff9cc44eb485433493d82e573a3cfdbd8ed",
+          "edgeHash": "4bc7df6fc9de870b608384d1b2f564b82ea47311497e0464ad97086e6456bfd6"
+        },
+        {
+          "view": "function-call-flow",
+          "nodes": 7626,
+          "edges": 15536,
+          "nodeHash": "dc3cc069187019c5b5760ed0110a7397bb20e09537bc22b70f630b2dfd560d99",
+          "edgeHash": "fa8b2d1393fb1ee0a3a3b83e43846cb8ccb936cecd523a23c5a6e4d564a9e0df"
+        },
+        {
+          "view": "data-flow",
+          "nodes": 142244,
+          "edges": 151076,
+          "nodeHash": "89f6c43b86070ab1bd3946936a187d43ffaf88f8a93afb24a63c4f8546ff7438",
+          "edgeHash": "dbf3355848926cc5737eef8f2f4bc1172a31b51371b8bb3ee465ba35601e6ea6"
+        },
+        {
+          "view": "data-model",
+          "nodes": 376,
+          "edges": 534,
+          "nodeHash": "1ada7cd43c6ed8d41bba0996ed4aab9e6955ca2512b6ec076c23796e9c23aa18",
+          "edgeHash": "5bf697d15ef7ebd3743e8dfc7facd426772220ef00e743aba436c48096c1876e"
+        },
+        {
+          "view": "architecture-map",
+          "nodes": 10,
+          "edges": 17,
+          "nodeHash": "7c041e6b1a17c3e067442a8adc4c069ddc0d608db56aaff8375b2f46d0f8543e",
+          "edgeHash": "9f10cd4f389ace3b325f6bdad7bcfddb77160a586c873c5ce7128e266c4e3bb2"
+        }
+      ]
+    }
+  ],
+  "heapBefore": {
+    "browser": "152.0.4191.66",
+    "note": "Independent headless Edge; explicit GC separates collectible allocations from retained heap. Not the IAB performance comparison.",
+    "rows": [
+      {
+        "cycle": 0,
+        "before": {
+          "usedSize": 258156040,
+          "totalSize": 323903488,
+          "embedderHeapUsedSize": 4716232,
+          "backingStorageSize": 4502181
+        },
+        "after": {
+          "usedSize": 153398576,
+          "totalSize": 170758144,
+          "embedderHeapUsedSize": 2417432,
+          "backingStorageSize": 3779411
+        },
+        "counters": {
+          "documents": 1,
+          "nodes": 1221,
+          "jsEventListeners": 274
+        },
+        "dom": {
+          "elements": 463,
+          "labels": 9,
+          "canvases": 1
+        }
+      },
+      {
+        "cycle": 1,
+        "before": {
+          "usedSize": 360380796,
+          "totalSize": 411320320,
+          "embedderHeapUsedSize": 7396800,
+          "backingStorageSize": 6732092
+        },
+        "after": {
+          "usedSize": 206973296,
+          "totalSize": 222978048,
+          "embedderHeapUsedSize": 2884536,
+          "backingStorageSize": 5523732
+        },
+        "counters": {
+          "documents": 1,
+          "nodes": 1286,
+          "jsEventListeners": 299
+        },
+        "dom": {
+          "elements": 460,
+          "labels": 8,
+          "canvases": 1
+        }
+      },
+      {
+        "cycle": 2,
+        "before": {
+          "usedSize": 410135396,
+          "totalSize": 455397376,
+          "embedderHeapUsedSize": 6850216,
+          "backingStorageSize": 9610601
+        },
+        "after": {
+          "usedSize": 270375864,
+          "totalSize": 289562624,
+          "embedderHeapUsedSize": 2843648,
+          "backingStorageSize": 8402929
+        },
+        "counters": {
+          "documents": 1,
+          "nodes": 1367,
+          "jsEventListeners": 312
+        },
+        "dom": {
+          "elements": 460,
+          "labels": 8,
+          "canvases": 1
+        }
+      },
+      {
+        "cycle": 3,
+        "before": {
+          "usedSize": 447914100,
+          "totalSize": 512577536,
+          "embedderHeapUsedSize": 6617184,
+          "backingStorageSize": 12488774
+        },
+        "after": {
+          "usedSize": 324620028,
+          "totalSize": 344637440,
+          "embedderHeapUsedSize": 3039344,
+          "backingStorageSize": 11281776
+        },
+        "counters": {
+          "documents": 1,
+          "nodes": 1448,
+          "jsEventListeners": 325
+        },
+        "dom": {
+          "elements": 460,
+          "labels": 8,
+          "canvases": 1
+        }
+      },
+      {
+        "cycle": 4,
+        "before": {
+          "usedSize": 495370460,
+          "totalSize": 566251520,
+          "embedderHeapUsedSize": 6932392,
+          "backingStorageSize": 15368290
+        },
+        "after": {
+          "usedSize": 369115456,
+          "totalSize": 388726784,
+          "embedderHeapUsedSize": 2842720,
+          "backingStorageSize": 14160213
+        },
+        "counters": {
+          "documents": 1,
+          "nodes": 1529,
+          "jsEventListeners": 338
+        },
+        "dom": {
+          "elements": 460,
+          "labels": 8,
+          "canvases": 1
+        }
+      },
+      {
+        "cycle": 5,
+        "before": {
+          "usedSize": 563703508,
+          "totalSize": 625037312,
+          "embedderHeapUsedSize": 6376552,
+          "backingStorageSize": 19389319
+        },
+        "after": {
+          "usedSize": 446744316,
+          "totalSize": 468439040,
+          "embedderHeapUsedSize": 2989368,
+          "backingStorageSize": 18780116
+        },
+        "counters": {
+          "documents": 1,
+          "nodes": 1770,
+          "jsEventListeners": 378
+        },
+        "dom": {
+          "elements": 460,
+          "labels": 8,
+          "canvases": 1
+        }
+      },
+      {
+        "cycle": 6,
+        "before": {
+          "usedSize": 628587076,
+          "totalSize": 686497792,
+          "embedderHeapUsedSize": 6195480,
+          "backingStorageSize": 22971319
+        },
+        "after": {
+          "usedSize": 500637508,
+          "totalSize": 523776000,
+          "embedderHeapUsedSize": 3107296,
+          "backingStorageSize": 21658934
+        },
+        "counters": {
+          "documents": 1,
+          "nodes": 1851,
+          "jsEventListeners": 391
+        },
+        "dom": {
+          "elements": 460,
+          "labels": 8,
+          "canvases": 1
+        }
+      }
+    ],
+    "errors": []
+  },
+  "heapAfter": {
+    "browser": "152.0.4191.66",
+    "note": "Independent headless Edge; explicit GC separates collectible allocations from retained heap. Not the IAB performance comparison.",
+    "rows": [
+      {
+        "cycle": 0,
+        "before": {
+          "usedSize": 249950376,
+          "totalSize": 323366912,
+          "embedderHeapUsedSize": 5371336,
+          "backingStorageSize": 5561297
+        },
+        "after": {
+          "usedSize": 159011140,
+          "totalSize": 176041984,
+          "embedderHeapUsedSize": 2545136,
+          "backingStorageSize": 3780484
+        },
+        "counters": {
+          "documents": 1,
+          "nodes": 1216,
+          "jsEventListeners": 273
+        },
+        "dom": {
+          "elements": 460,
+          "labels": 8,
+          "canvases": 1
+        }
+      },
+      {
+        "cycle": 1,
+        "before": {
+          "usedSize": 356028336,
+          "totalSize": 417529856,
+          "embedderHeapUsedSize": 6952904,
+          "backingStorageSize": 6731843
+        },
+        "after": {
+          "usedSize": 151853308,
+          "totalSize": 172437504,
+          "embedderHeapUsedSize": 3071016,
+          "backingStorageSize": 3429774
+        },
+        "counters": {
+          "documents": 1,
+          "nodes": 1247,
+          "jsEventListeners": 299
+        },
+        "dom": {
+          "elements": 460,
+          "labels": 8,
+          "canvases": 1
+        }
+      },
+      {
+        "cycle": 2,
+        "before": {
+          "usedSize": 330172968,
+          "totalSize": 395853824,
+          "embedderHeapUsedSize": 7982512,
+          "backingStorageSize": 7637896
+        },
+        "after": {
+          "usedSize": 154525948,
+          "totalSize": 168361984,
+          "embedderHeapUsedSize": 2936152,
+          "backingStorageSize": 3429634
+        },
+        "counters": {
+          "documents": 1,
+          "nodes": 1205,
+          "jsEventListeners": 286
+        },
+        "dom": {
+          "elements": 460,
+          "labels": 8,
+          "canvases": 1
+        }
+      },
+      {
+        "cycle": 3,
+        "before": {
+          "usedSize": 324307008,
+          "totalSize": 397549568,
+          "embedderHeapUsedSize": 7384704,
+          "backingStorageSize": 7527654
+        },
+        "after": {
+          "usedSize": 143404448,
+          "totalSize": 154374144,
+          "embedderHeapUsedSize": 2746592,
+          "backingStorageSize": 3429406
+        },
+        "counters": {
+          "documents": 1,
+          "nodes": 1205,
+          "jsEventListeners": 286
+        },
+        "dom": {
+          "elements": 460,
+          "labels": 8,
+          "canvases": 1
+        }
+      },
+      {
+        "cycle": 4,
+        "before": {
+          "usedSize": 343360932,
+          "totalSize": 397975552,
+          "embedderHeapUsedSize": 6978040,
+          "backingStorageSize": 8659420
+        },
+        "after": {
+          "usedSize": 152330560,
+          "totalSize": 170340352,
+          "embedderHeapUsedSize": 2751216,
+          "backingStorageSize": 3429469
+        },
+        "counters": {
+          "documents": 1,
+          "nodes": 1247,
+          "jsEventListeners": 299
+        },
+        "dom": {
+          "elements": 460,
+          "labels": 8,
+          "canvases": 1
+        }
+      },
+      {
+        "cycle": 5,
+        "before": {
+          "usedSize": 345931144,
+          "totalSize": 405962752,
+          "embedderHeapUsedSize": 7458640,
+          "backingStorageSize": 7531668
+        },
+        "after": {
+          "usedSize": 158046028,
+          "totalSize": 169291776,
+          "embedderHeapUsedSize": 3104704,
+          "backingStorageSize": 3430261
+        },
+        "counters": {
+          "documents": 1,
+          "nodes": 1247,
+          "jsEventListeners": 299
+        },
+        "dom": {
+          "elements": 460,
+          "labels": 8,
+          "canvases": 1
+        }
+      },
+      {
+        "cycle": 6,
+        "before": {
+          "usedSize": 352654476,
+          "totalSize": 406769664,
+          "embedderHeapUsedSize": 7620944,
+          "backingStorageSize": 7532343
+        },
+        "after": {
+          "usedSize": 150240284,
+          "totalSize": 169029632,
+          "embedderHeapUsedSize": 2716048,
+          "backingStorageSize": 3429715
+        },
+        "counters": {
+          "documents": 1,
+          "nodes": 1247,
+          "jsEventListeners": 299
+        },
+        "dom": {
+          "elements": 460,
+          "labels": 8,
+          "canvases": 1
+        }
+      }
+    ],
+    "errors": []
+  }
+}

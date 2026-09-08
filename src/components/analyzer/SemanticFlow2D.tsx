@@ -6,7 +6,7 @@ import type { SemanticGraph } from '../../analyzer/semantic/types';
 import { explorerEdgeVisible, layoutExplorerRelations, type ExplorerLocation, type SemanticExplorerModel } from '../../analyzer/semantic/semanticExplorer';
 import { SemanticExplorerBlocks } from './SemanticExplorerBlocks';
 import { semanticFlowPlot } from './semanticFlowViewport';
-import { semanticNodeDisplays } from './semanticFlowDisplay';
+import { semanticNodeDisplays, type SemanticNodeDisplay } from './semanticFlowDisplay';
 import { resolveSemanticFlowHover, semanticFlowNodeRelationKinds, semanticFlowNodeRoles, semanticFlowRoleLabel, type SemanticFlowHoverHandler, type SemanticFlowHoverTarget } from '../../analyzer/semantic/flowRelationInteraction';
 import { semanticFlowHoverBindings } from './semanticFlowHoverBindings';
 import './semantic-flow-relation-interaction.css';
@@ -14,6 +14,7 @@ import './semantic-flow-relation-interaction.css';
 export type FlowCamera2D = NonNullable<NonNullable<AnalyzerViewSession['flowCameras']>['2d']>;
 export interface FlowCameraCommand { kind: 'fit' | 'reset' | 'focus' | 'zoom-in' | 'zoom-out'; nonce: number; ids?: string[] }
 export interface SemanticFlowRenderProps {
+  nodeDisplays?: ReadonlyMap<string, SemanticNodeDisplay>;
   graph: SemanticGraph; selectedIds: ReadonlySet<string>; selectedEdgeId?: string; matchIds: ReadonlySet<string>;
   command?: FlowCameraCommand; motion: { enabled: boolean; reduced: boolean; visible: boolean };
   overlayTop?: number;
@@ -41,6 +42,7 @@ interface Explorer2DProps extends SemanticFlowRenderProps {
 export function SemanticFlow2D(props: Explorer2DProps) {
   const visibleIds = useMemo(() => new Set(props.graph.nodes.map(node => node.id)), [props.graph.nodes]);
   if (props.explorer && props.location && !props.location.centerId) return <SemanticExplorerBlocks explorer={props.explorer} location={props.location} visibleIds={visibleIds}
+    nodeDisplays={props.nodeDisplays}
     fineExpandedScopeIds={props.fineExpandedScopeIds} onFineExpandedScopeIds={props.onFineExpandedScopeIds}
     matchIds={props.matchIds} selectedIds={props.selectedIds} visitId={props.visitId ?? ''} scrollTop={props.scrollTop ?? 0} overlayTop={props.overlayTop ?? 150}
     focusIds={props.command?.kind === 'focus' ? props.command.ids : undefined} focusNonce={props.command?.nonce}
@@ -48,7 +50,7 @@ export function SemanticFlow2D(props: Explorer2DProps) {
   return <SemanticLocalFlow2D key={props.visitId ?? props.location?.centerId} {...props} />;
 }
 
-function SemanticLocalFlow2D({ graph, selectedIds, selectedEdgeId, matchIds, command, motion, overlayTop, location, direction = 'both', camera: savedCamera, onCamera, onSelect, onSelectEdge, onClear, hoverTarget, onHoverTarget, explicitPathNodeIds, explicitPathEdgeIds }: Explorer2DProps) {
+function SemanticLocalFlow2D({ graph, explorer, nodeDisplays, selectedIds, selectedEdgeId, matchIds, command, motion, overlayTop, location, direction = 'both', camera: savedCamera, onCamera, onSelect, onSelectEdge, onClear, hoverTarget, onHoverTarget, explicitPathNodeIds, explicitPathEdgeIds }: Explorer2DProps) {
   const root = useRef<SVGSVGElement>(null);
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [camera, setCamera] = useState<FlowCamera2D>(savedCamera ?? { x: 100, y: 100, scale: 1 });
@@ -57,7 +59,7 @@ function SemanticLocalFlow2D({ graph, selectedIds, selectedEdgeId, matchIds, com
   const lastCommand = useRef<number | undefined>(undefined);
   const centerId = location?.centerId ?? graph.nodes[0]?.id ?? '';
   const positions = useMemo(() => layoutExplorerRelations(graph, centerId), [graph, centerId]);
-  const displays = useMemo(() => semanticNodeDisplays(graph.nodes), [graph.nodes]);
+  const displays = useMemo(() => nodeDisplays ?? semanticNodeDisplays(graph.nodes, explorer?.nodes), [nodeDisplays, graph.nodes, explorer]);
   const paths = useMemo(() => semanticFlowEdgePaths(graph, positions, selectedIds, selectedEdgeId, '2d'), [graph, positions, selectedIds, selectedEdgeId]);
   const shownPaths = useMemo(() => paths.filter(path => explorerEdgeVisible(path.edge, selectedIds, direction, selectedEdgeId)), [paths, selectedIds, direction, selectedEdgeId]);
   const shownGraph = useMemo(() => ({ ...graph, edges: shownPaths.map(path => path.edge) }), [graph, shownPaths]);

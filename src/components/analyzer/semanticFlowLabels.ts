@@ -16,6 +16,7 @@ const coversPoint = (obstacle: FlowLabelObstacle, x: number, y: number) => x >= 
 const labelInset = (label: FlowLabelContent) => label.selected || label.aggregate ? 17 : 9;
 
 export function semanticFlowConnectionNotices(camera: Camera, size: { width: number; height: number }, positions: readonly SemanticPosition[], ids: ReadonlySet<string>, labels: readonly FlowLabelPlacement[], overlayTop = 148, obstacles: readonly FlowLabelObstacle[] = []): FlowConnectionNotice[] {
+  if (!ids.size) return [];
   camera.updateMatrixWorld();
   const labelled = new Set(labels.map(label => label.id)), point = new Vector3();
   const plot = semanticFlowPlot(size.width, size.height, overlayTop);
@@ -86,7 +87,9 @@ export function projectSemanticFlowLabels(camera: Camera, size: { width: number;
     return count * 300;
   };
   const budget = Math.max(6, Math.min(24, Math.floor(size.width * size.height / 28000)));
+  const placedIds = new Set<string>();
   const place = (label: FlowLabelContent, px: number, py: number, force: boolean) => {
+    if (placedIds.has(label.id) || !Number.isFinite(px) || !Number.isFinite(py)) return false;
     const measureText = (text: string) => [...text].reduce((sum, char) => sum + (char.charCodeAt(0) > 255 ? 12 : 6.7), 16);
     // Hover must not grow a mounted hit box: a left-side label would then cover
     // its own dot and be relocated out from under the stationary pointer.
@@ -114,12 +117,14 @@ export function projectSemanticFlowLabels(camera: Camera, size: { width: number;
     }
     if (!fallback || !force && fallback.overlap > 0) return false;
     occupied.push({ left: fallback.left, top: fallback.top, width, height });
+    placedIds.add(label.id);
     labels.push({ ...label, x: fallback.x, y: fallback.y, pointX: px, pointY: py, width, height });
     return true;
   };
   const nodeLabel = (item: SemanticPosition): FlowLabelContent => {
     const display = context.displays?.get(item.node.id), role = context.roles?.get(item.node.id);
-    return { id: item.node.id, label: context.view === 'data-flow' ? display?.title ?? item.node.label : item.node.label, path: item.node.attributes.displayAggregate === true ? `表示上の集約 · ${Number(item.node.attributes.targetCount).toLocaleString()}対象${Number(item.node.attributes.matchingCount) > 0 ? ` · 内部に${Number(item.node.attributes.matchingCount)}件一致` : ''}` : `${item.node.kind === 'external' ? '定義先未特定 · 呼び出し箇所 ' : ''}${display?.location ?? `${item.node.path ?? item.node.group}${item.node.line ? `:${item.node.line}` : ''}`}`,
+    return { id: item.node.id, label: typeof item.node.attributes.shortLabel === 'string' ? item.node.attributes.shortLabel : context.view === 'data-flow' ? display?.title ?? item.node.label : item.node.label, path: item.node.attributes.displayAggregate === true ? `${Number(item.node.attributes.targetCount).toLocaleString()}対象${Number(item.node.attributes.matchingCount) > 0 ? ` · ${Number(item.node.attributes.matchingCount)}件一致` : ''}` : `${item.node.kind === 'external' ? '定義先未特定 · 呼び出し箇所 ' : ''}${display?.location ?? `${item.node.path ?? item.node.group}${item.node.line ? `:${item.node.line}` : ''}`}`,
+      ...(item.node.attributes.displayAggregate === true ? { tooltip: `表示上の集約\n${String(item.node.attributes.fullLabel ?? item.node.label)}\n${Number(item.node.attributes.targetCount).toLocaleString()}対象` } : {}),
       ...(display ? { disambiguation: display.disambiguation, tooltip: display.tooltip } : {}),
       ...(role ? { role, roleLabel: semanticFlowRoleLabel(role, context.view ?? 'runtime-flow', context.relationKinds?.get(item.node.id)) } : {}),
       ...(display?.dataRole ? { roleLabel: display.dataRole } : {}),
@@ -130,16 +135,20 @@ export function projectSemanticFlowLabels(camera: Camera, size: { width: number;
   const transient = (id: string) => context.hoveredIds?.has(id) || context.emphasisIds?.has(id);
   const important = (id: string) => required(id) || transient(id);
   // Reserve both explicitly selected endpoints before hover can consume space.
-  for (const item of projected.filter(p => required(p.item.node.id)).sort((a, b) => Number(selectedIds.has(b.item.node.id)) - Number(selectedIds.has(a.item.node.id)) || a.item.node.id.localeCompare(b.item.node.id))) place(nodeLabel(item.item), item.x, item.y, true);
+  if (selectedIds.size || context.priorityIds?.size) for (const item of projected.filter(p => required(p.item.node.id)).sort((a, b) => Number(selectedIds.has(b.item.node.id)) - Number(selectedIds.has(a.item.node.id)) || a.item.node.id.localeCompare(b.item.node.id))) place(nodeLabel(item.item), item.x, item.y, true);
   let nodeCount = 0, relatedAttempts = 0;
   const stableOrder = (a: typeof projected[number], b: typeof projected[number]) => Number(previous.has(b.item.node.id)) - Number(previous.has(a.item.node.id)) || a.item.node.id.localeCompare(b.item.node.id);
-  for (const item of projected.filter(p => !required(p.item.node.id) && transient(p.item.node.id)).sort(stableOrder)) place(nodeLabel(item.item), item.x, item.y, true);
-  const relatedVisible = projected.filter(p => !important(p.item.node.id) && context.relatedIds?.has(p.item.node.id)).sort(stableOrder);
+  if (context.hoveredIds?.size || context.emphasisIds?.size) for (const item of projected.filter(p => !required(p.item.node.id) && transient(p.item.node.id)).sort(stableOrder)) place(nodeLabel(item.item), item.x, item.y, true);
+  const relatedVisible = context.relatedIds?.size ? projected.filter(p => !important(p.item.node.id) && context.relatedIds?.has(p.item.node.id)).sort(stableOrder) : [];
   for (const item of relatedVisible) {
     if (nodeCount >= budget || relatedAttempts++ >= budget * 8) break;
     if (place(nodeLabel(item.item), item.x, item.y, relatedVisible.length <= 3)) nodeCount++;
   }
-  for (const item of projected.filter(p => p.item.node.attributes.displayAggregate === true && !important(p.item.node.id))) place(nodeLabel(item.item), item.x, item.y, false);
+  let aggregateCount = 0, aggregateAttempts = 0;
+  for (const item of projected.filter(p => p.item.node.attributes.displayAggregate === true && !important(p.item.node.id) && !context.relatedIds?.has(p.item.node.id)).sort(stableOrder)) {
+    if (aggregateCount >= Math.min(8, budget) || aggregateAttempts++ >= budget * 4) break;
+    if (place(nodeLabel(item.item), item.x, item.y, false)) aggregateCount++;
+  }
   let regionCount = 0;
   const projectedById = new Map(projected.map(item => [item.item.node.id, item]));
   const nodesById = new Map(ordered.map(item => [item.node.id, item.node]));
@@ -149,14 +158,19 @@ export function projectSemanticFlowLabels(camera: Camera, size: { width: number;
     const corners = members.length ? members : [region.z, region.z + (region.depth ?? 0)].flatMap(z => [[region.x, region.y], [region.x + region.width, region.y], [region.x, region.y + region.height], [region.x + region.width, region.y + region.height]].map(([x, y]) => {
       point.set(x!, y!, z).project(camera); return { x: (point.x + 1) * size.width / 2, y: (1 - point.y) * size.height / 2, z: point.z };
     }));
-    const minX = Math.min(...corners.map(p => p.x)), maxX = Math.max(...corners.map(p => p.x)), minY = Math.min(...corners.map(p => p.y)), maxY = Math.max(...corners.map(p => p.y));
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const p of corners) { minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y); }
     if (maxX < 0 || minX > size.width || maxY < 0 || minY > size.height || corners.every(p => p.z < -1 || p.z > 1)) continue;
     const unresolvedGroup = region.nodeIds.length > 0 && region.nodeIds.every(id => nodesById.get(id)?.kind === 'external');
     if (place({ id: `flow-region:${region.id}`, label: region.label, path: `${unresolvedGroup ? '表示上の集約 · ' : ''}${region.count.toLocaleString()}対象`, selected: false, match: false, region: true }, Math.max(12, minX), Math.max(top, minY - 38), false)) regionCount++;
   }
   let considered = 0;
+  // Below the retention threshold none of the ordinary, nonmatching labels can
+  // be shown. Do not sort the entire visible point cloud only to reject it.
+  if (zoom < .62 && !matchIds.size) return labels;
   const regionCounts = new Map<string, number>(), regionAttempts = new Map<string, number>();
-  const candidates = projected.filter(p => !important(p.item.node.id) && !context.relatedIds?.has(p.item.node.id) && p.item.node.attributes.displayAggregate !== true).sort((a, b) => Number(matchIds.has(b.item.node.id)) - Number(matchIds.has(a.item.node.id)) || stableOrder(a, b));
+  const candidates = projected.filter(p => !important(p.item.node.id) && !context.relatedIds?.has(p.item.node.id) && p.item.node.attributes.displayAggregate !== true
+    && (matchIds.has(p.item.node.id) || zoom >= (previous.has(p.item.node.id) ? .62 : .78))).sort((a, b) => Number(matchIds.has(b.item.node.id)) - Number(matchIds.has(a.item.node.id)) || stableOrder(a, b));
   for (const item of candidates) {
     const related = context.relatedIds?.has(item.item.node.id), match = matchIds.has(item.item.node.id);
     if (nodeCount >= budget || considered >= budget * 6) break;
@@ -227,6 +241,12 @@ export class FlowLabelLayer {
 
   update = (next: FlowLabelPlacement[]) => {
     if (!this.active) return;
+    // Keep React keys, hit regions and frame placements in the same unique set.
+    const ids = new Set<string>();
+    next = next.filter(label => {
+      if (ids.has(label.id) || !Number.isFinite(label.x) || !Number.isFinite(label.y)) return false;
+      ids.add(label.id); return true;
+    });
     this.placements = new Map(next.map(label => [label.id, label]));
     for (const [id, element] of this.elements) this.place(id, element);
     if (next.length === this.content.length && next.every((label, index) => {

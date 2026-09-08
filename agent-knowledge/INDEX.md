@@ -36,6 +36,14 @@
 - files: `src/analyzer/semantic/analyze.ts`, `src/analyzer/semantic/project.ts`, `src/analyzer/semantic/types.ts` …
 - memory: `agent-knowledge/entries/2026-09-08-semantic-view-field-conservation-c23e054.md`
 
+### 複数の優先passをまたいでlabel IDを一度だけ配置する
+- id: `rm-20260909-flow-label-unique-placement`
+- type: `failure`
+- maturity: `candidate`
+- tags: `label`, `stable-id`, `react-key`, `aggregation`, `lifecycle`
+- files: `src/components/analyzer/semanticFlowLabels.ts`, `src/components/analyzer/semanticFlowLabels.test.ts`, `src/components/analyzer/SemanticFlow3D.tsx` …
+- memory: `agent-knowledge/entries/2026-09-09-flow-label-unique-placement-45ea82.md`
+
 ## analyzer-model
 
 ### 派生した項目のコピーを、元の定義所有者へ置き換えない
@@ -79,6 +87,22 @@
 - tags: `3d`, `coordinates`, `manual-collapse`, `conservation`
 - files: `src/components/analyzer/AnalyzerSpatialGraphStage.tsx`, `src/components/analyzer/moduleAggregationControls.test.tsx`, `src/analyzer/moduleAutoAggregation.ts` …
 - memory: `agent-knowledge/entries/2026-09-08-module-layout-before-visibility-91d52a.md`
+
+### 密度計算の準備と表示ownerの更新を分離して計測する
+- id: `rm-20260909-aggregation-input-reuse`
+- type: `pattern`
+- maturity: `candidate`
+- tags: `density`, `immutable-input`, `cache`, `performance`, `profiling`
+- files: `src/analyzer/autoAggregation.ts`, `src/analyzer/autoAggregation.test.ts`, `src/analyzer/semantic/flowAutoAggregation.ts` …
+- memory: `agent-knowledge/entries/2026-09-09-aggregation-input-reuse-b8d45a.md`
+
+### Canvas除去後のControls破棄ではdocument listenerが残る
+- id: `rm-20260909-canvas-document-disposal`
+- type: `failure`
+- maturity: `candidate`
+- tags: `r3f`, `orbit-controls`, `lifecycle`, `heap`, `event-listener`
+- files: `src/components/analyzer/canvasDisposals.ts`, `src/components/analyzer/canvasDisposals.test.tsx`, `src/components/analyzer/SemanticFlow3D.tsx` …
+- memory: `agent-knowledge/entries/2026-09-09-canvas-document-disposal-317bd4.md`
 
 ## deployment
 

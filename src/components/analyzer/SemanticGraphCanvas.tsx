@@ -5,6 +5,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { layoutSemanticGraph } from '../../analyzer/semantic/presentation';
 import type { SemanticGraph, SemanticKind } from '../../analyzer/semantic/types';
 import type { AnalyzerViewSession } from '../../analyzer/session';
+import { registerCanvasDisposal, useCanvasDisposals } from './canvasDisposals';
 
 type CameraState = NonNullable<AnalyzerViewSession['semanticCamera']>;
 interface Props {
@@ -13,7 +14,7 @@ interface Props {
 }
 const palette: Record<SemanticKind, string> = { function: '#497869', entry: '#447fb1', request: '#9172b3', operation: '#ad7643', value: '#4b8293', model: '#817243', resource: '#a65c65', subsystem: '#546f91', external: '#898482', span: '#3c9485', log: '#85867a' };
 
-function Scene({ graph, selected, orbit, focus, fit, camera: savedCamera, onCamera, onSelect }: Props) {
+function Scene({ graph, selected, orbit, focus, fit, camera: savedCamera, onCamera, onSelect, canvasDisposals }: Props & { canvasDisposals: Set<() => void> }) {
   const { camera, gl, size, invalidate } = useThree();
   const controls = useRef<OrbitControls | null>(null);
   const callbacks = useRef({ onCamera, onSelect });
@@ -82,8 +83,8 @@ function Scene({ graph, selected, orbit, focus, fit, camera: savedCamera, onCame
     const change = () => { invalidate(); };
     const end = () => callbacks.current.onCamera({ position: camera.position.toArray(), target: control.target.toArray(), zoom: (camera as THREE.OrthographicCamera).zoom });
     control.addEventListener('change', change); control.addEventListener('end', end);
-    return () => { control.dispose(); controls.current = null; };
-  }, [camera, gl, invalidate, orbit]);
+    return registerCanvasDisposal(canvasDisposals, () => { control.removeEventListener('change', change); control.removeEventListener('end', end); control.dispose(); controls.current = null; });
+  }, [camera, gl, invalidate, orbit, canvasDisposals]);
   useEffect(() => {
     const control = controls.current; if (!control) return;
     const cam = camera as THREE.OrthographicCamera;
@@ -126,7 +127,8 @@ class GraphBoundary extends Component<{ children: ReactNode }, { failed: boolean
 }
 
 export function SemanticGraphCanvas(props: Props) {
+  const canvasDisposals = useCanvasDisposals();
   return <div className="semantic-canvas" role="img" aria-label={`${props.graph.nodes.length} objects、${props.graph.edges.length} relationsのグラフ。左の一覧からも選択できます。`}>
-    <GraphBoundary><Canvas orthographic frameloop="demand" dpr={[1, 1.7]} camera={{ position: [0, 0, 1800], zoom: 1, near: .1, far: 30000 }} gl={{ antialias: true, alpha: true }}><Scene {...props} /></Canvas></GraphBoundary>
+    <GraphBoundary><Canvas orthographic frameloop="demand" dpr={[1, 1.7]} camera={{ position: [0, 0, 1800], zoom: 1, near: .1, far: 30000 }} gl={{ antialias: true, alpha: true }}><Scene {...props} canvasDisposals={canvasDisposals} /></Canvas></GraphBoundary>
   </div>;
 }

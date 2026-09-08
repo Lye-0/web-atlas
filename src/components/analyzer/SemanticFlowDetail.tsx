@@ -127,7 +127,7 @@ export function SemanticFlowDetail({ node, edge, nodes, edges, sources, view, on
   const displays = useMemo(() => {
     const related = new Set([...(node ? [node.id] : []), ...edges.filter(item => item.source === node?.id || item.target === node?.id).flatMap(item => [item.source, item.target]),
       ...(edge ? [edge.source, edge.target, ...edge.provenance?.edges.flatMap(item => [item.source, item.target]) ?? []] : [])]);
-    return semanticNodeDisplays([...related].flatMap(id => { const item = nodes.get(id); return item ? [item] : []; }));
+    return semanticNodeDisplays([...related].flatMap(id => { const item = nodes.get(id); return item ? [item] : []; }), nodes);
   }, [node, edge, nodes, edges]);
   const interaction: DetailInteraction = { hoverTarget, onHoverTarget, displays };
   if (!node && !edge) return null;

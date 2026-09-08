@@ -175,6 +175,10 @@ BrowserのFile System Access APIがない場合はdirectory file inputを使い�
 
 ## Validation
 
+The cross-View stabilization and performance results are recorded in [the stabilization review](analyzer-cross-tab-stabilization-review.md). Module selection, source-edge selection and explicit connection framing do not open containing directories. The spatial renderer extracts protected canonical endpoints from the existing manual scope; clearing them restores its prior closure. Only an explicit hierarchy/open action changes directory expansion. Camera requests are scoped to the current View and source store and cleared on selection cancellation/input replacement. Module aggregate markers retain hit targets for every current representative, while only spaced priority captions remain continuously visible.
+
+Native scrollbars use the application's dark color scheme, a muted green-grey thumb and a transparent track. Standard thin scrollbars retain native wheel, dragging and keyboard behavior; forced-colors restores platform coloring and width. This does not change the graph layout or scroll-area ownership.
+
 `pnpm test`、`pnpm typecheck`、`pnpm lint`、`pnpm build`で検証します。Tab 1–5のFact・import解決・routing・spatial layout・操作・Sessionの回帰は、`src/analyzer/*.test.ts`と既存のAnalyzerコンポーネントテストで維持します。View 6–10の実WASM解析・投影・Trace・UI回帰は`src/analyzer/semantic/*.test.ts`と`src/pages/SemanticAnalyzerPage.test.tsx`で検証します。
 
 `WEB_ATLAS_VALIDATION_REPOS`を指定すると、任意の実Repositoryを読み取り専用で検証します。指定がない通常のテストでは、この外部入力検証のみskipします。`vehicle-management`と`git-lines`は許可された検証入力であり、解析側からコードを変更・実行しません。実際のWebGL描画・ファイル選択・View間の移動は別途ブラウザで確認します。

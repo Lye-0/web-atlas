@@ -1,9 +1,10 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { explorerChildren, type ExplorerLocation, type SemanticExplorerModel } from '../../analyzer/semantic/semanticExplorer';
 import { kindLabels } from '../../analyzer/semantic/types';
-import { isFineDataExpression, semanticNodeDisplays } from './semanticFlowDisplay';
+import { isFineDataExpression, semanticNodeDisplays, type SemanticNodeDisplay } from './semanticFlowDisplay';
 
-export function SemanticExplorerBlocks({ explorer, location, visibleIds, matchIds, selectedIds, visitId, scrollTop, overlayTop, focusIds, focusNonce, onScroll, onOpenScope, onOpenNode, fineExpandedScopeIds, onFineExpandedScopeIds }: {
+export function SemanticExplorerBlocks({ explorer, nodeDisplays, location, visibleIds, matchIds, selectedIds, visitId, scrollTop, overlayTop, focusIds, focusNonce, onScroll, onOpenScope, onOpenNode, fineExpandedScopeIds, onFineExpandedScopeIds }: {
+  nodeDisplays?: ReadonlyMap<string, SemanticNodeDisplay>;
   explorer: SemanticExplorerModel; location: ExplorerLocation; visibleIds: ReadonlySet<string>; matchIds: ReadonlySet<string>; selectedIds: ReadonlySet<string>;
   visitId: string; scrollTop: number; overlayTop: number; onScroll: (scrollTop: number) => void; onOpenScope: (id: string) => void; onOpenNode: (id: string) => void;
   focusIds?: string[]; focusNonce?: number;
@@ -11,7 +12,7 @@ export function SemanticExplorerBlocks({ explorer, location, visibleIds, matchId
 }) {
   const root = useRef<HTMLDivElement>(null), saved = useRef(scrollTop); saved.current = scrollTop;
   const children = useMemo(() => explorerChildren(explorer, location, visibleIds), [explorer, location, visibleIds]);
-  const displays = useMemo(() => semanticNodeDisplays(explorer.nodes.values()), [explorer]);
+  const displays = useMemo(() => nodeDisplays ?? semanticNodeDisplays(explorer.nodes.values()), [nodeDisplays, explorer]);
   const [localFineOpen, setLocalFineOpen] = useState(false);
   const fineOpen = fineExpandedScopeIds ? fineExpandedScopeIds.includes(location.scopeId) : localFineOpen;
   const setFineOpen = (open: boolean) => {

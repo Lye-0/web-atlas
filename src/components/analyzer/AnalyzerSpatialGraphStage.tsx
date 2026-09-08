@@ -65,7 +65,7 @@ import { useSpatialFlowMotion } from './useSpatialFlowMotion';
 import { SpatialParticleControl } from './SpatialParticleControl';
 import { SemanticFlowLegend } from './SemanticFlowLegend';
 import { semanticFlowDirectionLanguage } from './semanticFlowLanguage';
-import { projectAutoAggregation, projectAggregationRelations, stableAggregationRepresentation, type AutoAggregationResult } from '../../analyzer/autoAggregation';
+import { prepareAutoAggregation, projectAutoAggregation, projectAggregationRelations, shortAggregationLabels, stableAggregationRepresentation, type AutoAggregationResult } from '../../analyzer/autoAggregation';
 import { moduleAggregationInput, moduleAggregationProjection, moduleManualGroups, moduleRelationEvidenceCounts } from '../../analyzer/moduleAutoAggregation';
 import type { AnalyzerViewSession } from '../../analyzer/session';
 import { AutoAggregationPanel, AutoAggregationToggle, type AggregationInspection, type AggregationGroupMode } from './AutoAggregationPanel';
@@ -377,13 +377,19 @@ export function AnalyzerSpatialGraphStage({
   const explicitExpandedIds = useMemo(() => new Set(aggregationPreference.expandedGroupIds), [aggregationPreference.expandedGroupIds]);
   const explicitCollapsedIds = useMemo(() => new Set(aggregationPreference.collapsedGroupIds), [aggregationPreference.collapsedGroupIds]);
   const manualGroups = useMemo(() => moduleManualGroups(filteredModules, new Set(visiblePositionedModules.map(point => point.node.id)), expandedPresentationIds,
-    new Map([...regionById].filter(([, region]) => region.regionKind === 'directory').map(([id, region]) => [id, region.label]))), [filteredModules, visiblePositionedModules, expandedPresentationIds, regionById]);
-  const protectedIds = useMemo(() => new Set([selectedNodeId, hoveredNodeId, focusedNodeId, ...selectedEdgeEndpointIds, ...focusRequest?.entityIds ?? [], focusRequest?.entityId,
+    new Map([...regionById].filter(([, region]) => region.regionKind === 'directory').map(([id, region]) => [id, region.subtitle ?? region.label]))), [filteredModules, visiblePositionedModules, expandedPresentationIds, regionById]);
+  const directNeighbours = useMemo(() => {
+    const ids = new Set<string>();
+    for (const edge of view.edges) { if (edge.sourceId === selectedNodeId) ids.add(edge.targetId); if (edge.targetId === selectedNodeId) ids.add(edge.sourceId); }
+    return ids.size <= 3 ? [...ids] : [];
+  }, [view.edges, selectedNodeId]);
+  const protectedIds = useMemo(() => new Set([selectedNodeId, hoveredNodeId, focusedNodeId, ...directNeighbours, ...selectedEdgeEndpointIds, ...focusRequest?.entityIds ?? [], focusRequest?.entityId,
     ...filteredModules.filter(point => moduleNodeVisible(point.node, regionById, expandedPresentationIds, '') && regionPathForNode(point.node).some(id => aggregationPreference.expandedRegionIds?.includes(id))).map(point => point.node.id)].filter((id): id is string => Boolean(id))),
-  [selectedNodeId, hoveredNodeId, focusedNodeId, selectedEdgeEndpointIds, focusRequest, filteredModules, aggregationPreference.expandedRegionIds, regionById, expandedPresentationIds]);
-  const aggregation = useMemo(() => stableAggregationRepresentation(projectAutoAggregation({ ...aggregationInput, enabled: autoAggregation, protectedIds, expandedGroupIds: explicitExpandedIds,
+  [selectedNodeId, hoveredNodeId, focusedNodeId, directNeighbours, selectedEdgeEndpointIds, focusRequest, filteredModules, aggregationPreference.expandedRegionIds, regionById, expandedPresentationIds]);
+  const preparedAggregation = useMemo(() => prepareAutoAggregation(aggregationInput.points, aggregationInput.groups), [aggregationInput]);
+  const aggregation = useMemo(() => stableAggregationRepresentation(projectAutoAggregation({ ...aggregationInput, prepared: preparedAggregation, enabled: autoAggregation, protectedIds, expandedGroupIds: explicitExpandedIds,
     manualGroups: [...manualGroups, ...aggregationInput.groups.filter(group => explicitCollapsedIds.has(group.id))], projection: moduleAggregationProjection(camera), previousActiveGroupIds: previousAggregation.current,
-    matchIds: new Set(filteredModules.filter(point => Boolean(search.trim()) && nodeMatchesSearch(point.node, search)).map(point => point.node.id)) }), previousRepresentation.current), [aggregationInput, autoAggregation, protectedIds, explicitExpandedIds, explicitCollapsedIds, manualGroups, camera, filteredModules, search]);
+    matchIds: new Set(filteredModules.filter(point => Boolean(search.trim()) && nodeMatchesSearch(point.node, search)).map(point => point.node.id)) }), previousRepresentation.current), [aggregationInput, preparedAggregation, autoAggregation, protectedIds, explicitExpandedIds, explicitCollapsedIds, manualGroups, camera, filteredModules, search]);
   useEffect(() => { previousRepresentation.current = aggregation; }, [aggregation]);
   useEffect(() => {
     if (!autoAggregation || camera.viewportWidth <= 0 || camera.viewportHeight <= 0) return;
@@ -394,6 +400,18 @@ export function AnalyzerSpatialGraphStage({
   const individualModules = useMemo(() => filteredModules.filter(point => aggregation.individualIds.has(point.node.id)), [filteredModules, aggregation.individualIds]);
   const aggregateModules = useMemo<PositionedNode[]>(() => aggregation.aggregates.map(group => ({ x: group.x - ANALYZER_MODULE_NODE_WIDTH / 2, y: group.y - 18, height: 36,
     node: { id: group.id, type: 'module', label: `${group.memberIds.length}対象 · ${group.label}`, evidenceIds: [], metadata: { displayAggregate: true, displayElevation: group.z, groupId: group.groupId } } })), [aggregation.aggregates]);
+  const aggregateLabels = useMemo(() => {
+    const shortNames = shortAggregationLabels(aggregation.aggregates), occupied: { x: number; y: number }[] = [];
+    return aggregation.aggregates.map(group => ({ group, point: projectSpatialPoint(group, camera) }))
+      .filter(({ point }) => Number.isFinite(point.x) && Number.isFinite(point.y) && point.x >= 0 && point.y >= 65 && point.x <= viewport.width && point.y <= viewport.height - 45)
+      .sort((a, b) => Number(b.group.groupId === inspection?.id) - Number(a.group.groupId === inspection?.id) || b.group.matchingCount - a.group.matchingCount)
+      .map(item => {
+        const priority = item.group.groupId === inspection?.id;
+        const visible = priority || occupied.length < 8 && !occupied.some(old => Math.abs(old.x - item.point.x) < 190 && Math.abs(old.y - item.point.y) < 50);
+        if (visible) occupied.push(item.point);
+        return { ...item, visible, label: shortNames.get(item.group.id) };
+      });
+  }, [aggregation.aggregates, camera, viewport.width, viewport.height, inspection]);
   const renderedPositionedModules = useMemo(() => [...individualModules, ...aggregateModules], [individualModules, aggregateModules]);
   const renderedById = useMemo(() => new Map([...positionedById, ...aggregateModules.map(point => [point.node.id, point] as const)]), [positionedById, aggregateModules]);
   const canonicalRelations = useMemo(() => view.edges.map(edge => ({ ...edge, source: edge.sourceId, target: edge.targetId, confidence: String(edge.metadata.confidence ?? 'source') })), [view.edges]);
@@ -408,6 +426,7 @@ export function AnalyzerSpatialGraphStage({
     onTogglePresentation(id);
   };
   const groupMode = (id: string, mode: AggregationGroupMode) => {
+    if (![...aggregationInput.groups, ...manualGroups].some(group => group.id === id)) return;
     if (id.startsWith('module-manual:')) { const regionId = id.slice('module-manual:'.length); if (mode === 'expanded' || mode === 'auto') toggleRegion(regionId, mode === 'expanded'); return; }
     changeAggregation({ ...aggregationPreference, expandedGroupIds: [...aggregationPreference.expandedGroupIds.filter(value => value !== id), ...(mode === 'expanded' ? [id] : [])], collapsedGroupIds: [...aggregationPreference.collapsedGroupIds.filter(value => value !== id), ...(mode === 'collapsed' ? [id] : [])] });
   };
@@ -1004,10 +1023,9 @@ export function AnalyzerSpatialGraphStage({
                 </button>
               );
             })}
-            {aggregation.aggregates.map(group => ({ group, point: projectSpatialPoint(group, camera) })).filter(({ point }) => point.x >= -10 && point.y >= 65 && point.x <= viewport.width + 10 && point.y <= viewport.height - 45)
-              .sort((a, b) => Number(b.group.groupId === inspection?.id) - Number(a.group.groupId === inspection?.id) || b.group.matchingCount - a.group.matchingCount).slice(0, 100).map(({ group, point }) =>
-                <button key={group.id} type="button" className="analyzer-spatial-aggregate-label" style={{ left: point.x, top: point.y }} onClick={() => setInspection({ kind: 'group', id: group.groupId })}
-                  aria-label={`${group.label} · ${group.memberIds.length}対象の表示集合を確認`} title={group.label}>◎ {group.memberIds.length.toLocaleString()}対象{group.matchingCount ? ` · 内部に${group.matchingCount}件一致` : ''}</button>)}
+            {aggregateLabels.map(({ group, point, visible, label }) =>
+                <button key={group.id} type="button" className="analyzer-spatial-aggregate-label" data-label-visible={visible || undefined} style={{ left: point.x, top: point.y }} onClick={() => setInspection({ kind: 'group', id: group.groupId })}
+                  aria-label={`${group.label} · ${group.memberIds.length}対象の表示集合を確認`} title={group.label}><span>{label}<br />{group.memberIds.length.toLocaleString()}対象{group.matchingCount ? ` · ${group.matchingCount}件一致` : ''}</span></button>)}
             <svg className="analyzer-spatial-graph-layer" width={Math.max(1, viewport.width)} height={Math.max(1, viewport.height)} viewBox={`0 0 ${Math.max(1, viewport.width)} ${Math.max(1, viewport.height)}`} aria-label="Module dependency relations">
               {visibleProjectedEdges.map((edge) => (
                 <g key={edge.id} className={`analyzer-spatial-edge${edge.selected ? ' is-selected' : ''}${edge.connected ? ' is-connected' : ''}${edge.dimmed ? ' is-dimmed' : ''}`}>

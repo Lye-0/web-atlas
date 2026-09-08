@@ -1,5 +1,6 @@
 import { act, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { bindSemanticFlowKeyboard } from './semanticFlowKeyboard';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SemanticGraph } from '../../analyzer/semantic/types';
 import type { SemanticPosition } from '../../analyzer/semantic/presentation';
@@ -25,9 +26,9 @@ const graph: SemanticGraph = { view: 'function-call-flow', nodes: [
 
 describe('3D presentation controls retain canonical selection', () => {
   let host: HTMLDivElement, root: Root;
-  const onSelect = vi.fn(), onFocus = vi.fn(), onCamera = vi.fn(), onHoverTarget = vi.fn();
+  const onSelect = vi.fn(), onFocus = vi.fn(), onCamera = vi.fn(), onHoverTarget = vi.fn(), onClear = vi.fn();
   const render = (selectedIds = new Set<string>(), selectedEdgeId?: string, options: { showGroupBounds?: boolean; hoverTarget?: SemanticFlowHoverTarget; onHoverTarget?: SemanticFlowHoverHandler; aggregationState?: AnalyzerViewSession['aggregation']; autoAggregation?: boolean } = {}) => act(async () => root.render(<SemanticFlow3D graph={graph} selectedIds={selectedIds} selectedEdgeId={selectedEdgeId} matchIds={new Set()} {...options} onHoverTarget={options.onHoverTarget ?? onHoverTarget}
-    motion={{ enabled: false, reduced: false, visible: true }} onCamera={onCamera} onSelect={onSelect} onSelectEdge={() => {}} onClear={() => {}} onUnavailable={() => {}} onFocusRegion={onFocus} />));
+    motion={{ enabled: false, reduced: false, visible: true }} onCamera={onCamera} onSelect={onSelect} onSelectEdge={() => {}} onClear={onClear} onUnavailable={() => {}} onFocusRegion={onFocus} />));
   beforeEach(() => {
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
     host = document.createElement('div'); document.body.append(host); root = createRoot(host);
@@ -39,6 +40,18 @@ describe('3D presentation controls retain canonical selection', () => {
     details.open = true; details.dispatchEvent(new Event('toggle', { bubbles: true }));
   });
   const clickText = (text: string) => act(async () => [...host.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === text)!.click());
+
+  it('accepts Escape before Scene initialization and clears only once after its native listener is ready', async () => {
+    await render(new Set(['caller']));
+    const canvas = document.createElement('canvas'); host.querySelector('[data-testid="canvas"]')!.append(canvas);
+    const escape = () => canvas.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    await act(async () => { escape(); }); expect(onClear).toHaveBeenCalledTimes(1);
+    const unbind = bindSemanticFlowKeyboard(canvas, onClear);
+    await act(async () => { escape(); }); expect(onClear).toHaveBeenCalledTimes(2);
+    unbind();
+    const prevented = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }); prevented.preventDefault();
+    await act(async () => { canvas.dispatchEvent(prevented); }); expect(onClear).toHaveBeenCalledTimes(2);
+  });
 
   it('keeps small inputs individual until an explicit manual collapse, with no duplicated representative on expansion', async () => {
     await render();
@@ -52,7 +65,7 @@ describe('3D presentation controls retain canonical selection', () => {
     const aggregate = scene.current.positions.find(item => item.node.attributes.displayAggregate)!;
     await act(async () => scene.current.onSelect(aggregate.node.id));
     expect(host.querySelector('.auto-aggregation-panel h4')?.textContent).toContain('未特定');
-    await clickText('全メンバーを個別表示');
+    await clickText('この所属の2対象を個別表示');
     expect(scene.current.positions.map(point => point.node.id).sort()).toEqual(['caller', 'first', 'second']);
     expect(onSelect).not.toHaveBeenCalled(); expect(onCamera).not.toHaveBeenCalled();
   });

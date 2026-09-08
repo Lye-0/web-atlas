@@ -5,13 +5,15 @@ type: failure
 status: active
 maturity: candidate
 created: 2026-09-08
-last_verified: 2026-09-08
-source_commit: "f97bafe59bb72d7af596504bbc0de319a84cb625"
+last_verified: 2026-09-09
+source_commit: "91b471a8997a50832c1330024f79e06274469e2b"
 related_files:
   - src/components/analyzer/AnalyzerSpatialGraphStage.tsx
   - src/components/analyzer/moduleAggregationControls.test.tsx
   - src/analyzer/moduleAutoAggregation.ts
   - src/analyzer/layout.ts
+  - src/pages/AnalyzerPage.tsx
+  - src/pages/AnalyzerPage.test.tsx
   - docs/technical/analyzer.md
 tags:
   - 3d
@@ -49,6 +51,8 @@ Do not apply:
 - 記録時のHEADに対する未コミット実装で確立し、最終製品テストおよび独立正確性検証で再確認した。HEADは観測元であり、単独で修正内容を含むとは限らない。
 
 ## Verification
+
+2026-09-09の追加検証では、rendererの保護だけでなくページの選択処理も確認した。元のedge選択がDirectoryを自動で開いており、両端の一時保護を解除しても手動閉状態へ戻らなかった。`AnalyzerPage`で選択と明示的な所属開閉を分離し、ページintegration testと実UI（2対象の閉scope→元imports両端→Escape→手動2対象）で復帰を確認した。rendererだけのunit testではこの経路を検出できない。
 
 1. layout入力が手動の可視状態で元Moduleを削除していないことと、全座標・boundsが開閉前後で同一であることを確認する。
 2. `pnpm exec vitest run src/components/analyzer/moduleAggregationControls.test.tsx src/analyzer/moduleAutoAggregation.test.ts`を実行する。

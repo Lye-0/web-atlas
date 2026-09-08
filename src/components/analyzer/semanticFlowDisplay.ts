@@ -108,8 +108,22 @@ export function semanticNodeDisplay(node: SemanticNode): SemanticNodeDisplay {
 }
 
 /** Distinct objects can share a shortened title and even a source line; expose their recorded ranges. */
-export function semanticNodeDisplays(nodes: Iterable<SemanticNode>): ReadonlyMap<string, SemanticNodeDisplay> {
+export function semanticNodeDisplays(nodes: Iterable<SemanticNode>, contextNodes?: ReadonlyMap<string, SemanticNode>): ReadonlyMap<string, SemanticNodeDisplay> {
   const items = [...nodes], displays = new Map(items.map(node => [node.id, semanticNodeDisplay(node)]));
+  const byId = new Map(items.map(node => [node.id, node]));
+  const contexts = new Map<string, string>();
+  for (const node of items) {
+    const contextId = node.data?.contextId;
+    const call = contextId ? contextNodes?.get(contextId) ?? byId.get(contextId) : undefined;
+    if (!call) continue;
+    const source = call.evidence[0], path = call.path ?? source?.path;
+    if (!path) continue;
+    const context = `呼び出し ${path}:${call.line ?? source?.line ?? '?'}${source ? ` · 箇所 ${source.start}–${source.end}` : ''}`;
+    contexts.set(node.id, `呼び出し L${call.line ?? source?.line ?? '?'}${source ? ` (${source.start}–${source.end})` : ''} · ${path.split('/').at(-1)}`);
+    const display = displays.get(node.id)!;
+    display.location += ` · ${context}`;
+    display.tooltip += `\n${context}`;
+  }
   const repeated = new Map<string, number>();
   for (const display of displays.values()) {
     const key = `${display.title}\n${display.location}`;
@@ -159,6 +173,8 @@ export function semanticNodeDisplays(nodes: Iterable<SemanticNode>): ReadonlyMap
     };
     const duplicateRows = groupRows();
     for (const same of duplicateRows.values()) if (same.length > 1) for (const node of same) {
+      const context = contexts.get(node.id);
+      if (context) { rows.set(node.id, `${context} · ${rows.get(node.id)}`); continue; }
       const evidence = node.evidence[0];
       // Put the distinguishing range first, where a narrow label cannot ellipsize it away.
       if (evidence) rows.set(node.id, `範囲 ${evidence.start}–${evidence.end} · ${rows.get(node.id)}`);

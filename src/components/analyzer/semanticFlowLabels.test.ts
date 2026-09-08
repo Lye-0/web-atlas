@@ -11,6 +11,25 @@ const region: SemanticFlowRegion = { id: 'directory:src/git', kind: 'directory',
 const sceneCamera = () => { const camera = new OrthographicCamera(-500, 500, 400, -400, .1, 1000); camera.position.set(0, 0, 100); camera.lookAt(0, 0, 0); return camera; };
 
 describe('semantic 3D label synchronization', () => {
+  it.each(['runtime-flow', 'function-call-flow', 'data-flow', 'data-model'] as const)('admits a related aggregate only once in %s, then removes its label and hit area on OFF', view => {
+    const source = positioned('source', -300), aggregate = positioned('aggregate', 120);
+    aggregate.node.attributes = { displayAggregate: true, targetCount: 40 };
+    const labels = projectSemanticFlowLabels(sceneCamera(), { width: 1000, height: 800 }, 1, [source, aggregate], new Set(['source']), new Set(), { view, relatedIds: new Set(['aggregate']) });
+    expect(labels.filter(label => label.id === 'aggregate')).toHaveLength(1);
+    const publish = vi.fn(), layer = new FlowLabelLayer(publish), button = document.createElement('button');
+    layer.update([...labels, labels.find(label => label.id === 'aggregate')!]); layer.attach('aggregate', button);
+    expect(publish.mock.calls[0]![0].filter((label: FlowLabelPlacement) => label.id === 'aggregate')).toHaveLength(1);
+    const off = projectSemanticFlowLabels(sceneCamera(), { width: 1000, height: 800 }, 1, [source], new Set(['source']), new Set(), { view, previous: labels });
+    layer.update(off); expect(button.style.visibility).toBe('hidden'); expect(button.tabIndex).toBe(-1);
+    expect(off.map(label => label.id)).toEqual(['source']);
+  });
+
+  it('rejects invalid and behind-camera positions without pinning them to the screen', () => {
+    const positions = [positioned('invalid', NaN), positioned('behind', 0, 0, 200)];
+    expect(projectSemanticFlowLabels(sceneCamera(), { width: 1000, height: 800 }, 1, positions, new Set(['invalid', 'behind']), new Set())).toEqual([]);
+    const publish = vi.fn(), layer = new FlowLabelLayer(publish);
+    layer.update([placement('invalid', Infinity, 200)]); expect(publish).not.toHaveBeenCalled();
+  });
   it.each(['selected node', 'selected edge'])('keeps a 220×60 left-side label hit box fixed on hover and unhover beside %s priorities', selection => {
     const positions = [positioned('source', -100, -100), positioned('edge-end', -300, 100), positioned('peer', 300)];
     positions[2]!.node.label = 'callback L163';
