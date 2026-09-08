@@ -46,6 +46,8 @@ export function semanticFlowRoleLabel(role: SemanticFlowNodeRole, view: Semantic
   if (role === 'source') return '始点（Source）';
   if (role === 'target') return '終点（Target）';
   if (role === 'source-target') return '始点・終点（自己関係）';
+  if (view === 'data-flow') return role === 'incoming' ? '由来・入力' : role === 'outgoing' ? '結果・利用先' : '由来・利用先の両方';
+  if (view === 'data-model') return role === 'incoming' ? '参照する元・派生する型' : role === 'outgoing' ? '参照先・派生元' : '参照する元・先の両方';
   if (view === 'function-call-flow' && kinds?.size === 1 && kinds.has('calls')) return role === 'incoming' ? '呼び出し元' : role === 'outgoing' ? '呼び出し先' : '呼び出し元・先';
   if (view === 'function-call-flow' && kinds?.size === 1 && kinds.has('callback')) return role === 'incoming' ? 'コールバック元' : role === 'outgoing' ? 'コールバック先' : 'コールバック元・先';
   return role === 'incoming' ? '入る関係' : role === 'outgoing' ? '出る関係' : '入る・出る関係';

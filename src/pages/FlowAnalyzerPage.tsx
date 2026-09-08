@@ -2,13 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { filesFromDirectoryHandle, scanProjectFiles, useAnalyzerSession, type AnalyzerProjectStore, type AnalyzerViewSession } from '../analyzer';
 import { cancelSemanticAnalysis, getSemanticAnalysis } from '../analyzer/semantic/client';
-import { confidenceLabels, kindLabels, semanticQuestions, type SemanticAnalysis, type SemanticGraph, type SemanticViewId } from '../analyzer/semantic/types';
+import { confidenceLabels, kindLabels, semanticQuestions, type SemanticAnalysis, type SemanticGraph, type SemanticViewId, type SemanticExplorerViewId } from '../analyzer/semantic/types';
 import { projectSemanticView } from '../analyzer/semantic/project';
 import { buildSemanticExplorer, explorerChildren } from '../analyzer/semantic/semanticExplorer';
 import { recordExplorerCamera, recordExplorerSelection } from '../analyzer/semantic/semanticExplorerState';
 import { searchSemanticNodes } from '../analyzer/semantic/search';
 import { semanticTraceCache } from '../analyzer/semantic/traceCache';
 import { importExecutionTrace } from '../analyzer/semantic/traces';
+import { adaptDataExecutionTrace, importDataExecutionTrace } from '../analyzer/semantic/dataTrace';
 import { semanticNavigationContext } from '../analyzer/semantic/navigation';
 import { AnalyzerProjectHeader, AnalyzerSearchControl, AnalyzerViewHeading } from '../components/analyzer/AnalyzerViewChrome';
 import { AnalyzerViewTabs } from '../components/analyzer/AnalyzerToolbar';
@@ -28,7 +29,7 @@ const defaultFlow: NonNullable<AnalyzerViewSession['flow']> = { mode: '2d', expa
 const defaultOrbitFlow: NonNullable<AnalyzerViewSession['flow']> = { mode: '3d', expandedGroupIds: [] };
 const emptyAnalysis: SemanticAnalysis = { nodes: [], edges: [], coverage: [], warnings: [], stats: { files: 0, functions: 0, models: 0, unresolved: 0, elapsedMs: 0 } };
 
-export default function FlowAnalyzerPage({ view }: { view: 'runtime-flow' | 'function-call-flow' }) {
+export default function FlowAnalyzerPage({ view }: { view: SemanticExplorerViewId }) {
   const { state, updateView, setActiveView, setFlowGroupBounds, replaceProject } = useAnalyzerSession(), navigate = useNavigate();
   const store = state.store, session = state.views[view], options = session.semantic ?? semanticFlowDefaults;
   const flow = session.flow ?? (options.orbit ? defaultOrbitFlow : defaultFlow);
@@ -37,11 +38,15 @@ export default function FlowAnalyzerPage({ view }: { view: 'runtime-flow' | 'fun
   const [settings, setSettings] = useState(false), [rescanning, setRescanning] = useState(false), [traceError, setTraceError] = useState('');
   const [, setTraceVersion] = useState(0), [notice, setNotice] = useState(''), [unavailable3D, setUnavailable3D] = useState(false);
   const traceInput = useRef<HTMLInputElement>(null), focusNonce = useRef(0);
+  const traceRequest = useRef(0), rescanRequest = useRef(0), traceContext = useRef({ store, view, folder: state.folderHandle });
+  traceContext.current = { store, view, folder: state.folderHandle };
+  useEffect(() => { const traceToken = traceRequest, rescanToken = rescanRequest; setRescanning(false); return () => { traceToken.current++; rescanToken.current++; }; }, [store, view, state.folderHandle]);
   const [focus, setFocus] = useState<{ nonce: number; ids: string[]; mode?: '2d' | '3d' }>();
   const requestFocus = useCallback((mode: '2d' | '3d', ids: string[]) => setFocus({ nonce: ++focusNonce.current, ids, mode }), []);
   const fullscreen = useWorkspaceFullscreen(Boolean(store));
   const analysis = loaded?.store === store ? loaded?.analysis : undefined;
-  const traces = store ? semanticTraceCache.get(store) : undefined;
+  const rawTraces = store ? semanticTraceCache.get(store) : undefined;
+  const traces = useMemo(() => view === 'data-flow' && rawTraces ? adaptDataExecutionTrace(rawTraces) : view === 'data-model' ? undefined : rawTraces, [rawTraces, view]);
   useEffect(() => { setActiveView(view); setNotice(''); }, [view, state.scanVersion, setActiveView]);
   useEffect(() => {
     setError(''); if (!store) return;
@@ -50,7 +55,7 @@ export default function FlowAnalyzerPage({ view }: { view: 'runtime-flow' | 'fun
     job.promise.then(result => { if (active) setLoaded({ store, analysis: result }); }, reason => { if (active) setError(reason instanceof Error ? reason.message : String(reason)); });
     return () => { active = false; job.unsubscribe(); };
   }, [store, retry]);
-  const graph = useMemo(() => projectSemanticView(analysis ?? emptyAnalysis, view, traces, options.layer), [analysis, view, traces, options.layer]);
+  const graph = useMemo(() => projectSemanticView(analysis ?? emptyAnalysis, view, traces, view === 'data-model' ? 'source' : options.layer), [analysis, view, traces, options.layer]);
   const byId = useMemo(() => new Map(graph.nodes.map(node => [node.id, node])), [graph.nodes]);
   const allNodes = useMemo(() => new Map([...(analysis?.nodes ?? []), ...graph.nodes].map(node => [node.id, node])), [analysis, graph.nodes]);
   const selected = session.selectedNodeId ? byId.get(session.selectedNodeId) : undefined;
@@ -110,27 +115,43 @@ export default function FlowAnalyzerPage({ view }: { view: 'runtime-flow' | 'fun
     changeOptions({ scope: '', kind: '', confidence: '', depth: 0, members: undefined, auxiliary: true });
     revealSelection();
   };
-  const jump = (id: string, targetView: SemanticViewId) => {
+  const jump = (id: string, targetView: SemanticViewId, fieldId?: string) => {
     const node = allNodes.get(id); if (!node) return;
     const layer = targetView === 'data-model' ? 'source' : options.layer;
     const context = semanticNavigationContext(projectSemanticView(analysis ?? emptyAnalysis, targetView, traces, layer), node);
+    if ((view === 'data-flow' || view === 'data-model') && targetView !== 'architecture-map' && context.target) {
+      updateView(targetView, current => ({ ...current, selectedNodeId: context.target!.id, selectedEdgeId: undefined, semanticFieldId: fieldId, detailOpen: true,
+        semantic: { ...(current.semantic ?? semanticFlowDefaults), layer, scope: '', kind: '', confidence: '', members: undefined, auxiliary: true } }));
+      navigate(analyzerRoutes[targetView], { state: { semanticExplorerJump: { targetId: context.target.id } } }); return;
+    }
     updateView(targetView, current => ({ ...current, selectedNodeId: context.target?.id, selectedEdgeId: undefined, detailOpen: Boolean(context.target), search: context.search,
       semantic: { ...semanticFlowDefaults, layer, auxiliary: options.auxiliary, members: context.members, overview: !context.target, depth: context.target ? 1 : 0 },
       ...(targetView === 'runtime-flow' || targetView === 'function-call-flow' ? {} : { semanticCamera: undefined, flowCameras: undefined }),
       flow: { ...(current.flow ?? defaultFlow), expandedGroupIds: [] } }));
-    navigate(analyzerRoutes[targetView], targetView === 'runtime-flow' || targetView === 'function-call-flow' ? { state: { semanticExplorerJump: { targetId: context.target?.id } } } : undefined);
+    navigate(analyzerRoutes[targetView], targetView !== 'architecture-map' ? { state: { semanticExplorerJump: { targetId: context.target?.id } } } : undefined);
   };
   const importTrace = async (file?: File) => {
     if (!file || !store) return; setTraceError('');
+    const request = ++traceRequest.current, contextStore = store, contextView = view;
+    const current = () => request === traceRequest.current && traceContext.current.store === contextStore && traceContext.current.view === contextView;
     try {
       if (file.size > 20 * 1024 * 1024) throw new Error('実行データは20 MB以下に分割してください。');
-      semanticTraceCache.set(store, importExecutionTrace(await file.text(), file.name, analysis)); setTraceVersion(value => value + 1); changeOptions({ layer: 'combined' });
-    } catch (reason) { setTraceError(reason instanceof Error ? reason.message : String(reason)); }
+      const text = await file.text();
+      if (!current()) return;
+      semanticTraceCache.set(store, view === 'data-flow' ? importDataExecutionTrace(text, file.name, analysis) : importExecutionTrace(text, file.name, analysis)); setTraceVersion(value => value + 1); changeOptions({ layer: 'combined' });
+    } catch (reason) { if (current()) setTraceError(reason instanceof Error ? reason.message : String(reason)); }
   };
   const rescan = async () => {
     if (!state.folderHandle) return; setRescanning(true); setError('');
-    try { if (store) cancelSemanticAnalysis(store); replaceProject(await scanProjectFiles(await filesFromDirectoryHandle(state.folderHandle)), state.folderHandle); }
-    catch { setError('再解析できませんでした。フォルダを選び直してください。'); } finally { setRescanning(false); }
+    const request = ++rescanRequest.current, folder = state.folderHandle, contextStore = store, contextView = view;
+    const current = () => request === rescanRequest.current && traceContext.current.store === contextStore && traceContext.current.view === contextView && traceContext.current.folder === folder;
+    try {
+      if (store) cancelSemanticAnalysis(store);
+      const files = await filesFromDirectoryHandle(folder); if (!current()) return;
+      const nextStore = await scanProjectFiles(files); if (!current()) return;
+      replaceProject(nextStore, folder);
+    } catch { if (current()) setError('再解析できませんでした。フォルダを選び直してください。'); }
+    finally { if (current()) setRescanning(false); }
   };
   const activeFilters = [options.scope, options.kind, options.confidence, options.layer !== 'source', options.direction !== 'both', options.auxiliary, options.members?.length].filter(Boolean).length;
   return <div className="page-stack analyzer-page semantic-flow-page">
@@ -145,21 +166,25 @@ export default function FlowAnalyzerPage({ view }: { view: 'runtime-flow' | 'fun
       </div></div>
       {settings && <div id="semantic-flow-settings" className="semantic-flow-settings">
         <label>確度<select value={options.confidence} onChange={event => changeOptions({ confidence: event.target.value })}><option value="">すべて</option>{Object.entries(confidenceLabels).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
-        <label>表示データ<select value={options.layer} onChange={event => changeOptions({ layer: event.target.value as typeof options.layer })}><option value="source">ソース解析</option><option value="observed">実行ログ・Trace</option><option value="combined">ソース ＋ 実測</option></select></label>
+        {view !== 'data-model' ? <label>表示データ<select value={options.layer} onChange={event => changeOptions({ layer: event.target.value as typeof options.layer })}><option value="source">ソース解析</option><option value="observed">実行ログ・Trace</option><option value="combined">ソース ＋ 実測</option></select></label> : <p>データ構造はソースの定義を表示します。現在のTrace形式にはモデル定義との比較用サンプルがありません。</p>}
         <label>線の方向（選択対象）<select value={options.direction} onChange={event => changeOptions({ direction: event.target.value as typeof options.direction })}><option value="both">入る・出る関係</option><option value="incoming">{semanticFlowDirectionLanguage(view).incoming}から</option><option value="outgoing">{semanticFlowDirectionLanguage(view).outgoing}へ</option></select></label>
         <label className="semantic-flow-checkbox"><input type="checkbox" checked={Boolean(options.auxiliary)} onChange={event => changeOptions({ auxiliary: event.target.checked })} />Test・生成定義を含む</label>
-        <button type="button" className="analyzer-quiet-button" disabled={!analysis} onClick={() => traceInput.current?.click()}>実行データを読み込む</button>
+        {view !== 'data-model' && <button type="button" className="analyzer-quiet-button" disabled={!analysis} onClick={() => traceInput.current?.click()}>実行データを読み込む</button>}
         <button type="button" className="analyzer-quiet-button" disabled={!state.folderHandle || rescanning} onClick={() => void rescan()}>{rescanning ? '再解析中…' : '再解析'}</button>
         <button type="button" className="analyzer-quiet-button" onClick={() => updateView(view, { semantic: { ...semanticFlowDefaults } })}>フィルターを解除</button>
       </div>}
       <input ref={traceInput} type="file" hidden accept=".json,.jsonl,.ndjson,.log" aria-label="実行ログ・Traceファイル" onChange={event => { void importTrace(event.target.files?.[0]); event.target.value = ''; }} />
       {traceError && <p className="semantic-error" role="alert">{traceError}</p>}
-      {traces && <p className="semantic-trace-info">{traces.name} · {traces.spans} spans · {traces.logs} logs <button type="button" onClick={() => { if (store) semanticTraceCache.delete(store); setTraceVersion(value => value + 1); changeOptions({ layer: 'source' }); }}>実行データを解除</button></p>}
+      {traces && <p className="semantic-trace-info">{traces.name} · {traces.spans} spans · {traces.logs} logs <button type="button" onClick={() => { traceRequest.current++; if (store) semanticTraceCache.delete(store); setTraceVersion(value => value + 1); changeOptions({ layer: 'source' }); }}>実行データを解除</button></p>}
       {error && <p className="semantic-error" role="alert">{error} <button type="button" onClick={() => { if (store) cancelSemanticAnalysis(store); setRetry(value => value + 1); }}>再実行</button></p>}
       {!analysis && store && !error && <div className="semantic-flow-progress" role="status"><progress value={progress.done} max={Math.max(1, progress.total)} /><span>ソースを解析中… {progress.done} / {progress.total}</span><button type="button" onClick={() => cancelSemanticAnalysis(store)}>解析を中止</button></div>}
       {notice && <p className="semantic-flow-notice" role="status">{notice}<button type="button" onClick={() => setNotice('')}>閉じる</button></p>}
       {unavailable3D && <p className="semantic-flow-notice" role="status">この環境では3D描画を継続できません。検索・選択を保持して2Dエクスプローラーを表示しています。<button type="button" onClick={() => changeMode('3d')}>3Dを再試行</button></p>}
       {hiddenSelection && <p className="semantic-flow-notice" role="status">選択中の「{selected?.label ?? selectedEdge?.label}」は現在のフィルターで非表示です。<button type="button" onClick={restoreSelection}>フィルターを解除して表示</button><button type="button" onClick={clearSelection}>選択解除</button></p>}
+      {analysis && (view === 'data-flow' || view === 'data-model') && !filtered.nodes.length && <p className="semantic-flow-notice" role="status">{graph.nodes.length ? '適用中のフィルターですべての対象が除外されています。詳細設定から条件を確認できます。'
+        : view === 'data-flow' && options.layer === 'observed' ? 'この実行記録には表示できる入出力の名前がありません。data.input.name / data.output.name を持つspanを対象とし、未記録の値や因果関係は生成しません。'
+          : view === 'data-model' ? '読み込んだソースに、表示対象のモデル定義がありません。解析範囲で未対応・部分解析・失敗の有無を確認できます。'
+            : '読み込んだソースに、表示対象の値・操作がありません。解析範囲で対象ファイルと解析状態を確認できます。'}</p>}
       <SearchResultStrip query={session.search} items={results.map(result => {
         const display = searchDisplays.get(result.id);
         const location = display?.location ?? `${result.path ?? result.node.group}${result.node.line ? `:${result.node.line}` : ''}`;
@@ -180,6 +205,7 @@ export default function FlowAnalyzerPage({ view }: { view: 'runtime-flow' | 'fun
           onUnavailable={() => { setUnavailable3D(true); navigation.changeMode('2d'); }} />
           : <div className="semantic-empty"><p>プロジェクトフォルダを選択すると、構造と関係を解析します。</p><p>ソースはブラウザ内で読み取り、外部へ送信しません。</p></div>}
         {store && session.detailOpen && (selected || selectedEdge) && <SemanticFlowDetail key={selected?.id ?? selectedEdge?.id} node={selected} edge={selectedEdge} nodes={allNodes} edges={graph.edges} sources={store.semanticSources ?? store.sources} view={view}
+          fieldId={session.semanticFieldId} onField={semanticFieldId => updateView(view, current => recordExplorerSelection(current, { selectedNodeId: current.selectedNodeId, selectedEdgeId: current.selectedEdgeId, detailOpen: current.detailOpen, semanticFieldId }))}
           hoverTarget={hoverTarget} onHoverTarget={onHoverTarget}
           onSelect={selectNode} onSelectEdge={selectEdge} onClose={() => { clearHover(); updateView(view, current => recordExplorerSelection(current, { selectedNodeId: current.selectedNodeId, selectedEdgeId: current.selectedEdgeId, detailOpen: false })); }} onJump={jump} />}
       </div>

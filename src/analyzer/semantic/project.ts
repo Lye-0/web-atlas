@@ -82,8 +82,8 @@ export function projectSemanticView(analysis: SemanticAnalysis, view: SemanticVi
     const used = new Set(edges.flatMap(edge => [edge.source, edge.target]));
     nodes = analysis.nodes.filter(node => used.has(node.id)
       || view === 'function-call-flow' && node.kind === 'function' && !node.attributes.initializer
-      || view === 'data-model' && node.kind === 'model'
-      || view === 'data-flow' && node.kind === 'value'
+      || view === 'data-model' && node.kind === 'model' && !node.attributes.dataModelExcluded
+      || view === 'data-flow' && (node.data || node.kind === 'value' && !node.attributes.dataFlowExcluded)
       || view === 'architecture-map' && ['function', 'entry', 'model', 'resource'].includes(node.kind));
   }
   if (layer === 'observed') { nodes = []; edges = []; }
@@ -93,6 +93,10 @@ export function projectSemanticView(analysis: SemanticAnalysis, view: SemanticVi
     nodes = [...nodes, ...traces.nodes.filter(node => view !== 'data-flow' ? node.kind !== 'value' : traceIds.has(node.id))]; edges = [...edges, ...traceEdges];
   }
   if (view === 'architecture-map') ({ nodes, edges } = architectureGraph(nodes, edges));
+  if ((view === 'runtime-flow' || view === 'function-call-flow') && analysis.flowFieldsByNode) {
+    const legacyFields = analysis.flowFieldsByNode;
+    nodes = nodes.map(node => Object.hasOwn(legacyFields, node.id) ? { ...node, fields: legacyFields[node.id] } : node);
+  }
   const ids = new Set(nodes.map(node => node.id));
   return { view, nodes, edges: edges.filter(edge => ids.has(edge.source) && ids.has(edge.target)) };
 }

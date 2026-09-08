@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { uniqueSemanticEvidence } from '../../analyzer/semantic/presentation';
-import { kindLabels, semanticViewIds, type SemanticEdge, type SemanticEvidence, type SemanticNode, type SemanticRelationSource, type SemanticViewId } from '../../analyzer/semantic/types';
+import { kindLabels, semanticViewIds, type SemanticEdge, type SemanticEvidence, type SemanticNode, type SemanticRelationSource, type SemanticViewId, type SemanticExplorerViewId } from '../../analyzer/semantic/types';
 import { analyzerViewLabels } from '../../analyzer/types';
 import type { SemanticFlowHoverHandler, SemanticFlowHoverTarget } from '../../analyzer/semantic/flowRelationInteraction';
 import { semanticNodeDisplays, type SemanticNodeDisplay } from './semanticFlowDisplay';
@@ -8,10 +8,12 @@ import { useSemanticFlowHoverBindings } from './semanticFlowHoverBindings';
 import { isUnresolvedCallNode, semanticFlowDirectionLanguage, semanticNodeConfidence, semanticNodeExplanation, semanticRelationConfidence, semanticRelationExplanation, semanticRelationLabel } from './semanticFlowLanguage';
 import './semantic-flow-language.css';
 import './semantic-flow-relation-interaction.css';
+import { SemanticModelStructure } from './SemanticModelStructure';
 
 interface Props {
   node?: SemanticNode; edge?: SemanticEdge; nodes: ReadonlyMap<string, SemanticNode>; edges: SemanticEdge[]; sources: Record<string, string>;
-  view: 'runtime-flow' | 'function-call-flow'; onSelect: (id: string) => void; onSelectEdge: (id: string) => void; onClose: () => void; onJump: (id: string, targetView: SemanticViewId) => void;
+  view: SemanticExplorerViewId; onSelect: (id: string) => void; onSelectEdge: (id: string) => void; onClose: () => void; onJump: (id: string, targetView: SemanticViewId, fieldId?: string) => void;
+  fieldId?: string; onField?: (id?: string) => void;
   hoverTarget?: SemanticFlowHoverTarget; onHoverTarget?: SemanticFlowHoverHandler;
 }
 type DetailInteraction = Pick<Props, 'hoverTarget' | 'onHoverTarget'> & { displays: ReadonlyMap<string, SemanticNodeDisplay> };
@@ -119,7 +121,7 @@ export function SemanticFlowEvidence({ items, sources, autoOpenSingle = true }: 
     {unique.length > limit && <button type="button" className="analyzer-detail-show-more" onClick={() => setLimit(limit + 20)}>根拠をさらに表示（残り{unique.length - limit}件）</button>}</div>;
 }
 
-export function SemanticFlowDetail({ node, edge, nodes, edges, sources, view, onSelect, onSelectEdge, onClose, onJump, hoverTarget, onHoverTarget }: Props) {
+export function SemanticFlowDetail({ node, edge, nodes, edges, sources, view, onSelect, onSelectEdge, onClose, onJump, hoverTarget, onHoverTarget, fieldId, onField }: Props) {
   const displays = useMemo(() => {
     const related = new Set([...(node ? [node.id] : []), ...edges.filter(item => item.source === node?.id || item.target === node?.id).flatMap(item => [item.source, item.target]),
       ...(edge ? [edge.source, edge.target, ...edge.provenance?.edges.flatMap(item => [item.source, item.target]) ?? []] : [])]);
@@ -146,6 +148,15 @@ export function SemanticFlowDetail({ node, edge, nodes, edges, sources, view, on
       {node && displays.get(node.id)?.disambiguation && <p className="semantic-flow-detail-identity">{displays.get(node.id)!.disambiguation}</p>}
       <div className="analyzer-module-detail-meta"><span className="semantic-confidence">{node ? semanticNodeConfidence(node) : semanticRelationConfidence(edge!)}</span></div>
     </header>
+    {view === 'data-flow' && node?.confidence === 'observed' && <div className="semantic-flow-resolution-note" role="note"><p>{node.attributes.valueRecorded === false ? '観測された入力・出力の名前です。実値は記録されていません。' : '読み込んだ観測イベントです。静的に可能な経路と区別して表示しています。'}</p>{typeof node.attributes.sourceBinding === 'string' && <p>{node.attributes.sourceBinding}</p>}</div>}
+    {node?.model && view === 'data-model' && <SemanticModelStructure node={node} fieldId={fieldId} onField={id => onField?.(id)} onSelect={onSelect} onJump={onJump} evidence={items => <SemanticFlowEvidence items={items} sources={sources} />} />}
+    {node?.data && view === 'data-flow' && <Section title="値・操作の内容" initiallyOpen><Info entries={[
+      ['種類', ({ declaration: '変数の宣言・初期値', assignment: '再代入', use: '値の利用箇所', 'property-read': '項目の読み取り', 'property-write': '項目への設定', argument: '実引数', parameter: '仮引数', return: '戻り値・return箇所', termination: '値を指定せずに終了', 'call-result': 'この呼び出しの結果', operation: '操作・加工', literal: 'リテラル・関数の値', unknown: '由来未解決の値' })[node.data.role]],
+      ['所属', node.attributes.ownerName], ['項目の経路', node.data.propertyPath?.join('.')], ['引数位置', node.data.argumentIndex !== undefined ? `第${node.data.argumentIndex + 1}引数` : undefined],
+      ['経路', node.data.conditional ? '条件付きの可能な経路（実行を観測していません）' : undefined], ['追跡状態', node.data.resolution === 'unresolved' ? '未解決' : node.data.resolution === 'partial' ? '部分的に展開' : undefined],
+    ]} /><pre className="semantic-data-expression">{node.data.expression}</pre>{node.data.reasons?.map((reason, index) => <p key={index}>{reason}</p>)}
+      {node.attributes.contextualSummary && Array.isArray(node.attributes.sourceMembers) && <details><summary>集約した定義の対象 {node.attributes.sourceMembers.length}件</summary><ExpandableList items={node.attributes.sourceMembers} render={id => <li key={id}><NodeLink id={id} nodes={nodes} onSelect={onSelect} interaction={interaction} /></li>} /></details>}
+    </Section>}
     {explanation && <div className="semantic-flow-resolution-note" role="note" aria-label="確認できている範囲"><p>{explanation}</p>
       {isUnresolvedCallNode(node) && callSiteCount > 0 && <small>{callSiteCount}箇所の呼び出しを確認。{callSiteCount > 1 ? '各箇所の定義先は個別に未特定です。' : ''}呼び出し元ごとの関係から根拠を開けます。</small>}
     </div>}
@@ -159,7 +170,7 @@ export function SemanticFlowDetail({ node, edge, nodes, edges, sources, view, on
       {internal.length > 0 && <Section title="自己参照" count={internal.length} direction="internal" initiallyOpen>
         <Connections edges={internal} nodes={nodes} onSelect={onSelect} onSelectEdge={onSelectEdge} interaction={interaction} />
       </Section>}
-      {(node.fields || Array.isArray(unresolvedSpreads)) && <Section title="Fields" count={node.fields?.length} initiallyOpen>
+      {!(view === 'data-model' && node.model) && (node.fields || Array.isArray(unresolvedSpreads)) && <Section title="Fields" count={node.fields?.length} initiallyOpen>
         {node.fields && <table className="semantic-fields" aria-label="Fields"><thead><tr><th scope="col">Field</th><th scope="col">Type</th></tr></thead><tbody>{node.fields.map(field => <tr key={field.name}>
           <td>{field.name}{field.optional ? '?' : ''}{field.key && <small>{field.key === 'primary' ? 'PK' : 'FK'}</small>}</td><td>{field.type}</td>
         </tr>)}</tbody></table>}
@@ -177,7 +188,9 @@ export function SemanticFlowDetail({ node, edge, nodes, edges, sources, view, on
       </section>
       <Section title="関係情報" initiallyOpen><Info entries={[
         ['関係', semanticRelationLabel(edge)], ['確認状況', semanticRelationConfidence(edge)],
+        ['理由', edge.details?.reason], ['項目', edge.details?.propertyPath?.join('.')], ['呼び出し箇所', edge.details?.callSiteId ? nodePath(nodes.get(edge.details.callSiteId)) : undefined],
       ]} /><RelationSourceInfo edge={edge} /></Section>
+      {edge.details?.sourceEdgeIds && <Section title="集約元の関係" count={edge.details.sourceEdgeIds.length}><ExpandableList items={edge.details.sourceEdgeIds.flatMap(id => { const original = edges.find(item => item.id === id); return original ? [original] : []; })} render={item => <li key={item.id}><RelationLink edge={item} onSelectEdge={onSelectEdge} interaction={interaction} /></li>} /></Section>}
       {edge.provenance && <Section title="元の関係" count={edge.provenance.edges.length} initiallyOpen={edge.provenance.edges.length <= 4}>
         <ExpandableList items={edge.provenance.edges} render={(item, index) => <li key={`${item.id}:${index}`} className="semantic-flow-original-relation">
           <div className="semantic-flow-original-endpoints"><NodeLink id={item.source} nodes={nodes} onSelect={onSelect} interaction={interaction} /><span aria-hidden="true">↓</span><NodeLink id={item.target} nodes={nodes} onSelect={onSelect} interaction={interaction} /></div>
@@ -192,7 +205,8 @@ export function SemanticFlowDetail({ node, edge, nodes, edges, sources, view, on
     </Section>
     {node && <>
       <Section title="Metadata"><Info entries={Object.entries(node.attributes).filter(([key]) => !['owner', 'members', 'files', 'initializer'].includes(key))} /></Section>
-      <Section title="関連するView" count={semanticViewIds.length - 1}><div className="semantic-crosslinks" role="group" aria-label="関連するView">{semanticViewIds.filter(id => id !== view).map(id => <button key={id} type="button" onClick={() => onJump(node.id, id)}>{analyzerViewLabels[id]} ↗</button>)}</div></Section>
+      {(view === 'data-flow' || view === 'data-model') && node.links?.length ? <Section title={view === 'data-flow' ? '対応するデータ構造' : 'データフロー・利用箇所'} count={node.links.length} initiallyOpen><ExpandableList items={node.links.filter(link => nodes.has(link.targetId))} render={(link, index) => <li key={`${link.targetId}:${index}`}><button type="button" onClick={() => onJump(link.targetId, link.view, link.fieldId)}>{link.reason} ↗</button></li>} /></Section> : null}
+      <Section title="関連するView" count={semanticViewIds.filter(id => id !== view && (!(view === 'data-flow' || view === 'data-model') || id !== 'data-flow' && id !== 'data-model')).length}><div className="semantic-crosslinks" role="group" aria-label="関連するView">{semanticViewIds.filter(id => id !== view && (!(view === 'data-flow' || view === 'data-model') || id !== 'data-flow' && id !== 'data-model')).map(id => <button key={id} type="button" onClick={() => onJump(node.id, id)}>{analyzerViewLabels[id]} ↗</button>)}</div></Section>
     </>}
   </aside>;
 }

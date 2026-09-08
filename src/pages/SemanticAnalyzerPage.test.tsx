@@ -59,8 +59,9 @@ describe('semantic Analyzer exploration', () => {
     await openDetailSection('Evidence'); expect(host.querySelector('.semantic-detail')?.textContent).toContain('run declaration');
     await act(async () => button('3D').click()); expect(host.querySelector('[data-orbit]')?.getAttribute('data-orbit')).toBe('true');
     await act(async () => host.querySelector<HTMLAnchorElement>('a[href="/analyzer/data-model"]')!.click());
-    expect(host.querySelector('.semantic-object-list')?.textContent).toContain('User'); expect(host.querySelector('.semantic-object-list')?.textContent).not.toContain('run');
-    await act(async () => host.querySelector<HTMLButtonElement>('.semantic-object-list button')!.click()); expect(host.querySelector('.semantic-fields')?.textContent).toContain('string');
+    expect(host.querySelector('.semantic-object-list')).toBeNull(); await openBlock('app.ts');
+    expect(host.querySelector('.semantic-explorer-blocks')?.textContent).toContain('User'); expect(host.querySelector('.semantic-explorer-blocks')?.textContent).not.toContain('run');
+    await openBlock('User'); expect(host.querySelector('.semantic-fields')?.textContent).toContain('string');
     await act(async () => host.querySelector<HTMLAnchorElement>('a[href="/analyzer/function-call-flow"]')!.click());
     expect(host.querySelector('.semantic-detail h3')?.textContent).toBe('run'); expect(host.querySelector('[data-orbit]')?.getAttribute('data-orbit')).toBe('true');
   });
@@ -150,7 +151,8 @@ describe('semantic Analyzer exploration', () => {
     await act(async () => button('Data Model ↗').click());
     expect(host.querySelector('.semantic-detail h3')?.textContent).toBe('User'); expect(host.querySelector('.semantic-fields')?.textContent).toContain('idstring');
     const layer = [...host.querySelectorAll<HTMLSelectElement>('select')].find(select => select.parentElement?.textContent?.startsWith('表示データ'))!;
-    expect(layer.value).toBe('source');
+    expect(layer).toBeUndefined(); expect(host.querySelector('.semantic-object-list')).toBeNull();
+    await openDetailSection('関連するView');
     await act(async () => button('Runtime Flow ↗').click());
     expect(host.querySelector('.semantic-detail h3')?.textContent).toBe('User'); expect(host.querySelector('.semantic-fields')?.textContent).toContain('idstring');
   });
@@ -164,9 +166,10 @@ describe('semantic Analyzer exploration', () => {
     await render({ ...store, scannedAt: 'owner-values' }); await choose('run');
     await openDetailSection('関連するView');
     await act(async () => button('Data Flow ↗').click());
-    expect(host.querySelector('.semantic-object-list')?.textContent).toContain('input'); expect(host.querySelector('.semantic-object-list')?.textContent).toContain('result');
-    expect(host.querySelector('.semantic-object-list')?.textContent).not.toContain('other');
-    await act(async () => host.querySelector<HTMLButtonElement>('.semantic-object-list button')!.click());
+    expect(host.querySelector('.semantic-object-list')).toBeNull(); await openBlock('app.ts');
+    expect(host.querySelector('.semantic-explorer-blocks')?.textContent).toContain('input'); expect(host.querySelector('.semantic-explorer-blocks')?.textContent).toContain('result');
+    expect(host.querySelector('.semantic-explorer-blocks')?.textContent).not.toContain('other');
+    await openBlock('input'); await openDetailSection('関連するView');
     await act(async () => button('Function Call Flow ↗').click());
     expect(host.querySelector('.semantic-detail h3')?.textContent).toBe('run');
   });

@@ -5,6 +5,7 @@ import type { ExplorerSession } from './semantic/semanticExplorerState';
 
 export interface AnalyzerViewSession {
   selectedNodeId?: string;
+  semanticFieldId?: string;
   selectedRegionId?: string;
   selectedEdgeId?: string;
   search: string;

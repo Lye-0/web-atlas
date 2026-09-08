@@ -33,7 +33,7 @@ function Evidence({ items, sources }: { items: SemanticEvidence[]; sources: Reco
 }
 
 export default function SemanticAnalyzerPage({ view }: { view: SemanticViewId }) {
-  return view === 'runtime-flow' || view === 'function-call-flow' ? <FlowAnalyzerPage view={view} /> : <LegacySemanticAnalyzerPage view={view} />;
+  return view !== 'architecture-map' ? <FlowAnalyzerPage view={view} /> : <LegacySemanticAnalyzerPage view={view} />;
 }
 
 function LegacySemanticAnalyzerPage({ view }: { view: SemanticViewId }) {

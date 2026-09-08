@@ -4,7 +4,7 @@ import { analyzerEdgeDirection } from '../edgeDirection';
 
 export interface ExplorerLocation { scopeId: string; centerId?: string; depth: number; direction: 'both' | 'incoming' | 'outgoing' }
 export interface ExplorerScope {
-  id: string; kind: 'project' | 'context' | 'directory' | 'file' | 'group'; label: string; parentId?: string; path?: string;
+  id: string; kind: 'project' | 'context' | 'directory' | 'file' | 'function' | 'group'; label: string; parentId?: string; path?: string;
   contextId?: string; childIds: string[]; nodeIds: string[]; memberIds: string[]; grounded?: boolean;
 }
 export interface ExplorerOwner {
@@ -72,6 +72,10 @@ export function buildSemanticExplorer(graph: SemanticGraph, knownFiles: Readonly
       }
       const id = scopeKey('file', contextId ?? '', localPath);
       addScope({ id, kind: 'file', label: localPath.split('/').at(-1)!, path: localPath, parentId, contextId }); parentId = id;
+      if (graph.view === 'data-flow' && typeof node.attributes.owner === 'string' && node.data) {
+        const functionId = scopeKey('function', localPath, node.attributes.owner);
+        addScope({ id: functionId, kind: 'function', label: String(node.attributes.ownerName ?? '所属する処理'), path: localPath, parentId, contextId }); parentId = functionId;
+      }
     } else {
       const external = node.kind === 'external';
       const group = external ? 'unresolved-calls' : `membership:${node.group}`;
@@ -83,7 +87,7 @@ export function buildSemanticExplorer(graph: SemanticGraph, knownFiles: Readonly
     let scope: ExplorerScope | undefined = scopes.get(parentId);
     while (scope) { scope.memberIds.push(node.id); scope = scope.parentId ? scopes.get(scope.parentId) : undefined; }
   }
-  const rank = { project: 0, context: 1, directory: 2, file: 3, group: 4 };
+  const rank = { project: 0, context: 1, directory: 2, file: 3, function: 4, group: 5 };
   for (const scope of scopes.values()) {
     scope.childIds.sort((a, b) => rank[scopes.get(a)!.kind] - rank[scopes.get(b)!.kind] || scopes.get(a)!.label.localeCompare(scopes.get(b)!.label) || a.localeCompare(b));
     scope.nodeIds.sort((a, b) => nodes.get(a)!.label.localeCompare(nodes.get(b)!.label) || (nodes.get(a)!.line ?? 0) - (nodes.get(b)!.line ?? 0) || a.localeCompare(b));

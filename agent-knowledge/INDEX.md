@@ -12,6 +12,40 @@
 - files: `src/components/analyzer/useSemanticFlowHover.ts`, `src/components/analyzer/semanticFlowHoverBindings.ts`, `src/components/analyzer/SemanticFlow3D.tsx` …
 - memory: `agent-knowledge/entries/2026-09-07-flow-hover-input-ownership-fcd28d0.md`
 
+### Data Flowの呼び出し文脈と原定義を、集約しても分離する
+- id: `rm-20260908-data-flow-context-summaries`
+- type: `pattern`
+- maturity: `candidate`
+- tags: `data-flow`, `call-site`, `stable-id`, `provenance`, `bounded-expansion`
+- files: `src/analyzer/semantic/dataFlow.ts`, `src/analyzer/semantic/types.ts`, `src/analyzer/semantic/tabs89IndependentAccuracy.test.ts` …
+- memory: `agent-knowledge/entries/2026-09-08-data-flow-context-summaries-c23e054.md`
+
+### 共通Viewの保全確認には、詳細が読むFieldsも含める
+- id: `rm-20260908-semantic-view-field-conservation`
+- type: `constraint`
+- maturity: `candidate`
+- tags: `shared-ui`, `view-adapter`, `regression`, `fields`, `projection`
+- files: `src/analyzer/semantic/analyze.ts`, `src/analyzer/semantic/project.ts`, `src/analyzer/semantic/types.ts` …
+- memory: `agent-knowledge/entries/2026-09-08-semantic-view-field-conservation-c23e054.md`
+
+## analyzer-model
+
+### 派生した項目のコピーを、元の定義所有者へ置き換えない
+- id: `rm-20260908-derived-field-link-ownership`
+- type: `failure`
+- maturity: `candidate`
+- tags: `field-identity`, `cross-view`, `alias`, `inheritance`, `source-model`
+- files: `src/analyzer/semantic/dataModels.ts`, `src/analyzer/semantic/dataFlow.ts`, `src/analyzer/semantic/types.ts` …
+- memory: `agent-knowledge/entries/2026-09-08-derived-field-link-ownership-c23e054.md`
+
+### モデルの定義式を確認できても、最終構造の展開済みとは限らない
+- id: `rm-20260908-model-definition-expansion`
+- type: `constraint`
+- maturity: `candidate`
+- tags: `data-model`, `derived-type`, `expansion`, `union`, `evidence`
+- files: `src/analyzer/semantic/dataModels.ts`, `src/analyzer/semantic/dataCompiler.ts`, `src/analyzer/semantic/types.ts` …
+- memory: `agent-knowledge/entries/2026-09-08-model-definition-expansion-c23e054.md`
+
 ## deployment
 
 ### Workers Buildsでのpnpm install script許可

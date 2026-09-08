@@ -1,14 +1,14 @@
 import { useCallback, useLayoutEffect, useMemo, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import type { AnalyzerViewSession, AnalyzerViewSessionUpdate } from '../../analyzer/session';
-import type { SemanticEdge } from '../../analyzer/semantic/types';
+import type { SemanticEdge, SemanticExplorerViewId } from '../../analyzer/semantic/types';
 import { explorerLocationForNode, explorerParentLocation, explorerProjectLocation, resolveExplorerLocation, type ExplorerLocation, type SemanticExplorerModel } from '../../analyzer/semantic/semanticExplorer';
 import { enterExplorerVisit, explorerSelection, initialExplorer2D, recordExplorerScroll, type Explorer2DState, type ExplorerSelection, type ExplorerVisit } from '../../analyzer/semantic/semanticExplorerState';
 import { analyzerRoutes } from '../../utils/routes';
 
 interface RouteStamp { view: string; scanVersion: number; visitId: string }
 interface Props {
-  view: 'runtime-flow' | 'function-call-flow'; scanVersion: number; session: AnalyzerViewSession; explorer: SemanticExplorerModel; ready: boolean;
+  view: SemanticExplorerViewId; scanVersion: number; session: AnalyzerViewSession; explorer: SemanticExplorerModel; ready: boolean;
   edges: readonly SemanticEdge[];
   updateView: (view: Props['view'], update: AnalyzerViewSessionUpdate) => void;
   onFocus: (mode: '2d' | '3d', ids: string[]) => void;

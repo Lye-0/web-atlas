@@ -3,6 +3,14 @@ import { confidenceLabels, type SemanticNode, type SemanticRelationSource, type 
 export type SemanticFlowLanguageView = SemanticViewId | 'module-dependency';
 
 export function semanticFlowDirectionLanguage(view: SemanticFlowLanguageView) {
+  if (view === 'data-flow') return {
+    incoming: '由来・入力', outgoing: '結果・利用先', caption: '矢印・粒子は値の由来から処理・結果・利用先への関係',
+    help: '代入、項目の取り出し、引数、加工、戻り値などの関係を、由来から利用先へ示します。青は選択対象から出る関係、橙は入る関係です。静的な粒子は実際の値・実行順・頻度・データ流量を表しません。',
+  };
+  if (view === 'data-model') return {
+    incoming: '参照する元・派生する型', outgoing: '参照先・派生元', caption: '矢印・粒子は型・スキーマ・テーブルの構造上の関係',
+    help: '項目の型を使うモデルから参照先へ、派生した型から元の型へ向かいます。外部キーは宣言元から参照先へ向かいます。青は選択対象から出る関係、橙は入る関係です。型の参照は実行時の値の流れではありません。',
+  };
   if (view === 'module-dependency') return {
     incoming: 'import元', outgoing: 'import先', caption: '矢印・粒子は import する側から読み込まれる側へ',
     help: '矢印と粒子は、importするファイルから読み込まれるファイルへ向かいます。青は選択対象がimportする先、琥珀色は選択対象をimportする元、緑は選択範囲内の依存です。粒子は依存の向きを示し、実行順や実行時間は表しません。',

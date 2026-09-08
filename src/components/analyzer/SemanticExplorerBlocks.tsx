@@ -19,7 +19,7 @@ export function SemanticExplorerBlocks({ explorer, location, visibleIds, matchId
     const box = target.getBoundingClientRect(), viewport = container.getBoundingClientRect();
     if (box.top < viewport.top || box.bottom > viewport.bottom) container.scrollTop += box.top - viewport.top - Math.max(0, (viewport.height - box.height) / 2);
   }, [focusIds, focusNonce]);
-  const labels = { project: 'プロジェクト', context: '実行環境・所属', directory: 'ディレクトリ', file: 'ファイル', group: '所属', node: '対象' };
+  const labels = { project: 'プロジェクト', context: '実行環境・所属', directory: 'ディレクトリ', file: 'ファイル', function: '関数・ファイル直下の処理', group: '所属', node: '対象' };
   return <div ref={root} className="semantic-explorer-blocks" style={{ top: overlayTop }} onScroll={event => onScroll(event.currentTarget.scrollTop)} data-explorer-scope={location.scopeId} data-child-count={children.length}>
     {children.length ? <ul className="semantic-explorer-block-grid">{children.map(child => {
       const matches = child.memberIds.filter(id => matchIds.has(id)).length, selected = child.memberIds.some(id => selectedIds.has(id));
