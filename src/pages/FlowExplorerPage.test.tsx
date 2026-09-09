@@ -9,8 +9,9 @@ import { AnalyzerPage } from './AnalyzerPage';
 import type { SemanticFlowHoverHandler, SemanticFlowHoverTarget } from '../analyzer/semantic/flowRelationInteraction';
 
 vi.mock('../analyzer/semantic/client', () => ({ getSemanticAnalysis: vi.fn(), cancelSemanticAnalysis: vi.fn() }));
-vi.mock('../components/analyzer/SemanticFlow3D', () => ({ SemanticFlow3D: ({ graph, camera, command, onCamera, showGroupBounds, hoverTarget, onHoverTarget }: { graph: { nodes: { id: string }[] }; camera?: { zoom: number }; command?: { kind: string; ids?: string[] }; onCamera: (camera: unknown) => void; showGroupBounds?: boolean; hoverTarget?: SemanticFlowHoverTarget; onHoverTarget?: SemanticFlowHoverHandler }) =>
-  <div data-cloud-count={graph.nodes.length} data-cloud-zoom={camera?.zoom ?? ''} data-cloud-command={command ? `${command.kind}:${command.ids?.join(',')}` : ''} data-cloud-bounds={String(showGroupBounds)} data-cloud-hover={hoverTarget?.id ?? ''}>
+vi.mock('../components/analyzer/SemanticFlow3D', () => ({ SemanticFlow3D: ({ graph, camera, command, onCamera, showGroupBounds, hoverTarget, onHoverTarget, explicitPathNodeIds, onClear, onSelect }: { graph: { nodes: { id: string }[] }; camera?: { zoom: number }; command?: { kind: string; ids?: string[] }; onCamera: (camera: unknown) => void; showGroupBounds?: boolean; hoverTarget?: SemanticFlowHoverTarget; onHoverTarget?: SemanticFlowHoverHandler; explicitPathNodeIds?: ReadonlySet<string>; onClear: () => void; onSelect: (id: string) => void }) =>
+  <div data-cloud-path={[...explicitPathNodeIds ?? []].join(",")} data-cloud-count={graph.nodes.length} data-cloud-zoom={camera?.zoom ?? ''} data-cloud-command={command ? `${command.kind}:${command.ids?.join(',')}` : ''} data-cloud-bounds={String(showGroupBounds)} data-cloud-hover={hoverTarget?.id ?? ''}>
+    <button type="button" onClick={onClear}>3D選択解除</button><button type="button" onClick={() => onSelect("unrelated")}>3D関係0を選択</button>
     <button type="button" onClick={() => onCamera({ position: [20, 30, 40], target: [1, 2, 3], zoom: .73 })}>3Dカメラを保存</button>
     <button type="button" onClick={() => onHoverTarget?.({ kind: 'node', id: 'save' }, { source: 'test-graph', modality: 'pointer' })}>3D相手ホバー</button>
   </div> }));
@@ -83,6 +84,18 @@ describe('Flow explorer locations and visits', () => {
     expect(host.querySelector('.semantic-explorer-breadcrumb')?.textContent).toContain('run.ts'); expect(center()).toBeUndefined();
     await click(button('親へ'));
     expect([...host.querySelectorAll('.semantic-explorer-block strong')].map(item => item.textContent)).toEqual(['run.ts']);
+  });
+
+  it.each(['3D選択解除', '3D関係0を選択'])('does not resurrect a cleared relationship on normal mode visits after %s', async action => {
+    await openRunFile(); await openBlock('run');
+    await act(async () => { const select = host.querySelector<HTMLSelectElement>('[aria-label="中心からの関係の深さ"]')!; select.value = '2'; select.dispatchEvent(new Event('change', { bubbles: true })); });
+    await click(button('3D'));
+    expect(host.querySelector('[data-cloud-path]')?.getAttribute('data-cloud-path')).toContain('run');
+    await click(button(action));
+    expect(host.querySelector('[data-cloud-path]')?.getAttribute('data-cloud-path')).toBe('');
+    await click(button('3Dカメラを保存')); await click(button('自動省略：ON')); await click(button('自動省略：OFF'));
+    await click(button('2D')); expect(center()).toBe('run'); await click(button('3D'));
+    expect(host.querySelector('[data-cloud-path]')?.getAttribute('data-cloud-path')).toBe('');
   });
 
   it('searches the full filtered project without moving until candidate selection and keeps scope on clear', async () => {

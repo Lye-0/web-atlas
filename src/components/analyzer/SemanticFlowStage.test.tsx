@@ -15,6 +15,19 @@ beforeEach(() => {
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
 });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); });
+it('applies the current direction filter to an active path without reviving a saved inactive location', async () => {
+  const location = { scopeId: 'project', centerId: 'a', depth: 2, direction: 'both' as const };
+  const navigation = { location, activePath: location, visitId: 'visit', scrollTop: 0, canBack: false, onBack: vi.fn(), onParent: vi.fn(), onProject: vi.fn(), onOpenScope: vi.fn(), onOpenNode: vi.fn(), onCenter: vi.fn(), onDefinition: vi.fn(), onJumpMode: vi.fn(), onDepth: vi.fn(), onScroll: vi.fn(), onRevealSelection: vi.fn() };
+  const nodes = ['a', 'b', 'c'].map(id => ({ id, label: id, kind: 'value' as const, group: 'fixture', confidence: 'source' as const, evidence: [], attributes: {} }));
+  const edges = [['in', 'b', 'a'], ['out', 'a', 'c']].map(([id, source, target]) => ({ id: id!, source: source!, target: target!, kind: 'reads', label: id!, confidence: 'source' as const, views: ['data-flow' as const], evidence: [] }));
+  const props = { graph: { view: 'data-flow' as const, nodes, edges }, navigation, mode: '2d' as const, selectedIds: new Set(['a']), matchIds: new Set<string>(), cameras: {}, onCamera: vi.fn(), onMode: vi.fn(), onParticleMode: vi.fn(), onSelect: vi.fn(), onSelectEdge: vi.fn(), onClear: vi.fn(), isFullscreen: false, onFullscreen: vi.fn(), onUnavailable: vi.fn() };
+  await act(async () => root.render(<SemanticFlowStage {...props} direction="incoming" />));
+  expect([...capture.props!.explicitPathEdgeIds!]).toEqual(['in']);
+  await act(async () => root.render(<SemanticFlowStage {...props} direction="outgoing" />));
+  expect([...capture.props!.explicitPathEdgeIds!]).toEqual(['out']);
+  await act(async () => root.render(<SemanticFlowStage {...props} navigation={{ ...navigation, activePath: undefined }} direction="both" />));
+  expect(capture.props!.explicitPathEdgeIds!.size).toBe(0);
+});
 it.each([['2d','clear'],['3d','clear'],['2d','node'],['3d','node'],['2d','edge'],['3d','edge']] as const)('releases a consumed focus request on %s/%s without moving the camera or replaying focus', async (mode, action) => {
   const onClear = vi.fn(), onCamera = vi.fn(), focus = { nonce: 1, ids: ['selected'] };
   const props = { graph: { view: 'data-flow' as const, nodes: [{ id: 'selected', label: 'value', kind: 'value' as const, group: 'fixture', confidence: 'source' as const, evidence: [], attributes: {} }], edges: [] }, mode, matchIds: new Set<string>(), focus, cameras: {}, onCamera,

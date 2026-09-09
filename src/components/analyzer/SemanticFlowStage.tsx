@@ -62,9 +62,10 @@ export function SemanticFlowStage({ graph, explorer, nodeDisplays, navigation, m
   const motion = useMemo(() => ({ enabled: flow.enabled, reduced: flow.reduced, visible: flow.visible }), [flow.enabled, flow.reduced, flow.visible]);
   const localGraph = useMemo(() => navigation?.location.centerId ? explorerRelations(graph, navigation.location.centerId, navigation.location.depth, 'both') : graph,
     [graph, navigation?.location.centerId, navigation?.location.depth]);
-  const explicitPath = useMemo(() => navigation?.location.centerId && navigation.location.depth > 1
-    ? explorerRelations(graph, navigation.location.centerId, navigation.location.depth, navigation.location.direction) : undefined,
-  [graph, navigation?.location.centerId, navigation?.location.depth, navigation?.location.direction]);
+  const activePath = navigation?.activePath;
+  const explicitPath = useMemo(() => activePath?.centerId && activePath.depth > 1
+    ? explorerRelations(graph, activePath.centerId, activePath.depth, direction ?? activePath.direction) : undefined,
+  [graph, activePath, direction]);
   const explicitPathNodeIds = useMemo(() => new Set(explicitPath?.nodes.map(node => node.id)), [explicitPath]);
   const explicitPathEdgeIds = useMemo(() => new Set(explicitPath?.edges.map(edge => edge.id)), [explicitPath]);
   const overlayTop = controlsHeight + (navigation ? navigationHeight + 36 : 24);

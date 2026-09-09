@@ -10,7 +10,7 @@ import { SemanticFlow3D } from './SemanticFlow3D';
 import type { AnalyzerViewSession } from '../../analyzer/session';
 
 const scene = vi.hoisted(() => ({ current: {} as {
-  positions: SemanticPosition[]; graph: SemanticGraph; onSelect: (id: string) => void;
+  positions: SemanticPosition[]; graph: SemanticGraph; onSelect: (id: string) => void; selectedIds: ReadonlySet<string>;
   onLabels: (labels: FlowLabelPlacement[]) => void; onConnections: (notices: FlowConnectionNotice[]) => void;
   onHover: (id?: string, edgeId?: string) => void; hoverTarget?: SemanticFlowHoverTarget; showGroupBounds?: boolean;
 } }));
@@ -40,6 +40,17 @@ describe('3D presentation controls retain canonical selection', () => {
     details.open = true; details.dispatchEvent(new Event('toggle', { bubbles: true }));
   });
   const clickText = (text: string) => act(async () => [...host.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === text)!.click());
+
+  it.each([false, true])('keeps inspection outside the main selection when automatic omission is %s', async autoAggregation => {
+    await render(new Set(['caller']), undefined, { autoAggregation, aggregationState: { expandedGroupIds: [], collapsedGroupIds: [], unresolved: 'collapsed' } });
+    const aggregate = scene.current.positions.find(point => point.node.attributes.displayAggregate)!;
+    await act(async () => scene.current.onSelect(aggregate.node.id));
+    expect([...scene.current.selectedIds]).toEqual(['caller']);
+    expect(onSelect).not.toHaveBeenCalled(); expect(onCamera).not.toHaveBeenCalled();
+    await act(async () => scene.current.onLabels([{ id: aggregate.node.id, label: 'calls', path: '1対象', aggregate: true, selected: false, match: false, x: 10, y: 10 }]));
+    const label = host.querySelector(`[data-flow-label-id="${aggregate.node.id}"]`)!;
+    expect(label.getAttribute('aria-pressed')).toBe('false'); expect(label.textContent).toContain('内訳を表示中');
+  });
 
   it('accepts Escape before Scene initialization and clears only once after its native listener is ready', async () => {
     await render(new Set(['caller']));

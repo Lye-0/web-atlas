@@ -6,6 +6,7 @@ import { semanticNodeDisplay } from './semanticFlowDisplay';
 
 export interface SemanticExplorerNavigationActions {
   location: ExplorerLocation; visitId: string; scrollTop: number; canBack: boolean;
+  activePath?: ExplorerLocation;
   onBack: () => void; onParent: () => void; onProject: () => void; onOpenScope: (id: string) => void; onOpenNode: (id: string) => void;
   onCenter: (id: string) => void; onDefinition: (id: string) => void; onJumpMode: (mode: '2d' | '3d', id: string) => void;
   onDepth: (depth: number) => void; onScroll: (top: number) => void; onRevealSelection: () => void;

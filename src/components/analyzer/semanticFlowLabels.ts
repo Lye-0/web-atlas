@@ -1,4 +1,4 @@
-import { Vector3, type Camera } from 'three';
+import { Matrix4, Vector3, type Camera } from 'three';
 import type { SemanticPosition } from '../../analyzer/semantic/presentation';
 import type { SemanticFlowRegion } from '../../analyzer/semantic/flowRegions';
 import type { FlowEdgePath } from '../../analyzer/semantic/flowPresentation';
@@ -11,9 +11,10 @@ export interface FlowLabelContent { id: string; label: string; path: string; sel
 export interface FlowLabelPlacement extends FlowLabelContent { x: number; y: number; pointX?: number; pointY?: number; width?: number; height?: number }
 export interface FlowConnectionNotice { id: string; status: 'offscreen' | 'unlabelled' }
 export interface FlowLabelObstacle { left: number; top: number; width: number; height: number }
-interface LabelContext { regions?: readonly SemanticFlowRegion[]; relatedIds?: ReadonlySet<string>; hoveredIds?: ReadonlySet<string>; priorityIds?: ReadonlySet<string>; overlayTop?: number; previous?: readonly FlowLabelPlacement[]; obstacles?: readonly FlowLabelObstacle[]; roles?: ReadonlyMap<string, SemanticFlowNodeRole>; displays?: ReadonlyMap<string, SemanticNodeDisplay>; view?: SemanticViewId; emphasisIds?: ReadonlySet<string>; relationKinds?: ReadonlyMap<string, ReadonlySet<string>> }
+interface LabelContext { quietBackground?: boolean; regions?: readonly SemanticFlowRegion[]; relatedIds?: ReadonlySet<string>; hoveredIds?: ReadonlySet<string>; priorityIds?: ReadonlySet<string>; overlayTop?: number; previous?: readonly FlowLabelPlacement[]; obstacles?: readonly FlowLabelObstacle[]; roles?: ReadonlyMap<string, SemanticFlowNodeRole>; displays?: ReadonlyMap<string, SemanticNodeDisplay>; view?: SemanticViewId; emphasisIds?: ReadonlySet<string>; relationKinds?: ReadonlyMap<string, ReadonlySet<string>> }
 const coversPoint = (obstacle: FlowLabelObstacle, x: number, y: number) => x >= obstacle.left && x <= obstacle.left + obstacle.width && y >= obstacle.top && y <= obstacle.top + obstacle.height;
 const labelInset = (label: FlowLabelContent) => label.selected || label.aggregate ? 17 : 9;
+const nodeIndexes = new WeakMap<readonly SemanticPosition[], Map<string, SemanticPosition['node']>>();
 
 export function semanticFlowConnectionNotices(camera: Camera, size: { width: number; height: number }, positions: readonly SemanticPosition[], ids: ReadonlySet<string>, labels: readonly FlowLabelPlacement[], overlayTop = 148, obstacles: readonly FlowLabelObstacle[] = []): FlowConnectionNotice[] {
   if (!ids.size) return [];
@@ -65,13 +66,30 @@ export function projectSemanticFlowLabels(camera: Camera, size: { width: number;
   camera.updateMatrixWorld();
   if (size.width <= 0 || size.height <= 0) return [];
   const labels: FlowLabelPlacement[] = [], point = new Vector3();
+  const projection = new Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
   const { top, bottom } = semanticFlowPlot(size.width, size.height, context.overlayTop ?? (size.width < 700 ? 198 : 148));
   const previous = new Map(context.previous?.map(label => [label.id, label]));
-  const projected = ordered.map(item => {
-    point.set(item.x, item.y, item.z).project(camera);
-    return { item, x: (point.x + 1) * size.width / 2, y: (1 - point.y) * size.height / 2, visible: Math.abs(point.x) <= 1 && Math.abs(point.y) <= 1 && point.z >= -1 && point.z <= 1 };
-  }).filter(item => item.visible && item.y >= top && item.y <= bottom && !context.obstacles?.some(obstacle => coversPoint(obstacle, item.x, item.y)));
+  const projected: { item: SemanticPosition; x: number; y: number }[] = [];
+  for (const item of ordered) {
+    point.set(item.x, item.y, item.z).applyMatrix4(projection);
+    if (Math.abs(point.x) > 1 || Math.abs(point.y) > 1 || point.z < -1 || point.z > 1 || !Number.isFinite(point.x + point.y + point.z)) continue;
+    const x = (point.x + 1) * size.width / 2, y = (1 - point.y) * size.height / 2;
+    if (y >= top && y <= bottom && !context.obstacles?.some(obstacle => coversPoint(obstacle, x, y))) projected.push({ item, x, y });
+  }
   const occupied: FlowLabelObstacle[] = [...context.obstacles ?? []];
+  // A forced label may cover ordinary background dots, but never an active
+  // endpoint (including the enlarged point and the arrow's connection area).
+  const criticalCells = new Map<string, typeof projected>();
+  for (const p of projected) if (selectedIds.has(p.item.node.id) || context.priorityIds?.has(p.item.node.id) || context.hoveredIds?.has(p.item.node.id)) {
+    const key = `${Math.floor(p.x / 40)}:${Math.floor(p.y / 40)}`, cell = criticalCells.get(key) ?? [];
+    cell.push(p); criticalCells.set(key, cell);
+  }
+  const coversCritical = (id: string, rect: FlowLabelObstacle) => {
+    for (let x = Math.floor((rect.left - 17) / 40); x <= Math.floor((rect.left + rect.width + 17) / 40); x++) for (let y = Math.floor((rect.top - 17) / 40); y <= Math.floor((rect.top + rect.height + 17) / 40); y++) {
+      for (const p of criticalCells.get(`${x}:${y}`) ?? []) if (p.item.node.id !== id && p.x > rect.left - 17 && p.x < rect.left + rect.width + 17 && p.y > rect.top - 17 && p.y < rect.top + rect.height + 17) return true;
+    }
+    return false;
+  };
   const cells = new Map<string, typeof projected>();
   for (const p of projected) {
     const key = `${Math.floor(p.x / 40)}:${Math.floor(p.y / 40)}`, cell = cells.get(key) ?? [];
@@ -110,7 +128,7 @@ export function projectSemanticFlowLabels(camera: Camera, size: { width: number;
         && py + inset > rect.top + .001 && py - inset < rect.top + height - .001;
       const labelOverlap = occupied.reduce((sum, previous) => sum + Math.max(0, Math.min(rect.left + width + clearance, previous.left + previous.width) - Math.max(rect.left - clearance, previous.left))
         * Math.max(0, Math.min(rect.top + height + clearance, previous.top + previous.height) - Math.max(rect.top - clearance, previous.top)), 0);
-      if (ownDotOverlap || labelOverlap) continue;
+      if (ownDotOverlap || labelOverlap || coversCritical(label.id, rect)) continue;
       const overlap = pointOverlap(label.id, rect);
       if (!fallback || overlap < fallback.overlap) fallback = { x, y, left: rect.left, top: rect.top, overlap };
       if (overlap === 0) break;
@@ -146,14 +164,15 @@ export function projectSemanticFlowLabels(camera: Camera, size: { width: number;
   }
   let aggregateCount = 0, aggregateAttempts = 0;
   for (const item of projected.filter(p => p.item.node.attributes.displayAggregate === true && !important(p.item.node.id) && !context.relatedIds?.has(p.item.node.id)).sort(stableOrder)) {
-    if (aggregateCount >= Math.min(8, budget) || aggregateAttempts++ >= budget * 4) break;
+    if (aggregateCount >= Math.min(context.quietBackground ? 3 : 8, budget) || aggregateAttempts++ >= budget * 4) break;
     if (place(nodeLabel(item.item), item.x, item.y, false)) aggregateCount++;
   }
   let regionCount = 0;
   const projectedById = new Map(projected.map(item => [item.item.node.id, item]));
-  const nodesById = new Map(ordered.map(item => [item.node.id, item.node]));
+  let nodesById = nodeIndexes.get(ordered);
+  if (!nodesById) { nodesById = new Map(ordered.map(item => [item.node.id, item.node])); nodeIndexes.set(ordered, nodesById); }
   for (const region of [...context.regions ?? []].sort((a, b) => Number(previous.has(`flow-region:${b.id}`)) - Number(previous.has(`flow-region:${a.id}`)) || b.count - a.count || a.label.localeCompare(b.label))) {
-    if (regionCount >= 16) break;
+    if (regionCount >= (context.quietBackground ? 4 : 16)) break;
     const members = region.nodeIds.flatMap(id => { const p = projectedById.get(id); return p ? [{ x: p.x, y: p.y, z: 0 }] : []; });
     const corners = members.length ? members : [region.z, region.z + (region.depth ?? 0)].flatMap(z => [[region.x, region.y], [region.x + region.width, region.y], [region.x, region.y + region.height], [region.x + region.width, region.y + region.height]].map(([x, y]) => {
       point.set(x!, y!, z).project(camera); return { x: (point.x + 1) * size.width / 2, y: (1 - point.y) * size.height / 2, z: point.z };
@@ -173,7 +192,7 @@ export function projectSemanticFlowLabels(camera: Camera, size: { width: number;
     && (matchIds.has(p.item.node.id) || zoom >= (previous.has(p.item.node.id) ? .62 : .78))).sort((a, b) => Number(matchIds.has(b.item.node.id)) - Number(matchIds.has(a.item.node.id)) || stableOrder(a, b));
   for (const item of candidates) {
     const related = context.relatedIds?.has(item.item.node.id), match = matchIds.has(item.item.node.id);
-    if (nodeCount >= budget || considered >= budget * 6) break;
+    if (nodeCount >= (context.quietBackground ? Math.min(6, budget) : budget) || considered >= budget * 6) break;
     if (!related && !match && zoom < (previous.has(item.item.node.id) ? .62 : .78)) continue;
     const group = item.item.node.path?.split('/').slice(0, -1).join('/') ?? item.item.node.group;
     if (!related && !match && (regionCounts.get(group) ?? 0) >= (zoom >= 1.2 ? 4 : 1)) continue;

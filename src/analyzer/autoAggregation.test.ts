@@ -7,6 +7,42 @@ const points: AggregationPoint[] = Array.from({ length: 80 }, (_, index) => ({ i
 const groups = buildAggregationGroups(points);
 
 describe('reversible 3D display ownership', () => {
+  it('defers offscreen unfolding only for enabled Flow policy, reusing density but not stale pan ownership', () => {
+    const points = Array.from({ length: 16 }, (_, i) => ({ id: `far-${i}`, x: 1300 + i % 4 * 40, y: Math.floor(i / 4) * 40, z: 0, group: { id: 'far', label: 'far file', minimumMembers: 4 } }));
+    const groups = buildAggregationGroups(points), prepared = prepareAutoAggregation(points, groups);
+    const matrix = [2 / 1200, 0, 0, 0, 0, 2 / 800, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+    const options = { points, groups, prepared, projection: { ...camera, matrix }, retainOffscreen: true };
+    const offscreen = projectAutoAggregation({ ...options, enabled: true, protectedIds: new Set(['far-0']) });
+    expect(offscreen.individualIds).toEqual(new Set(['far-0'])); expect(offscreen.aggregates[0]!.memberIds).toHaveLength(15);
+    const moved = [...matrix]; moved[12] = -2;
+    const onscreen = projectAutoAggregation({ ...options, projection: { ...camera, matrix: moved }, enabled: true, previousActiveGroupIds: offscreen.activeGroupIds });
+    expect(onscreen.metrics).toBe(offscreen.metrics); expect(onscreen.individualIds.size).toBe(16);
+    for (const shift of [-660, -680, -670]) {
+      const border = [...matrix]; border[12] = shift / (camera.width / 2);
+      const retained = projectAutoAggregation({ ...options, projection: { ...camera, matrix: border }, enabled: true, previousActiveGroupIds: offscreen.activeGroupIds });
+      expect(retained.aggregates).toHaveLength(1);
+      const unexpandedHistory = projectAutoAggregation({ ...options, projection: { ...camera, matrix: border }, enabled: true });
+      expect(unexpandedHistory.individualIds.size).toBe(16);
+    }
+    for (const projection of [options.projection, { ...camera, matrix: moved }]) {
+      expect(projectAutoAggregation({ ...options, projection, enabled: false }).individualIds.size).toBe(16);
+    }
+    expect(projectAutoAggregation({ ...options, enabled: true, expandedGroupIds: new Set(['far']) }).individualIds.size).toBe(16);
+    expect(projectAutoAggregation({ ...options, enabled: true, retainOffscreen: false }).individualIds.size).toBe(16);
+  });
+  it('keeps a wide crowded remainder in its finest existing affiliation only when ON', () => {
+    const crowded = Array.from({ length: 80 }, (_, i) => ({ id: `dense-${i}`, x: Math.floor(i / 2) * 20, y: i % 2, z: 0,
+      group: { id: `tiny-${i}`, label: 'too small', minimumMembers: 8 },
+      parentGroups: [{ id: 'file', label: 'file', level: 2, maximumProjectedSpan: 100, minimumMembers: 12 }, { id: 'directory', label: 'directory', level: 3, maximumProjectedSpan: 200, minimumMembers: 24 }] }));
+    const groups = buildAggregationGroups(crowded);
+    const on = projectAutoAggregation({ points: crowded, groups, enabled: true, projection: camera, protectedIds: new Set(['dense-0']) });
+    expect(on.individualIds).toEqual(new Set(['dense-0'])); expect(on.aggregates.map(group => group.groupId)).toEqual(['file']);
+    expect(on.aggregates[0]!.memberIds).toHaveLength(79);
+    const off = projectAutoAggregation({ points: crowded, groups, enabled: false, projection: camera, previousActiveGroupIds: on.activeGroupIds });
+    expect(off.individualIds.size).toBe(80); expect(off.aggregates).toEqual([]);
+    const manual = projectAutoAggregation({ points: crowded, groups, enabled: true, projection: camera, expandedGroupIds: new Set(['file']) });
+    expect(manual.individualIds.size).toBe(80);
+  });
   it('keeps enough path context to distinguish same-named affiliations in compact labels', () => {
     const labels = shortAggregationLabels([{ id: 'a', label: 'parse · src/one/util.ts · 仮引数' }, { id: 'b', label: 'parse · src/two/util.ts · 仮引数' }, { id: 'c', label: 'src/git/parsers · 所属の集合' }]);
     expect(labels.get('a')).toBe('parse · one/util.ts'); expect(labels.get('b')).toBe('parse · two/util.ts'); expect(labels.get('c')).toBe('parsers');

@@ -64,14 +64,6 @@
 
 ## analyzer-spatial
 
-### 細かな所属の密度だけでは、大規模な重なりを見逃す
-- id: `rm-20260908-aggregation-fragmented-density`
-- type: `failure`
-- maturity: `candidate`
-- tags: `density`, `hierarchy`, `3d`, `performance`, `projected-span`
-- files: `src/analyzer/autoAggregation.ts`, `src/analyzer/autoAggregation.test.ts`, `src/analyzer/semantic/flowAutoAggregation.ts` …
-- memory: `agent-knowledge/entries/2026-09-08-aggregation-fragmented-density-a9f18c.md`
-
 ### 共有の自動設定とView別の密度履歴を、初期投影で混ぜない
 - id: `rm-20260908-aggregation-view-history-initialization`
 - type: `failure`
@@ -91,10 +83,18 @@
 ### 密度計算の準備と表示ownerの更新を分離して計測する
 - id: `rm-20260909-aggregation-input-reuse`
 - type: `pattern`
-- maturity: `candidate`
+- maturity: `reused`
 - tags: `density`, `immutable-input`, `cache`, `performance`, `profiling`
 - files: `src/analyzer/autoAggregation.ts`, `src/analyzer/autoAggregation.test.ts`, `src/analyzer/semantic/flowAutoAggregation.ts` …
 - memory: `agent-knowledge/entries/2026-09-09-aggregation-input-reuse-b8d45a.md`
+
+### 広い所属のspan超過は、密集した全メンバーを戻す理由にならない
+- id: `rm-20260909-aggregation-wide-density`
+- type: `failure`
+- maturity: `candidate`
+- tags: `density`, `hierarchy`, `projected-span`, `offscreen`, `manual-protection`
+- files: `src/analyzer/autoAggregation.ts`, `src/analyzer/autoAggregation.test.ts`, `src/analyzer/semantic/flowAutoAggregation.test.ts` …
+- memory: `agent-knowledge/entries/2026-09-09-aggregation-wide-density-e591ac.md`
 
 ### Canvas除去後のControls破棄ではdocument listenerが残る
 - id: `rm-20260909-canvas-document-disposal`
@@ -155,6 +155,16 @@
 - tags: `dictionary`, `presentation`, `map`, `mirror`, `responsive`, `accessibility`
 - files: `src/components/map/StackMap.tsx`, `src/styles.css`, `src/data/dictionaryGroups.ts` …
 - memory: `agent-knowledge/entries/2026-08-30-dictionary-map-mirror-7c2d1a.md`
+
+## semantic-explorer
+
+### 2D履歴の中心を現在の3D経路の所有者にしない
+- id: `rm-20260909-explorer-active-path`
+- type: `failure`
+- maturity: `candidate`
+- tags: `selection`, `history`, `active-path`, `mode-restore`
+- files: `src/analyzer/semantic/semanticExplorerState.ts`, `src/analyzer/semantic/semanticExplorerState.test.ts`, `src/components/analyzer/useSemanticExplorerNavigation.ts` …
+- memory: `agent-knowledge/entries/2026-09-09-explorer-active-path-0f35e1.md`
 
 ## Search guidance
 

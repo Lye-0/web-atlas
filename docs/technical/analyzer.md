@@ -179,6 +179,8 @@ The cross-View stabilization and performance results are recorded in [the stabil
 
 Native scrollbars use the application's dark color scheme, a muted green-grey thumb and a transparent track. Standard thin scrollbars retain native wheel, dragging and keyboard behavior; forced-colors restores platform coloring and width. This does not change the graph layout or scroll-area ownership.
 
+Module Dependencyの集約内訳は主選択と別の参照状態であり、内訳を開いただけで関係線を追加しない。代表の文言は「内訳を表示中」とし、具体的メンバーを選ぶと主選択を更新する。内訳パネルは下部パンくずの上へ離して配置する。Flow 4 Viewの有効経路、ON限定の密度制御、OFF保全と性能の比較は[選択とON密度の検証記録](analyzer-selection-density-review.md)を参照。
+
 `pnpm test`、`pnpm typecheck`、`pnpm lint`、`pnpm build`で検証します。Tab 1–5のFact・import解決・routing・spatial layout・操作・Sessionの回帰は、`src/analyzer/*.test.ts`と既存のAnalyzerコンポーネントテストで維持します。View 6–10の実WASM解析・投影・Trace・UI回帰は`src/analyzer/semantic/*.test.ts`と`src/pages/SemanticAnalyzerPage.test.tsx`で検証します。
 
 `WEB_ATLAS_VALIDATION_REPOS`を指定すると、任意の実Repositoryを読み取り専用で検証します。指定がない通常のテストでは、この外部入力検証のみskipします。`vehicle-management`と`git-lines`は許可された検証入力であり、解析側からコードを変更・実行しません。実際のWebGL描画・ファイル選択・View間の移動は別途ブラウザで確認します。

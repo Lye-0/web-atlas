@@ -1,9 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { buildAggregationGroups, prepareAutoAggregation, projectAutoAggregation, stableAggregationRepresentation } from '../autoAggregation';
 import { createSemanticFlowProjector } from './flowAutoAggregation';
+import { semanticFlow3DInput } from './flow3DInput';
 import type { SemanticGraph } from './types';
 
 describe('display projection retains canonical relations through cached transitions', () => {
+  it('reuses immutable 3D input across visits without sharing it with a replacement graph', () => {
+    const graph: SemanticGraph = { view: 'data-model', nodes: [{ id: 'model', label: 'model', kind: 'model', group: 'source', confidence: 'source', attributes: {}, evidence: [] }], edges: [] };
+    const first = semanticFlow3DInput(graph);
+    expect(semanticFlow3DInput(graph)).toBe(first);
+    const replacement = semanticFlow3DInput({ ...graph, nodes: [...graph.nodes] });
+    expect(replacement).not.toBe(first);
+    expect(replacement.allPositions).toEqual(first.allPositions);
+    expect(replacement.preparedAggregation).not.toBe(first.preparedAggregation);
+  });
   it('reuses split/merge geometry and query-only relations without inferring a route between distinct group members', () => {
     const nodes = ['A', 'b1', 'b2', 'C'].map(id => ({ id, label: id, kind: 'value' as const, group: 'source', confidence: 'source' as const, attributes: {}, evidence: [] }));
     const edges = [['left', 'A', 'b1'], ['right', 'b2', 'C']].map(([id, source, target]) => ({ id: id!, source: source!, target: target!, kind: 'reads', label: id!, confidence: 'source' as const, views: ['data-flow' as const], evidence: [{ path: 'fixture.ts', start: 0, end: 1, line: 1, endLine: 1, description: id! }] }));

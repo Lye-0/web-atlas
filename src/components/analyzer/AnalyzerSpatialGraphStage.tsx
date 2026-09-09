@@ -690,15 +690,14 @@ export function AnalyzerSpatialGraphStage({
     }
     const source = collectSpatialEdgeSet(view, filteredModules, visiblePositionedRegions, regionById, expandedPresentationIds, 'near', selectedNodeId, selectedRegionId, selectedEdgeId);
     const active = new Map(source.edges.map(edge => [edge.id, edge]));
-    const inspected = inspection?.kind === 'group' ? aggregation.aggregates.find(group => group.groupId === inspection.id)?.id : undefined;
     return { edges: displayRelations.flatMap(relation => {
       const incident = relation.originals.flatMap(edge => { const item = active.get(edge.id); return item ? [item] : []; });
-      if (!incident.length && relation.source !== inspected && relation.target !== inspected) return [];
+      if (!incident.length) return [];
       const first = relation.originals[0]!;
       return [{ id: relation.id, edge: first, sourceId: relation.source, targetId: relation.target, edgeIds: relation.originals.map(edge => edge.id), count: relation.originals.length,
         selected: relation.originals.some(edge => edge.id === selectedEdgeId), connected: true, dimmed: false, aggregated: relation.aggregated, importance: incident[0]?.importance ?? 1 }];
     }), groupedCount: displayRelations.filter(relation => relation.aggregated).length };
-  }, [filteredModules, visiblePositionedRegions, expandedPresentationIds, regionById, selectedEdgeId, selectedNodeId, selectedRegionId, view, displayRelations, inspection, aggregation.aggregates]);
+  }, [filteredModules, visiblePositionedRegions, expandedPresentationIds, regionById, selectedEdgeId, selectedNodeId, selectedRegionId, view, displayRelations]);
   const selectionMembers = useMemo(() => {
     if (selectedNodeId) return new Set([selectedNodeId]);
     if (!selectedRegionId) return new Set<string>();
@@ -1025,7 +1024,7 @@ export function AnalyzerSpatialGraphStage({
             })}
             {aggregateLabels.map(({ group, point, visible, label }) =>
                 <button key={group.id} type="button" className="analyzer-spatial-aggregate-label" data-label-visible={visible || undefined} style={{ left: point.x, top: point.y }} onClick={() => setInspection({ kind: 'group', id: group.groupId })}
-                  aria-label={`${group.label} · ${group.memberIds.length}対象の表示集合を確認`} title={group.label}><span>{label}<br />{group.memberIds.length.toLocaleString()}対象{group.matchingCount ? ` · ${group.matchingCount}件一致` : ''}</span></button>)}
+                  aria-label={`${group.label} · ${group.memberIds.length}対象の表示集合を確認`} title={group.label}><span>{label}<br />{inspection?.kind === 'group' && inspection.id === group.groupId ? '内訳を表示中 · ' : ''}{group.memberIds.length.toLocaleString()}対象{group.matchingCount ? ` · ${group.matchingCount}件一致` : ''}</span></button>)}
             <svg className="analyzer-spatial-graph-layer" width={Math.max(1, viewport.width)} height={Math.max(1, viewport.height)} viewBox={`0 0 ${Math.max(1, viewport.width)} ${Math.max(1, viewport.height)}`} aria-label="Module dependency relations">
               {visibleProjectedEdges.map((edge) => (
                 <g key={edge.id} className={`analyzer-spatial-edge${edge.selected ? ' is-selected' : ''}${edge.connected ? ' is-connected' : ''}${edge.dimmed ? ' is-dimmed' : ''}`}>

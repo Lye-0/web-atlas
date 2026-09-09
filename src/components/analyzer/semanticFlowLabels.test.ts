@@ -11,6 +11,17 @@ const region: SemanticFlowRegion = { id: 'directory:src/git', kind: 'directory',
 const sceneCamera = () => { const camera = new OrthographicCamera(-500, 500, 400, -400, .1, 1000); camera.position.set(0, 0, 100); camera.lookAt(0, 0, 0); return camera; };
 
 describe('semantic 3D label synchronization', () => {
+  it('never lets a forced label cover another important point or its enlarged connection area', () => {
+    const points = [positioned('selected', -250), positioned('endpoint', -195), positioned('hover', -120), positioned('background', 180)];
+    const labels = projectSemanticFlowLabels(sceneCamera(), { width: 1000, height: 800 }, 1, points, new Set(['selected']), new Set(), { priorityIds: new Set(['endpoint']), hoveredIds: new Set(['hover']) });
+    expect(labels.some(label => label.id === 'selected')).toBe(true);
+    for (const label of labels) for (const point of points.slice(0, 3)) {
+      const left = label.x + (label.selected || label.aggregate ? 17 : 9), top = label.y - label.height! / 2;
+      const px = point.x + 500, py = 400 - point.y;
+      expect(px > left - 17 && px < left + label.width! + 17 && py > top - 17 && py < top + label.height! + 17).toBe(false);
+    }
+    expect(points.map(point => point.x)).toEqual([-250, -195, -120, 180]);
+  });
   it.each(['runtime-flow', 'function-call-flow', 'data-flow', 'data-model'] as const)('admits a related aggregate only once in %s, then removes its label and hit area on OFF', view => {
     const source = positioned('source', -300), aggregate = positioned('aggregate', 120);
     aggregate.node.attributes = { displayAggregate: true, targetCount: 40 };

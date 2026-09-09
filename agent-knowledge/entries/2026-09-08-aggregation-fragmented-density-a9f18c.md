@@ -2,7 +2,7 @@
 id: rm-20260908-aggregation-fragmented-density
 topic: analyzer-spatial
 type: failure
-status: active
+status: superseded
 maturity: candidate
 created: 2026-09-08
 last_verified: 2026-09-08
@@ -24,6 +24,8 @@ promoted_to: null
 ---
 
 # 細かな所属の密度だけでは、大規模な重なりを見逃す
+
+2026-09-09: `rm-20260909-aggregation-wide-density`で置換。下記の「粗い候補にも投影spanの上限を持たせ、ズームで個別化を戻す」は、近接時に密集した数万点を戻すため現行の判断には使用しない。歴史的な計測証拠として保存する。
 
 ## Conclusion
 

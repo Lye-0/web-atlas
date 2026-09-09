@@ -7,6 +7,8 @@ export interface Explorer2DState { location: ExplorerLocation; camera?: Explorer
 export interface ExplorerSelection { selectedNodeId?: string; selectedEdgeId?: string; semanticFieldId?: string; detailOpen: boolean }
 export interface ExplorerVisit extends ExplorerSelection {
   id: string; previousId?: string; mode: '2d' | '3d'; twoD: Explorer2DState; camera3d?: ExplorerCamera3D;
+  /** Current explicit relationship, independent of the saved 2D location. */
+  activePath?: ExplorerLocation;
 }
 export interface ExplorerSession {
   currentVisitId: string; visits: Record<string, ExplorerVisit>; twoD: Explorer2DState; visited2D: boolean; visited3D: boolean;
@@ -28,7 +30,8 @@ export function recordExplorerSelection(current: AnalyzerViewSession, selection:
   const next = { ...current, ...selection }, navigation = current.explorer;
   if (!navigation) return next;
   const visit = navigation.visits[navigation.currentVisitId];
-  return visit ? { ...next, explorer: { ...navigation, visits: { ...navigation.visits, [visit.id]: { ...visit, ...selection } } } } : next;
+  const replaced = current.selectedNodeId !== selection.selectedNodeId || current.selectedEdgeId !== selection.selectedEdgeId;
+  return visit ? { ...next, explorer: { ...navigation, visits: { ...navigation.visits, [visit.id]: { ...visit, ...selection, activePath: replaced || !selection.selectedNodeId && !selection.selectedEdgeId ? undefined : visit.activePath } } } } : next;
 }
 
 export function recordExplorerCamera(current: AnalyzerViewSession, mode: '2d' | '3d', camera: ExplorerCamera2D | ExplorerCamera3D): AnalyzerViewSession {

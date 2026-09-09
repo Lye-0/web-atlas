@@ -53,7 +53,7 @@ export interface AutoAggregationResult {
   ownerById: ReadonlyMap<string, string>;
   aggregates: DisplayAggregation[];
   activeGroupIds: ReadonlySet<string>;
-  metrics: ReadonlyMap<string, { spacing: number; width: number; height: number; members: number; crowdedFraction: number }>;
+  metrics: ReadonlyMap<string, { spacing: number; width: number; height: number; members: number; crowdedFraction: number; bounds?: readonly [number, number, number, number] }>;
   counts: AggregationCounts;
 }
 
@@ -107,6 +107,7 @@ type DensityMetrics = AutoAggregationResult['metrics'];
 interface AggregationSample {
   enabled: boolean; metrics: DensityMetrics; protectedIds: ReadonlySet<string>; expandedGroupIds: ReadonlySet<string>;
   manualGroups: readonly AggregationGroup[]; matchIds: ReadonlySet<string>; previousActiveGroupIds: ReadonlySet<string>;
+  offscreenGroupIds: ReadonlySet<string>;
   result: AutoAggregationResult;
 }
 const equalIds = (a: ReadonlySet<string>, b: ReadonlySet<string>) => a === b || a.size === b.size && [...a].every(id => b.has(id));
@@ -114,7 +115,7 @@ const equalIds = (a: ReadonlySet<string>, b: ReadonlySet<string>) => a === b || 
 interface IndexedAggregationGroup { group: AggregationGroup; indices: number[]; displayId: string }
 function aggregationDensity(points: readonly AggregationPoint[], groups: readonly IndexedAggregationGroup[], projection: AggregationProjection,
   screenX: Float64Array, screenY: Float64Array, crowded: Uint8Array): DensityMetrics {
-  const metrics = new Map<string, { spacing: number; width: number; height: number; members: number; crowdedFraction: number }>();
+  const metrics = new Map<string, { spacing: number; width: number; height: number; members: number; crowdedFraction: number; bounds: readonly [number, number, number, number] }>();
   const cells = new Map<number, Map<number, number[]>>();
   crowded.fill(0);
   for (let index = 0; index < points.length; index++) {
@@ -144,7 +145,7 @@ function aggregationDensity(points: readonly AggregationPoint[], groups: readonl
     }
     const width = Math.max(8, maxX - minX), height = Math.max(8, maxY - minY);
     const spacing = Math.sqrt(width * height / indices.length), crowdedFraction = crowdedCount / indices.length;
-    metrics.set(group.id, { spacing, width, height, members: indices.length, crowdedFraction });
+    metrics.set(group.id, { spacing, width, height, members: indices.length, crowdedFraction, bounds: [minX, minY, maxX, maxY] });
   }
   return metrics;
 }
@@ -175,18 +176,32 @@ export function prepareAutoAggregation(points: readonly AggregationPoint[], grou
   } };
 }
 
-export function projectAutoAggregation({ points, groups, enabled, protectedIds = new Set(), expandedGroupIds = new Set(), manualGroups = [], projection, previousActiveGroupIds = new Set(), matchIds = new Set(), prepared }: {
+export function projectAutoAggregation({ points, groups, enabled, protectedIds = new Set(), expandedGroupIds = new Set(), manualGroups = [], projection, previousActiveGroupIds = new Set(), matchIds = new Set(), prepared, retainOffscreen = false }: {
   points: readonly AggregationPoint[]; groups: readonly AggregationGroup[]; enabled: boolean;
   prepared?: ReturnType<typeof prepareAutoAggregation>;
   protectedIds?: ReadonlySet<string>; expandedGroupIds?: ReadonlySet<string>;
   manualGroups?: readonly AggregationGroup[]; projection: AggregationProjection;
   previousActiveGroupIds?: ReadonlySet<string>; matchIds?: ReadonlySet<string>;
+  /** Flow 3D may defer automatic unfolding outside the actual viewport. */
+  retainOffscreen?: boolean;
 }): AutoAggregationResult {
   const input = prepared?.points === points && prepared.groups === groups ? prepared : prepareAutoAggregation(points, groups);
   const { canonical, indexById } = input;
   const ownerById = new Map<string, string>(), aggregates: DisplayAggregation[] = [], activeGroupIds = new Set<string>();
   const metrics = enabled ? input.density(projection) : input.emptyMetrics;
+  const offscreenGroupIds = new Set<string>(), matrix = projection.matrix;
+  if (enabled && retainOffscreen && matrix?.length === 16 && matrix[3] === 0 && matrix[7] === 0 && matrix[11] === 0 && matrix[15] === 1) {
+    const dx = matrix[12]! * projection.width / 2, dy = matrix[13]! * projection.height / 2;
+    for (const [id, metric] of metrics) if (metric.bounds) {
+      // Density is translation-invariant; visibility is not. Reuse the prepared
+      // bounds but include the resulting visibility set in ownership caching.
+      const [left, bottom, right, top] = metric.bounds, padding = previousActiveGroupIds.has(id) ? -24 : 64;
+      if (right + dx < -projection.width / 2 - padding || left + dx > projection.width / 2 + padding
+        || top + dy < -projection.height / 2 - padding || bottom + dy > projection.height / 2 + padding) offscreenGroupIds.add(id);
+    }
+  }
   const cached = input.results.find(sample => sample.enabled === enabled && sample.metrics === metrics
+    && equalIds(sample.offscreenGroupIds, offscreenGroupIds)
     && equalIds(sample.protectedIds, protectedIds) && equalIds(sample.expandedGroupIds, expandedGroupIds) && equalIds(sample.matchIds, matchIds)
     && sample.manualGroups.length === manualGroups.length && sample.manualGroups.every((group, index) => group === manualGroups[index])
     && (!enabled || equalIds(sample.previousActiveGroupIds, previousActiveGroupIds) || equalIds(sample.result.activeGroupIds, previousActiveGroupIds)));
@@ -208,21 +223,43 @@ export function projectAutoAggregation({ points, groups, enabled, protectedIds =
   };
   // Manual scope wins; automatic groups can only own the remainder.
   for (const group of manualGroups) add(group, group.memberIds.flatMap(id => { const index = indexById.get(id); return index !== undefined && !owners[index] && !explicitProtection[index] ? [index] : []; }), 'manual');
+  const denseRemainders: typeof input.orderedGroups = [];
   if (enabled) for (const { group, indices, displayId } of input.orderedGroups) {
     // Density history belongs to the stable group, independently of temporary
     // protected points or a manual opening/closure of that same range.
     const density = metrics.get(group.id); if (!density) continue;
+    if (offscreenGroupIds.has(group.id)) {
+      activeGroupIds.add(group.id);
+      if (!expandedGroupIds.has(group.id)) {
+        const hidden = indices.filter(index => !owners[index] && !automaticProtection[index]);
+        if (hidden.length >= 2) add(group, hidden, 'automatic', displayId);
+      }
+      continue;
+    }
     const { spacing, width, height, crowdedFraction } = density;
     // Screen footprint incorporates zoom, distance and orientation. A wide deadband
     // avoids changes from tiny camera motions; camera adapters sample after gestures.
     const previous = previousActiveGroupIds.has(group.id);
-    if (Math.max(width, height) > (group.maximumProjectedSpan ?? Infinity) * (previous ? 1.2 : 1)) continue;
+    if (Math.max(width, height) > (group.maximumProjectedSpan ?? Infinity) * (previous ? 1.2 : 1)) {
+      // A wide parent first yields to readable child collections. Its remaining
+      // crowded members must not all unfold merely because the camera is near.
+      if (crowdedFraction >= (previous ? .4 : .65)) denseRemainders.push({ group, indices, displayId });
+      continue;
+    }
     if (spacing > (previous ? 22 : 14) && crowdedFraction < (previous ? .4 : .65)) continue;
     activeGroupIds.add(group.id);
     if (expandedGroupIds.has(group.id)) continue;
     const hidden = indices.filter(index => !owners[index] && !automaticProtection[index]);
     if (hidden.length < 2) continue;
     add(group, hidden, 'automatic', displayId);
+  }
+  // The regular pass has already assigned compact children. Prefer the finest
+  // existing affiliation for the dense remainder; manual openings still win.
+  for (const { group, indices, displayId } of denseRemainders.reverse()) {
+    if (expandedGroupIds.has(group.id)) continue;
+    const hidden = indices.filter(index => !owners[index] && !automaticProtection[index]);
+    if (hidden.length < 2) continue;
+    activeGroupIds.add(group.id); add(group, hidden, 'automatic', displayId);
   }
   const individualIds = new Set<string>();
   for (let index = 0; index < points.length; index++) {
@@ -235,7 +272,7 @@ export function projectAutoAggregation({ points, groups, enabled, protectedIds =
     manualMembers: manual.reduce((sum, group) => sum + group.memberIds.length, 0), manualGroups: manual.length, representations: individualIds.size + aggregates.length,
   } }, input.results.at(-1)?.result);
   if (input.results.length >= 4) input.results.shift();
-  input.results.push({ enabled, metrics, protectedIds: new Set(protectedIds), expandedGroupIds: new Set(expandedGroupIds), matchIds: new Set(matchIds), manualGroups: [...manualGroups], previousActiveGroupIds: new Set(previousActiveGroupIds), result });
+  input.results.push({ enabled, metrics, offscreenGroupIds, protectedIds: new Set(protectedIds), expandedGroupIds: new Set(expandedGroupIds), matchIds: new Set(matchIds), manualGroups: [...manualGroups], previousActiveGroupIds: new Set(previousActiveGroupIds), result });
   return result;
 }
 
