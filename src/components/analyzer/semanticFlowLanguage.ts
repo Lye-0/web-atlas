@@ -3,6 +3,10 @@ import { confidenceLabels, type SemanticNode, type SemanticRelationSource, type 
 export type SemanticFlowLanguageView = SemanticViewId | 'module-dependency';
 
 export function semanticFlowDirectionLanguage(view: SemanticFlowLanguageView) {
+  if (view === 'architecture-map') return {
+    incoming: '関係元', outgoing: '関係先', caption: '矢印は参照・要求・設定の向き。種類は線の詳細で確認',
+    help: '青は選択対象から出る関係、橙は入る関係です。宣言依存、コード参照、呼び出し、通信要求、配置設定を区別します。粒子は方向の補助表示です。設定は稼働状況を示さず、集約された連続線は一連の実行を証明しません。',
+  };
   if (view === 'data-flow') return {
     incoming: '由来・入力', outgoing: '結果・利用先', caption: '矢印・粒子は値の由来から処理・結果・利用先への関係',
     help: '代入、項目の取り出し、引数、加工、戻り値などの関係を、由来から利用先へ示します。青は選択対象から出る関係、橙は入る関係です。静的な粒子は実際の値・実行順・頻度・データ流量を表しません。',
@@ -25,7 +29,7 @@ export function semanticFlowDirectionLanguage(view: SemanticFlowLanguageView) {
   };
 }
 
-export const isUnresolvedCallNode = (node?: SemanticNode) => node?.kind === 'external' && node.confidence === 'unresolved';
+export const isUnresolvedCallNode = (node?: SemanticNode) => node?.kind === 'external' && node.confidence === 'unresolved' && !node.architecture;
 
 export function semanticNodeConfidence(node: SemanticNode) {
   if (isUnresolvedCallNode(node)) return '呼び出し先の定義を未特定';

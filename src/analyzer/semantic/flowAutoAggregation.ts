@@ -8,7 +8,7 @@ export function semanticAggregationInput(graph: SemanticGraph, positions: readon
   const identity = (value: AggregationGroupIdentity) => { const previous = identities.get(value.id); if (previous) return previous; identities.set(value.id, value); return value; };
   const points: AggregationPoint[] = positions.map(point => {
     const node = point.node, owner = explorer?.owners.get(node.id), scope = owner ? explorer?.scopes.get(owner.scopeId) : undefined;
-    const unresolved = node.kind === 'external' && node.confidence === 'unresolved';
+    const unresolved = !node.architecture && node.kind === 'external' && node.confidence === 'unresolved';
     const membership = unresolved ? node.path ?? node.evidence[0]?.path ?? '呼び出し箇所の所属未判定' : scope?.id ?? node.path ?? node.group;
     const label = unresolved ? `呼び出し箇所 ${membership}` : scope?.kind === 'function' ? `${scope.label} · ${scope.path}` : scope?.path ?? scope?.label ?? node.group;
     const role = node.data?.role;

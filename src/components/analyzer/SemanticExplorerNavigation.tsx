@@ -15,6 +15,26 @@ export interface SemanticExplorerNavigationActions {
 export function SemanticExplorerNavigation({ explorer, navigation, mode, graph, localGraph, selectedIds, selectedEdgeId }: {
   explorer: SemanticExplorerModel; navigation: SemanticExplorerNavigationActions; mode: '2d' | '3d'; graph: SemanticGraph; localGraph: SemanticGraph; selectedIds: ReadonlySet<string>; selectedEdgeId?: string;
 }) {
+  if (graph.view === 'architecture-map') return <ArchitectureNavigation mode={mode} explorer={explorer} navigation={navigation} graph={graph} selectedId={[...selectedIds][0]} />;
+  return <FlowNavigation explorer={explorer} navigation={navigation} mode={mode} graph={graph} localGraph={localGraph} selectedIds={selectedIds} selectedEdgeId={selectedEdgeId} />;
+}
+
+function ArchitectureNavigation({ explorer, navigation, graph, selectedId, mode }: { explorer: SemanticExplorerModel; navigation: SemanticExplorerNavigationActions; graph: SemanticGraph; selectedId?: string; mode: '2d' | '3d' }) {
+  const scopeId = navigation.location.scopeId;
+  const selected = graph.nodes.find(n => n.id === selectedId);
+  const hasChildren = selected && [...explorer.nodes.values()].some(n => n.architecture?.parentId === selected.id);
+  return <div className="semantic-explorer-navigation">
+    <div className="semantic-explorer-navigation-row"><div className="semantic-explorer-history" role="group" aria-label="階層の移動">
+      <button onClick={navigation.onBack} disabled={!navigation.canBack}>戻る</button><button onClick={navigation.onParent} disabled={scopeId === 'project'}>親へ</button><button onClick={navigation.onProject} disabled={scopeId === 'project'}>プロジェクトへ</button>
+    </div><nav className="semantic-explorer-breadcrumb" aria-label="構成図の現在地">{explorerBreadcrumbs(explorer, { ...navigation.location, centerId: undefined }).map(item => <button key={item.id} onClick={() => navigation.onOpenScope(item.id)} aria-current={item.id === scopeId ? 'page' : undefined}>{item.label}</button>)}</nav></div>
+    <div className="semantic-explorer-caption"><span>{graph.nodes.length}構成要素 · {graph.edges.length}関係</span><small>クリックで選択 · 線はソース・設定上の関係</small></div>
+    {selected && <div className="semantic-explorer-selection"><span>{selected.attributes.architectureContext ? 'この範囲の外部: ' : '選択: '}{selected.label}</span><div className="semantic-explorer-selection-actions">{hasChildren && <button onClick={() => navigation.onOpenScope(selected.id)}>内部を開く</button>}<button onClick={() => navigation.onJumpMode(mode === '2d' ? '3d' : '2d', selected.id)}>{mode === '2d' ? '3D上で位置を見る' : '2Dで詳しく見る'}</button></div></div>}
+  </div>;
+}
+
+function FlowNavigation({ explorer, navigation, mode, graph, localGraph, selectedIds, selectedEdgeId }: {
+  explorer: SemanticExplorerModel; navigation: SemanticExplorerNavigationActions; mode: '2d' | '3d'; graph: SemanticGraph; localGraph: SemanticGraph; selectedIds: ReadonlySet<string>; selectedEdgeId?: string;
+}) {
   const location = navigation.location, selectedId = [...selectedIds][0], selected = selectedId ? explorer.nodes.get(selectedId) : undefined;
   const owner = selectedId ? explorer.owners.get(selectedId) : undefined;
   const center = location.centerId ? explorer.nodes.get(location.centerId) : undefined;

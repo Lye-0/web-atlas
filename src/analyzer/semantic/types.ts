@@ -1,6 +1,6 @@
 export const semanticViewIds = ['runtime-flow', 'function-call-flow', 'data-flow', 'data-model', 'architecture-map'] as const;
 export type SemanticViewId = typeof semanticViewIds[number];
-export type SemanticExplorerViewId = Exclude<SemanticViewId, 'architecture-map'>;
+export type SemanticExplorerViewId = SemanticViewId;
 export const isSemanticView = (id: string): id is SemanticViewId => (semanticViewIds as readonly string[]).includes(id);
 export type SemanticConfidence = 'source' | 'inferred' | 'observed' | 'unresolved';
 export type SemanticKind = 'function' | 'entry' | 'request' | 'operation' | 'value' | 'model' | 'resource' | 'subsystem' | 'external' | 'span' | 'log';
@@ -28,6 +28,7 @@ export interface SemanticData {
 }
 export interface SemanticCrossLink { targetId: string; view: 'data-flow' | 'data-model'; reason: string; fieldId?: string; evidence: SemanticEvidence[] }
 export interface SemanticNode {
+  architecture?: import('./architecture').ArchitectureEntity;
   id: string; kind: SemanticKind; label: string; path?: string; line?: number; endLine?: number;
   language?: string; group: string; confidence: SemanticConfidence; evidence: SemanticEvidence[];
   signature?: string; fields?: SemanticField[]; attributes: Record<string, string | number | boolean | string[]>;
@@ -38,11 +39,12 @@ export interface SemanticEdge {
   views: SemanticViewId[]; confidence: SemanticConfidence; evidence: SemanticEvidence[];
   /** Original source relations behind a display aggregate or compressed runtime path. */
   provenance?: { edges: SemanticRelationSource[]; intermediateNodeIds?: string[] };
-  details?: { reason?: string; callSiteId?: string; argumentIndex?: number; fieldId?: string; propertyPath?: string[]; conditional?: boolean; contextId?: string; sourceEdgeIds?: string[] };
+  details?: { environment?: string; reason?: string; callSiteId?: string; argumentIndex?: number; fieldId?: string; propertyPath?: string[]; conditional?: boolean; contextId?: string; sourceEdgeIds?: string[] };
 }
 export type SemanticRelationSource = Pick<SemanticEdge, 'id' | 'source' | 'target' | 'kind' | 'label' | 'confidence' | 'evidence'>;
 export interface SemanticCoverage { path: string; language: string; status: 'parsed' | 'partial' | 'unsupported' | 'skipped'; message?: string }
 export interface SemanticAnalysis {
+  architecture?: import('./architecture').ArchitectureModel;
   nodes: SemanticNode[]; edges: SemanticEdge[]; coverage: SemanticCoverage[]; warnings: string[];
   /** Pre-refinement fields used only by the accepted Runtime / Function Call detail presentation. */
   flowFieldsByNode?: Record<string, SemanticField[]>;

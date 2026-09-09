@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { AnalyzerViewSession } from '../../analyzer/session';
-import { semanticFlowEdgePaths, semanticMemberIds } from '../../analyzer/semantic/flowPresentation';
+import { layoutSemanticFlow, semanticFlowEdgePaths, semanticMemberIds } from '../../analyzer/semantic/flowPresentation';
 import { spatialFlowPhase, SPATIAL_FLOW_PARTICLE_SPACING, SPATIAL_FLOW_SPEED } from '../../analyzer/spatialFlow';
 import type { SemanticGraph } from '../../analyzer/semantic/types';
 import { explorerEdgeVisible, layoutExplorerRelations, type ExplorerLocation, type SemanticExplorerModel } from '../../analyzer/semantic/semanticExplorer';
@@ -41,7 +41,7 @@ interface Explorer2DProps extends SemanticFlowRenderProps {
 
 export function SemanticFlow2D(props: Explorer2DProps) {
   const visibleIds = useMemo(() => new Set(props.graph.nodes.map(node => node.id)), [props.graph.nodes]);
-  if (props.explorer && props.location && !props.location.centerId) return <SemanticExplorerBlocks explorer={props.explorer} location={props.location} visibleIds={visibleIds}
+  if (props.graph.view !== 'architecture-map' && props.explorer && props.location && !props.location.centerId) return <SemanticExplorerBlocks explorer={props.explorer} location={props.location} visibleIds={visibleIds}
     nodeDisplays={props.nodeDisplays}
     fineExpandedScopeIds={props.fineExpandedScopeIds} onFineExpandedScopeIds={props.onFineExpandedScopeIds}
     matchIds={props.matchIds} selectedIds={props.selectedIds} visitId={props.visitId ?? ''} scrollTop={props.scrollTop ?? 0} overlayTop={props.overlayTop ?? 150}
@@ -58,7 +58,7 @@ function SemanticLocalFlow2D({ graph, explorer, nodeDisplays, selectedIds, selec
   const previousSize = useRef(viewport);
   const lastCommand = useRef<number | undefined>(undefined);
   const centerId = location?.centerId ?? graph.nodes[0]?.id ?? '';
-  const positions = useMemo(() => layoutExplorerRelations(graph, centerId), [graph, centerId]);
+  const positions = useMemo(() => graph.view === 'architecture-map' ? layoutSemanticFlow(graph, '2d') : layoutExplorerRelations(graph, centerId), [graph, centerId]);
   const displays = useMemo(() => nodeDisplays ?? semanticNodeDisplays(graph.nodes, explorer?.nodes), [nodeDisplays, graph.nodes, explorer]);
   const paths = useMemo(() => semanticFlowEdgePaths(graph, positions, selectedIds, selectedEdgeId, '2d'), [graph, positions, selectedIds, selectedEdgeId]);
   const shownPaths = useMemo(() => paths.filter(path => explorerEdgeVisible(path.edge, selectedIds, direction, selectedEdgeId)), [paths, selectedIds, direction, selectedEdgeId]);
@@ -108,12 +108,12 @@ function SemanticLocalFlow2D({ graph, explorer, nodeDisplays, selectedIds, selec
     if (!initialized && positions.length) {
       const plot = semanticFlowPlot(viewport.width, viewport.height, overlayTop);
       let initial: FlowCamera2D = { x: viewport.width / 2, y: plot.centerY, scale: Math.min(1.1, Math.max(.85, (viewport.width - 40) / 880)) };
-      if (positions.length <= 12) {
+      if (graph.view === 'architecture-map' || positions.length <= 12) {
         let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
         for (const point of positions) { minX = Math.min(minX, point.x - 112); maxX = Math.max(maxX, point.x + 112); minY = Math.min(minY, point.y - (point.node.id === centerId ? 44 : 36)); maxY = Math.max(maxY, point.y + 36); }
         for (const path of paths) for (const point of path.points) { minX = Math.min(minX, point.x - 6); maxX = Math.max(maxX, point.x + 6); minY = Math.min(minY, point.y - 6); maxY = Math.max(maxY, point.y + 6); }
         const scale = Math.min(1.05, (viewport.width - 32) / (maxX - minX), (plot.height - 16) / (maxY - minY));
-        if (scale >= .8) initial = { x: viewport.width / 2 - (minX + maxX) / 2 * scale, y: plot.centerY - (minY + maxY) / 2 * scale, scale };
+        if (graph.view === 'architecture-map' || scale >= .8) initial = { x: viewport.width / 2 - (minX + maxX) / 2 * scale, y: plot.centerY - (minY + maxY) / 2 * scale, scale };
       }
       commit(initial);
       setInitialized(true);
@@ -123,7 +123,7 @@ function SemanticLocalFlow2D({ graph, explorer, nodeDisplays, selectedIds, selec
       commit(current => ({ ...current, x: current.x + (viewport.width - previous.width) / 2, y: current.y + (viewport.height - previous.height) / 2 }));
     }
     previousSize.current = viewport;
-  }, [positions, paths, viewport, commit, overlayTop, centerId, initialized]);
+  }, [graph.view, positions, paths, viewport, commit, overlayTop, centerId, initialized]);
   const zoom = useCallback((factor: number, x = viewport.width / 2, y = viewport.height / 2) => commit(current => {
     const scale = Math.max(.000001, Math.min(5, current.scale * factor));
     return { scale, x: x - (x - current.x) * scale / current.scale, y: y - (y - current.y) * scale / current.scale };
@@ -205,14 +205,14 @@ function SemanticLocalFlow2D({ graph, explorer, nodeDisplays, selectedIds, selec
           <title>{display.tooltip}{roleLabel ? `\n${roleLabel}` : ''}</title>
           <rect x={-106} y={-30} width={212} height={60} rx={7} />
           {selected && <rect className="semantic-flow-selection-ring" x={-111} y={-35} width={222} height={70} rx={10} />}
-          {point.node.id === centerId && <text x={-106} y={-42} className="semantic-explorer-center-mark">中心</text>}
+          {graph.view !== 'architecture-map' && point.node.id === centerId && <text x={-106} y={-42} className="semantic-explorer-center-mark">中心</text>}
           {detail ? <foreignObject x={-94} y={-23} width={188} height={48} pointerEvents="none"><div className="semantic-explorer-node-copy"><strong>{display.title}</strong>
             <small>{roleLabel && <span className="semantic-flow-2d-role">{roleLabel} · </span>}{display.disambiguation ?? display.location}</small></div></foreignObject>
             : <circle r={8} className="semantic-flow-node-dot" />}
         </g>;
       })}</g>
       <g data-flow-layer="edges" pointerEvents="none">{shownPaths.map(path => <g key={path.edge.id} data-edge-id={path.edge.id} data-source={path.edge.source} data-target={path.edge.target} data-direction={path.direction ?? ''} data-flow-emphasized={emphasis.edgeIds.has(path.edge.id) || undefined} opacity={emphasis.edgeIds.size && !emphasis.edgeIds.has(path.edge.id) ? explicitPathEdgeIds?.has(path.edge.id) ? .7 : .18 : undefined}>
-        <path d={path.svgPath} fill="none" stroke={path.color} strokeWidth={path.selected ? 2.6 : graph.view === 'data-flow' && (location?.depth ?? 1) > 1 ? 1.9 : 1.2} opacity={path.selected ? 1 : graph.view === 'data-flow' && (location?.depth ?? 1) > 1 ? .85 : .4} markerEnd={`url(#flow-arrow-${path.color.slice(1)})`} />
+        <path d={path.svgPath} fill="none" stroke={path.color} strokeWidth={path.selected ? 2.6 : graph.view === 'data-flow' && (location?.depth ?? 1) > 1 ? 1.9 : 1.2} opacity={path.selected ? 1 : graph.view === 'architecture-map' ? .7 : graph.view === 'data-flow' && (location?.depth ?? 1) > 1 ? .85 : .4} markerEnd={`url(#flow-arrow-${path.color.slice(1)})`} />
       </g>)}</g>
       {/* Round zero-length dashes keep exact arc spacing without a DOM node per dot. */}
       <g data-flow-layer="particles" pointerEvents="none">{motion.enabled && motion.visible && active.map(path => <path key={path.edge.id} data-flow-particle data-particle-edge-id={path.edge.id} data-phase={spatialFlowPhase(path.edge.id)}

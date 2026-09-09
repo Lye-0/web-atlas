@@ -25,6 +25,7 @@ const scopeKey = (kind: string, context: string, path: string) => `${kind}:${JSO
 
 /** Ownership is recorded source membership or an explicit runtime boundary, never call reachability. */
 export function buildSemanticExplorer(graph: SemanticGraph, knownFiles: ReadonlySet<string>): SemanticExplorerModel {
+  if (graph.view === 'architecture-map') return buildArchitectureExplorer(graph);
   const files = new Set([...knownFiles].map(normalizeExplorerPath)), nodes = new Map(graph.nodes.map(node => [node.id, node]));
   const scopes = new Map<string, ExplorerScope>(), owners = new Map<string, ExplorerOwner>();
   const addScope = (scope: Omit<ExplorerScope, 'childIds' | 'nodeIds' | 'memberIds'>) => {
@@ -103,8 +104,22 @@ export function explorerRegionIdentity(model: SemanticExplorerModel, nodeId: str
   return { id: scope?.id ?? 'group:unknown', label: scope?.label ?? '所属情報なし', kind: 'group' };
 }
 
+function buildArchitectureExplorer(graph: SemanticGraph): SemanticExplorerModel {
+  const nodes = new Map(graph.nodes.map(n => [n.id, n])), owners = new Map<string, ExplorerOwner>();
+  const scopes = new Map<string, ExplorerScope>([['project', { id: 'project', kind: 'project', label: 'プロジェクト', childIds: [], nodeIds: [], memberIds: [] }]]);
+  for (const node of graph.nodes) scopes.set(node.id, { id: node.id, kind: 'group', label: node.label, parentId: node.architecture?.parentId ?? 'project', childIds: [], nodeIds: [], memberIds: [], grounded: true });
+  for (const node of graph.nodes) {
+    const parent = node.architecture?.parentId ?? 'project';
+    scopes.get(parent)?.childIds.push(node.id);
+    owners.set(node.id, { scopeId: parent, contextId: node.architecture?.parentId, definitionAvailable: false, runtimeCandidateIds: [] });
+    let scope = scopes.get(node.id); const visited = new Set<string>();
+    while (scope && !visited.has(scope.id)) { visited.add(scope.id); scope.memberIds.push(node.id); scope = scope.parentId ? scopes.get(scope.parentId) : undefined; }
+  }
+  return { view: graph.view, scopes, nodes, owners, runtimeMode: 'grounded' };
+}
+
 export function explorerLocationForNode(model: SemanticExplorerModel, id: string): ExplorerLocation {
-  return { scopeId: model.owners.get(id)?.scopeId ?? 'project', centerId: model.nodes.has(id) ? id : undefined, depth: 1, direction: 'both' };
+  return { scopeId: model.owners.get(id)?.scopeId ?? 'project', centerId: model.view !== 'architecture-map' && model.nodes.has(id) ? id : undefined, depth: 1, direction: 'both' };
 }
 
 export function resolveExplorerLocation(model: SemanticExplorerModel, location: ExplorerLocation): ExplorerLocation {
@@ -166,7 +181,7 @@ export function explorerRelations(graph: SemanticGraph, centerId: string, depth 
 /** Direction controls the selected object's lines; the local node set remains centered on its visit. */
 export function explorerEdgeVisible(edge: SemanticEdge, selectedIds: ReadonlySet<string>, direction: ExplorerLocation['direction'], selectedEdgeId?: string) {
   if (direction === 'both' || !selectedIds.size || edge.id === selectedEdgeId || edge.provenance?.edges.some(item => item.id === selectedEdgeId)) return true;
-  const relation = analyzerEdgeDirection(edge.provenance?.edges[0]?.source ?? edge.source, edge.provenance?.edges.at(-1)?.target ?? edge.target, selectedIds);
+  const relation = analyzerEdgeDirection(edge.provenance?.edges[0]?.source ?? edge.source, edge.provenance?.edges.at(-1)?.target ?? edge.target, selectedIds) ?? analyzerEdgeDirection(edge.source, edge.target, selectedIds);
   return !relation || relation === 'internal' || relation === direction;
 }
 

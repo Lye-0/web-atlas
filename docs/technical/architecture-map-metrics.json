@@ -1,0 +1,933 @@
+{
+  "date": "2026-09-09",
+  "baselineCommit": "62a01861b3f1cd8ec5df8d019d989a8143dc1775",
+  "environment": {
+    "os": "Windows",
+    "cpu": "Intel Core i7-13700K",
+    "ramGiB": 95.7,
+    "browser": "headless Microsoft Edge",
+    "viewport": [
+      1600,
+      1000
+    ],
+    "deviceScaleFactor": 1
+  },
+  "measurementNotes": [
+    "Three independent page loads per input; actions include Playwright and two requestAnimationFrame callbacks.",
+    "Old and new Architecture projections differ in semantic content. These are UX timings, not equivalent renderer benchmarks.",
+    "Heap samples include explicit GC after waiting 1200 ms for initialization and delayed teardown.",
+    "Static original inputs and heap snapshots are intentionally excluded."
+  ],
+  "performance": [
+    {
+      "name": "git-lines",
+      "beforeReady": {
+        "n": 3,
+        "median": 3088,
+        "p95": 3199,
+        "min": 3050,
+        "max": 3199
+      },
+      "intermediateReady": {
+        "n": 3,
+        "median": 3695,
+        "p95": 3724,
+        "min": 3658,
+        "max": 3724
+      },
+      "finalReady": {
+        "n": 3,
+        "median": 3952,
+        "p95": 4012,
+        "min": 3799,
+        "max": 4012
+      },
+      "beforeSelection": {
+        "n": 15,
+        "median": 67,
+        "p95": 100,
+        "min": 60,
+        "max": 100
+      },
+      "intermediateSelection": {
+        "n": 15,
+        "median": 217,
+        "p95": 279,
+        "min": 175,
+        "max": 279
+      },
+      "actions": {
+        "select": {
+          "n": 15,
+          "median": 65,
+          "p95": 113,
+          "min": 60,
+          "max": 113
+        },
+        "drill": {
+          "n": 9,
+          "median": 67,
+          "p95": 83,
+          "min": 54,
+          "max": 83
+        },
+        "parent": {
+          "n": 9,
+          "median": 67,
+          "p95": 69,
+          "min": 65,
+          "max": 69
+        },
+        "to3D": {
+          "n": 21,
+          "median": 68,
+          "p95": 370,
+          "min": 66,
+          "max": 381
+        },
+        "rotate-true": {
+          "n": 9,
+          "median": 313,
+          "p95": 314,
+          "min": 307,
+          "max": 314
+        },
+        "aggregationToggle": {
+          "n": 3,
+          "median": 65,
+          "p95": 69,
+          "min": 65,
+          "max": 69
+        },
+        "rotate-false": {
+          "n": 9,
+          "median": 314,
+          "p95": 347,
+          "min": 307,
+          "max": 347
+        },
+        "to2D": {
+          "n": 18,
+          "median": 65,
+          "p95": 87,
+          "min": 57,
+          "max": 87
+        }
+      },
+      "architectureMs": {
+        "n": 3,
+        "median": 230.79999999701977,
+        "p95": 237.20000000298023,
+        "min": 218.60000000149012,
+        "max": 237.20000000298023
+      },
+      "phases": {
+        "2d-selection": {
+          "rafP95Range": {
+            "n": 3,
+            "median": 16.800000000000182,
+            "p95": 16.800000000000182,
+            "min": 16.700000000000273,
+            "max": 16.800000000000182
+          },
+          "longTasks": [
+            {
+              "samples": 0,
+              "medianMs": null,
+              "p95Ms": null,
+              "maxMs": null,
+              "over50ms": 0
+            },
+            {
+              "samples": 0,
+              "medianMs": null,
+              "p95Ms": null,
+              "maxMs": null,
+              "over50ms": 0
+            },
+            {
+              "samples": 0,
+              "medianMs": null,
+              "p95Ms": null,
+              "maxMs": null,
+              "over50ms": 0
+            }
+          ],
+          "cpu": {},
+          "labelDuplicates": [
+            [],
+            [],
+            []
+          ],
+          "architectureProjectionCalls": 0
+        },
+        "3d-rotate-true": {
+          "rafP95Range": {
+            "n": 3,
+            "median": 16.800000000000182,
+            "p95": 16.800000000000182,
+            "min": 16.800000000000182,
+            "max": 16.800000000000182
+          },
+          "longTasks": [
+            {
+              "samples": 0,
+              "medianMs": null,
+              "p95Ms": null,
+              "maxMs": null,
+              "over50ms": 0
+            },
+            {
+              "samples": 0,
+              "medianMs": null,
+              "p95Ms": null,
+              "maxMs": null,
+              "over50ms": 0
+            },
+            {
+              "samples": 0,
+              "medianMs": null,
+              "p95Ms": null,
+              "maxMs": null,
+              "over50ms": 0
+            }
+          ],
+          "cpu": {
+            "hitSemanticFlowPoint": {
+              "calls": 9,
+              "totalMs": 0.20000000298023224,
+              "meanMs": 0.022222222553359136,
+              "maxMs": 0.10000000149011612
+            },
+            "projectSemanticFlowLabels": {
+              "calls": 153,
+              "totalMs": 27.900000020861626,
+              "meanMs": 0.1823529413128211,
+              "maxMs": 0.3999999985098839
+            },
+            "semanticFlowConnectionNotices": {
+              "calls": 153,
+              "totalMs": 1.7000000178813934,
+              "meanMs": 0.011111111227982964,
+              "maxMs": 0.10000000149011612
+            },
+            "SemanticFlow3D": {
+              "calls": 48,
+              "totalMs": 3.4000000208616257,
+              "meanMs": 0.07083333376795053,
+              "maxMs": 0.20000000298023224
+            },
+            "projectAutoAggregation": {
+              "calls": 9,
+              "totalMs": 0.5,
+              "meanMs": 0.05555555555555555,
+              "maxMs": 0.10000000149011612
+            }
+          },
+          "labelDuplicates": [
+            [],
+            [],
+            []
+          ],
+          "architectureProjectionCalls": 0
+        },
+        "3d-rotate-false": {
+          "rafP95Range": {
+            "n": 3,
+            "median": 16.799999999999272,
+            "p95": 16.800000000000182,
+            "min": 16.799999999999272,
+            "max": 16.800000000000182
+          },
+          "longTasks": [
+            {
+              "samples": 0,
+              "medianMs": null,
+              "p95Ms": null,
+              "maxMs": null,
+              "over50ms": 0
+            },
+            {
+              "samples": 0,
+              "medianMs": null,
+              "p95Ms": null,
+              "maxMs": null,
+              "over50ms": 0
+            },
+            {
+              "samples": 0,
+              "medianMs": null,
+              "p95Ms": null,
+              "maxMs": null,
+              "over50ms": 0
+            }
+          ],
+          "cpu": {
+            "hitSemanticFlowPoint": {
+              "calls": 9,
+              "totalMs": 0.4999999925494194,
+              "meanMs": 0.055555554727713265,
+              "maxMs": 0.20000000298023224
+            },
+            "projectSemanticFlowLabels": {
+              "calls": 153,
+              "totalMs": 29.300000064074993,
+              "meanMs": 0.191503268392647,
+              "maxMs": 0.3999999985098839
+            },
+            "semanticFlowConnectionNotices": {
+              "calls": 153,
+              "totalMs": 1.0999999940395355,
+              "meanMs": 0.007189542444702847,
+              "maxMs": 0.10000000149011612
+            },
+            "SemanticFlow3D": {
+              "calls": 53,
+              "totalMs": 2.7000000178813934,
+              "meanMs": 0.05094339656379988,
+              "maxMs": 0.20000000298023224
+            },
+            "projectAutoAggregation": {
+              "calls": 15,
+              "totalMs": 0.5,
+              "meanMs": 0.03333333333333333,
+              "maxMs": 0.20000000298023224
+            }
+          },
+          "labelDuplicates": [
+            [],
+            [],
+            []
+          ],
+          "architectureProjectionCalls": 0
+        }
+      },
+      "cycles": [
+        {
+          "run": 0,
+          "events": [
+            315,
+            333,
+            333,
+            333,
+            333,
+            333
+          ],
+          "domNodes": [
+            2078,
+            2128,
+            2123,
+            2123,
+            2123,
+            2123
+          ],
+          "clearedScenes": 0
+        },
+        {
+          "run": 1,
+          "events": [
+            315,
+            333,
+            333,
+            343,
+            333,
+            333
+          ],
+          "domNodes": [
+            2078,
+            2128,
+            2123,
+            2123,
+            2123,
+            2123
+          ],
+          "clearedScenes": 0
+        },
+        {
+          "run": 2,
+          "events": [
+            315,
+            333,
+            333,
+            333,
+            333,
+            333
+          ],
+          "domNodes": [
+            2078,
+            2128,
+            2123,
+            2123,
+            2123,
+            2123
+          ],
+          "clearedScenes": 0
+        }
+      ],
+      "errors": []
+    },
+    {
+      "name": "vehicle-management",
+      "beforeReady": {
+        "n": 3,
+        "median": 15527,
+        "p95": 15811,
+        "min": 14869,
+        "max": 15811
+      },
+      "intermediateReady": {
+        "n": 3,
+        "median": 24105,
+        "p95": 24366,
+        "min": 24069,
+        "max": 24366
+      },
+      "finalReady": {
+        "n": 3,
+        "median": 19000,
+        "p95": 19511,
+        "min": 18227,
+        "max": 19511
+      },
+      "beforeSelection": {
+        "n": 15,
+        "median": 66,
+        "p95": 75,
+        "min": 58,
+        "max": 75
+      },
+      "intermediateSelection": {
+        "n": 15,
+        "median": 331,
+        "p95": 391,
+        "min": 298,
+        "max": 391
+      },
+      "actions": {
+        "select": {
+          "n": 15,
+          "median": 65,
+          "p95": 93,
+          "min": 63,
+          "max": 93
+        },
+        "drill": {
+          "n": 9,
+          "median": 79,
+          "p95": 105,
+          "min": 75,
+          "max": 105
+        },
+        "parent": {
+          "n": 9,
+          "median": 100,
+          "p95": 100,
+          "min": 83,
+          "max": 100
+        },
+        "to3D": {
+          "n": 21,
+          "median": 83,
+          "p95": 379,
+          "min": 66,
+          "max": 882
+        },
+        "rotate-true": {
+          "n": 9,
+          "median": 317,
+          "p95": 347,
+          "min": 304,
+          "max": 347
+        },
+        "aggregationToggle": {
+          "n": 3,
+          "median": 61,
+          "p95": 92,
+          "min": 60,
+          "max": 92
+        },
+        "rotate-false": {
+          "n": 9,
+          "median": 346,
+          "p95": 347,
+          "min": 304,
+          "max": 347
+        },
+        "to2D": {
+          "n": 18,
+          "median": 97,
+          "p95": 107,
+          "min": 80,
+          "max": 107
+        }
+      },
+      "architectureMs": {
+        "n": 3,
+        "median": 648.1000000014901,
+        "p95": 723.3000000044703,
+        "min": 626.7000000029802,
+        "max": 723.3000000044703
+      },
+      "phases": {
+        "2d-selection": {
+          "rafP95Range": {
+            "n": 3,
+            "median": 16.700000000000728,
+            "p95": 16.80000000000291,
+            "min": 16.700000000000728,
+            "max": 16.80000000000291
+          },
+          "longTasks": [
+            {
+              "samples": 0,
+              "medianMs": null,
+              "p95Ms": null,
+              "maxMs": null,
+              "over50ms": 0
+            },
+            {
+              "samples": 0,
+              "medianMs": null,
+              "p95Ms": null,
+              "maxMs": null,
+              "over50ms": 0
+            },
+            {
+              "samples": 0,
+              "medianMs": null,
+              "p95Ms": null,
+              "maxMs": null,
+              "over50ms": 0
+            }
+          ],
+          "cpu": {},
+          "labelDuplicates": [
+            [],
+            [],
+            []
+          ],
+          "architectureProjectionCalls": 0
+        },
+        "3d-rotate-true": {
+          "rafP95Range": {
+            "n": 3,
+            "median": 16.700000000000728,
+            "p95": 16.80000000000291,
+            "min": 16.700000000000728,
+            "max": 16.80000000000291
+          },
+          "longTasks": [
+            {
+              "samples": 0,
+              "medianMs": null,
+              "p95Ms": null,
+              "maxMs": null,
+              "over50ms": 0
+            },
+            {
+              "samples": 0,
+              "medianMs": null,
+              "p95Ms": null,
+              "maxMs": null,
+              "over50ms": 0
+            },
+            {
+              "samples": 0,
+              "medianMs": null,
+              "p95Ms": null,
+              "maxMs": null,
+              "over50ms": 0
+            }
+          ],
+          "cpu": {
+            "hitSemanticFlowPoint": {
+              "calls": 9,
+              "totalMs": 0.29999998211860657,
+              "meanMs": 0.03333333134651184,
+              "maxMs": 0.09999999403953552
+            },
+            "projectSemanticFlowLabels": {
+              "calls": 156,
+              "totalMs": 50.599999979138374,
+              "meanMs": 0.324358974225246,
+              "maxMs": 0.6000000014901161
+            },
+            "semanticFlowConnectionNotices": {
+              "calls": 156,
+              "totalMs": 2.6000000089406967,
+              "meanMs": 0.016666666723978825,
+              "maxMs": 0.10000000149011612
+            },
+            "SemanticFlow3D": {
+              "calls": 153,
+              "totalMs": 13.399999998509884,
+              "meanMs": 0.0875816993366659,
+              "maxMs": 0.7999999970197678
+            },
+            "projectAutoAggregation": {
+              "calls": 15,
+              "totalMs": 1.1000000014901161,
+              "meanMs": 0.07333333343267441,
+              "maxMs": 0.20000000298023224
+            },
+            "projectAggregationRelations": {
+              "calls": 3,
+              "totalMs": 0.10000000149011612,
+              "meanMs": 0.033333333830038704,
+              "maxMs": 0.10000000149011612
+            },
+            "projectAggregatedSemanticFlow": {
+              "calls": 3,
+              "totalMs": 0.7999999970197678,
+              "meanMs": 0.2666666656732559,
+              "maxMs": 0.29999999701976776
+            }
+          },
+          "labelDuplicates": [
+            [],
+            [],
+            []
+          ],
+          "architectureProjectionCalls": 0
+        },
+        "3d-rotate-false": {
+          "rafP95Range": {
+            "n": 3,
+            "median": 16.799999999999272,
+            "p95": 16.799999999999272,
+            "min": 16.700000000000728,
+            "max": 16.799999999999272
+          },
+          "longTasks": [
+            {
+              "samples": 0,
+              "medianMs": null,
+              "p95Ms": null,
+              "maxMs": null,
+              "over50ms": 0
+            },
+            {
+              "samples": 0,
+              "medianMs": null,
+              "p95Ms": null,
+              "maxMs": null,
+              "over50ms": 0
+            },
+            {
+              "samples": 0,
+              "medianMs": null,
+              "p95Ms": null,
+              "maxMs": null,
+              "over50ms": 0
+            }
+          ],
+          "cpu": {
+            "hitSemanticFlowPoint": {
+              "calls": 9,
+              "totalMs": 0.30000000447034836,
+              "meanMs": 0.033333333830038704,
+              "maxMs": 0.10000000149011612
+            },
+            "projectSemanticFlowLabels": {
+              "calls": 156,
+              "totalMs": 58.6000000461936,
+              "meanMs": 0.37564102593713844,
+              "maxMs": 0.6000000014901161
+            },
+            "semanticFlowConnectionNotices": {
+              "calls": 156,
+              "totalMs": 1.9000000059604645,
+              "meanMs": 0.012179487217695285,
+              "maxMs": 0.10000000149011612
+            },
+            "SemanticFlow3D": {
+              "calls": 199,
+              "totalMs": 13.900000028312206,
+              "meanMs": 0.06984924637342817,
+              "maxMs": 0.29999999701976776
+            },
+            "projectAutoAggregation": {
+              "calls": 21,
+              "totalMs": 0.10000000149011612,
+              "meanMs": 0.004761904832862672,
+              "maxMs": 0.10000000149011612
+            }
+          },
+          "labelDuplicates": [
+            [],
+            [],
+            []
+          ],
+          "architectureProjectionCalls": 0
+        }
+      },
+      "cycles": [
+        {
+          "run": 0,
+          "events": [
+            339,
+            337,
+            337,
+            337,
+            337,
+            337
+          ],
+          "domNodes": [
+            2936,
+            2919,
+            2919,
+            2917,
+            2917,
+            2919
+          ],
+          "clearedScenes": 0
+        },
+        {
+          "run": 1,
+          "events": [
+            339,
+            337,
+            337,
+            337,
+            337,
+            337
+          ],
+          "domNodes": [
+            2936,
+            2919,
+            2919,
+            2919,
+            2917,
+            2917
+          ],
+          "clearedScenes": 0
+        },
+        {
+          "run": 2,
+          "events": [
+            342,
+            337,
+            337,
+            340,
+            337,
+            337
+          ],
+          "domNodes": [
+            2936,
+            2919,
+            2917,
+            2917,
+            2919,
+            2919
+          ],
+          "clearedScenes": 0
+        }
+      ],
+      "errors": []
+    }
+  ],
+  "heap": {
+    "rows": [
+      {
+        "cycle": 0,
+        "heap": {
+          "usedSize": 569928776,
+          "totalSize": 587862016,
+          "embedderHeapUsedSize": 2171312,
+          "backingStorageSize": 1711153
+        },
+        "dom": {
+          "documents": 1,
+          "nodes": 2003,
+          "jsEventListeners": 265
+        },
+        "canvas": 1
+      },
+      {
+        "cycle": 1,
+        "heap": {
+          "usedSize": 570678792,
+          "totalSize": 586289152,
+          "embedderHeapUsedSize": 2197768,
+          "backingStorageSize": 1715672
+        },
+        "dom": {
+          "documents": 1,
+          "nodes": 2005,
+          "jsEventListeners": 265
+        },
+        "canvas": 1
+      },
+      {
+        "cycle": 2,
+        "heap": {
+          "usedSize": 570901704,
+          "totalSize": 586551296,
+          "embedderHeapUsedSize": 2210080,
+          "backingStorageSize": 1715752
+        },
+        "dom": {
+          "documents": 1,
+          "nodes": 2005,
+          "jsEventListeners": 265
+        },
+        "canvas": 1
+      },
+      {
+        "cycle": 3,
+        "heap": {
+          "usedSize": 571114952,
+          "totalSize": 587075584,
+          "embedderHeapUsedSize": 2230544,
+          "backingStorageSize": 1715832
+        },
+        "dom": {
+          "documents": 1,
+          "nodes": 2005,
+          "jsEventListeners": 265
+        },
+        "canvas": 1
+      },
+      {
+        "cycle": 4,
+        "heap": {
+          "usedSize": 571234272,
+          "totalSize": 586813440,
+          "embedderHeapUsedSize": 2234144,
+          "backingStorageSize": 1715912
+        },
+        "dom": {
+          "documents": 1,
+          "nodes": 2005,
+          "jsEventListeners": 265
+        },
+        "canvas": 1
+      },
+      {
+        "cycle": 5,
+        "heap": {
+          "usedSize": 571295792,
+          "totalSize": 586813440,
+          "embedderHeapUsedSize": 2242624,
+          "backingStorageSize": 1715994
+        },
+        "dom": {
+          "documents": 1,
+          "nodes": 2005,
+          "jsEventListeners": 265
+        },
+        "canvas": 1
+      },
+      {
+        "cycle": 6,
+        "heap": {
+          "usedSize": 571315912,
+          "totalSize": 586813440,
+          "embedderHeapUsedSize": 2250408,
+          "backingStorageSize": 1716076
+        },
+        "dom": {
+          "documents": 1,
+          "nodes": 2005,
+          "jsEventListeners": 265
+        },
+        "canvas": 1
+      },
+      {
+        "cycle": 7,
+        "heap": {
+          "usedSize": 571376832,
+          "totalSize": 587337728,
+          "embedderHeapUsedSize": 2262584,
+          "backingStorageSize": 1716158
+        },
+        "dom": {
+          "documents": 1,
+          "nodes": 2005,
+          "jsEventListeners": 265
+        },
+        "canvas": 1
+      },
+      {
+        "cycle": "empty-project",
+        "heap": {
+          "usedSize": 31640980,
+          "totalSize": 34340864,
+          "embedderHeapUsedSize": 1836232,
+          "backingStorageSize": 1681385
+        },
+        "dom": {
+          "documents": 1,
+          "nodes": 517,
+          "jsEventListeners": 238
+        },
+        "canvas": 0
+      },
+      {
+        "cycle": "empty-rerender",
+        "heap": {
+          "usedSize": 31653836,
+          "totalSize": 32505856,
+          "embedderHeapUsedSize": 1925512,
+          "backingStorageSize": 1681531
+        },
+        "dom": {
+          "documents": 1,
+          "nodes": 603,
+          "jsEventListeners": 243
+        },
+        "canvas": 0
+      },
+      {
+        "cycle": "leave-analyzer",
+        "heap": {
+          "usedSize": 32194620,
+          "totalSize": 33292288,
+          "embedderHeapUsedSize": 3225896,
+          "backingStorageSize": 1686063
+        },
+        "dom": {
+          "documents": 1,
+          "nodes": 1741,
+          "jsEventListeners": 381
+        },
+        "canvas": 0
+      }
+    ],
+    "errors": []
+  },
+  "sourceIntegrity": [
+    {
+      "name": "git-lines",
+      "head": "7a89625acba9cf64b1f0648fed64381330218184",
+      "trackedFiles": 145,
+      "changed": [],
+      "headUnchanged": true,
+      "statusUnchanged": true
+    },
+    {
+      "name": "vehicle-management",
+      "head": "8211ee8145425ef85b7cf1156a55cd0adf0db088",
+      "trackedFiles": 345,
+      "changed": [],
+      "headUnchanged": true,
+      "statusUnchanged": true
+    }
+  ],
+  "validation": {
+    "testsPassed": 634,
+    "testsSkipped": 8,
+    "testFilesPassed": 72,
+    "testFilesSkipped": 4,
+    "commands": [
+      "pnpm install --frozen-lockfile",
+      "pnpm build",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test",
+      "git diff --check",
+      "pnpm exec wrangler deploy --dry-run"
+    ],
+    "published": false
+  }
+}

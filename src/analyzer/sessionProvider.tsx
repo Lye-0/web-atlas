@@ -1,4 +1,6 @@
-import { useCallback, useReducer, type ReactNode } from 'react';
+import { useCallback, useReducer, useRef, type ReactNode } from 'react';
+import { cancelSemanticAnalysis } from './semantic/client';
+import { semanticTraceCache } from './semantic/traceCache';
 import { analyzerSessionContext } from './sessionContext';
 import { analyzerSessionReducer, createInitialAnalyzerSessionState } from './session';
 import type { AnalyzerProjectStore, AnalyzerViewId } from './types';
@@ -7,7 +9,12 @@ import type { AnalyzerViewSessionUpdate } from './session';
 
 export function AnalyzerSessionProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(analyzerSessionReducer, undefined, createInitialAnalyzerSessionState);
+  const currentStore = useRef(state.store);
+  currentStore.current = state.store;
   const replaceProject = useCallback((store: AnalyzerProjectStore, folderHandle?: DirectoryHandleLike) => {
+    const previous = currentStore.current;
+    if (previous && previous !== store) { cancelSemanticAnalysis(previous); semanticTraceCache.delete(previous); }
+    currentStore.current = store;
     dispatch({ type: 'replaceProject', store, folderHandle });
   }, []);
   const setActiveView = useCallback((view: AnalyzerViewId) => {

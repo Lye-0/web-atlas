@@ -6,6 +6,7 @@ import { refineDataModels } from './dataModels';
 import { refineDataSchemas } from './dataSchemas';
 import { refineDataFlow } from './dataFlow';
 import { refineSchemaFiles } from './dataSchemaFiles';
+import { buildArchitectureModel } from './architecture';
 
 const functionTypes = new Set(['function_declaration', 'function_definition', 'function_expression', 'arrow_function', 'method_definition', 'method_declaration', 'constructor_declaration', 'function_item', 'method', 'singleton_method', 'local_function_statement', 'lambda_expression', 'function_literal', 'function_signature']);
 const modelTypes = new Set(['interface_declaration', 'type_alias_declaration', 'type_item', 'class_declaration', 'class_definition', 'class', 'struct_item', 'struct_specifier', 'type_spec', 'record_declaration', 'enum_declaration', 'enum_item', 'object_declaration', 'trait_item']);
@@ -438,6 +439,7 @@ export async function analyzeSemanticSources(input: SemanticInput, loadLanguage:
   const models = refineDataModels(analysis, compiler, schemas);
   refineSchemaFiles(analysis, input);
   refineDataFlow(analysis, compiler, models);
+  analysis.architecture = buildArchitectureModel(input, analysis);
   analysis.stats.models = analysis.nodes.filter(node => node.kind === 'model' && !node.attributes.dataModelExcluded).length;
   analysis.stats.elapsedMs = Math.round(performance.now() - started);
   return analysis;

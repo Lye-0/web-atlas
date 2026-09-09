@@ -1,5 +1,7 @@
 import { Component, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { Canvas, useThree } from '@react-three/fiber';
+import { useDisposableFrame } from './useDisposableFrame';
+import { initializeSemanticCanvas } from './semanticCanvasLifecycle';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import type { AnalyzerViewSession } from '../../analyzer/session';
@@ -215,7 +217,7 @@ function Scene({ graph: sourceGraph, renderGraph, explorer, nodeDisplays: displa
     return () => { element.removeEventListener('pointerdown', start); element.removeEventListener('pointerup', end); element.removeEventListener('pointermove', move); element.removeEventListener('pointerleave', leave); element.style.cursor = ''; };
   }, [camera, gl, positions, paths]);
   const labelOrder = useMemo(() => [...positions].sort((a, b) => Number(selectedIds.has(b.node.id)) - Number(selectedIds.has(a.node.id)) || Number(matchIds.has(b.node.id)) - Number(matchIds.has(a.node.id)) || Number(connected.has(b.node.id)) - Number(connected.has(a.node.id)) || Number(b.node.kind === 'entry') - Number(a.node.kind === 'entry')), [positions, selectedIds, matchIds, connected]);
-  useFrame((_, delta) => {
+  useDisposableFrame((_, delta) => {
     const zoom = (camera as THREE.OrthographicCamera).zoom;
     nodeAsset.material.uniforms.zoom!.value = zoom;
     (edgeAsset.arrowMaterial.uniforms.viewport!.value as THREE.Vector2).set(size.width, size.height);
@@ -400,7 +402,7 @@ export function SemanticFlow3D(props: Props) {
         event.preventDefault(); event.stopPropagation(); props.onClear();
       }
     }}>
-    <FlowGraphBoundary onUnavailable={props.onUnavailable}><Canvas orthographic frameloop="demand" dpr={[1, 1.7]} camera={{ position: [600, 450, 2200], zoom: 1, near: .1, far: 1000000 }} gl={{ antialias: true, alpha: true }}><Scene {...props} canvasDisposals={canvasDisposals} nodeDisplays={displays} selectedIds={props.selectedIds} hoverTarget={hoverTarget} positions={positions} renderGraph={displayed.graph} allPositions={allPositions} onProjection={onProjection} labelObstacles={labelObstacles} onSelect={selectPoint} onSelectEdge={selectRelation} onConnections={onConnections} onLabels={labelLayer.update} hoveredIds={hoveredIds} onHover={onHover} hoverAt={labelLayer.hoverAt} /></Canvas></FlowGraphBoundary>
+    <FlowGraphBoundary onUnavailable={props.onUnavailable}><Canvas onCreated={initializeSemanticCanvas} orthographic frameloop="demand" dpr={[1, 1.7]} camera={{ position: [600, 450, 2200], zoom: 1, near: .1, far: 1000000 }} gl={{ antialias: true, alpha: true }}><Scene {...props} canvasDisposals={canvasDisposals} nodeDisplays={displays} selectedIds={props.selectedIds} hoverTarget={hoverTarget} positions={positions} renderGraph={displayed.graph} allPositions={allPositions} onProjection={onProjection} labelObstacles={labelObstacles} onSelect={selectPoint} onSelectEdge={selectRelation} onConnections={onConnections} onLabels={labelLayer.update} hoveredIds={hoveredIds} onHover={onHover} hoverAt={labelLayer.hoverAt} /></Canvas></FlowGraphBoundary>
     <svg className="semantic-flow-label-leaders" aria-hidden="true">{labels.filter(label => !label.region && (aggregation.individualIds.has(label.id) || aggregation.aggregates.some(group => group.id === label.id))).map(label => <line key={label.id} ref={element => labelLayer.attachLeader(label.id, element)} />)}</svg>
     <div className="semantic-flow-3d-labels">{labels.filter(label => label.region ? regionNodes.has(label.id) : aggregation.individualIds.has(label.id) || aggregation.aggregates.some(group => group.id === label.id)).map(label => <button key={label.id} ref={element => labelLayer.attach(label.id, element)} type="button"
       data-flow-label-id={label.id} data-flow-inspected={label.id === inspectedId || undefined} data-flow-role={label.role} data-flow-emphasized={label.emphasized || undefined} className={`${label.selected ? 'is-selected' : ''}${label.match ? ' is-match' : ''}${label.hovered ? ' is-hovered' : ''}${label.related ? ' is-related' : ''}${label.region ? ' is-region' : ''}${label.aggregate ? ' is-aggregate' : ''}${label.emphasized ? ' is-emphasized' : ''}${label.dimmed ? ' is-dimmed' : ''}`} aria-pressed={label.region ? undefined : label.selected} title={`${label.tooltip ?? `${label.label}\n${label.path}`}${label.roleLabel ? `\n${label.roleLabel}` : ''}`}

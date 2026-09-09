@@ -99,6 +99,12 @@ function LegacyAnalyzerPage() {
   const requestFocus = useCallback((entityId: string) => {
     setFocusRequest({ view, store, entityId, nonce: ++focusNonce.current });
   }, [view, store]);
+  const focusedRoute = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const target = location.state?.analyzerFocus as { view?: string; id?: string; scanVersion?: number } | undefined;
+    if (focusedRoute.current === location.key || !target?.id || target.view !== view || target.scanVersion !== session.scanVersion || !model?.nodes.some(node => node.id === target.id)) return;
+    focusedRoute.current = location.key; requestFocus(target.id);
+  }, [location.key, location.state, model, requestFocus, session.scanVersion, view]);
 
   const updateCamera = useCallback((update: AnalyzerGraphTransform | ((current: AnalyzerGraphTransform) => AnalyzerGraphTransform)) => {
     updateView(view, (current) => ({

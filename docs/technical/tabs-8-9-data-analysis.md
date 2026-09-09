@@ -4,7 +4,7 @@
 
 Data Flow follows a selected value through a source occurrence, property access, actual argument, operation, return and consumer. Data Model reads code types, validation definitions and persistence declarations as distinct domains. Their stable registry IDs remain `data-flow` and `data-model`.
 
-Views 6–9 share `FlowAnalyzerPage`, `SearchResultStrip`, `useSemanticExplorerNavigation`, `SemanticFlowStage`, the existing 2D and 3D renderers, direction palette, particle preference, bounds preference and input-owned hover lifecycle. Architecture Map remains on the legacy page. No Dictionary, header/footer or Cloudflare redesign is involved.
+Views 6–9 share `FlowAnalyzerPage`, `SearchResultStrip`, `useSemanticExplorerNavigation`, `SemanticFlowStage`, the existing 2D and 3D renderers, direction palette, particle preference, bounds preference and input-owned hover lifecycle. Architecture Map now shares the C controls and renderer with its own connected architecture projection; see [Architecture Map](architecture-map.md). No Dictionary, header/footer or Cloudflare redesign is involved.
 
 The fixed-height single-row search searches explicit names, paths, ownership and fields. Typing only produces candidates/highlights; selecting a candidate performs a semantic jump. Clearing the query preserves selection and camera. Separate View sessions preserve queries and filters. The 2D explorer displays direct ownership children: project → directory → file → function/file-level processing → value/operation for View 8, and project → directory → file → model for View 9. Function scopes derive from recorded owner IDs, not graph reachability. Model fields remain in structural detail, rather than permanent individual points in the 3D overview.
 

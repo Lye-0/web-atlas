@@ -5,7 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AnalyzerSessionProvider, useAnalyzerSession, type AnalyzerProjectStore } from '../analyzer';
 import { AnalyzerPage } from './AnalyzerPage';
 import type { SemanticAnalysis, SemanticGraph } from '../analyzer/semantic/types';
-import { getSemanticAnalysis } from '../analyzer/semantic/client';
+import { cancelSemanticAnalysis, getSemanticAnalysis } from '../analyzer/semantic/client';
+import { buildArchitectureModel } from '../analyzer/semantic/architecture';
 
 vi.mock('../analyzer/semantic/client', () => ({ getSemanticAnalysis: vi.fn(), cancelSemanticAnalysis: vi.fn() }));
 vi.mock('../components/analyzer/AnalyzerEmptyOrbit', () => ({ AnalyzerEmptyOrbit: () => null }));
@@ -17,6 +18,7 @@ const analysis: SemanticAnalysis = { nodes: [
   { id: 'User', label: 'User', kind: 'model', path: 'app.ts', group: 'Data models', confidence: 'source', evidence: [], fields: [{ name: 'id', type: 'string', optional: false }], attributes: {} },
 ], edges: [{ id: 'run-save', source: 'run', target: 'save', kind: 'calls', label: 'save()', views: ['function-call-flow', 'runtime-flow'], confidence: 'source', evidence: [{ path: 'app.ts', start: 17, end: 23, line: 1, endLine: 1, description: 'save call' }] }], coverage: [{ path: 'app.ts', language: 'typescript', status: 'parsed' }], warnings: [], stats: { files: 1, functions: 2, models: 1, unresolved: 0, elapsedMs: 3 } };
 const store: AnalyzerProjectStore = { files: [], facts: [], relations: [], evidence: [], sources: { 'app.ts': 'function run() { save(); }\nfunction save() { return 1; }' }, warnings: [], scannedAt: 'first' };
+analysis.architecture = buildArchitectureModel({ sources: store.sources, imports: [], resources: [] }, analysis);
 function Project({ project }: { project: AnalyzerProjectStore }) {
   const { state, replaceProject } = useAnalyzerSession(); useEffect(() => replaceProject(project), [replaceProject, project]);
   return <><span data-active-view={state.activeView} /><AnalyzerPage /></>;
@@ -74,6 +76,7 @@ describe('semantic Analyzer exploration', () => {
     await act(async () => button('3D').click()); expect(host.querySelector('[data-graph]')?.textContent).toContain('observed run'); await act(async () => button('2D').click());
     await choose('run');
     await render({ ...store, scannedAt: 'second' });
+    expect(cancelSemanticAnalysis).toHaveBeenCalledWith(store);
     expect(host.querySelector('.semantic-trace-info')).toBeNull(); expect(host.querySelector('.semantic-detail')).toBeNull();
     expect(host.querySelector('[data-active-view]')?.getAttribute('data-active-view')).toBe('function-call-flow');
   });
@@ -92,9 +95,11 @@ describe('semantic Analyzer exploration', () => {
   });
   it('opens actual subsystem members in another view', async () => {
     await act(async () => host.querySelector<HTMLAnchorElement>('a[href="/analyzer/architecture-map"]')!.click());
-    await act(async () => host.querySelector<HTMLButtonElement>('.semantic-object-list button')!.click());
-    expect(host.querySelector('.semantic-member-files')?.textContent).toContain('app.ts');
-    await act(async () => button('Function Call Flow ↗').click());
+    expect(host.querySelector('.semantic-object-list')).toBeNull();
+    await act(async () => host.querySelector('[data-node-id]')!.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    expect(host.querySelector('.semantic-detail')?.textContent).toContain('app.ts');
+    await act(async () => { const section = [...host.querySelectorAll<HTMLDetailsElement>('.semantic-detail details')].find(item => item.querySelector(':scope > summary')?.textContent === '専門Viewで調べる')!; section.open = true; section.dispatchEvent(new Event('toggle')); });
+    await act(async () => button('Function Call Flow').click());
     await openBlock('app.ts');
     expect(host.querySelector('.semantic-flow-stage')?.textContent).toContain('run'); expect(host.querySelector('.semantic-empty-result')).toBeNull();
   });
@@ -184,11 +189,16 @@ describe('semantic Analyzer exploration', () => {
       { id: 'handler', source: 'event', target: 'run', kind: 'handles', label: 'handler', views: ['runtime-flow'], confidence: 'source', evidence: [] },
       { id: 'request-edge', source: 'run', target: 'request', kind: 'requests', label: 'API request', views: ['runtime-flow'], confidence: 'source', evidence: [] },
     ] };
+    navigation.architecture = buildArchitectureModel({ sources: { 'src/ui.ts': 'const ui = true;', 'src/api.ts': 'export function run() {}' }, imports: [], resources: [] }, navigation);
     vi.mocked(getSemanticAnalysis).mockImplementation(() => ({ promise: Promise.resolve(navigation), unsubscribe: () => {} }));
     await render({ ...store, scannedAt: 'member-reset' });
     await act(async () => host.querySelector<HTMLAnchorElement>('a[href="/analyzer/architecture-map"]')!.click());
-    const apiGroup = [...host.querySelectorAll<HTMLButtonElement>('.semantic-object-list > button')].find(element => element.querySelector('strong')?.textContent === 'API')!;
-    await act(async () => apiGroup.click()); await act(async () => button('Runtime Flow ↗').click());
+    await act(async () => host.querySelector('[data-node-id]')!.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    await act(async () => button('内部を開く').click());
+    const apiGroup = [...host.querySelectorAll('[data-node-id]')].find(element => element.textContent?.includes('API'))!;
+    await act(async () => apiGroup.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    await act(async () => { const section = [...host.querySelectorAll<HTMLDetailsElement>('.semantic-detail details')].find(item => item.querySelector(':scope > summary')?.textContent === '専門Viewで調べる')!; section.open = true; section.dispatchEvent(new Event('toggle')); });
+    await act(async () => button('Runtime Flow').click());
     expectFiltered(2, 1);
     await choose('run'); await search('run');
     await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="Zoom in"]')!.click());

@@ -92,6 +92,11 @@ function compactCallee(callee: string) {
 
 /** Display strings only: the canonical node, label, expression, range and ID stay untouched. */
 export function semanticNodeDisplay(node: SemanticNode): SemanticNodeDisplay {
+  if (node.architecture) {
+    const arch = node.architecture;
+    const location = [node.attributes.architectureContext ? 'この範囲の外部' : '', arch.context.join(' / '), arch.parentId ? node.group : arch.ownerPath].filter(Boolean).join(' · ') || node.path || '構成要素';
+    return { title: node.label, location, tooltip: `${node.label}\n${location}\n${node.evidence[0]?.description ?? ''}` };
+  }
   const initializer = node.kind === 'function' && node.attributes.initializer === true;
   const callee = (node.kind === 'external' || node.kind === 'operation') && typeof node.attributes.callee === 'string' ? node.attributes.callee : undefined;
   const data = node.data;

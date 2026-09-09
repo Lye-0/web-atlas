@@ -60,7 +60,7 @@ export function SemanticFlowStage({ graph, explorer, nodeDisplays, navigation, m
     if (focus && (!focus.mode || focus.mode === mode) && focus.nonce !== previousFocus.current) { previousFocus.current = focus.nonce; run('focus', focus.ids); }
   }, [focus, run, mode]);
   const motion = useMemo(() => ({ enabled: flow.enabled, reduced: flow.reduced, visible: flow.visible }), [flow.enabled, flow.reduced, flow.visible]);
-  const localGraph = useMemo(() => navigation?.location.centerId ? explorerRelations(graph, navigation.location.centerId, navigation.location.depth, 'both') : graph,
+  const localGraph = useMemo(() => graph.view !== 'architecture-map' && navigation?.location.centerId ? explorerRelations(graph, navigation.location.centerId, navigation.location.depth, 'both') : graph,
     [graph, navigation?.location.centerId, navigation?.location.depth]);
   const activePath = navigation?.activePath;
   const explicitPath = useMemo(() => activePath?.centerId && activePath.depth > 1
@@ -71,7 +71,7 @@ export function SemanticFlowStage({ graph, explorer, nodeDisplays, navigation, m
   const overlayTop = controlsHeight + (navigation ? navigationHeight + 36 : 24);
   const properties = { graph, explorer, nodeDisplays, direction, selectedIds, selectedEdgeId, matchIds, motion, command, onSelect: selectNode, onSelectEdge: selectEdge, onClear: clearSelection, overlayTop, hoverTarget, onHoverTarget, showGroupBounds,
     autoAggregation, aggregationState, onAggregationState, explicitPathNodeIds, explicitPathEdgeIds, totalNodeCount, fineExpandedScopeIds, onFineExpandedScopeIds };
-  const cameraApplicable = mode === '3d' || !navigation || Boolean(navigation.location.centerId);
+  const cameraApplicable = graph.view === 'architecture-map' || mode === '3d' || !navigation || Boolean(navigation.location.centerId);
   const cameraTitle = cameraApplicable ? undefined : 'この階層のブロックはスクロールで移動します';
   return <div ref={setElement} className="analyzer-graph-stage analyzer-spatial-graph-stage semantic-flow-stage" data-mode={mode} data-visit-id={navigation?.visitId}
     style={{ '--flow-controls-height': `${controlsHeight}px` } as CSSProperties}>
@@ -94,8 +94,8 @@ export function SemanticFlowStage({ graph, explorer, nodeDisplays, navigation, m
     {explorer && navigation && <div ref={navigationElement} className="semantic-explorer-navigation-position" style={{ top: controlsHeight + 24 }}>
       <SemanticExplorerNavigation explorer={explorer} navigation={navigation} mode={mode} graph={graph} localGraph={localGraph} selectedIds={selectedIds} selectedEdgeId={selectedEdgeId} />
     </div>}
-    {help && <div className="analyzer-stage-help" role="dialog" aria-label="グラフ操作ヘルプ"><strong>{mode === '2d' ? '2Dエクスプローラー' : '3D全体図'}</strong>
-      <p>{mode === '2d' ? 'ブロックをクリック・Enterで開き、パンくずや「親へ」で所属階層を移動します。「戻る」とブラウザの戻る・進むは訪問した場所を復元します。関係図の対象はクリックで選択し、「この要素を中心に見る」で中心を切り替えます。関係図はドラッグと矢印キーで移動、ホイールと＋ / −で拡大縮小できます。' : 'ドラッグで回転、右ドラッグで移動。点やラベルから対象を選択できます。ホイールと＋ / −で拡大縮小できます。'}</p>
+    {help && <div className="analyzer-stage-help" role="dialog" aria-label="グラフ操作ヘルプ"><strong>{graph.view === 'architecture-map' ? '構成図の操作' : mode === '2d' ? '2Dエクスプローラー' : '3D全体図'}</strong>
+      <p>{graph.view === 'architecture-map' ? 'クリック・Enterで構成要素を選択し、内部を開くボタンで下位の構成へ移動します。パンくず・親へ・戻るで階層と訪問先を移動できます。2Dはドラッグで移動、3Dはドラッグで回転します。ホイールと＋ / −で拡大縮小できます。' : mode === '2d' ? 'ブロックをクリック・Enterで開き、パンくずや「親へ」で所属階層を移動します。「戻る」とブラウザの戻る・進むは訪問した場所を復元します。関係図の対象はクリックで選択し、「この要素を中心に見る」で中心を切り替えます。関係図はドラッグと矢印キーで移動、ホイールと＋ / −で拡大縮小できます。' : 'ドラッグで回転、右ドラッグで移動。点やラベルから対象を選択できます。ホイールと＋ / −で拡大縮小できます。'}</p>
       <p>検索入力はプロジェクト全体の候補を強調します。候補を選ぶと対象の場所へ移動します。2Dと3Dの切り替えは各モードの場所を復元し、明示的な相互ジャンプは選んだ対象へ移動します。</p>
       <p>{semanticFlowDirectionLanguage(graph.view).help}</p><button type="button" onClick={() => setHelp(false)}>ヘルプを閉じる</button></div>}
     {mode === '2d' ? <SemanticFlow2D key={navigation?.visitId ?? '2d'} {...properties} graph={localGraph} location={navigation?.location} visitId={navigation?.visitId}

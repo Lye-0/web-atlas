@@ -70,7 +70,7 @@ export function useSemanticExplorerNavigation({ view, scanVersion, session, expl
   const openLocation = useCallback((location: ExplorerLocation) => push('2d', { location, scrollTop: 0 }), [push]);
   const openNode = useCallback((id: string) => push('2d', { location: explorerLocationForNode(model.current, id), scrollTop: 0 }, { selectedNodeId: id, selectedEdgeId: undefined, detailOpen: true }), [push]);
   const jumpMode = useCallback((mode: '2d' | '3d', id: string, semanticFieldId?: string) => push(mode,
-    mode === '2d' ? { location: explorerLocationForNode(model.current, id), scrollTop: 0 } : current.current.explorer?.twoD ?? initialExplorer2D(),
+    mode === '2d' || model.current.view === 'architecture-map' ? { location: explorerLocationForNode(model.current, id), scrollTop: 0 } : current.current.explorer?.twoD ?? initialExplorer2D(),
     { selectedNodeId: id, selectedEdgeId: undefined, semanticFieldId, detailOpen: true }, mode === '3d' ? [id] : undefined), [push]);
   const changeMode = useCallback((mode: '2d' | '3d') => {
     const stored = current.current; if (stored.flow?.mode === mode) return;
