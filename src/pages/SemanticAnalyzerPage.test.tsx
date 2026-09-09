@@ -11,7 +11,7 @@ import { buildArchitectureModel } from '../analyzer/semantic/architecture';
 vi.mock('../analyzer/semantic/client', () => ({ getSemanticAnalysis: vi.fn(), cancelSemanticAnalysis: vi.fn() }));
 vi.mock('../components/analyzer/AnalyzerEmptyOrbit', () => ({ AnalyzerEmptyOrbit: () => null }));
 vi.mock('../components/analyzer/SemanticGraphCanvas', () => ({ SemanticGraphCanvas: ({ graph, orbit }: { graph: SemanticGraph; orbit: boolean }) => <div data-graph={graph.view} data-orbit={orbit}>{graph.nodes.length} graph objects</div> }));
-vi.mock('../components/analyzer/SemanticFlow3D', () => ({ SemanticFlow3D: ({ graph, camera, onCamera }: { graph: SemanticGraph; camera?: { zoom: number }; onCamera: (camera: { position: [number, number, number]; target: [number, number, number]; zoom: number }) => void }) => <div data-graph={graph.view} data-orbit="true" data-camera-zoom={camera?.zoom}>{graph.nodes.map(node => node.label).join(' ')}<button onClick={() => onCamera({ position: [2, 3, 4], target: [5, 6, 7], zoom: .72 })}>3Dテスト移動</button></div> }));
+vi.mock('../components/analyzer/SemanticFlow3D', () => ({ SemanticFlow3D: ({ graph, camera, onCamera, onSelect, onClear }: { graph: SemanticGraph; camera?: { zoom: number }; onCamera: (camera: { position: [number, number, number]; target: [number, number, number]; zoom: number }) => void; onSelect: (id: string) => void; onClear: () => void }) => <div data-graph={graph.view} data-orbit="true" data-camera-zoom={camera?.zoom}>{graph.nodes.map(node => <button key={node.id} data-node-id={node.id} onClick={() => onSelect(node.id)}>{node.label}</button>)}<button onClick={() => onCamera({ position: [2, 3, 4], target: [5, 6, 7], zoom: .72 })}>3Dテスト移動</button><button onClick={onClear}>3Dテスト解除</button></div> }));
 const analysis: SemanticAnalysis = { nodes: [
   { id: 'run', label: 'run', kind: 'function', path: 'app.ts', line: 1, endLine: 1, group: 'API', confidence: 'source', evidence: [{ path: 'app.ts', start: 0, end: 20, line: 1, endLine: 1, description: 'run declaration' }], attributes: { name: 'run', entry: true } },
   { id: 'save', label: 'save', kind: 'function', path: 'app.ts', line: 2, endLine: 2, group: 'Persistence', confidence: 'source', evidence: [], attributes: { name: 'save' } },
@@ -97,6 +97,10 @@ describe('semantic Analyzer exploration', () => {
     await act(async () => host.querySelector<HTMLAnchorElement>('a[href="/analyzer/architecture-map"]')!.click());
     expect(host.querySelector('.semantic-object-list')).toBeNull();
     await act(async () => host.querySelector('[data-node-id]')!.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    expect(host.querySelector('.semantic-detail')?.textContent).toContain('コードパッケージ');
+    expect(host.querySelector('.semantic-detail pre')).toBeNull();
+    await act(async () => { const section = [...host.querySelectorAll<HTMLDetailsElement>('.semantic-detail details')].find(item => item.querySelector(':scope > summary')?.textContent?.startsWith('内部の構成'))!; section.open = true; section.dispatchEvent(new Event('toggle')); });
+    await act(async () => { const section = [...host.querySelectorAll<HTMLDetailsElement>('.semantic-detail details')].find(item => item.querySelector(':scope > summary')?.textContent === '構成ファイル一覧')!; section.open = true; section.dispatchEvent(new Event('toggle')); });
     expect(host.querySelector('.semantic-detail')?.textContent).toContain('app.ts');
     await act(async () => { const section = [...host.querySelectorAll<HTMLDetailsElement>('.semantic-detail details')].find(item => item.querySelector(':scope > summary')?.textContent === '専門Viewで調べる')!; section.open = true; section.dispatchEvent(new Event('toggle')); });
     await act(async () => button('Function Call Flow').click());
@@ -231,5 +235,33 @@ describe('semantic Analyzer exploration', () => {
     expect(host.querySelector('.semantic-flow-notice')?.textContent).toContain('現在のフィルターで非表示');
     expect(host.querySelector<HTMLInputElement>('input[type="search"]')!.value).toBe('test');
     expect(host.querySelector('.semantic-flow-2d')!.getAttribute('data-camera-scale')).toBe(before);
+  });
+  it('T11/T12/T14 selects a surrounding app without moving, opens it explicitly in 3D and restores the previous camera', async () => {
+    const sources = Object.fromEntries(['A', 'B', 'C'].flatMap(name => [[`${name}/package.json`, JSON.stringify({ name, scripts: { dev: 'vite' } })], [`${name}/main.ts`, 'export const value=1;']]));
+    const architecture = buildArchitectureModel({ sources, imports: [], resources: [] }, { nodes: [], edges: [] });
+    vi.mocked(getSemanticAnalysis).mockImplementation(() => ({ promise: Promise.resolve({ ...analysis, architecture }), unsubscribe: () => {} }));
+    await render({ ...store, sources, scannedAt: 'focus-context' });
+    await act(async () => host.querySelector<HTMLAnchorElement>('a[href="/analyzer/architecture-map"]')!.click());
+    const ids = Object.fromEntries(architecture.nodes.filter(n => n.architecture?.kind === 'application').map(n => [n.label, n.id]));
+    const chooseArchitecture = async (id: string) => act(async () => [...host.querySelectorAll<HTMLElement>('[data-node-id]')].find(element => element.dataset.nodeId === id)!.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    const current = () => host.querySelector('[aria-label="構成図の現在地"] [aria-current="page"]')?.textContent;
+    await chooseArchitecture(ids.A!); await act(async () => button('内部を開く').click());
+    expect(current()).toBe('A');
+    await act(async () => button('3D').click()); await act(async () => button('3Dテスト移動').click());
+    await chooseArchitecture(ids.B!); expect(current()).toBe('A');
+    expect(host.querySelector('.semantic-detail')?.textContent).toContain('表示範囲外');
+    await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="周辺構成"]')!.click());
+    expect([...host.querySelectorAll<HTMLElement>('[data-node-id]')].map(element => element.dataset.nodeId)).toContain(ids.B);
+    expect([...host.querySelectorAll<HTMLElement>('[data-node-id]')].map(element => element.dataset.nodeId)).not.toContain(ids.C);
+    expect(host.querySelector('[data-orbit]')?.getAttribute('data-camera-zoom')).toBe('0.72');
+    await act(async () => button('この構成を開く').click());
+    expect(current()).toBe('B'); expect(host.querySelector('.semantic-flow-stage')?.getAttribute('data-mode')).toBe('3d');
+    await act(async () => button('戻る').click());
+    expect(current()).toBe('A'); expect(host.querySelector('[data-orbit]')?.getAttribute('data-camera-zoom')).toBe('0.72');
+    expect(host.querySelector('.semantic-detail h3')?.textContent).toBe('B');
+    expect(host.querySelector('[aria-label="周辺構成"]')?.getAttribute('aria-pressed')).toBe('false');
+    await act(async () => button('3Dテスト解除').click()); expect(current()).toBe('A'); expect(host.querySelector('.semantic-detail')).toBeNull();
+    await act(async () => button('2D').click()); expect(current()).toBe('A');
+    await act(async () => button('3D').click()); expect(current()).toBe('A'); expect(host.querySelector('.semantic-detail')).toBeNull();
   });
 });

@@ -63,11 +63,20 @@ export function useSemanticExplorerNavigation({ view, scanVersion, session, expl
     const activePath = restoreMode ? stored.explorer?.visits[stored.explorer.currentVisitId]?.activePath
       : mode === '2d' && twoD.location.centerId && twoD.location.depth > 1 ? twoD.location : undefined;
     const visit: ExplorerVisit = { id: `visit:${view}:${scanVersion}:${Date.now()}:${++serial.current}`, previousId: stored.explorer?.currentVisitId,
-      mode, twoD, activePath, camera3d: stored.flowCameras?.['3d'] ?? stored.semanticCamera, ...(selection ?? explorerSelection(stored)) };
+      mode, twoD, activePath, camera3d: model.current.view === 'architecture-map'
+        ? Object.values(stored.explorer?.visits ?? {}).reverse().find(visit => visit.mode === '3d' && visit.twoD.location.scopeId === twoD.location.scopeId)?.camera3d
+        : stored.flowCameras?.['3d'] ?? stored.semanticCamera, ...(selection ?? explorerSelection(stored)) };
     updateView(view, state => enterExplorerVisit(state, visit)); writeRoute(visit, false);
     if (focusIds?.length) onFocus(mode, focusIds);
   }, [view, scanVersion, updateView, writeRoute, onFocus]);
-  const openLocation = useCallback((location: ExplorerLocation) => push('2d', { location, scrollTop: 0 }), [push]);
+  const openLocation = useCallback((location: ExplorerLocation) => {
+    if (model.current.view !== 'architecture-map') { push('2d', { location, scrollTop: 0 }); return; }
+    const scope = model.current.scopes.get(location.scopeId);
+    if (!scope || location.scopeId !== 'project' && !scope.childIds.length) return;
+    const mode = current.current.flow?.mode ?? '2d';
+    const saved = Object.values(current.current.explorer?.visits ?? {}).reverse().find(visit => visit.mode === mode && visit.twoD.location.scopeId === location.scopeId);
+    push(mode, { location, scrollTop: 0, camera: saved?.twoD.camera }, { selectedNodeId: undefined, selectedEdgeId: undefined, detailOpen: false });
+  }, [push]);
   const openNode = useCallback((id: string) => push('2d', { location: explorerLocationForNode(model.current, id), scrollTop: 0 }, { selectedNodeId: id, selectedEdgeId: undefined, detailOpen: true }), [push]);
   const jumpMode = useCallback((mode: '2d' | '3d', id: string, semanticFieldId?: string) => push(mode,
     mode === '2d' || model.current.view === 'architecture-map' ? { location: explorerLocationForNode(model.current, id), scrollTop: 0 } : current.current.explorer?.twoD ?? initialExplorer2D(),

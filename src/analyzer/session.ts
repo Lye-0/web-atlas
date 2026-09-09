@@ -8,6 +8,7 @@ export interface AnalyzerViewSession {
   semanticFieldId?: string;
   modelOpenChoiceIds?: string[];
   dataFineExpandedScopeIds?: string[];
+  architecture?: { surroundings?: boolean; expandedRequestGroupIds?: string[] };
   aggregation?: { expandedGroupIds: string[]; collapsedGroupIds: string[]; activeGroupIds?: string[]; expandedRegionIds?: string[]; unresolved?: 'expanded' | 'collapsed' };
   selectedRegionId?: string;
   selectedEdgeId?: string;

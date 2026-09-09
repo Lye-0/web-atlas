@@ -1,0 +1,37 @@
+.architecture-detail .architecture-detail-kind { color: #b6ccc2; font-size: 12px; }
+.semantic-flow-page .semantic-flow-detail.architecture-detail { font-size: 12px; line-height: 1.7; }
+.architecture-detail > .analyzer-detail-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 16px; }
+.architecture-detail > .analyzer-detail-heading h3 { margin: 0; font-size: 17px; line-height: 1.45; overflow-wrap: anywhere; }
+.architecture-detail > .analyzer-detail-heading button { flex: 0 0 28px; height: 28px; border: 1px solid #4a6258; border-radius: 4px; }
+.architecture-detail > :is(p, dl, .architecture-summary-partners) { margin: 12px 16px; }
+.architecture-detail > .architecture-open-action { margin: 10px 16px 16px; padding: 8px 12px; border: 1px solid #739784; border-radius: 4px; color: #dcece3; background: #1b3429; }
+.architecture-detail .architecture-summary > div { margin-block: 8px; }
+.architecture-detail .analyzer-detail-accordion-body p { margin-block: 8px; }
+.architecture-detail .analyzer-detail-accordion-body button { color: #c3ddd0; text-align: left; border-bottom: 1px solid #4c6b5b; padding: 3px 0; }
+.architecture-detail-kind strong { color: #dcece3; }
+.architecture-summary { margin-block: 14px; }
+.architecture-summary dd { overflow-wrap: anywhere; }
+.architecture-summary-partners { font-size: 12px; padding-block: 8px; border-block: 1px solid #294139; }
+.architecture-summary-partners p { margin-block: 7px; }
+.architecture-summary-partners button { padding: 3px 5px; }
+.architecture-context-note { border-left: 2px solid #8ca99b; padding-left: 9px; color: #c6d9ce; }
+.architecture-open-action { margin-block: 12px 4px; }
+.architecture-relation-group { padding-block: 6px; border-bottom: 1px solid #2e453a; }
+.architecture-relation-group[data-direction="outgoing"] { border-left: 2px solid #82c6e2; padding-left: 8px; }
+.architecture-relation-group[data-direction="incoming"] { border-left: 2px solid #dfb785; padding-left: 8px; }
+.architecture-detail :is(h4, code) { overflow-wrap: anywhere; }
+.architecture-detail h4 { margin-block: 18px 8px; font-size: 12px; }
+.architecture-boundary-relations { font-size: 11px; border-top: 1px solid #294139; padding-top: 6px; }
+.architecture-boundary-relations summary { cursor: pointer; }
+.architecture-boundary-relations > div { max-height: 140px; overflow: auto; display: grid; gap: 5px; padding-block: 8px; }
+.architecture-boundary-relations button { text-align: left; white-space: normal; }
+.architecture-count-note { display: block; font-size: 10px; color: #9fbaac; }
+.architecture-request-inspection { position: absolute; z-index: 6; right: 14px; bottom: 70px; width: min(350px, calc(100% - 28px)); max-height: 300px; overflow: auto; padding: 12px; background: #10231cf5; color: #d7e7dc; border: 1px solid #769a86; border-radius: 6px; font-size: 12px; }
+.architecture-request-inspection > div { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.architecture-request-inspection p { line-height: 1.65; }
+.architecture-request-inspection ul { padding: 0; list-style: none; display: grid; gap: 6px; }
+.architecture-request-inspection button { cursor: pointer; color: inherit; background: #19372a; border: 1px solid #537962; border-radius: 4px; padding: 7px; }
+.architecture-request-inspection li button { width: 100%; text-align: left; }
+.architecture-request-inspection :is(strong, small) { display: block; overflow-wrap: anywhere; }
+.architecture-request-inspection small { margin-top: 4px; color: #a9c3b3; }
+.architecture-request-inspection button:focus-visible { outline: 2px solid #cfdec5; outline-offset: 2px; }

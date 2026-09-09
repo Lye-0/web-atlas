@@ -1,4 +1,5 @@
 import { confidenceLabels, type SemanticNode, type SemanticRelationSource, type SemanticViewId } from '../../analyzer/semantic/types';
+import { architectureRelationLabel } from '../../analyzer/semantic/architectureRelations';
 
 export type SemanticFlowLanguageView = SemanticViewId | 'module-dependency';
 
@@ -65,7 +66,8 @@ export function semanticRelationExplanation(edge: SemanticRelationSource, target
   return '関係の一部を確定できていません。元の関係とEvidenceで、確認できている範囲を調べられます。';
 }
 
-export function semanticRelationLabel(edge: SemanticRelationSource) {
+export function semanticRelationLabel(edge: SemanticRelationSource, view?: SemanticViewId) {
+  if (view === 'architecture-map' || edge.details?.architectureRelation) return architectureRelationLabel(edge);
   switch (edge.kind) {
     case 'callback': return 'コールバックとして渡す';
     case 'handles': return '担当する処理';

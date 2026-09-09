@@ -141,7 +141,7 @@ export function projectSemanticFlowLabels(camera: Camera, size: { width: number;
   };
   const nodeLabel = (item: SemanticPosition): FlowLabelContent => {
     const display = context.displays?.get(item.node.id), role = context.roles?.get(item.node.id);
-    return { id: item.node.id, label: typeof item.node.attributes.shortLabel === 'string' ? item.node.attributes.shortLabel : context.view === 'data-flow' ? display?.title ?? item.node.label : item.node.label, path: item.node.attributes.displayAggregate === true ? `${Number(item.node.attributes.targetCount).toLocaleString()}対象${Number(item.node.attributes.matchingCount) > 0 ? ` · ${Number(item.node.attributes.matchingCount)}件一致` : ''}` : `${item.node.kind === 'external' ? '定義先未特定 · 呼び出し箇所 ' : ''}${display?.location ?? `${item.node.path ?? item.node.group}${item.node.line ? `:${item.node.line}` : ''}`}`,
+    return { id: item.node.id, label: typeof item.node.attributes.shortLabel === 'string' ? item.node.attributes.shortLabel : context.view === 'data-flow' ? display?.title ?? item.node.label : item.node.label, path: item.node.attributes.displayAggregate === true ? `${Number(item.node.attributes.targetCount).toLocaleString()}対象${Number(item.node.attributes.matchingCount) > 0 ? ` · ${Number(item.node.attributes.matchingCount)}件一致` : ''}` : `${item.node.kind === 'external' && !item.node.architecture ? '定義先未特定 · 呼び出し箇所 ' : ''}${display?.location ?? `${item.node.path ?? item.node.group}${item.node.line ? `:${item.node.line}` : ''}`}`,
       ...(item.node.attributes.displayAggregate === true ? { tooltip: `表示上の集約\n${String(item.node.attributes.fullLabel ?? item.node.label)}\n${Number(item.node.attributes.targetCount).toLocaleString()}対象` } : {}),
       ...(display ? { disambiguation: display.disambiguation, tooltip: display.tooltip } : {}),
       ...(role ? { role, roleLabel: semanticFlowRoleLabel(role, context.view ?? 'runtime-flow', context.relationKinds?.get(item.node.id)) } : {}),
@@ -186,15 +186,16 @@ export function projectSemanticFlowLabels(camera: Camera, size: { width: number;
   let considered = 0;
   // Below the retention threshold none of the ordinary, nonmatching labels can
   // be shown. Do not sort the entire visible point cloud only to reject it.
-  if (zoom < .62 && !matchIds.size) return labels;
+  const architecture = context.view === 'architecture-map';
+  if (zoom < (architecture ? .18 : .62) && !matchIds.size) return labels;
   const regionCounts = new Map<string, number>(), regionAttempts = new Map<string, number>();
   const candidates = projected.filter(p => !important(p.item.node.id) && !context.relatedIds?.has(p.item.node.id) && p.item.node.attributes.displayAggregate !== true
-    && (matchIds.has(p.item.node.id) || zoom >= (previous.has(p.item.node.id) ? .62 : .78))).sort((a, b) => Number(matchIds.has(b.item.node.id)) - Number(matchIds.has(a.item.node.id)) || stableOrder(a, b));
+    && (matchIds.has(p.item.node.id) || zoom >= (architecture ? .18 : previous.has(p.item.node.id) ? .62 : .78))).sort((a, b) => Number(matchIds.has(b.item.node.id)) - Number(matchIds.has(a.item.node.id)) || stableOrder(a, b));
   for (const item of candidates) {
     const related = context.relatedIds?.has(item.item.node.id), match = matchIds.has(item.item.node.id);
     if (nodeCount >= (context.quietBackground ? Math.min(6, budget) : budget) || considered >= budget * 6) break;
-    if (!related && !match && zoom < (previous.has(item.item.node.id) ? .62 : .78)) continue;
-    const group = item.item.node.path?.split('/').slice(0, -1).join('/') ?? item.item.node.group;
+    if (!related && !match && zoom < (architecture ? .18 : previous.has(item.item.node.id) ? .62 : .78)) continue;
+    const group = architecture ? item.item.node.id : item.item.node.path?.split('/').slice(0, -1).join('/') ?? item.item.node.group;
     if (!related && !match && (regionCounts.get(group) ?? 0) >= (zoom >= 1.2 ? 4 : 1)) continue;
     if (!related && !match && (regionAttempts.get(group) ?? 0) >= (zoom >= 1.2 ? 16 : 4)) continue;
     regionAttempts.set(group, (regionAttempts.get(group) ?? 0) + 1); considered++;

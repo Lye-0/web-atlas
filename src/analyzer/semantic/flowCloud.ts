@@ -56,6 +56,7 @@ export function layoutSemanticCloudGroup(nodes: readonly SemanticNode[], identit
 }
 
 export function layoutSemanticCloud(graph: SemanticGraph, explorer?: SemanticExplorerModel): SemanticPosition[] {
+  if (graph.view === 'architecture-map' && graph.architectureView) return graph.nodes.map(node => ({ node, ...graph.architectureView!.positions.get(node.id)! }));
   const groups = new Map<string, Map<string, SemanticNode[]>>();
   for (const node of graph.nodes) {
     const groupId = explorer ? explorerRegionIdentity(explorer, node.id).id : semanticRegionIdentity(node).id;

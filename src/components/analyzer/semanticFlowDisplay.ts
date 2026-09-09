@@ -1,4 +1,5 @@
 import { kindLabels, type SemanticNode } from '../../analyzer/semantic/types';
+import { architectureEnvironmentLabel, architectureKindLabels } from '../../analyzer/semantic/architectureMetadata';
 
 export interface SemanticNodeDisplay {
   title: string;
@@ -94,8 +95,19 @@ function compactCallee(callee: string) {
 export function semanticNodeDisplay(node: SemanticNode): SemanticNodeDisplay {
   if (node.architecture) {
     const arch = node.architecture;
-    const location = [node.attributes.architectureContext ? 'この範囲の外部' : '', arch.context.join(' / '), arch.parentId ? node.group : arch.ownerPath].filter(Boolean).join(' · ') || node.path || '構成要素';
-    return { title: node.label, location, tooltip: `${node.label}\n${location}\n${node.evidence[0]?.description ?? ''}` };
+    const identity = arch.identity;
+    const binding = identity?.configurations[0]?.binding;
+    const location = [node.attributes.architectureContext ? '表示範囲外・周辺概要' : '',
+      identity || ['resource', 'external-service'].includes(arch.kind) ? architectureEnvironmentLabel(arch.environments) : arch.context.join(' / '),
+      binding ? `${binding}${identity?.identifier ? ` · ID:${identity.identifier.slice(0, 8)}` : ' · 同一性未確認'}` : arch.parentId ? node.group : arch.ownerPath,
+      Number(node.attributes.architectureInternalCount) > 0 ? `内部関係 ${node.attributes.architectureInternalCount}件` : '',
+    ].filter(Boolean).join(' · ') || node.path || '構成要素';
+    const kind = node.attributes.architectureRequestGroup ? '表示上の集合' : arch.request ? '相手は未特定' : architectureKindLabels[arch.kind];
+    const dataRole = node.attributes.architectureContext ? `表示範囲外 · ${kind}` : kind;
+    const disambiguation = identity ? `${architectureEnvironmentLabel(arch.environments)}${binding ? ` · ${binding}` : ''}${identity.identifier ? ` · ID:${identity.identifier.length > 10 ? `${identity.identifier.slice(0, 4)}…${identity.identifier.slice(-4)}` : identity.identifier}` : ' · 同一性未確認'}`
+      : arch.request ? `${node.evidence[0]?.path ?? node.path ?? ''}:${node.evidence[0]?.line ?? ''}`
+        : Number(node.attributes.architectureInternalCount) > 0 ? `内部関係 ${node.attributes.architectureInternalCount}件` : undefined;
+    return { title: node.label, location, dataRole, disambiguation, tooltip: `${node.label}\n${dataRole}\n${location}\n${identity?.identifier ? `識別子: ${identity.identifier}\n` : ''}${arch.request?.expression ?? node.evidence[0]?.description ?? ''}` };
   }
   const initializer = node.kind === 'function' && node.attributes.initializer === true;
   const callee = (node.kind === 'external' || node.kind === 'operation') && typeof node.attributes.callee === 'string' ? node.attributes.callee : undefined;
@@ -154,6 +166,15 @@ export function semanticNodeDisplays(nodes: Iterable<SemanticNode>, contextNodes
   }
   for (const named of names.values()) {
     if (named.length < 2) continue;
+    if (named.every(node => node.architecture)) {
+      for (const node of named) {
+        const display = displays.get(node.id)!;
+        const source = node.evidence[0];
+        display.disambiguation = node.architecture?.request && source ? `箇所 ${source.start}–${source.end} · ${source.path}:${source.line}`
+          : `${display.disambiguation ?? display.location} · ${source?.path ?? node.path ?? ''}:${source?.line ?? ''}`;
+      }
+      continue;
+    }
     const paths = new Map(named.map(node => [node.id, (node.path ?? node.evidence[0]?.path)?.replaceAll('\\', '/')]).filter((item): item is [string, string] => Boolean(item[1])));
     const suffixCounts = new Map<string, number>();
     for (const path of new Set(paths.values())) {

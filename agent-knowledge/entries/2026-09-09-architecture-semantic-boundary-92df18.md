@@ -6,7 +6,7 @@ status: active
 maturity: candidate
 created: 2026-09-09
 last_verified: 2026-09-09
-source_commit: "62a01861b3f1cd8ec5df8d019d989a8143dc1775"
+source_commit: "907f640c46c9e5000d76bd7e43e688958c6092b9"
 related_files:
   - src/analyzer/semantic/architecture.ts
   - src/analyzer/semantic/architectureProjection.ts
@@ -14,6 +14,8 @@ related_files:
   - src/pages/FlowAnalyzerPage.tsx
   - docs/technical/architecture-map.md
   - docs/technical/architecture-map-review.md
+  - src/analyzer/semantic/architectureFocus.test.ts
+  - docs/technical/architecture-focus-review.md
 tags:
   - architecture
   - semantic-aggregation
@@ -29,7 +31,9 @@ promoted_to: null
 
 タブ10はCの操作基盤を使うが、2Dは各構成階層の関係を選択前から表示する構成図。3Dも同じArchitecture要素を点にし、元の全関数・全値へ戻さない。自動省略OFFはArchitecture要素を全表示する指定であり、意味集約を解除する指定ではない。
 
-実行単位の境界はmanifest・具体的な入口・設定から確定する。内部責務は子要素、ライブラリは共有コード、配備先は環境付きの属性として分ける。構成関係の集約は端点・種類・confidence・環境ごとに元edge/Evidenceの集合を保存し、隣り合う要約関係から推移的な実行経路を生成しない。
+実行単位の境界はmanifest・具体的な入口・設定から確定する。manifestだけなら利用未確認のコードパッケージとし、共有コードにはライブラリ契約と参照または境界をまたぐソース参照を求める。構成関係の集約は端点・種類・confidence・環境ごとに元edge/Evidenceの集合を保存し、隣り合う要約関係から推移的な実行経路を生成しない。
+
+3Dは現在の直下を詳細に、外側の主要ルートを概要に投影する。外側を選択しても現在地を変えず、明示的に開いた場合だけ移動する。親だけに根拠のある境界関係を子へ接続しない。折り畳みによる内部関係の要約と、現在粒度で根拠のある実際の自己関係は別扱いとする。周辺構成OFFでも直接関係先と保護した選択を残し、自動省略OFFと意味を混同しない。
 
 ## Scope
 
@@ -40,6 +44,7 @@ promoted_to: null
 - 記録時HEADに対する変更を検証。T01–15と補足22テストで誤ったアプリ境界・DB生成・動的接続・集約の負例を確認。
 - Git LinesでExtension Host/Webview、vehicle-managementでWeb/Worker/WPF/共有コード、Web Atlasで静的Webを独立期待値に照合。
 - 40要素fixtureでON/OFF後のArchitecture ID・位置・カメラを保持し、内訳閲覧と明示選択を分離。受け入れ表は技術レビューに記載。
+- 上記source_commitに対する未コミット変更でF1–F7/T01–T16を再照合した。新しい混合粒度、未特定要求の表示集合、同一IDの設定出現箇所、宣言技術と主体別使用はarchitecture-focus-review.mdを参照。HEAD単独が今回の変更を含むとは限らない。
 
 ## Verification
 

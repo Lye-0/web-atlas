@@ -13,10 +13,11 @@ const build = (sources: Record<string, string>, nodes: SemanticNode[] = [], edge
 const web = { 'apps/web/package.json': json({ name: 'Web', scripts: { dev: 'vite' } }), 'apps/web/src/main.ts': 'createRoot(root).render(App);' };
 
 describe('Architecture independent contracts', () => {
-  it('T01 distinguishes app and shared package, with declared dependency', () => {
+  it('T01 distinguishes app and a package with declared use but no confirmed library role', () => {
     const model = build({ ...web, 'apps/web/package.json': json({ name: 'Web', scripts: { dev: 'vite' }, dependencies: { shared: 'workspace:*' } }), 'packages/shared/package.json': json({ name: 'shared' }) });
     expect(model.nodes.find(n => n.label === 'Web')?.architecture?.kind).toBe('application');
-    expect(model.nodes.find(n => n.label === 'shared')?.architecture?.kind).toBe('shared-code');
+    expect(model.nodes.find(n => n.label === 'shared')?.architecture?.kind).toBe('code-package');
+    expect(model.nodes.find(n => n.label === 'shared')?.architecture?.codeUsage?.status).toBe('declared');
     expect(architectureScopeGraph(model).edges.some(e => e.kind === 'declaration-dependency')).toBe(true);
   });
   it('T02 api folder and package manifest alone do not imply an API server', () => {
@@ -51,7 +52,7 @@ describe('Architecture independent contracts', () => {
   });
   it('T06 retains call vs declaration kinds and original IDs', () => {
     const model = build({ ...web, 'apps/web/src/other.ts': 'export function other(){}' }, [fact('one', 'apps/web/src/main.ts'), fact('two', 'apps/web/src/other.ts')], [relation('canonical-call', 'one', 'two')]);
-    expect(architectureScopeGraph(model).edges.find(e => e.kind === 'calls')?.provenance?.edges.map(e => e.id)).toEqual(['canonical-call']);
+    expect(architectureScopeGraph(model).architectureView?.internalRelations.find(e => e.kind === 'calls')?.provenance?.edges.map(e => e.id)).toEqual(['canonical-call']);
     const imported = buildArchitectureModel({ sources: { ...web, 'apps/web/src/other.ts': 'export const n=1;' }, imports: [{ from: 'apps/web/src/main.ts', to: 'apps/web/src/other.ts', specifier: './other' }], resources: [] }, { nodes: [], edges: [] });
     expect(imported.edges.map(e => e.kind)).toEqual(['code-reference']);
   });
@@ -122,7 +123,7 @@ describe('Architecture independent contracts', () => {
   it('T13 tests are hidden together with relations', () => {
     const model = build({ ...web, 'apps/web/test/demo.test.ts': 'test()' }, [fact('test', 'apps/web/test/demo.test.ts'), fact('main', 'apps/web/src/main.ts')], [relation('test-call', 'test', 'main')]);
     expect(architectureScopeGraph(model).edges).toHaveLength(0);
-    expect(architectureScopeGraph(model, undefined, '', true).edges).toHaveLength(1);
+    expect(architectureScopeGraph(model, undefined, '', true).architectureView?.internalRelations).toHaveLength(1);
     const mock = build({ ...web, 'apps/web/src/__mocks__/api.ts': 'fetch(url)', 'apps/web/src/generated/value.g.ts': 'export const value=1;' });
     expect(mock.nodes.filter(n => n.architecture?.kind === 'component' && n.architecture.auxiliary).flatMap(n => n.architecture!.files)).toHaveLength(2);
     expect(architectureScopeGraph(mock).nodes.every(n => !n.architecture?.auxiliary)).toBe(true);
@@ -134,7 +135,7 @@ describe('Architecture independent contracts', () => {
   it('T15 same names in different projects retain distinct IDs and deterministic ancestry', () => {
     const sources = { 'a/a.csproj': '<Project><OutputType>Exe</OutputType><AssemblyName>same</AssemblyName></Project>', 'b/b.csproj': '<Project><AssemblyName>same</AssemblyName></Project>' };
     const a = build(sources), b = build(sources); expect(a).toEqual(b);
-    expect(new Set(a.nodes.map(n => n.id)).size).toBe(2); expect(a.nodes.map(n => n.architecture?.kind).sort()).toEqual(['application', 'shared-code']);
+    expect(new Set(a.nodes.map(n => n.id)).size).toBe(2); expect(a.nodes.map(n => n.architecture?.kind).sort()).toEqual(['application', 'code-package']);
   });
   it('keeps the same architectural grain and deterministic positions in the shared renderer', () => {
     const model = build({ ...web, 'apps/web/src/main.ts': 'fetch(url)' }, [fact('request', 'apps/web/src/main.ts', { kind: 'request' })]);

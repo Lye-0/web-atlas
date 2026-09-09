@@ -49,7 +49,7 @@ Data values represent parameters, assignments and returns. Views 8–9 add a clo
 | Function Call Flow | Function declarations and actual call sites, unresolved/external targets, and inferred callbacks for known callback-taking APIs. |
 | Data Flow | Parameters, values, intermediate operations, arguments, return results, serialization/validation and persistence. |
 | Data Model | Static model/schema definitions, fields and references, including detected primary/foreign keys. Execution logs do not create schemas. |
-| Architecture Map | Applications/execution units, shared code, internal components, external services/programs and configured resources. A connected 2D diagram and same-grain point-cloud 3D share explicit hierarchy, environment, relation-kind/confidence and canonical provenance. See [Architecture Map](architecture-map.md). |
+| Architecture Map | Applications/execution units, shared code, internal components, external services/programs and configured resources. A connected 2D diagram and a 3D view of local detail with surrounding root summaries share one Architecture model, environment, relation-kind/confidence and canonical provenance. See [Architecture Map](architecture-map.md). |
 
 ## Execution data
 

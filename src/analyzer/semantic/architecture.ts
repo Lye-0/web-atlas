@@ -3,15 +3,20 @@ import { architectureSyntax } from './architectureSyntax';
 import { architectureToml } from './architectureToml';
 import { architectureRole } from './architectureRole';
 import { uniqueArchitectureEvidence } from './architectureEvidence';
+import type { ArchitectureCodeUsage, ArchitectureIdentity, ArchitectureRequest, ArchitectureTechnology } from './architectureMetadata';
+import { populateArchitectureUsage } from './architectureUsage';
+import { architectureResourceIdentity } from './architectureIdentity';
+import { architectureFirstArgument } from './architectureArguments';
 import { responsibility, semanticLanguage } from './languages';
 import type { SemanticAnalysis, SemanticConfidence, SemanticEdge, SemanticEvidence, SemanticGraph, SemanticInput, SemanticNode } from './types';
 
-export type ArchitectureKind = 'application' | 'component' | 'shared-code' | 'resource' | 'external-service' | 'external-program' | 'unresolved';
+export type ArchitectureKind = 'application' | 'component' | 'shared-code' | 'code-package' | 'resource' | 'external-service' | 'external-program' | 'unresolved';
 export interface ArchitectureRole { label: string; confidence: SemanticConfidence; reason: string; evidence: SemanticEvidence[] }
 export interface ArchitectureEntity {
   kind: ArchitectureKind; parentId?: string; ownerPath?: string; entryPaths: string[];
   roles: ArchitectureRole[]; environments: string[]; context: string[];
   memberIds: string[]; files: string[]; technologyNames: string[]; auxiliary: boolean;
+  identity?: ArchitectureIdentity; codeUsage?: ArchitectureCodeUsage; technologies?: ArchitectureTechnology[]; request?: ArchitectureRequest;
   configurationVariants?: { environment: string; name?: string; entryPath?: string; inherited: string[]; evidence: SemanticEvidence[] }[];
 }
 export interface ArchitectureModel extends SemanticGraph { environments: string[]; limitations: string[] }
@@ -61,9 +66,9 @@ export function buildArchitectureModel(input: SemanticInput, analysis: Pick<Sema
       attributes: { architectureKind: kind, members: [], files: [], auxiliary: arch.auxiliary } };
     nodes.set(keyId, node); return node;
   };
-  const connect = (source: string, target: string, kind: string, label: string, evidence: SemanticEvidence[], confidence: SemanticConfidence = 'source', environment = '') => {
-    edges.push({ id: id('relation', source, target, kind, environment, ...evidence.map(e => `${e.path}:${e.start}`)), source, target, kind, label,
-      confidence, evidence, views: ['architecture-map'], details: { environment, reason: 'ソース・設定上の静的関係。現在の実行や通信を示しません。' } });
+  const connect = (source: string, target: string, kind: string, label: string, evidence: SemanticEvidence[], confidence: SemanticConfidence = 'source', environment = '', configurationId?: string) => {
+    edges.push({ id: id('relation', source, target, kind, environment, ...evidence.map(e => `${e.path}:${e.start}`), ...(configurationId ? [configurationId] : [])), source, target, kind, label,
+      confidence, evidence, views: ['architecture-map'], details: { environment, configurationId, reason: 'ソース・設定上の静的関係。現在の実行や通信を示しません。' } });
   };
   const parse = (path: string, source: string) => { try { return object(parseJsonc(source)); } catch { limitations.add(`${path}: 構造化設定を解析できませんでした`); return {}; } };
   for (const [path, source] of configs.filter(([p]) => /(?:^|\/)package\.json$/.test(p))) {
@@ -72,11 +77,11 @@ export function buildArchitectureModel(input: SemanticInput, analysis: Pick<Sema
     const scripts = Object.values(object(config.scripts)).map(string);
     const web = scripts.some(script => /(?:^|[\s&])(?:vite|next|nuxt|astro)(?:\s|$)/.test(script));
     const cli = Boolean(config.bin);
-    const kind = extension || web || cli ? 'application' : 'shared-code';
+    const kind = extension || web || cli ? 'application' : 'code-package';
     const reason = extension ? '拡張manifestのengines.vscodeと入口宣言' : web ? 'manifestのWebビルド・起動コマンド' : cli ? 'manifestのbin宣言' : 'package manifestで確認したコードパッケージ。独立実行の根拠は未確認';
     const node = add(['package', path], name, kind, ev(path, extension ? 'vscode' : web ? 'scripts' : cli ? 'bin' : 'name', reason), {
       ownerPath: dir, context: extension ? ['Extension Host'] : web ? ['ブラウザ'] : cli ? ['CLI'] : [], auxiliary: auxiliary(path),
-      technologyNames: unique(['dependencies', 'devDependencies', 'peerDependencies'].flatMap(key => Object.keys(object(config[key])))),
+      technologyNames: unique(['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'].flatMap(key => Object.keys(object(config[key])))),
     });
     node.architecture!.entryPaths = unique([string(config.main), string(config.browser), ...Object.values(object(config.bin)).map(string), typeof config.bin === 'string' ? config.bin : ''].filter(Boolean).map(p => architecturePath(dir, p)));
     packages.push({ path, dir, config, node });
@@ -90,7 +95,7 @@ export function buildArchitectureModel(input: SemanticInput, analysis: Pick<Sema
     const output = source.match(/<OutputType>([^<]+)<\/OutputType>/)?.[1];
     if (/\bCondition\s*=|<Import\b/.test(source)) limitations.add(`${path}: MSBuildの条件式と外部Importは評価せず、ファイル内の明示宣言を使用`);
     const executable = /^(?:Exe|WinExe)$/i.test(output ?? '') || /Sdk="Microsoft\.NET\.Sdk\.Web"/.test(source);
-    const node = add(['dotnet', path], name, executable ? 'application' : 'shared-code', ev(path, output ?? '<Project', output ? `OutputType=${output}の宣言` : '.NETプロジェクト宣言'), {
+    const node = add(['dotnet', path], name, executable ? 'application' : 'code-package', ev(path, output ?? '<Project', output ? `OutputType=${output}の宣言` : '.NETプロジェクト宣言'), {
       ownerPath: directory(path), context: executable ? [/<UseWPF>true<\/UseWPF>/i.test(source) ? '.NET / WPF' : '.NET'] : [], auxiliary: auxiliary(path), technologyNames: ['dotnet'],
     }); units.push({ dir: directory(path), node });
   }
@@ -107,7 +112,7 @@ export function buildArchitectureModel(input: SemanticInput, analysis: Pick<Sema
     const toml = path.endsWith('.toml') ? architectureToml(source) : undefined;
     if (toml?.unsupported) limitations.add(`${path}: TOMLの複数行値・inline table等は未対応。解釈できたリテラル設定のみ使用`);
     const config = toml?.config ?? parse(path, source), dir = directory(path), main = string(config.main), pkg = packageAt(path);
-    const worker = main && pkg && pkg.node.architecture?.kind === 'shared-code' ? pkg.node : main ? add(['worker', path], string(config.name) || pkg?.node.label || dir, 'application', ev(path, main, 'Wrangler mainが実行入口を指す'), { ownerPath: dir, entryPaths: [architecturePath(dir, main)], context: ['Cloudflare Workers'], technologyNames: ['cloudflare-workers'] }) : pkg?.node;
+    const worker = main && pkg && pkg.node.architecture?.kind === 'code-package' ? pkg.node : main ? add(['worker', path], string(config.name) || pkg?.node.label || dir, 'application', ev(path, main, 'Wrangler mainが実行入口を指す'), { ownerPath: dir, entryPaths: [architecturePath(dir, main)], context: ['Cloudflare Workers'], technologyNames: ['cloudflare-workers'] }) : pkg?.node;
     if (!worker) continue;
     if (main) {
       worker.label = string(config.name) || worker.label; worker.architecture!.kind = 'application'; worker.attributes.architectureKind = 'application';
@@ -134,9 +139,14 @@ export function buildArchitectureModel(input: SemanticInput, analysis: Pick<Sema
         for (const [index, value] of (Array.isArray(values[key]) ? values[key] as unknown[] : []).entries()) {
           const valueObject = object(value), binding = string(valueObject.binding), label = string(valueObject[labelKey]) || binding || resourceKind;
           const evidence = settingEvidence(key, `${key}の宣言（binding=${binding}、対象=${label}）`);
-          const node = add(['resource', path, environment, key, String(index), label], label, key === 'services' ? 'external-service' : 'resource', evidence, { environments: [environment || 'default'], context: [resourceKind], technologyNames: [resourceKind === 'D1' ? 'cloudflare-d1' : resourceKind === 'R2' ? 'cloudflare-r2' : resourceKind] });
+          const occurrence = { id: id('setting', path, environment, key, String(index)), path, environment, binding, name: label, evidence };
+          const identity = architectureResourceIdentity(resourceKind, valueObject, string(values.account_id ?? config.account_id), occurrence);
+          const node = add(identity.key ?? ['resource', path, environment, key, String(index), label], label, key === 'services' ? 'external-service' : 'resource', evidence, { environments: [], context: [resourceKind], technologyNames: [resourceKind === 'D1' ? 'cloudflare-d1' : resourceKind === 'R2' ? 'cloudflare-r2' : resourceKind] });
+          if (node.architecture!.identity) node.architecture!.identity.configurations.push(...identity.identity.configurations);
+          else node.architecture!.identity = identity.identity;
+          node.architecture!.environments.push(environment || 'default'); node.evidence.push(...evidence);
           bindings.push({ owner: worker, node, binding, environment, dir });
-          connect(worker.id, node.id, 'deployment-config', `${resourceKind} bindingの設定`, evidence, 'source', environment);
+          connect(worker.id, node.id, 'deployment-config', `${resourceKind} bindingの設定`, evidence, 'source', environment, occurrence.id);
         }
       }
       const assets = object(values.assets ?? config.assets), assetDir = string(assets.directory);
@@ -151,14 +161,19 @@ export function buildArchitectureModel(input: SemanticInput, analysis: Pick<Sema
       const bucket = string(vars.B2_BUCKET), endpoint = string(vars.B2_ENDPOINT);
       if (bucket && endpoint) {
         const evidence = settingEvidence('vars', 'B2_BUCKETとB2_ENDPOINTによるストレージ設定');
-        const node = add(['storage-config', path, environment, endpoint, bucket], bucket, 'resource', evidence, { context: ['S3互換ストレージ'], environments: [environment || 'default'], technologyNames: ['backblaze-b2'] });
+        const node = add(['storage-config', path, environment, endpoint, bucket], bucket, 'resource', evidence, { context: ['S3互換ストレージ'], environments: [environment || 'default'], technologyNames: ['backblaze-b2'],
+          identity: { status: 'unconfirmed', type: 'S3互換ストレージ', scope: endpoint, reason: 'endpointとbucketの設定を確認。アカウント・安定IDとの対応は未確認', configurations: [{ id: id('storage-setting', path, environment), path, environment, binding: 'B2_BUCKET', name: bucket, evidence }] } });
         connect(worker.id, node.id, 'deployment-config', 'ストレージ接続先の設定', evidence, 'source', environment);
       }
       const project = string(vars.FIREBASE_PROJECT_ID);
       if (project) {
         const emulator = vars.FIREBASE_AUTH_EMULATOR === 'true' || vars.FIREBASE_AUTH_EMULATOR === true;
         const evidence = settingEvidence('vars', `FirebaseプロジェクトとAuth ${emulator ? 'エミュレーター' : '接続先'}設定`);
-        const node = add(['firebase-config', path, environment, project, emulator ? 'emulator' : 'service'], `Firebase Auth · ${project}${emulator ? '（エミュレーター）' : ''}`, 'external-service', evidence, { context: ['Firebase Auth'], environments: [environment || 'default'], technologyNames: ['firebase-authentication'] });
+        const node = add(emulator ? ['firebase-config', path, environment, project, 'emulator'] : ['firebase-project', project, 'auth'], `Firebase Auth · ${project}${emulator ? '（エミュレーター）' : ''}`, 'external-service', evidence, { context: ['Firebase Auth'], environments: [], technologyNames: ['firebase-authentication'] });
+        node.architecture!.identity ??= { status: emulator ? 'unconfirmed' : 'confirmed', type: emulator ? 'Firebase Auth emulator' : 'Firebase Auth', identifier: project,
+          reason: emulator ? 'エミュレーター利用の設定。接続先の同一性は未確認' : 'Firebase project IDが一致する認証サービス設定', configurations: [] };
+        node.architecture!.identity.configurations.push({ id: id('firebase-setting', path, environment), path, environment, binding: 'FIREBASE_PROJECT_ID', name: project, evidence });
+        node.architecture!.environments.push(environment || 'default'); node.evidence.push(...evidence);
         connect(worker.id, node.id, 'deployment-config', '認証サービスの設定', evidence, 'source', environment);
       }
     }
@@ -201,13 +216,13 @@ export function buildArchitectureModel(input: SemanticInput, analysis: Pick<Sema
   for (const node of analysis.nodes) if (node.path) { const members = sourceNodes.get(node.path) ?? []; members.push(node); sourceNodes.set(node.path, members); }
   for (const [path, source] of configs.filter(([p]) => Boolean(semanticLanguage(p)))) {
     let owner = ownerAt(path);
-    if (!owner) owner = add(['unassigned', directory(path).split('/')[0] ?? ''], directory(path).split('/')[0] || 'プロジェクトのコード', 'shared-code', ev(path, '', 'ソースファイルの所属。独立実行の根拠は未確認'), { ownerPath: directory(path).split('/')[0] });
+    if (!owner) owner = add(['unassigned', directory(path).split('/')[0] ?? ''], directory(path).split('/')[0] || 'プロジェクトのコード', 'code-package', ev(path, '', 'ソースファイルの所属。独立実行の根拠は未確認'), { ownerPath: directory(path).split('/')[0] });
     const members = sourceNodes.get(path) ?? [];
     const detectedRole = architectureRole(path, stripJsonComments(source), owner.architecture!, syntax.get(path));
     const primary = detectedRole?.label ?? responsibility(path, '');
     const modelOnly = members.some(n => n.model) && members.every(n => n.model || n.kind === 'external' || n.attributes.initializer || n.data);
     const label = auxiliary(path) ? 'テスト・補助コード' : primary === 'Data models' && !modelOnly ? 'モデルを扱うコード' : primary === 'Shared logic' ? '役割未判定' : primary;
-    const child = add(['component', owner.id, label], label, 'component', [], { parentId: owner.id, ownerPath: owner.architecture!.ownerPath, auxiliary: auxiliary(path),
+    const child = add(['component', owner.id, label], label, 'component', [], { parentId: owner.id, ownerPath: owner.architecture!.ownerPath, context: [...owner.architecture!.context], auxiliary: auxiliary(path),
       roles: [{ label, confidence: 'inferred', reason: detectedRole?.reason ?? (primary === 'Shared logic' ? 'ソースの所属は確認済み。構文・配置規約から具体的な役割は未判定' : `所属パスの分類規則: ${path}。機能の実装完了を保証しません`), evidence: ev(path, '', `役割推定の対象ファイル: ${path}`) }] });
     child.architecture!.memberIds.push(...members.map(n => n.id)); child.architecture!.files.push(path);
     for (const member of members) for (const item of member.evidence) child.evidence.push(item);
@@ -226,7 +241,19 @@ export function buildArchitectureModel(input: SemanticInput, analysis: Pick<Sema
   }
   for (const ref of input.imports) {
     const from = fileOwners.get(ref.from), to = fileOwners.get(ref.to);
-    if (from && to) connect(from, to, 'code-reference', 'モジュール参照', ev(ref.from, ref.specifier, `import: ${ref.specifier}`));
+    if (from && to) {
+      connect(from, to, 'code-reference', 'モジュール参照', ev(ref.from, ref.specifier, `import: ${ref.specifier}`));
+      const relation = edges.at(-1)!;
+      relation.details!.architectureOrigin = 'source';
+      relation.provenance = { edges: [{ ...relation, source: `file:${ref.from}`, target: `file:${ref.to}` }] };
+    }
+  }
+  for (const [path, parsed] of syntax) for (const ref of parsed.importReferences) {
+    const target = packages.filter(pkg => typeof pkg.config.name === 'string' && (ref.name === pkg.config.name || ref.name.startsWith(`${pkg.config.name}/`))).sort((a, b) => String(b.config.name).length - String(a.config.name).length)[0];
+    const from = fileOwners.get(path);
+    if (!target || !from || ownerAt(path)?.id === target.node.id || input.imports.some(item => item.from === path && item.specifier === ref.name)) continue;
+    connect(from, target.node.id, 'code-reference', 'コードパッケージのモジュール参照', [ref.evidence]);
+    edges.at(-1)!.details!.architectureOrigin = 'source';
   }
   const canonicalOwners = new Map<string, string>();
   for (const node of nodes.values()) for (const member of node.architecture!.memberIds) canonicalOwners.set(member, node.id);
@@ -252,7 +279,8 @@ export function buildArchitectureModel(input: SemanticInput, analysis: Pick<Sema
     // A configured environment resolves only that environment. Keep the unknown/default request.
     const owner = ownerAt(request.path!);
     const excluded = unique(mappings.map(m => `except:${m.environment}`)).sort();
-    const node = add(['http-target', owner?.id ?? from, origin, auxiliary(request.path!) ? 'auxiliary' : 'source', ...excluded], absolute ? origin : `${owner?.label ?? 'コード'}のHTTP接続先（未解決）`, absolute ? 'external-service' : 'unresolved', [], { environments: excluded, auxiliary: auxiliary(request.path!) });
+    const node = add(absolute ? ['http-target', owner?.id ?? from, origin, auxiliary(request.path!) ? 'auxiliary' : 'source', ...excluded] : ['http-request-target', request.id, ...excluded], absolute ? origin : 'HTTPリクエスト先・未特定', absolute ? 'external-service' : 'unresolved', [], { environments: excluded, auxiliary: auxiliary(request.path!),
+      request: absolute ? undefined : { kind: 'http', ownerId: owner?.id ?? from, expression: endpoint || '動的な接続先', sourceId: request.id } });
     node.evidence.push(...request.evidence); node.architecture!.memberIds.push(request.id); node.architecture!.files.push(request.path!);
     node.attributes.endpoints = unique([...(node.attributes.endpoints as string[] ?? []), endpoint || '動的な接続先']);
     connect(from, node.id, 'http-request', `HTTP要求: ${endpoint || '動的な接続先'}（静的コード）`, request.evidence, absolute ? 'source' : 'unresolved');
@@ -265,11 +293,13 @@ export function buildArchitectureModel(input: SemanticInput, analysis: Pick<Sema
     }
     for (const match of source.matchAll(/\b(?:spawn|execFile|Process\.Start)\s*\(\s*([^,\n)]+)/g)) {
       if (syntax.has(path) && !syntax.get(path)!.calls.some(call => call.start === match.index)) continue;
-      const expression = match[1]!.trim(), literal = expression.match(/^['"]([^'"]+)['"]$/)?.[1];
+      const expression = architectureFirstArgument(source, source.indexOf('(', match.index!)), literal = expression.match(/^['"]([^'"]+)['"]$/)?.[1];
       const evidence = [architectureEvidence(path, raw, match.index!, match[0].length, '外部プログラム起動の静的コード')];
       const call = syntax.get(path)?.calls.find(c => c.start === match.index), fallback = call?.defaultArgument;
       if (fallback) evidence.push(fallback.evidence);
-      const node = add(['program', literal ?? path, literal ?? expression, literal ? '' : String(call?.ownerScope ?? match.index), auxiliary(path) ? 'auxiliary' : 'source'], literal ?? (fallback ? `${fallback.value}（起動先の既定値）` : `${expression}（起動先未解決）`), literal || fallback ? 'external-program' : 'unresolved', evidence, { auxiliary: auxiliary(path) });
+      const node = add(['program', literal ?? path, literal ?? expression, literal ? '' : String(fallback ? call?.ownerScope : match.index), auxiliary(path) ? 'auxiliary' : 'source'], literal ?? (fallback ? `${fallback.value}（起動先の既定値）` : '外部プログラムへの起動要求'), literal || fallback ? 'external-program' : 'unresolved', evidence, { auxiliary: auxiliary(path),
+        request: literal || fallback ? undefined : { kind: 'process', ownerId: ownerAt(path)?.id ?? from, expression, sourceId: `call:${path}:${match.index}` } });
+      node.attributes.targetExpression = expression;
       if (fallback) { node.confidence = 'inferred'; node.attributes.targetExpression = expression; node.attributes.targetOverride = '起動先はコンストラクター引数で変更可能。実行時の値は未確認'; }
       connect(from, node.id, 'process-start', fallback ? 'プログラム起動要求（既定値から推定）' : 'プログラム起動要求', evidence, literal ? 'source' : fallback ? 'inferred' : 'unresolved');
     }
@@ -279,7 +309,8 @@ export function buildArchitectureModel(input: SemanticInput, analysis: Pick<Sema
       if (auth.length) {
         const emulator = auth.filter(c => c.callee.endsWith('connectAuthEmulator'));
         const evidence = auth.map(c => c.evidence);
-        const node = add(['auth-use', ownerAt(path)?.id ?? from, path], 'Firebase Auth（プロジェクト未解決）', 'external-service', evidence, { context: ['Firebase Auth'], auxiliary: auxiliary(path), technologyNames: ['firebase-authentication'] });
+        const node = add(['auth-use', ownerAt(path)?.id ?? from, path], '認証サービス向けの使用・設定（プロジェクト未特定）', 'unresolved', evidence, { context: ['Firebase Auth'], auxiliary: auxiliary(path), technologyNames: ['firebase-authentication'],
+          request: { kind: 'auth', ownerId: ownerAt(path)?.id ?? from, expression: auth.map(call => `${call.callee}(${call.args.join(', ')})`).join('\n'), sourceId: `auth-use:${path}` } });
         connect(from, node.id, 'service-use', '認証SDKの使用コード', evidence, 'source');
         for (const call of emulator) {
           const target = call.literals[1], evidence = [call.evidence];
@@ -296,6 +327,7 @@ export function buildArchitectureModel(input: SemanticInput, analysis: Pick<Sema
       if (!receivers.length) continue;
       const evidence = [send.evidence, ...receivers.map(c => c.evidence)];
       connect(from, from, 'message', `同一receiver ${receiver}のイベント ${send.literals[0]}`, evidence, 'inferred');
+      edges.at(-1)!.details!.architectureOrigin = 'source';
     }
   }
   for (const pkg of packages.filter(p => p.node.architecture?.context.includes('Extension Host'))) {
@@ -343,5 +375,6 @@ export function buildArchitectureModel(input: SemanticInput, analysis: Pick<Sema
     node.evidence = uniqueArchitectureEvidence(node.evidence);
     node.attributes.members = arch.memberIds; node.attributes.files = arch.files; node.attributes.auxiliary = arch.auxiliary;
   }
+  populateArchitectureUsage(nodes, edges, packages, syntax, ev);
   return { view: 'architecture-map', nodes: [...nodes.values()], edges: [...new Map(edges.map(edge => [edge.id, edge])).values()], environments: [...environments].sort(), limitations: [...limitations] };
 }

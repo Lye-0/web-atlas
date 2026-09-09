@@ -39,9 +39,10 @@ export interface SemanticEdge {
   views: SemanticViewId[]; confidence: SemanticConfidence; evidence: SemanticEvidence[];
   /** Original source relations behind a display aggregate or compressed runtime path. */
   provenance?: { edges: SemanticRelationSource[]; intermediateNodeIds?: string[] };
-  details?: { environment?: string; reason?: string; callSiteId?: string; argumentIndex?: number; fieldId?: string; propertyPath?: string[]; conditional?: boolean; contextId?: string; sourceEdgeIds?: string[] };
+  details?: { environment?: string; reason?: string; callSiteId?: string; argumentIndex?: number; fieldId?: string; propertyPath?: string[]; conditional?: boolean; contextId?: string; sourceEdgeIds?: string[];
+    architectureOrigin?: 'source' | 'architecture'; architectureRelation?: 'connection' | 'internal' | 'self'; configurationId?: string };
 }
-export type SemanticRelationSource = Pick<SemanticEdge, 'id' | 'source' | 'target' | 'kind' | 'label' | 'confidence' | 'evidence'>;
+export type SemanticRelationSource = Pick<SemanticEdge, 'id' | 'source' | 'target' | 'kind' | 'label' | 'confidence' | 'evidence' | 'details'>;
 export interface SemanticCoverage { path: string; language: string; status: 'parsed' | 'partial' | 'unsupported' | 'skipped'; message?: string }
 export interface SemanticAnalysis {
   architecture?: import('./architecture').ArchitectureModel;
@@ -55,7 +56,7 @@ export interface SemanticInput {
   imports: { from: string; to: string; specifier: string }[];
   resources: { id: string; label: string; type: string; path?: string; binding?: string; entryPath?: string; evidence?: SemanticEvidence[] }[];
 }
-export interface SemanticGraph { view: SemanticViewId; nodes: SemanticNode[]; edges: SemanticEdge[]; }
+export interface SemanticGraph { view: SemanticViewId; nodes: SemanticNode[]; edges: SemanticEdge[]; architectureView?: import('./architectureProjection').ArchitectureProjection; }
 
 export const confidenceLabels: Record<SemanticConfidence, string> = { source: 'ソースで確認', inferred: '推定', observed: '実測', unresolved: '未解決' };
 export const kindLabels: Record<SemanticKind, string> = { function: 'Function', entry: 'Entry point', request: 'API request', operation: 'Operation', value: 'Data', model: 'Model / Schema', resource: 'Resource', subsystem: 'Subsystem', external: 'External call', span: 'Span', log: 'Log' };

@@ -126,6 +126,14 @@
 - files: `src/analyzer/autoAggregation.ts`, `src/analyzer/autoAggregation.test.ts`, `src/analyzer/semantic/flowAutoAggregation.test.ts` …
 - memory: `agent-knowledge/entries/2026-09-09-aggregation-wide-density-e591ac.md`
 
+### Architectureの3D内部移動ではCanvasと訪問Sceneの寿命を分ける
+- id: `rm-20260909-architecture-canvas-visit`
+- type: `failure`
+- maturity: `candidate`
+- tags: `r3f`, `lifecycle`, `architecture`, `navigation`
+- files: `src/components/analyzer/SemanticFlowStage.tsx`, `src/components/analyzer/SemanticFlow3D.tsx`, `docs/technical/architecture-focus-review.md`
+- memory: `agent-knowledge/entries/2026-09-09-architecture-canvas-visit-7cb29f.md`
+
 ### Canvas除去後のControls破棄ではdocument listenerが残る
 - id: `rm-20260909-canvas-document-disposal`
 - type: `failure`
