@@ -1,5 +1,6 @@
 import { kindLabels, type SemanticNode } from '../../analyzer/semantic/types';
 import { architectureEnvironmentLabel, architectureKindLabels } from '../../analyzer/semantic/architectureMetadata';
+import { architectureRequestSources } from './architectureSummary';
 
 export interface SemanticNodeDisplay {
   title: string;
@@ -7,6 +8,7 @@ export interface SemanticNodeDisplay {
   tooltip: string;
   disambiguation?: string;
   dataRole?: string;
+  scopeRole?: 'inside' | 'direct' | 'surrounding';
 }
 
 /** Source syntax only; the complete expression remains on the canonical node. */
@@ -97,17 +99,19 @@ export function semanticNodeDisplay(node: SemanticNode): SemanticNodeDisplay {
     const arch = node.architecture;
     const identity = arch.identity;
     const binding = identity?.configurations[0]?.binding;
+    const scopeRole = node.attributes.architectureScopeRole;
+    const scope = scopeRole === 'inside' || scopeRole === 'direct' || scopeRole === 'surrounding' ? scopeRole : undefined;
     const location = [node.attributes.architectureContext ? '表示範囲外・周辺概要' : '',
       identity || ['resource', 'external-service'].includes(arch.kind) ? architectureEnvironmentLabel(arch.environments) : arch.context.join(' / '),
-      binding ? `${binding}${identity?.identifier ? ` · ID:${identity.identifier.slice(0, 8)}` : ' · 同一性未確認'}` : arch.parentId ? node.group : arch.ownerPath,
+      binding ? `${binding}${identity?.identifier ? ` · ID:${identity.identifier.slice(0, 8)}` : ' · 同一性未確認'}` : arch.request || node.attributes.architectureRequestGroup ? '' : arch.parentId ? node.group : arch.ownerPath,
       Number(node.attributes.architectureInternalCount) > 0 ? `内部関係 ${node.attributes.architectureInternalCount}件` : '',
     ].filter(Boolean).join(' · ') || node.path || '構成要素';
     const kind = node.attributes.architectureRequestGroup ? '表示上の集合' : arch.request ? '相手は未特定' : architectureKindLabels[arch.kind];
-    const dataRole = node.attributes.architectureContext ? `表示範囲外 · ${kind}` : kind;
+    const dataRole = scope ? `${({ inside: '内部', direct: '接続先', surrounding: '周辺' })[scope]} · ${arch.kind === 'component' ? 'コンポーネント' : kind}` : node.attributes.architectureContext ? `表示範囲外 · ${kind}` : kind;
     const disambiguation = identity ? `${architectureEnvironmentLabel(arch.environments)}${binding ? ` · ${binding}` : ''}${identity.identifier ? ` · ID:${identity.identifier.length > 10 ? `${identity.identifier.slice(0, 4)}…${identity.identifier.slice(-4)}` : identity.identifier}` : ' · 同一性未確認'}`
-      : arch.request ? `${node.evidence[0]?.path ?? node.path ?? ''}:${node.evidence[0]?.line ?? ''}`
+      : arch.request ? node.evidence[0] ? `${node.evidence[0].path}:${node.evidence[0].line}` : node.path ?? 'ソース箇所未確認'
         : Number(node.attributes.architectureInternalCount) > 0 ? `内部関係 ${node.attributes.architectureInternalCount}件` : undefined;
-    return { title: node.label, location, dataRole, disambiguation, tooltip: `${node.label}\n${dataRole}\n${location}\n${identity?.identifier ? `識別子: ${identity.identifier}\n` : ''}${arch.request?.expression ?? node.evidence[0]?.description ?? ''}` };
+    return { title: node.label, location, dataRole, disambiguation, scopeRole: scope, tooltip: `${node.label}\n${dataRole}\n${location}\n${identity?.identifier ? `識別子: ${identity.identifier}\n` : ''}${arch.request?.expression ?? node.evidence[0]?.description ?? ''}` };
   }
   const initializer = node.kind === 'function' && node.attributes.initializer === true;
   const callee = (node.kind === 'external' || node.kind === 'operation') && typeof node.attributes.callee === 'string' ? node.attributes.callee : undefined;
@@ -128,6 +132,14 @@ export function semanticNodeDisplay(node: SemanticNode): SemanticNodeDisplay {
 export function semanticNodeDisplays(nodes: Iterable<SemanticNode>, contextNodes?: ReadonlyMap<string, SemanticNode>): ReadonlyMap<string, SemanticNodeDisplay> {
   const items = [...nodes], displays = new Map(items.map(node => [node.id, semanticNodeDisplay(node)]));
   const byId = new Map(items.map(node => [node.id, node]));
+  const architectureNodes = contextNodes ? new Map([...contextNodes, ...byId]) : byId;
+  for (const node of items) if (node.architecture?.request || node.attributes.architectureRequestGroup) {
+    const requests = Array.isArray(node.attributes.requestIds) ? node.attributes.requestIds.map(id => architectureNodes.get(id)) : [node];
+    const origin = architectureRequestSources(requests, architectureNodes), display = displays.get(node.id)!;
+    display.location = `${origin.label} · ${display.location}`;
+    display.disambiguation = node.attributes.architectureRequestGroup ? `${origin.label}${node.architecture?.environments.length ? ` · ${architectureEnvironmentLabel(node.architecture.environments)}` : ''}` : `${origin.label} · ${display.disambiguation ?? ''}`;
+    display.tooltip += `\n${origin.label}${origin.sources.length > 1 ? `\n${origin.sources.map(source => source.label).join('\n')}` : ''}\n要求元は接続先の所属ではありません。`;
+  }
   const contexts = new Map<string, string>();
   for (const node of items) {
     const contextId = node.data?.contextId;
@@ -167,11 +179,15 @@ export function semanticNodeDisplays(nodes: Iterable<SemanticNode>, contextNodes
   for (const named of names.values()) {
     if (named.length < 2) continue;
     if (named.every(node => node.architecture)) {
+      const identifiers = new Map<string | undefined, number>();
+      for (const node of named) { const value = displays.get(node.id)?.disambiguation; identifiers.set(value, (identifiers.get(value) ?? 0) + 1); }
       for (const node of named) {
         const display = displays.get(node.id)!;
         const source = node.evidence[0];
-        display.disambiguation = node.architecture?.request && source ? `箇所 ${source.start}–${source.end} · ${source.path}:${source.line}`
-          : `${display.disambiguation ?? display.location} · ${source?.path ?? node.path ?? ''}:${source?.line ?? ''}`;
+        if (node.architecture?.identity && display.disambiguation && identifiers.get(display.disambiguation) === 1) continue;
+        const sourceLocation = source ? `${source.path}:${source.line}` : node.path;
+        display.disambiguation = node.architecture?.request && source ? `${architectureRequestSources([node], architectureNodes).label} · 箇所 ${source.start}–${source.end} · ${source.path}:${source.line}`
+          : `${display.disambiguation ?? display.location}${sourceLocation ? ` · ${sourceLocation}` : ''}`;
       }
       continue;
     }

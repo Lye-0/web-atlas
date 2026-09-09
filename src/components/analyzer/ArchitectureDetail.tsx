@@ -9,7 +9,9 @@ import { semanticNavigationContext } from '../../analyzer/semantic/navigation';
 import { confidenceLabels, type SemanticAnalysis, type SemanticEdge, type SemanticEvidence, type SemanticGraph, type SemanticNode, type SemanticViewId } from '../../analyzer/semantic/types';
 import { uniqueArchitectureEvidence } from '../../analyzer/semantic/architectureEvidence';
 import { architectureEnvironmentLabel, architectureKindLabels } from '../../analyzer/semantic/architectureMetadata';
-import { architectureRelationCounts, architectureRelationLabel } from '../../analyzer/semantic/architectureRelations';
+import { architectureRelationCounts, architectureRelationLabel, architectureRelationOriginals } from '../../analyzer/semantic/architectureRelations';
+import { architecturePartners, architectureRelationSummary, architectureRequestSources } from './architectureSummary';
+import { semanticNodeDisplays } from './semanticFlowDisplay';
 import { semanticFlowHoverBindings } from './semanticFlowHoverBindings';
 import type { SemanticFlowHoverHandler } from '../../analyzer/semantic/flowRelationInteraction';
 import './architecture-detail.css';
@@ -24,6 +26,11 @@ function EvidenceList({ evidence, sources }: { evidence: SemanticEvidence[]; sou
     {() => <pre>{sources[item.path]?.split('\n').slice(Math.max(0, item.line - 2), Math.min(item.endLine + 2, item.line + 15)).map((line, i) => `${Math.max(1, item.line - 1) + i}  ${line}`).join('\n') ?? '読み込まれたソースがありません'}</pre>}
   </Disclosure>)}{evidence.length > limit && <button onClick={() => setLimit(limit + 15)}>根拠をさらに表示</button>}</>;
 }
+function NodeEvidence({ node, sources }: { node: SemanticNode; sources: Record<string, string> }) {
+  const evidence = useMemo(() => uniqueArchitectureEvidence([...node.evidence, ...node.architecture?.roles.flatMap(role => role.evidence) ?? [], ...node.architecture?.configurationVariants?.flatMap(variant => variant.evidence) ?? []]), [node]);
+  const sites = new Set(evidence.map(item => JSON.stringify([item.path, item.start, item.end]))).size;
+  return <><p>{evidence.length} Evidence · {sites}ソース箇所</p><EvidenceList evidence={evidence} sources={sources} /></>;
+}
 function SemanticLinks({ analysis, node, onJump }: { analysis: SemanticAnalysis; node: SemanticNode; onJump: (id: string, view: SemanticViewId) => void }) {
   const links = useMemo(() => (['runtime-flow', 'function-call-flow', 'data-flow', 'data-model'] as const).map(view => ({ view, count: semanticNavigationContext(projectSemanticView(analysis, view), node).members?.length ?? 0 })), [analysis, node]);
   return <>{links.map(({ view, count }) => <p key={view}><button disabled={!count} title={count ? `${count}件の所属対象を範囲にして開く` : 'このViewに対応する下位の解析対象がありません'} onClick={() => onJump(node.id, view)}>{({ 'runtime-flow': 'Runtime Flow', 'function-call-flow': 'Function Call Flow', 'data-flow': 'Data Flow', 'data-model': 'Data Model' })[view]}</button> · {count}対象</p>)}</>;
@@ -31,6 +38,18 @@ function SemanticLinks({ analysis, node, onJump }: { analysis: SemanticAnalysis;
 function TechnologyLinks({ name }: { name: string }) {
   const exact = stacks.find(stack => stack.id === name), entries = exact ? [exact] : stacks.filter(stack => stack.packageNames?.includes(name));
   return <>{name}{entries.map(entry => <span key={entry.id}> · <Link to={stackPath(entry.id)}>{entry.name}</Link></span>)}</>;
+}
+
+function RelationEvidence({ edges, sources }: { edges: SemanticEdge[]; sources: Record<string, string> }) {
+  const [limit, setLimit] = useState(20);
+  const originals = architectureRelationOriginals(edges), counts = architectureRelationSummary(edges);
+  return <Disclosure title="元の関係・Evidenceを開く">{() => <>
+    <p>{counts.records}元関係 · {counts.evidence} Evidence · {counts.sites}ソース箇所</p>
+    <details className="architecture-count-definitions"><summary>件数の数え方</summary><p>元関係は異なる関係IDの数、ソース箇所は同じファイル・開始位置・終了位置を一つとした数、Evidenceはその箇所と説明文を一つとした根拠項目数です。同じ箇所から複数の関係や説明が得られるため、数は一致するとは限りません。通信・実行回数ではありません。</p><p>集約線の連続は、一連の実行経路を保証しません。</p></details>
+    {originals.slice(0, limit).map(original => <Disclosure key={original.id} title={`${architectureRelationLabel(original)} · ${confidenceLabels[original.confidence]} · ${original.evidence[0]?.path ?? '箇所未指定'}:${original.evidence[0]?.line ?? ''}`}>
+      {() => <><p>元の表記: {original.label}</p><p>種類: {original.kind} · {original.details?.environment || '環境共通・未指定'}</p><code>{original.source} → {original.target}</code><p><code>{original.id}</code></p><EvidenceList evidence={uniqueArchitectureEvidence(original.evidence)} sources={sources} /></>}
+    </Disclosure>)}{originals.length > limit && <button onClick={() => setLimit(limit + 30)}>元関係をさらに表示</button>}
+  </>}</Disclosure>;
 }
 
 export function ArchitectureDetail({ node, edge, graph, visible, sources, store, analysis, onOpen, onReveal, onSelect, onSelectEdge, onJump, onClose, onHoverTarget }: {
@@ -45,20 +64,23 @@ export function ArchitectureDetail({ node, edge, graph, visible, sources, store,
   const internal = useMemo(() => visible.architectureView?.internalRelations.filter(e => e.source === node?.id) ?? [], [visible.architectureView?.internalRelations, node?.id]);
   const boundary = useMemo(() => visible.architectureView?.boundaryRelations.filter(e => e.source === node?.id || e.target === node?.id) ?? [], [visible.architectureView?.boundaryRelations, node?.id]);
   const relations = useMemo(() => [...visible.edges.filter(e => e.source === node?.id || e.target === node?.id), ...boundary], [visible.edges, node?.id, boundary]);
-  const relationGroups = useMemo(() => {
-    const groups = new Map<string, { otherId: string; direction: 'incoming' | 'outgoing' | 'self'; edges: SemanticEdge[] }>();
-    for (const edge of relations) {
-      const direction = edge.source === edge.target ? 'self' : edge.source === node?.id ? 'outgoing' : 'incoming';
-      const otherId = direction === 'incoming' ? edge.source : edge.target, key = JSON.stringify([otherId, direction, edge.kind, edge.details?.environment]);
-      const group = groups.get(key) ?? { otherId, direction, edges: [] }; group.edges.push(edge); groups.set(key, group);
-    }
-    return [...groups.values()];
-  }, [relations, node?.id]);
-  const evidence = useMemo(() => uniqueArchitectureEvidence(edge?.evidence ?? [...node?.evidence ?? [], ...node?.architecture?.roles.flatMap(role => role.evidence) ?? [], ...node?.architecture?.configurationVariants?.flatMap(variant => variant.evidence) ?? []]), [edge, node]);
-  const sites = new Set(evidence.map(item => JSON.stringify([item.path, item.start, item.end]))).size;
-  const title = node?.label ?? (edge ? `${byId.get(edge.source)?.label ?? edge.source} → ${byId.get(edge.target)?.label ?? edge.target}` : '構成の詳細');
+  const partners = useMemo(() => architecturePartners(relations, node?.id ?? ''), [relations, node?.id]);
+  const partnerDisplays = useMemo(() => semanticNodeDisplays(partners.flatMap(partner => { const other = byId.get(partner.otherId); return other ? [other] : []; }), byId), [partners, byId]);
+  const title = node?.label ?? (edge ? architectureRelationLabel(edge) : '構成の詳細');
   const otherButton = (otherId: string, key: string) => { const other = byId.get(otherId); return <button onClick={() => onSelect(otherId)} {...semanticFlowHoverBindings<HTMLButtonElement>(onHoverTarget, { kind: 'node', id: otherId }, `architecture-detail-node:${key}`)}>{other?.label ?? '元の対象'}{other?.architecture?.identity ? ` · ${architectureEnvironmentLabel(other.architecture.environments)}` : ''}</button>; };
-  const relationButton = (edge: SemanticEdge) => <button onClick={() => onSelectEdge(edge.id)} {...semanticFlowHoverBindings<HTMLButtonElement>(onHoverTarget, { kind: 'edge', id: edge.id }, `architecture-detail-edge:${edge.id}`)}>{architectureRelationLabel(edge)} · {confidenceLabels[edge.confidence]} · 元関係 {architectureRelationCounts([edge]).records}件{edge.details?.environment ? ` · ${edge.details.environment}` : ''}</button>;
+  const relationButton = (edge: SemanticEdge) => { const summary = architectureRelationSummary([edge]); return <button onClick={() => onSelectEdge(edge.id)} {...semanticFlowHoverBindings<HTMLButtonElement>(onHoverTarget, { kind: 'edge', id: edge.id }, `architecture-detail-edge:${edge.id}`)}>{architectureRelationLabel(edge)} · {summary.status} · {summary.sites}箇所{edge.details?.environment ? ` · ${edge.details.environment}` : ''}</button>; };
+  const partnerDetails = (partner: ReturnType<typeof architecturePartners>[number]) => <>
+    <p>{otherButton(partner.otherId, `partner-${partner.otherId}`)} を選択{!visible.nodes.some(item => item.id === partner.otherId) ? ' · 現在の階層では点を表示していない境界の相手' : ''}</p>
+    {partner.relations.map(group => { const first = group.edges[0]!, summary = architectureRelationSummary(group.edges); return <div className="architecture-relation-group" key={JSON.stringify([group.direction, first.kind, first.details?.environment])} data-direction={group.direction}>
+      <p className="architecture-relation-direction">{group.direction === 'incoming' ? '相手から選択中の構成へ' : group.direction === 'self' ? 'この粒度の自己関係' : '選択中の構成から相手へ'}</p>
+      <strong>{architectureRelationLabel(first)}</strong><p className="architecture-relation-status">{summary.status} · {summary.sites}箇所{first.details?.environment ? ` · ${first.details.environment}` : ''}</p>
+      {group.edges.some(item => boundary.includes(item)) && <p>構成全体の接続 · 内部の対応箇所は未確認</p>}
+      <RelationEvidence edges={group.edges} sources={sources} />
+      {group.edges.map(item => <button key={item.id} onClick={() => onSelectEdge(item.id)} {...semanticFlowHoverBindings<HTMLButtonElement>(onHoverTarget, { kind: 'edge', id: item.id }, `architecture-partner-edge:${item.id}`)}>図で関係を選択{group.edges.length > 1 ? ` · ${architectureRelationSummary([item]).status}` : ''}</button>)}
+    </div>; })}
+  </>;
+  const partnerEntry = (partner: ReturnType<typeof architecturePartners>[number]) => { const other = byId.get(partner.otherId), disambiguation = other?.architecture?.identity || other?.attributes.architectureRequestGroup ? partnerDisplays.get(partner.otherId)?.disambiguation : undefined; return <div className="architecture-partner" data-partner-id={partner.otherId} key={partner.otherId}><Disclosure title={<span><strong>{other?.label ?? '元の対象'}</strong>{disambiguation && <small>{disambiguation}</small>}<small>{partner.description}／{partner.direction}</small></span>}>{() => partnerDetails(partner)}</Disclosure></div>; };
+  const requestOrigin = node && (arch?.request || node.attributes.architectureRequestGroup) ? architectureRequestSources(Array.isArray(node.attributes.requestIds) ? node.attributes.requestIds.map(id => byId.get(id)) : [node], byId) : undefined;
   return <aside className="analyzer-detail-panel is-module-detail semantic-detail semantic-flow-detail architecture-detail" aria-label="構成の詳細">
     <div className="analyzer-detail-heading"><h3>{title}</h3><button type="button" aria-label="詳細を閉じる" onClick={onClose}>×</button></div>
     {node && arch && <>
@@ -66,10 +88,11 @@ export function ArchitectureDetail({ node, edge, graph, visible, sources, store,
       {node.attributes.architectureContext && <p className="architecture-context-note">表示範囲外 · 周辺の構成として表示</p>}
       <dl className="analyzer-metadata-list architecture-summary">
         <div><dt>役割</dt><dd>{arch.request ? `${({ http: 'HTTP要求のコードを確認。接続先は未特定', process: '起動要求のコードを確認。起動先は未特定', auth: '認証SDKの使用・設定コードを確認。プロジェクトは未特定' })[arch.request.kind]}` : arch.codeUsage?.reason ?? (arch.roles.length ? `${arch.roles.slice(0, 2).map(role => role.label).join(' / ')}${arch.roles.length > 2 ? ` ほか${arch.roles.length - 2}役割` : ''}（推定）` : '具体的な役割は未判定')}</dd></div>
-        <div><dt>所属</dt><dd>{arch.parentId ? byId.get(arch.parentId)?.label : arch.ownerPath || (['application', 'component', 'shared-code', 'code-package'].includes(arch.kind) ? 'プロジェクト' : '外部・設定上の対象')}</dd></div>
+        {requestOrigin ? <div><dt>要求元</dt><dd>{requestOrigin.label.replace(/^要求元：/, '')}<small className="architecture-count-note">要求を書いた側です。接続先の所属は未特定です。</small>{requestOrigin.sources.length > 1 && <Disclosure title="要求元の内訳">{() => <>{requestOrigin.sources.map(source => <p key={source.id}>{otherButton(source.id, `request-${source.id}`)}</p>)}{requestOrigin.unknown && <p>要求元未確認の要求も含みます。</p>}</>}</Disclosure>}</dd></div>
+          : <div><dt>所属</dt><dd>{arch.parentId ? byId.get(arch.parentId)?.label : arch.ownerPath || (['application', 'component', 'shared-code', 'code-package'].includes(arch.kind) ? 'プロジェクト' : '外部・設定上の対象')}</dd></div>}
         <div><dt>環境・設定</dt><dd>{arch.context.join(' / ') || '実行先未判定'} · {architectureEnvironmentLabel(arch.environments)}</dd></div>
       </dl>
-      {relationGroups.length > 0 && <div className="architecture-summary-partners"><strong>主な相手</strong>{relationGroups.slice(0, 3).map((group, index) => <p key={index}>{otherButton(group.otherId, `summary-${index}`)} · {architectureRelationLabel(group.edges[0]!)}{group.direction === 'incoming' ? '（相手から）' : group.direction === 'self' ? '（この粒度の自己関係）' : ''}</p>)}{relationGroups.length > 3 && <small>ほか{relationGroups.length - 3}組。つながる相手で確認できます。</small>}</div>}
+      <div className="architecture-summary-partners"><strong>主な相手</strong>{partners.slice(0, 3).map(partnerEntry)}{partners.length > 3 && <small>ほか{partners.length - 3}相手。つながる相手で確認できます。</small>}{!partners.length && <p>現在の表示条件で、つながる相手はありません。</p>}</div>
       {children.length > 0 && <button className="architecture-open-action" onClick={() => onOpen(node.id)}>{node.attributes.architectureContext ? 'この構成を開く' : '内部を開く'}</button>}
       <Disclosure title="専門Viewで調べる">{() => <><SemanticLinks analysis={analysis} node={node} onJump={onJump} /><ArchitectureExpertLinks node={node} store={store} /></>}</Disclosure>
       <Disclosure title={`内部の構成 · 全${children.length}要素 / 表示条件内の関係 ${architectureRelationCounts(internal).records}件`}>{() => <>
@@ -78,13 +101,9 @@ export function ArchitectureDetail({ node, edge, graph, visible, sources, store,
         {internal.length > 0 && <><p>現在の表示条件で同じ構成要素に収まる関係です。下位の再帰も含み、構成全体の自己通信を意味しません。</p>{internal.map(e => <p key={e.id}>{relationButton(e)}</p>)}</>}
         <Disclosure title="構成ファイル一覧">{() => arch.files.map(path => <p key={path}><code>{path}</code></p>)}</Disclosure>
       </>}</Disclosure>
-      <Disclosure title={`つながる相手 · ${relationGroups.length}組 / 元関係 ${architectureRelationCounts(relations).records}件`}>{() => <>
+      <Disclosure title={`つながる相手 · ${partners.length}相手`}>{() => <>
         <p>現在の環境・補助コードなどの表示条件を適用。内部関係は別欄です。構成全体の境界接続は内部の対応箇所を確認できていません。</p>
-        {relationGroups.slice(0, relationLimit).map((group, index) => <div className="architecture-relation-group" key={index} data-direction={group.direction}>
-          <p>{otherButton(group.otherId, `group-${index}`)} · {group.direction === 'incoming' ? '入る関係' : group.direction === 'self' ? 'この粒度の自己関係' : '出る関係'}</p>
-          <p>{architectureRelationLabel(group.edges[0]!)} · ソース上の {architectureRelationCounts(group.edges).sites}箇所</p>
-          {group.edges.map(e => <p key={e.id}>{relationButton(e)}{boundary.includes(e) ? ' · 構成全体の接続' : ''}{byId.get(group.otherId)?.architecture?.kind === 'unresolved' ? ' · 相手は未特定' : ''}</p>)}
-        </div>)}{relationGroups.length > relationLimit && <button onClick={() => setRelationLimit(relationLimit + 30)}>関係をさらに表示</button>}
+        {partners.slice(0, relationLimit).map(partnerEntry)}{partners.length > relationLimit && <button onClick={() => setRelationLimit(relationLimit + 30)}>相手をさらに表示</button>}
       </>}</Disclosure>
       <Disclosure title={`技術の宣言・参照 · ${arch.technologies?.length ?? arch.technologyNames.length}件`}>{() => <>
         <p>パッケージの依存区分だけでは、この実行主体で動く技術と確定しません。</p>
@@ -105,19 +124,14 @@ export function ArchitectureDetail({ node, edge, graph, visible, sources, store,
       {arch.request && <Disclosure title="確認した要求式・箇所">{() => <><p>要求や設定のコードを確認しています。同じ相手への実行回数ではありません。</p><pre>{arch.request!.expression}</pre><code>{arch.request!.sourceId}</code></>}</Disclosure>}
     </>}
     {edge && <>
-      <p className="architecture-detail-kind"><strong>選択中の関係</strong> · {architectureRelationLabel(edge)}</p>
-      <p>{otherButton(edge.source, 'source')} から {otherButton(edge.target, 'target')} へ · {confidenceLabels[edge.confidence]}</p>
-      <p>元関係 {architectureRelationCounts([edge]).records}件 / ソース上の {architectureRelationCounts([edge]).sites}箇所 · {edge.details?.environment || '環境共通・未指定'}</p>
+      <p className="architecture-detail-kind"><strong>選択中の関係</strong></p>
+      <p>{otherButton(edge.source, 'source')} から {otherButton(edge.target, 'target')} へ</p>
+      <p>{architectureRelationSummary([edge]).status} · {architectureRelationSummary([edge]).sites}箇所 · {edge.details?.environment || '環境共通・未指定'}</p>
       {edge.details?.architectureRelation === 'internal' && <p>表示上は一つの構成要素に収まる内部関係です。アプリ全体の自己通信を示しません。</p>}
       {edge.details?.architectureRelation === 'self' && <p>現在の構成粒度で確認した自己関係です。</p>}
-      <Disclosure title={`元の関係 · ${(edge.provenance?.edges ?? [edge]).length}件`}>{() => <>
-        <p>集約線の連続は一連の実行経路を保証しません。件数は関係レコード数で、通信・実行回数ではありません。</p>
-        {(edge.provenance?.edges ?? [edge]).slice(0, relationLimit).map(original => <Disclosure key={original.id} title={`${architectureRelationLabel(original)} · ${confidenceLabels[original.confidence]} · ${original.evidence[0]?.path ?? '箇所未指定'}:${original.evidence[0]?.line ?? ''}`}>
-          {() => <><p>元の表記: {original.label}</p><p>種類: {original.kind} · {original.details?.environment || '環境共通・未指定'}</p><code>{original.source} → {original.target}</code><EvidenceList evidence={original.evidence} sources={sources} /></>}
-        </Disclosure>)}{(edge.provenance?.edges.length ?? 0) > relationLimit && <button onClick={() => setRelationLimit(relationLimit + 30)}>元関係をさらに表示</button>}
-      </>}</Disclosure>
+      <RelationEvidence edges={[edge]} sources={sources} />
     </>}
-    <Disclosure title={`元の根拠・Evidence · ${evidence.length}件 / ${sites}固有箇所`}>{() => <EvidenceList evidence={evidence} sources={sources} />}</Disclosure>
+    {node && !edge && <Disclosure title="元の根拠・Evidence">{() => <NodeEvidence node={node} sources={sources} />}</Disclosure>}
     <Disclosure title="内部メタデータ">{() => <pre>{JSON.stringify(node ? { id: node.id, attributes: node.attributes } : { id: edge?.id, kind: edge?.kind }, null, 2)}</pre>}</Disclosure>
   </aside>;
 }

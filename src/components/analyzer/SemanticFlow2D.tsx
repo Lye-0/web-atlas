@@ -211,7 +211,7 @@ function SemanticLocalFlow2D({ graph, explorer, nodeDisplays, selectedIds, selec
           {selected && <rect className="semantic-flow-selection-ring" x={-111} y={-35} width={222} height={70} rx={10} />}
           {graph.view !== 'architecture-map' && point.node.id === centerId && <text x={-106} y={-42} className="semantic-explorer-center-mark">中心</text>}
           {detail ? <foreignObject x={-94} y={-23} width={188} height={48} pointerEvents="none"><div className="semantic-explorer-node-copy"><strong>{display.title}</strong>
-            <small>{roleLabel && <span className="semantic-flow-2d-role">{roleLabel} · </span>}{display.disambiguation ?? display.location}</small></div></foreignObject>
+            <small>{roleLabel && !point.node.architecture?.request && !point.node.attributes.architectureRequestGroup && <span className="semantic-flow-2d-role">{roleLabel} · </span>}{display.disambiguation ?? display.location}</small></div></foreignObject>
             : <circle r={8} className="semantic-flow-node-dot" />}
         </g>;
       })}</g>

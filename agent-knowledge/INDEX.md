@@ -12,6 +12,14 @@
 - files: `src/analyzer/semantic/architecture.ts`, `src/analyzer/semantic/architectureProjection.ts`, `src/analyzer/semantic/architecture.test.ts` …
 - memory: `agent-knowledge/entries/2026-09-09-architecture-semantic-boundary-92df18.md`
 
+### Architectureの元関係数は二段階の表示集約をほどいて数える
+- id: `rm-20260910-architecture-original-counts`
+- type: `constraint`
+- maturity: `candidate`
+- tags: `architecture`, `provenance`, `evidence`, `counts`
+- files: `src/analyzer/semantic/architectureRelations.ts`, `src/analyzer/semantic/flowAutoAggregation.ts`, `src/components/analyzer/architectureSummary.ts` …
+- memory: `agent-knowledge/entries/2026-09-10-architecture-original-counts-b68c11.md`
+
 ## analyzer-flow
 
 ### Flowの共有ホバーは入力元と表示寿命を区別する

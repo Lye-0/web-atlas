@@ -1,0 +1,3514 @@
+{
+  "date": "2026-09-10",
+  "baseline": "4f28a339cbeac0adbc24bd3c72d6156dd33efa81",
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36 Edg/152.0.0.0",
+    "width": 1600,
+    "height": 1000,
+    "dpr": 1
+  },
+  "method": "Local instrumented production builds; same 112/214 static input files; 3 runs per input; default particles; inside Git Lines host / vehicle-management API; 3 selection/clear and 3 16-step rotations for each auto/surroundings setting. RAF intervals are main-thread callback intervals, not GPU timing. Initial readiness is recorded separately and is not an optimization claim.",
+  "ready": [
+    {
+      "stage": "before",
+      "name": "git-lines",
+      "ms": [
+        3916,
+        4014,
+        3996
+      ]
+    },
+    {
+      "stage": "before",
+      "name": "vehicle-management",
+      "ms": [
+        18657,
+        19407,
+        19161
+      ]
+    },
+    {
+      "stage": "after",
+      "name": "git-lines",
+      "ms": [
+        3825,
+        3912,
+        3849
+      ]
+    },
+    {
+      "stage": "after",
+      "name": "vehicle-management",
+      "ms": [
+        17046,
+        17045,
+        17175
+      ]
+    }
+  ],
+  "rows": [
+    {
+      "stage": "before",
+      "name": "git-lines",
+      "auto": true,
+      "surroundings": true,
+      "runs": 3,
+      "points": [
+        7,
+        7,
+        7
+      ],
+      "paths": [
+        29,
+        29,
+        29
+      ],
+      "selectionMs": {
+        "samples": 9,
+        "median": 100,
+        "p95": 133,
+        "min": 71,
+        "max": 133
+      },
+      "selectionSamples": [
+        114,
+        99,
+        73,
+        97,
+        133,
+        71,
+        114,
+        100,
+        116
+      ],
+      "contextToggleMs": {
+        "samples": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "rotationGestureMs": {
+        "samples": 9,
+        "median": 330,
+        "p95": 346,
+        "min": 325,
+        "max": 346
+      },
+      "rafMedianMs": {
+        "samples": 3,
+        "median": 16.699999999999818,
+        "p95": 16.699999999999818,
+        "min": 16.699999999999818,
+        "max": 16.699999999999818
+      },
+      "rafP95Ms": {
+        "samples": 3,
+        "median": 16.800000000000182,
+        "p95": 16.800000000000182,
+        "min": 16.700000000000728,
+        "max": 16.800000000000182
+      },
+      "longTasks": 0,
+      "visibleLabels": [
+        7,
+        7,
+        7
+      ],
+      "labelProjection": [
+        {
+          "calls": 51,
+          "totalMs": 11.200000040233135,
+          "maxMs": 0.5,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.30000000447034836,
+            "maxMs": 0.5,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 51,
+          "totalMs": 11.299999967217445,
+          "maxMs": 0.3999999985098839,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.30000000447034836,
+            "maxMs": 0.3999999985098839,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 52,
+          "totalMs": 12.500000022351742,
+          "maxMs": 0.3999999985098839,
+          "distribution": {
+            "samples": 52,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.3999999985098839,
+            "maxMs": 0.3999999985098839,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        }
+      ],
+      "architectureProjectionCalls": [
+        0,
+        0,
+        0
+      ],
+      "errors": []
+    },
+    {
+      "stage": "before",
+      "name": "git-lines",
+      "auto": true,
+      "surroundings": false,
+      "runs": 3,
+      "points": [
+        7,
+        7,
+        7
+      ],
+      "paths": [
+        29,
+        29,
+        29
+      ],
+      "selectionMs": {
+        "samples": 9,
+        "median": 72,
+        "p95": 111,
+        "min": 62,
+        "max": 111
+      },
+      "selectionSamples": [
+        62,
+        72,
+        72,
+        64,
+        72,
+        100,
+        62,
+        111,
+        71
+      ],
+      "contextToggleMs": {
+        "samples": 3,
+        "median": 923,
+        "p95": 970,
+        "min": 55,
+        "max": 970
+      },
+      "rotationGestureMs": {
+        "samples": 9,
+        "median": 325,
+        "p95": 331,
+        "min": 313,
+        "max": 331
+      },
+      "rafMedianMs": {
+        "samples": 3,
+        "median": 16.69999999999891,
+        "p95": 16.69999999999891,
+        "min": 16.69999999999891,
+        "max": 16.69999999999891
+      },
+      "rafP95Ms": {
+        "samples": 3,
+        "median": 16.799999999999272,
+        "p95": 16.80000000000109,
+        "min": 16.700000000000728,
+        "max": 16.80000000000109
+      },
+      "longTasks": 0,
+      "visibleLabels": [
+        8,
+        8,
+        8
+      ],
+      "labelProjection": [
+        {
+          "calls": 51,
+          "totalMs": 10.99999999254942,
+          "maxMs": 0.3999999985098839,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.30000000447034836,
+            "maxMs": 0.3999999985098839,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 51,
+          "totalMs": 11.399999998509884,
+          "maxMs": 0.3999999985098839,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.30000000447034836,
+            "maxMs": 0.3999999985098839,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 51,
+          "totalMs": 12.30000002682209,
+          "maxMs": 0.4000000059604645,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.3999999985098839,
+            "maxMs": 0.4000000059604645,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        }
+      ],
+      "architectureProjectionCalls": [
+        0,
+        0,
+        0
+      ],
+      "errors": []
+    },
+    {
+      "stage": "before",
+      "name": "git-lines",
+      "auto": false,
+      "surroundings": true,
+      "runs": 3,
+      "points": [
+        7,
+        7,
+        7
+      ],
+      "paths": [
+        29,
+        29,
+        29
+      ],
+      "selectionMs": {
+        "samples": 9,
+        "median": 72,
+        "p95": 99,
+        "min": 64,
+        "max": 99
+      },
+      "selectionSamples": [
+        64,
+        73,
+        72,
+        65,
+        71,
+        72,
+        68,
+        99,
+        72
+      ],
+      "contextToggleMs": {
+        "samples": 3,
+        "median": 58,
+        "p95": 59,
+        "min": 58,
+        "max": 59
+      },
+      "rotationGestureMs": {
+        "samples": 9,
+        "median": 327,
+        "p95": 331,
+        "min": 314,
+        "max": 331
+      },
+      "rafMedianMs": {
+        "samples": 3,
+        "median": 16.69999999999891,
+        "p95": 16.69999999999891,
+        "min": 16.69999999999891,
+        "max": 16.69999999999891
+      },
+      "rafP95Ms": {
+        "samples": 3,
+        "median": 16.80000000000109,
+        "p95": 16.80000000000109,
+        "min": 16.700000000000728,
+        "max": 16.80000000000109
+      },
+      "longTasks": 0,
+      "visibleLabels": [
+        8,
+        8,
+        8
+      ],
+      "labelProjection": [
+        {
+          "calls": 37,
+          "totalMs": 7.699999995529652,
+          "maxMs": 0.30000000447034836,
+          "distribution": {
+            "samples": 37,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.30000000447034836,
+            "maxMs": 0.30000000447034836,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 37,
+          "totalMs": 8.400000028312206,
+          "maxMs": 0.4000000059604645,
+          "distribution": {
+            "samples": 37,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.3999999985098839,
+            "maxMs": 0.4000000059604645,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 37,
+          "totalMs": 8.900000035762787,
+          "maxMs": 0.3999999985098839,
+          "distribution": {
+            "samples": 37,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.3999999985098839,
+            "maxMs": 0.3999999985098839,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        }
+      ],
+      "architectureProjectionCalls": [
+        0,
+        0,
+        0
+      ],
+      "errors": []
+    },
+    {
+      "stage": "before",
+      "name": "git-lines",
+      "auto": false,
+      "surroundings": false,
+      "runs": 3,
+      "points": [
+        7,
+        7,
+        7
+      ],
+      "paths": [
+        29,
+        29,
+        29
+      ],
+      "selectionMs": {
+        "samples": 9,
+        "median": 71,
+        "p95": 99,
+        "min": 64,
+        "max": 99
+      },
+      "selectionSamples": [
+        64,
+        71,
+        72,
+        66,
+        70,
+        71,
+        91,
+        72,
+        99
+      ],
+      "contextToggleMs": {
+        "samples": 3,
+        "median": 55,
+        "p95": 68,
+        "min": 55,
+        "max": 68
+      },
+      "rotationGestureMs": {
+        "samples": 9,
+        "median": 310,
+        "p95": 311,
+        "min": 302,
+        "max": 311
+      },
+      "rafMedianMs": {
+        "samples": 3,
+        "median": 16.69999999999891,
+        "p95": 16.69999999999891,
+        "min": 16.69999999999891,
+        "max": 16.69999999999891
+      },
+      "rafP95Ms": {
+        "samples": 3,
+        "median": 16.799999999999272,
+        "p95": 16.80000000000109,
+        "min": 16.799999999999272,
+        "max": 16.80000000000109
+      },
+      "longTasks": 0,
+      "visibleLabels": [
+        8,
+        8,
+        8
+      ],
+      "labelProjection": [
+        {
+          "calls": 10,
+          "totalMs": 2.099999986588955,
+          "maxMs": 0.30000000447034836,
+          "distribution": {
+            "samples": 10,
+            "medianMs": 0.19999999552965164,
+            "p95Ms": 0.30000000447034836,
+            "maxMs": 0.30000000447034836,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 9,
+          "totalMs": 1.8999999985098839,
+          "maxMs": 0.29999999701976776,
+          "distribution": {
+            "samples": 9,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.29999999701976776,
+            "maxMs": 0.29999999701976776,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 9,
+          "totalMs": 1.8999999910593033,
+          "maxMs": 0.3999999985098839,
+          "distribution": {
+            "samples": 9,
+            "medianMs": 0.19999999552965164,
+            "p95Ms": 0.3999999985098839,
+            "maxMs": 0.3999999985098839,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        }
+      ],
+      "architectureProjectionCalls": [
+        0,
+        0,
+        0
+      ],
+      "errors": []
+    },
+    {
+      "stage": "before",
+      "name": "vehicle-management",
+      "auto": true,
+      "surroundings": true,
+      "runs": 3,
+      "points": [
+        26,
+        26,
+        26
+      ],
+      "paths": [
+        17,
+        17,
+        17
+      ],
+      "selectionMs": {
+        "samples": 9,
+        "median": 164,
+        "p95": 185,
+        "min": 164,
+        "max": 185
+      },
+      "selectionSamples": [
+        185,
+        164,
+        164,
+        179,
+        164,
+        165,
+        176,
+        164,
+        164
+      ],
+      "contextToggleMs": {
+        "samples": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "rotationGestureMs": {
+        "samples": 9,
+        "median": 313,
+        "p95": 331,
+        "min": 307,
+        "max": 331
+      },
+      "rafMedianMs": {
+        "samples": 3,
+        "median": 16.700000000000728,
+        "p95": 16.700000000000728,
+        "min": 16.69999999999709,
+        "max": 16.700000000000728
+      },
+      "rafP95Ms": {
+        "samples": 3,
+        "median": 16.799999999999272,
+        "p95": 16.799999999999272,
+        "min": 16.799999999999272,
+        "max": 16.799999999999272
+      },
+      "longTasks": 0,
+      "visibleLabels": [
+        8,
+        8,
+        8
+      ],
+      "labelProjection": [
+        {
+          "calls": 52,
+          "totalMs": 13.999999985098839,
+          "maxMs": 0.5,
+          "distribution": {
+            "samples": 52,
+            "medianMs": 0.29999999701976776,
+            "p95Ms": 0.5,
+            "maxMs": 0.5,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 52,
+          "totalMs": 15.899999976158142,
+          "maxMs": 0.5999999940395355,
+          "distribution": {
+            "samples": 52,
+            "medianMs": 0.29999999701976776,
+            "p95Ms": 0.5,
+            "maxMs": 0.5999999940395355,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 52,
+          "totalMs": 14.400000005960464,
+          "maxMs": 0.6000000014901161,
+          "distribution": {
+            "samples": 52,
+            "medianMs": 0.29999999701976776,
+            "p95Ms": 0.5,
+            "maxMs": 0.6000000014901161,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        }
+      ],
+      "architectureProjectionCalls": [
+        0,
+        0,
+        0
+      ],
+      "errors": []
+    },
+    {
+      "stage": "before",
+      "name": "vehicle-management",
+      "auto": true,
+      "surroundings": false,
+      "runs": 3,
+      "points": [
+        12,
+        12,
+        12
+      ],
+      "paths": [
+        17,
+        17,
+        17
+      ],
+      "selectionMs": {
+        "samples": 9,
+        "median": 150,
+        "p95": 166,
+        "min": 139,
+        "max": 166
+      },
+      "selectionSamples": [
+        156,
+        149,
+        165,
+        139,
+        166,
+        150,
+        155,
+        150,
+        149
+      ],
+      "contextToggleMs": {
+        "samples": 3,
+        "median": 935,
+        "p95": 935,
+        "min": 934,
+        "max": 935
+      },
+      "rotationGestureMs": {
+        "samples": 9,
+        "median": 327,
+        "p95": 347,
+        "min": 313,
+        "max": 347
+      },
+      "rafMedianMs": {
+        "samples": 3,
+        "median": 16.69999999999709,
+        "p95": 16.69999999999709,
+        "min": 16.69999999999709,
+        "max": 16.69999999999709
+      },
+      "rafP95Ms": {
+        "samples": 3,
+        "median": 16.799999999999272,
+        "p95": 16.799999999999272,
+        "min": 16.799999999999272,
+        "max": 16.799999999999272
+      },
+      "longTasks": 0,
+      "visibleLabels": [
+        5,
+        5,
+        5
+      ],
+      "labelProjection": [
+        {
+          "calls": 51,
+          "totalMs": 10.099999994039536,
+          "maxMs": 0.3999999985098839,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.19999999552965164,
+            "p95Ms": 0.30000000447034836,
+            "maxMs": 0.3999999985098839,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 51,
+          "totalMs": 9.200000010430813,
+          "maxMs": 0.30000000447034836,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.19999999552965164,
+            "p95Ms": 0.30000000447034836,
+            "maxMs": 0.30000000447034836,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 51,
+          "totalMs": 10.299999982118607,
+          "maxMs": 0.3999999985098839,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.30000000447034836,
+            "maxMs": 0.3999999985098839,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        }
+      ],
+      "architectureProjectionCalls": [
+        0,
+        0,
+        0
+      ],
+      "errors": []
+    },
+    {
+      "stage": "before",
+      "name": "vehicle-management",
+      "auto": false,
+      "surroundings": true,
+      "runs": 3,
+      "points": [
+        26,
+        26,
+        26
+      ],
+      "paths": [
+        17,
+        17,
+        17
+      ],
+      "selectionMs": {
+        "samples": 9,
+        "median": 166,
+        "p95": 187,
+        "min": 140,
+        "max": 187
+      },
+      "selectionSamples": [
+        173,
+        149,
+        149,
+        140,
+        149,
+        166,
+        187,
+        166,
+        182
+      ],
+      "contextToggleMs": {
+        "samples": 3,
+        "median": 74,
+        "p95": 91,
+        "min": 59,
+        "max": 91
+      },
+      "rotationGestureMs": {
+        "samples": 9,
+        "median": 313,
+        "p95": 314,
+        "min": 307,
+        "max": 314
+      },
+      "rafMedianMs": {
+        "samples": 3,
+        "median": 16.700000000000728,
+        "p95": 16.700000000000728,
+        "min": 16.69999999999709,
+        "max": 16.700000000000728
+      },
+      "rafP95Ms": {
+        "samples": 3,
+        "median": 16.799999999999272,
+        "p95": 16.80000000000291,
+        "min": 16.799999999999272,
+        "max": 16.80000000000291
+      },
+      "longTasks": 0,
+      "visibleLabels": [
+        10,
+        10,
+        10
+      ],
+      "labelProjection": [
+        {
+          "calls": 52,
+          "totalMs": 11.999999985098839,
+          "maxMs": 0.4000000059604645,
+          "distribution": {
+            "samples": 52,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.3999999985098839,
+            "maxMs": 0.4000000059604645,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 52,
+          "totalMs": 12.200000017881393,
+          "maxMs": 0.4000000059604645,
+          "distribution": {
+            "samples": 52,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.3999999985098839,
+            "maxMs": 0.4000000059604645,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 52,
+          "totalMs": 12.00000000745058,
+          "maxMs": 0.6000000014901161,
+          "distribution": {
+            "samples": 52,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.3999999985098839,
+            "maxMs": 0.6000000014901161,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        }
+      ],
+      "architectureProjectionCalls": [
+        0,
+        0,
+        0
+      ],
+      "errors": []
+    },
+    {
+      "stage": "before",
+      "name": "vehicle-management",
+      "auto": false,
+      "surroundings": false,
+      "runs": 3,
+      "points": [
+        12,
+        12,
+        12
+      ],
+      "paths": [
+        17,
+        17,
+        17
+      ],
+      "selectionMs": {
+        "samples": 9,
+        "median": 166,
+        "p95": 169,
+        "min": 140,
+        "max": 169
+      },
+      "selectionSamples": [
+        140,
+        149,
+        166,
+        168,
+        166,
+        166,
+        169,
+        148,
+        166
+      ],
+      "contextToggleMs": {
+        "samples": 3,
+        "median": 69,
+        "p95": 102,
+        "min": 68,
+        "max": 102
+      },
+      "rotationGestureMs": {
+        "samples": 9,
+        "median": 313,
+        "p95": 314,
+        "min": 308,
+        "max": 314
+      },
+      "rafMedianMs": {
+        "samples": 3,
+        "median": 16.700000000000728,
+        "p95": 16.700000000000728,
+        "min": 16.700000000000728,
+        "max": 16.700000000000728
+      },
+      "rafP95Ms": {
+        "samples": 3,
+        "median": 16.799999999999272,
+        "p95": 16.799999999999272,
+        "min": 16.799999999999272,
+        "max": 16.799999999999272
+      },
+      "longTasks": 0,
+      "visibleLabels": [
+        4,
+        4,
+        4
+      ],
+      "labelProjection": [
+        {
+          "calls": 37,
+          "totalMs": 5.600000008940697,
+          "maxMs": 0.29999999701976776,
+          "distribution": {
+            "samples": 37,
+            "medianMs": 0.19999999552965164,
+            "p95Ms": 0.29999999701976776,
+            "maxMs": 0.29999999701976776,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 38,
+          "totalMs": 5.400000013411045,
+          "maxMs": 0.30000000447034836,
+          "distribution": {
+            "samples": 38,
+            "medianMs": 0.10000000149011612,
+            "p95Ms": 0.29999999701976776,
+            "maxMs": 0.30000000447034836,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 37,
+          "totalMs": 6.299999997019768,
+          "maxMs": 0.30000000447034836,
+          "distribution": {
+            "samples": 37,
+            "medianMs": 0.19999999552965164,
+            "p95Ms": 0.30000000447034836,
+            "maxMs": 0.30000000447034836,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        }
+      ],
+      "architectureProjectionCalls": [
+        0,
+        0,
+        0
+      ],
+      "errors": []
+    },
+    {
+      "stage": "after",
+      "name": "git-lines",
+      "auto": true,
+      "surroundings": true,
+      "runs": 3,
+      "points": [
+        7,
+        7,
+        7
+      ],
+      "paths": [
+        29,
+        29,
+        29
+      ],
+      "selectionMs": {
+        "samples": 9,
+        "median": 74,
+        "p95": 100,
+        "min": 70,
+        "max": 100
+      },
+      "selectionSamples": [
+        91,
+        71,
+        70,
+        74,
+        98,
+        81,
+        100,
+        72,
+        71
+      ],
+      "contextToggleMs": {
+        "samples": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "rotationGestureMs": {
+        "samples": 9,
+        "median": 329,
+        "p95": 344,
+        "min": 322,
+        "max": 344
+      },
+      "rafMedianMs": {
+        "samples": 3,
+        "median": 16.699999999999818,
+        "p95": 16.699999999999818,
+        "min": 16.699999999999818,
+        "max": 16.699999999999818
+      },
+      "rafP95Ms": {
+        "samples": 3,
+        "median": 16.700000000000728,
+        "p95": 16.800000000000182,
+        "min": 16.700000000000728,
+        "max": 16.800000000000182
+      },
+      "longTasks": 0,
+      "visibleLabels": [
+        7,
+        7,
+        7
+      ],
+      "labelProjection": [
+        {
+          "calls": 51,
+          "totalMs": 9.700000010430813,
+          "maxMs": 0.30000000447034836,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.19999999552965164,
+            "p95Ms": 0.30000000447034836,
+            "maxMs": 0.30000000447034836,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 51,
+          "totalMs": 13.799999974668026,
+          "maxMs": 0.6000000014901161,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.29999999701976776,
+            "p95Ms": 0.4000000059604645,
+            "maxMs": 0.6000000014901161,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 51,
+          "totalMs": 10.599999994039536,
+          "maxMs": 0.4000000059604645,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.30000000447034836,
+            "maxMs": 0.4000000059604645,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        }
+      ],
+      "architectureProjectionCalls": [
+        0,
+        0,
+        0
+      ],
+      "errors": []
+    },
+    {
+      "stage": "after",
+      "name": "git-lines",
+      "auto": true,
+      "surroundings": false,
+      "runs": 3,
+      "points": [
+        7,
+        7,
+        7
+      ],
+      "paths": [
+        29,
+        29,
+        29
+      ],
+      "selectionMs": {
+        "samples": 9,
+        "median": 64,
+        "p95": 99,
+        "min": 63,
+        "max": 99
+      },
+      "selectionSamples": [
+        64,
+        72,
+        63,
+        63,
+        99,
+        63,
+        63,
+        72,
+        92
+      ],
+      "contextToggleMs": {
+        "samples": 3,
+        "median": 922,
+        "p95": 922,
+        "min": 921,
+        "max": 922
+      },
+      "rotationGestureMs": {
+        "samples": 9,
+        "median": 326,
+        "p95": 331,
+        "min": 312,
+        "max": 331
+      },
+      "rafMedianMs": {
+        "samples": 3,
+        "median": 16.69999999999891,
+        "p95": 16.69999999999891,
+        "min": 16.69999999999891,
+        "max": 16.69999999999891
+      },
+      "rafP95Ms": {
+        "samples": 3,
+        "median": 16.80000000000109,
+        "p95": 16.80000000000109,
+        "min": 16.799999999999272,
+        "max": 16.80000000000109
+      },
+      "longTasks": 0,
+      "visibleLabels": [
+        8,
+        8,
+        8
+      ],
+      "labelProjection": [
+        {
+          "calls": 51,
+          "totalMs": 11.80000001937151,
+          "maxMs": 0.6000000014901161,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.3999999985098839,
+            "maxMs": 0.6000000014901161,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 51,
+          "totalMs": 12.499999985098839,
+          "maxMs": 0.3999999985098839,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.29999999701976776,
+            "p95Ms": 0.30000000447034836,
+            "maxMs": 0.3999999985098839,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 51,
+          "totalMs": 13.299999997019768,
+          "maxMs": 0.4000000059604645,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.29999999701976776,
+            "p95Ms": 0.3999999985098839,
+            "maxMs": 0.4000000059604645,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        }
+      ],
+      "architectureProjectionCalls": [
+        0,
+        0,
+        0
+      ],
+      "errors": []
+    },
+    {
+      "stage": "after",
+      "name": "git-lines",
+      "auto": false,
+      "surroundings": true,
+      "runs": 3,
+      "points": [
+        7,
+        7,
+        7
+      ],
+      "paths": [
+        29,
+        29,
+        29
+      ],
+      "selectionMs": {
+        "samples": 9,
+        "median": 71,
+        "p95": 106,
+        "min": 60,
+        "max": 106
+      },
+      "selectionSamples": [
+        72,
+        71,
+        106,
+        60,
+        71,
+        70,
+        64,
+        79,
+        105
+      ],
+      "contextToggleMs": {
+        "samples": 3,
+        "median": 59,
+        "p95": 59,
+        "min": 58,
+        "max": 59
+      },
+      "rotationGestureMs": {
+        "samples": 9,
+        "median": 325,
+        "p95": 330,
+        "min": 312,
+        "max": 330
+      },
+      "rafMedianMs": {
+        "samples": 3,
+        "median": 16.69999999999891,
+        "p95": 16.700000000000728,
+        "min": 16.69999999999891,
+        "max": 16.700000000000728
+      },
+      "rafP95Ms": {
+        "samples": 3,
+        "median": 16.80000000000109,
+        "p95": 16.80000000000109,
+        "min": 16.799999999999272,
+        "max": 16.80000000000109
+      },
+      "longTasks": 0,
+      "visibleLabels": [
+        8,
+        8,
+        8
+      ],
+      "labelProjection": [
+        {
+          "calls": 37,
+          "totalMs": 7.499999992549419,
+          "maxMs": 0.30000000447034836,
+          "distribution": {
+            "samples": 37,
+            "medianMs": 0.19999999552965164,
+            "p95Ms": 0.30000000447034836,
+            "maxMs": 0.30000000447034836,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 37,
+          "totalMs": 8.199999995529652,
+          "maxMs": 0.30000000447034836,
+          "distribution": {
+            "samples": 37,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.30000000447034836,
+            "maxMs": 0.30000000447034836,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 37,
+          "totalMs": 7.699999995529652,
+          "maxMs": 0.3999999985098839,
+          "distribution": {
+            "samples": 37,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.30000000447034836,
+            "maxMs": 0.3999999985098839,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        }
+      ],
+      "architectureProjectionCalls": [
+        0,
+        0,
+        0
+      ],
+      "errors": []
+    },
+    {
+      "stage": "after",
+      "name": "git-lines",
+      "auto": false,
+      "surroundings": false,
+      "runs": 3,
+      "points": [
+        7,
+        7,
+        7
+      ],
+      "paths": [
+        29,
+        29,
+        29
+      ],
+      "selectionMs": {
+        "samples": 9,
+        "median": 72,
+        "p95": 104,
+        "min": 62,
+        "max": 104
+      },
+      "selectionSamples": [
+        62,
+        72,
+        104,
+        64,
+        99,
+        71,
+        62,
+        73,
+        99
+      ],
+      "contextToggleMs": {
+        "samples": 3,
+        "median": 54,
+        "p95": 70,
+        "min": 53,
+        "max": 70
+      },
+      "rotationGestureMs": {
+        "samples": 9,
+        "median": 312,
+        "p95": 326,
+        "min": 308,
+        "max": 326
+      },
+      "rafMedianMs": {
+        "samples": 3,
+        "median": 16.69999999999891,
+        "p95": 16.69999999999891,
+        "min": 16.69999999999891,
+        "max": 16.69999999999891
+      },
+      "rafP95Ms": {
+        "samples": 3,
+        "median": 16.799999999999272,
+        "p95": 16.799999999999272,
+        "min": 16.799999999999272,
+        "max": 16.799999999999272
+      },
+      "longTasks": 0,
+      "visibleLabels": [
+        8,
+        8,
+        8
+      ],
+      "labelProjection": [
+        {
+          "calls": 7,
+          "totalMs": 1.1999999955296516,
+          "maxMs": 0.20000000298023224,
+          "distribution": {
+            "samples": 7,
+            "medianMs": 0.19999999552965164,
+            "p95Ms": 0.20000000298023224,
+            "maxMs": 0.20000000298023224,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 7,
+          "totalMs": 1.5,
+          "maxMs": 0.30000000447034836,
+          "distribution": {
+            "samples": 7,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.30000000447034836,
+            "maxMs": 0.30000000447034836,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 7,
+          "totalMs": 1.7000000029802322,
+          "maxMs": 0.30000000447034836,
+          "distribution": {
+            "samples": 7,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.30000000447034836,
+            "maxMs": 0.30000000447034836,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        }
+      ],
+      "architectureProjectionCalls": [
+        0,
+        0,
+        0
+      ],
+      "errors": []
+    },
+    {
+      "stage": "after",
+      "name": "vehicle-management",
+      "auto": true,
+      "surroundings": true,
+      "runs": 3,
+      "points": [
+        26,
+        26,
+        26
+      ],
+      "paths": [
+        17,
+        17,
+        17
+      ],
+      "selectionMs": {
+        "samples": 9,
+        "median": 113,
+        "p95": 119,
+        "min": 97,
+        "max": 119
+      },
+      "selectionSamples": [
+        113,
+        114,
+        113,
+        103,
+        114,
+        115,
+        119,
+        97,
+        113
+      ],
+      "contextToggleMs": {
+        "samples": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "rotationGestureMs": {
+        "samples": 9,
+        "median": 313,
+        "p95": 330,
+        "min": 306,
+        "max": 330
+      },
+      "rafMedianMs": {
+        "samples": 3,
+        "median": 16.69999999999709,
+        "p95": 16.700000000000728,
+        "min": 16.69999999999709,
+        "max": 16.700000000000728
+      },
+      "rafP95Ms": {
+        "samples": 3,
+        "median": 16.799999999999272,
+        "p95": 16.799999999999272,
+        "min": 16.700000000000728,
+        "max": 16.799999999999272
+      },
+      "longTasks": 0,
+      "visibleLabels": [
+        7,
+        7,
+        7
+      ],
+      "labelProjection": [
+        {
+          "calls": 52,
+          "totalMs": 12.600000016391277,
+          "maxMs": 0.5,
+          "distribution": {
+            "samples": 52,
+            "medianMs": 0.29999999701976776,
+            "p95Ms": 0.4000000059604645,
+            "maxMs": 0.5,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 51,
+          "totalMs": 11.69999996572733,
+          "maxMs": 0.5,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.3999999985098839,
+            "maxMs": 0.5,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 52,
+          "totalMs": 13.000000022351742,
+          "maxMs": 0.6000000014901161,
+          "distribution": {
+            "samples": 52,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.3999999985098839,
+            "maxMs": 0.6000000014901161,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        }
+      ],
+      "architectureProjectionCalls": [
+        0,
+        0,
+        0
+      ],
+      "errors": []
+    },
+    {
+      "stage": "after",
+      "name": "vehicle-management",
+      "auto": true,
+      "surroundings": false,
+      "runs": 3,
+      "points": [
+        12,
+        12,
+        12
+      ],
+      "paths": [
+        17,
+        17,
+        17
+      ],
+      "selectionMs": {
+        "samples": 9,
+        "median": 99,
+        "p95": 115,
+        "min": 88,
+        "max": 115
+      },
+      "selectionSamples": [
+        88,
+        98,
+        99,
+        102,
+        99,
+        115,
+        88,
+        100,
+        99
+      ],
+      "contextToggleMs": {
+        "samples": 3,
+        "median": 947,
+        "p95": 952,
+        "min": 932,
+        "max": 952
+      },
+      "rotationGestureMs": {
+        "samples": 9,
+        "median": 325,
+        "p95": 331,
+        "min": 313,
+        "max": 331
+      },
+      "rafMedianMs": {
+        "samples": 3,
+        "median": 16.69999999999709,
+        "p95": 16.69999999999709,
+        "min": 16.69999999999709,
+        "max": 16.69999999999709
+      },
+      "rafP95Ms": {
+        "samples": 3,
+        "median": 16.799999999999272,
+        "p95": 16.799999999999272,
+        "min": 16.799999999999272,
+        "max": 16.799999999999272
+      },
+      "longTasks": 0,
+      "visibleLabels": [
+        5,
+        5,
+        5
+      ],
+      "labelProjection": [
+        {
+          "calls": 51,
+          "totalMs": 8.699999988079071,
+          "maxMs": 0.3999999985098839,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.19999999552965164,
+            "p95Ms": 0.30000000447034836,
+            "maxMs": 0.3999999985098839,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 51,
+          "totalMs": 8.199999988079071,
+          "maxMs": 0.29999999701976776,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.19999999552965164,
+            "p95Ms": 0.20000000298023224,
+            "maxMs": 0.29999999701976776,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 51,
+          "totalMs": 8.699999988079071,
+          "maxMs": 0.3999999985098839,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.19999999552965164,
+            "p95Ms": 0.30000000447034836,
+            "maxMs": 0.3999999985098839,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        }
+      ],
+      "architectureProjectionCalls": [
+        0,
+        0,
+        0
+      ],
+      "errors": []
+    },
+    {
+      "stage": "after",
+      "name": "vehicle-management",
+      "auto": false,
+      "surroundings": true,
+      "runs": 3,
+      "points": [
+        26,
+        26,
+        26
+      ],
+      "paths": [
+        17,
+        17,
+        17
+      ],
+      "selectionMs": {
+        "samples": 9,
+        "median": 114,
+        "p95": 116,
+        "min": 87,
+        "max": 116
+      },
+      "selectionSamples": [
+        116,
+        114,
+        96,
+        102,
+        115,
+        115,
+        87,
+        99,
+        115
+      ],
+      "contextToggleMs": {
+        "samples": 3,
+        "median": 101,
+        "p95": 115,
+        "min": 91,
+        "max": 115
+      },
+      "rotationGestureMs": {
+        "samples": 9,
+        "median": 312,
+        "p95": 323,
+        "min": 306,
+        "max": 323
+      },
+      "rafMedianMs": {
+        "samples": 3,
+        "median": 16.700000000000728,
+        "p95": 16.700000000000728,
+        "min": 16.69999999999709,
+        "max": 16.700000000000728
+      },
+      "rafP95Ms": {
+        "samples": 3,
+        "median": 16.73400000000038,
+        "p95": 16.799999999999272,
+        "min": 16.700000000000728,
+        "max": 16.799999999999272
+      },
+      "longTasks": 0,
+      "visibleLabels": [
+        8,
+        8,
+        8
+      ],
+      "labelProjection": [
+        {
+          "calls": 52,
+          "totalMs": 14.000000022351742,
+          "maxMs": 0.5,
+          "distribution": {
+            "samples": 52,
+            "medianMs": 0.29999999701976776,
+            "p95Ms": 0.4000000059604645,
+            "maxMs": 0.5,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 53,
+          "totalMs": 14.5,
+          "maxMs": 0.5,
+          "distribution": {
+            "samples": 53,
+            "medianMs": 0.29999999701976776,
+            "p95Ms": 0.4000000059604645,
+            "maxMs": 0.5,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 52,
+          "totalMs": 14.600000016391277,
+          "maxMs": 0.6000000014901161,
+          "distribution": {
+            "samples": 52,
+            "medianMs": 0.29999999701976776,
+            "p95Ms": 0.5,
+            "maxMs": 0.6000000014901161,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        }
+      ],
+      "architectureProjectionCalls": [
+        0,
+        0,
+        0
+      ],
+      "errors": []
+    },
+    {
+      "stage": "after",
+      "name": "vehicle-management",
+      "auto": false,
+      "surroundings": false,
+      "runs": 3,
+      "points": [
+        12,
+        12,
+        12
+      ],
+      "paths": [
+        17,
+        17,
+        17
+      ],
+      "selectionMs": {
+        "samples": 9,
+        "median": 98,
+        "p95": 99,
+        "min": 88,
+        "max": 99
+      },
+      "selectionSamples": [
+        88,
+        98,
+        99,
+        88,
+        99,
+        98,
+        88,
+        98,
+        99
+      ],
+      "contextToggleMs": {
+        "samples": 3,
+        "median": 67,
+        "p95": 69,
+        "min": 64,
+        "max": 69
+      },
+      "rotationGestureMs": {
+        "samples": 9,
+        "median": 313,
+        "p95": 314,
+        "min": 307,
+        "max": 314
+      },
+      "rafMedianMs": {
+        "samples": 3,
+        "median": 16.69999999999709,
+        "p95": 16.700000000000728,
+        "min": 16.69999999999709,
+        "max": 16.700000000000728
+      },
+      "rafP95Ms": {
+        "samples": 3,
+        "median": 16.799999999999272,
+        "p95": 16.799999999999272,
+        "min": 16.700000000000728,
+        "max": 16.799999999999272
+      },
+      "longTasks": 0,
+      "visibleLabels": [
+        4,
+        4,
+        4
+      ],
+      "labelProjection": [
+        {
+          "calls": 37,
+          "totalMs": 5.600000001490116,
+          "maxMs": 0.30000000447034836,
+          "distribution": {
+            "samples": 37,
+            "medianMs": 0.19999999552965164,
+            "p95Ms": 0.29999999701976776,
+            "maxMs": 0.30000000447034836,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 37,
+          "totalMs": 5.999999992549419,
+          "maxMs": 0.20000000298023224,
+          "distribution": {
+            "samples": 37,
+            "medianMs": 0.19999999552965164,
+            "p95Ms": 0.20000000298023224,
+            "maxMs": 0.20000000298023224,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 38,
+          "totalMs": 5.300000004470348,
+          "maxMs": 0.29999999701976776,
+          "distribution": {
+            "samples": 38,
+            "medianMs": 0.10000000149011612,
+            "p95Ms": 0.20000000298023224,
+            "maxMs": 0.29999999701976776,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        }
+      ],
+      "architectureProjectionCalls": [
+        0,
+        0,
+        0
+      ],
+      "errors": []
+    }
+  ],
+  "integrity": [
+    {
+      "name": "git-lines",
+      "head": "7a89625acba9cf64b1f0648fed64381330218184",
+      "trackedFiles": 145,
+      "changed": [],
+      "headUnchanged": true,
+      "statusUnchanged": true
+    },
+    {
+      "name": "vehicle-management",
+      "head": "8211ee8145425ef85b7cf1156a55cd0adf0db088",
+      "trackedFiles": 345,
+      "changed": [],
+      "headUnchanged": true,
+      "statusUnchanged": true
+    }
+  ],
+  "nativeInput": {
+    "method": "Same target ID: Git操作 / API. Actual CDP mouse click with a capture-phase click timestamp in the page, then two RAFs; verifies expected detail title. Excludes Playwright actionability/scroll and protocol waiting. Before and pre-deferral after were interleaved 3 times; final after rerun after deferring closed Evidence counts. Each setting has 9 samples including first selection. No original measurements discarded.",
+    "summaries": [
+      {
+        "phase": "before",
+        "name": "git-lines",
+        "auto": true,
+        "surroundings": true,
+        "targetIds": [
+          "architecture:[\"component\",\"architecture:[\\\"package\\\",\\\"package.json\\\"]\",\"Git操作\"]"
+        ],
+        "targetLabel": "Git操作",
+        "times": [
+          52,
+          30.200000002980232,
+          29.600000001490116,
+          42.5,
+          31.69999999552965,
+          33.399999998509884,
+          34.400000005960464,
+          30.69999999552965,
+          31.600000001490116
+        ],
+        "inputToTwoRafMs": {
+          "samples": 9,
+          "median": 31.69999999552965,
+          "p95": 52,
+          "min": 29.600000001490116,
+          "max": 52
+        },
+        "contextToggleMs": {
+          "samples": 0,
+          "median": null,
+          "p95": null,
+          "min": null,
+          "max": null
+        },
+        "detailCpuMsPerRender": {
+          "samples": 3,
+          "median": 2.0666666676600776,
+          "p95": 2.4000000009934106,
+          "min": 2.0666666676600776,
+          "max": 2.4000000009934106
+        },
+        "longTasks": [
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          },
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          },
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          }
+        ],
+        "errors": []
+      },
+      {
+        "phase": "before",
+        "name": "git-lines",
+        "auto": true,
+        "surroundings": false,
+        "targetIds": [
+          "architecture:[\"component\",\"architecture:[\\\"package\\\",\\\"package.json\\\"]\",\"Git操作\"]"
+        ],
+        "targetLabel": "Git操作",
+        "times": [
+          29.399999998509884,
+          29.600000001490116,
+          29.5,
+          29.400000005960464,
+          29.700000002980232,
+          29.900000005960464,
+          30.5,
+          30.899999998509884,
+          31.30000000447035
+        ],
+        "inputToTwoRafMs": {
+          "samples": 9,
+          "median": 29.700000002980232,
+          "p95": 31.30000000447035,
+          "min": 29.399999998509884,
+          "max": 31.30000000447035
+        },
+        "contextToggleMs": {
+          "samples": 3,
+          "median": 23,
+          "p95": 24.5,
+          "min": 21.5,
+          "max": 24.5
+        },
+        "detailCpuMsPerRender": {
+          "samples": 3,
+          "median": 2.0666666676600776,
+          "p95": 2.133333332836628,
+          "min": 2.0666666651765504,
+          "max": 2.133333332836628
+        },
+        "longTasks": [
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          },
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          },
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          }
+        ],
+        "errors": []
+      },
+      {
+        "phase": "before",
+        "name": "git-lines",
+        "auto": false,
+        "surroundings": true,
+        "targetIds": [
+          "architecture:[\"component\",\"architecture:[\\\"package\\\",\\\"package.json\\\"]\",\"Git操作\"]"
+        ],
+        "targetLabel": "Git操作",
+        "times": [
+          28.899999998509884,
+          30.100000001490116,
+          32,
+          33.399999998509884,
+          30.100000001490116,
+          29.899999998509884,
+          34.899999998509884,
+          30.399999998509884,
+          29.5
+        ],
+        "inputToTwoRafMs": {
+          "samples": 9,
+          "median": 30.100000001490116,
+          "p95": 34.899999998509884,
+          "min": 28.899999998509884,
+          "max": 34.899999998509884
+        },
+        "contextToggleMs": {
+          "samples": 3,
+          "median": 23.899999998509884,
+          "p95": 24.600000001490116,
+          "min": 21.900000005960464,
+          "max": 24.600000001490116
+        },
+        "detailCpuMsPerRender": {
+          "samples": 3,
+          "median": 2.366666667163372,
+          "p95": 2.5000000024835267,
+          "min": 2.1333333353201547,
+          "max": 2.5000000024835267
+        },
+        "longTasks": [
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          },
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          },
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          }
+        ],
+        "errors": []
+      },
+      {
+        "phase": "before",
+        "name": "git-lines",
+        "auto": false,
+        "surroundings": false,
+        "targetIds": [
+          "architecture:[\"component\",\"architecture:[\\\"package\\\",\\\"package.json\\\"]\",\"Git操作\"]"
+        ],
+        "targetLabel": "Git操作",
+        "times": [
+          33.69999999552965,
+          31.5,
+          36.79999999701977,
+          30.899999998509884,
+          29.799999997019768,
+          31,
+          31,
+          29.80000000447035,
+          29.5
+        ],
+        "inputToTwoRafMs": {
+          "samples": 9,
+          "median": 31,
+          "p95": 36.79999999701977,
+          "min": 29.5,
+          "max": 36.79999999701977
+        },
+        "contextToggleMs": {
+          "samples": 3,
+          "median": 23.69999999552965,
+          "p95": 25.299999997019768,
+          "min": 22.900000005960464,
+          "max": 25.299999997019768
+        },
+        "detailCpuMsPerRender": {
+          "samples": 3,
+          "median": 2.4000000009934106,
+          "p95": 2.5000000024835267,
+          "min": 2.366666667163372,
+          "max": 2.5000000024835267
+        },
+        "longTasks": [
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          },
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          },
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          }
+        ],
+        "errors": []
+      },
+      {
+        "phase": "before",
+        "name": "vehicle-management",
+        "auto": true,
+        "surroundings": true,
+        "targetIds": [
+          "architecture:[\"component\",\"architecture:[\\\"package\\\",\\\"apps/api/package.json\\\"]\",\"API\"]"
+        ],
+        "targetLabel": "API",
+        "times": [
+          94.39999999850988,
+          113.20000000298023,
+          124.20000000298023,
+          112.70000000298023,
+          103.39999999850988,
+          126.89999999850988,
+          96.40000000596046,
+          89.60000000149012,
+          86.5
+        ],
+        "inputToTwoRafMs": {
+          "samples": 9,
+          "median": 103.39999999850988,
+          "p95": 126.89999999850988,
+          "min": 86.5,
+          "max": 126.89999999850988
+        },
+        "contextToggleMs": {
+          "samples": 0,
+          "median": null,
+          "p95": null,
+          "min": null,
+          "max": null
+        },
+        "detailCpuMsPerRender": {
+          "samples": 3,
+          "median": 65.60000000149012,
+          "p95": 68.66666666666667,
+          "min": 53.033333333830036,
+          "max": 68.66666666666667
+        },
+        "longTasks": [
+          {
+            "samples": 3,
+            "medianMs": 93,
+            "p95Ms": 97,
+            "maxMs": 97,
+            "over50ms": 3
+          },
+          {
+            "samples": 3,
+            "medianMs": 86,
+            "p95Ms": 100,
+            "maxMs": 100,
+            "over50ms": 3
+          },
+          {
+            "samples": 3,
+            "medianMs": 69,
+            "p95Ms": 74,
+            "maxMs": 74,
+            "over50ms": 3
+          }
+        ],
+        "errors": []
+      },
+      {
+        "phase": "before",
+        "name": "vehicle-management",
+        "auto": true,
+        "surroundings": false,
+        "targetIds": [
+          "architecture:[\"component\",\"architecture:[\\\"package\\\",\\\"apps/api/package.json\\\"]\",\"API\"]"
+        ],
+        "targetLabel": "API",
+        "times": [
+          108.5,
+          83.69999999552965,
+          84.20000000298023,
+          124.10000000149012,
+          84.60000000149012,
+          87.5,
+          80.19999999552965,
+          82.70000000298023,
+          83.79999999701977
+        ],
+        "inputToTwoRafMs": {
+          "samples": 9,
+          "median": 84.20000000298023,
+          "p95": 124.10000000149012,
+          "min": 80.19999999552965,
+          "max": 124.10000000149012
+        },
+        "contextToggleMs": {
+          "samples": 3,
+          "median": 23.5,
+          "p95": 27.100000001490116,
+          "min": 22.600000001490116,
+          "max": 27.100000001490116
+        },
+        "detailCpuMsPerRender": {
+          "samples": 3,
+          "median": 54.266666665673256,
+          "p95": 59.20000000049671,
+          "min": 49.100000001490116,
+          "max": 59.20000000049671
+        },
+        "longTasks": [
+          {
+            "samples": 3,
+            "medianMs": 63,
+            "p95Ms": 74,
+            "maxMs": 74,
+            "over50ms": 3
+          },
+          {
+            "samples": 3,
+            "medianMs": 65,
+            "p95Ms": 92,
+            "maxMs": 92,
+            "over50ms": 3
+          },
+          {
+            "samples": 3,
+            "medianMs": 62,
+            "p95Ms": 63,
+            "maxMs": 63,
+            "over50ms": 3
+          }
+        ],
+        "errors": []
+      },
+      {
+        "phase": "before",
+        "name": "vehicle-management",
+        "auto": false,
+        "surroundings": true,
+        "targetIds": [
+          "architecture:[\"component\",\"architecture:[\\\"package\\\",\\\"apps/api/package.json\\\"]\",\"API\"]"
+        ],
+        "targetLabel": "API",
+        "times": [
+          88,
+          86.89999999850988,
+          87.10000000149012,
+          89,
+          86.5,
+          84.69999999552965,
+          99.60000000149012,
+          90,
+          85.5
+        ],
+        "inputToTwoRafMs": {
+          "samples": 9,
+          "median": 87.10000000149012,
+          "p95": 99.60000000149012,
+          "min": 84.69999999552965,
+          "max": 99.60000000149012
+        },
+        "contextToggleMs": {
+          "samples": 3,
+          "median": 26.599999994039536,
+          "p95": 29.899999998509884,
+          "min": 25.899999998509884,
+          "max": 29.899999998509884
+        },
+        "detailCpuMsPerRender": {
+          "samples": 3,
+          "median": 51.29999999950329,
+          "p95": 54.166666666666664,
+          "min": 50.5,
+          "max": 54.166666666666664
+        },
+        "longTasks": [
+          {
+            "samples": 3,
+            "medianMs": 66,
+            "p95Ms": 67,
+            "maxMs": 67,
+            "over50ms": 3
+          },
+          {
+            "samples": 3,
+            "medianMs": 64,
+            "p95Ms": 67,
+            "maxMs": 67,
+            "over50ms": 3
+          },
+          {
+            "samples": 3,
+            "medianMs": 68,
+            "p95Ms": 78,
+            "maxMs": 78,
+            "over50ms": 3
+          }
+        ],
+        "errors": []
+      },
+      {
+        "phase": "before",
+        "name": "vehicle-management",
+        "auto": false,
+        "surroundings": false,
+        "targetIds": [
+          "architecture:[\"component\",\"architecture:[\\\"package\\\",\\\"apps/api/package.json\\\"]\",\"API\"]"
+        ],
+        "targetLabel": "API",
+        "times": [
+          92.10000000149012,
+          82,
+          97.5,
+          89,
+          94.90000000596046,
+          103.29999999701977,
+          85.5,
+          83.09999999403954,
+          92
+        ],
+        "inputToTwoRafMs": {
+          "samples": 9,
+          "median": 92,
+          "p95": 103.29999999701977,
+          "min": 82,
+          "max": 103.29999999701977
+        },
+        "contextToggleMs": {
+          "samples": 3,
+          "median": 24.5,
+          "p95": 28.399999998509884,
+          "min": 23.400000005960464,
+          "max": 28.399999998509884
+        },
+        "detailCpuMsPerRender": {
+          "samples": 3,
+          "median": 55.63333333283663,
+          "p95": 59.233333334326744,
+          "min": 53.433333329856396,
+          "max": 59.233333334326744
+        },
+        "longTasks": [
+          {
+            "samples": 3,
+            "medianMs": 70,
+            "p95Ms": 77,
+            "maxMs": 77,
+            "over50ms": 3
+          },
+          {
+            "samples": 3,
+            "medianMs": 75,
+            "p95Ms": 80,
+            "maxMs": 80,
+            "over50ms": 3
+          },
+          {
+            "samples": 3,
+            "medianMs": 64,
+            "p95Ms": 71,
+            "maxMs": 71,
+            "over50ms": 3
+          }
+        ],
+        "errors": []
+      },
+      {
+        "phase": "beforeEvidenceDeferral",
+        "name": "git-lines",
+        "auto": true,
+        "surroundings": true,
+        "targetIds": [
+          "architecture:[\"component\",\"architecture:[\\\"package\\\",\\\"package.json\\\"]\",\"Git操作\"]"
+        ],
+        "targetLabel": "Git操作",
+        "times": [
+          44.79999999701977,
+          29.899999998509884,
+          30.100000001490116,
+          36.70000000298023,
+          34.399999998509884,
+          30,
+          38.79999999701977,
+          31.599999994039536,
+          34.20000000298023
+        ],
+        "inputToTwoRafMs": {
+          "samples": 9,
+          "median": 34.20000000298023,
+          "p95": 44.79999999701977,
+          "min": 29.899999998509884,
+          "max": 44.79999999701977
+        },
+        "contextToggleMs": {
+          "samples": 0,
+          "median": null,
+          "p95": null,
+          "min": null,
+          "max": null
+        },
+        "detailCpuMsPerRender": {
+          "samples": 3,
+          "median": 2.3333333333333335,
+          "p95": 2.4333333323399224,
+          "min": 2.3000000019868216,
+          "max": 2.4333333323399224
+        },
+        "longTasks": [
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          },
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          },
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          }
+        ],
+        "errors": []
+      },
+      {
+        "phase": "beforeEvidenceDeferral",
+        "name": "git-lines",
+        "auto": true,
+        "surroundings": false,
+        "targetIds": [
+          "architecture:[\"component\",\"architecture:[\\\"package\\\",\\\"package.json\\\"]\",\"Git操作\"]"
+        ],
+        "targetLabel": "Git操作",
+        "times": [
+          31,
+          30.900000005960464,
+          30.399999998509884,
+          30.900000005960464,
+          33.20000000298023,
+          30.399999998509884,
+          31.799999997019768,
+          31,
+          31.80000000447035
+        ],
+        "inputToTwoRafMs": {
+          "samples": 9,
+          "median": 31,
+          "p95": 33.20000000298023,
+          "min": 30.399999998509884,
+          "max": 33.20000000298023
+        },
+        "contextToggleMs": {
+          "samples": 3,
+          "median": 23.200000002980232,
+          "p95": 24.299999997019768,
+          "min": 21.600000001490116,
+          "max": 24.299999997019768
+        },
+        "detailCpuMsPerRender": {
+          "samples": 3,
+          "median": 2.2999999970197678,
+          "p95": 2.3333333308498063,
+          "min": 2.2000000029802322,
+          "max": 2.3333333308498063
+        },
+        "longTasks": [
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          },
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          },
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          }
+        ],
+        "errors": []
+      },
+      {
+        "phase": "beforeEvidenceDeferral",
+        "name": "git-lines",
+        "auto": false,
+        "surroundings": true,
+        "targetIds": [
+          "architecture:[\"component\",\"architecture:[\\\"package\\\",\\\"package.json\\\"]\",\"Git操作\"]"
+        ],
+        "targetLabel": "Git操作",
+        "times": [
+          30.700000002980232,
+          29.700000002980232,
+          29.799999997019768,
+          31,
+          31.099999994039536,
+          29.599999994039536,
+          41.899999998509884,
+          34.29999999701977,
+          33.5
+        ],
+        "inputToTwoRafMs": {
+          "samples": 9,
+          "median": 31,
+          "p95": 41.899999998509884,
+          "min": 29.599999994039536,
+          "max": 41.899999998509884
+        },
+        "contextToggleMs": {
+          "samples": 3,
+          "median": 24.600000001490116,
+          "p95": 24.700000002980232,
+          "min": 23.30000000447035,
+          "max": 24.700000002980232
+        },
+        "detailCpuMsPerRender": {
+          "samples": 3,
+          "median": 2.1333333353201547,
+          "p95": 2.899999998509884,
+          "min": 2.0999999990065894,
+          "max": 2.899999998509884
+        },
+        "longTasks": [
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          },
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          },
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          }
+        ],
+        "errors": []
+      },
+      {
+        "phase": "beforeEvidenceDeferral",
+        "name": "git-lines",
+        "auto": false,
+        "surroundings": false,
+        "targetIds": [
+          "architecture:[\"component\",\"architecture:[\\\"package\\\",\\\"package.json\\\"]\",\"Git操作\"]"
+        ],
+        "targetLabel": "Git操作",
+        "times": [
+          31.799999997019768,
+          40,
+          34.29999999701977,
+          30.5,
+          30,
+          30.399999998509884,
+          30.600000001490116,
+          31.400000005960464,
+          30.200000002980232
+        ],
+        "inputToTwoRafMs": {
+          "samples": 9,
+          "median": 30.600000001490116,
+          "p95": 40,
+          "min": 30,
+          "max": 40
+        },
+        "contextToggleMs": {
+          "samples": 3,
+          "median": 23.700000002980232,
+          "p95": 24.700000002980232,
+          "min": 23.100000001490116,
+          "max": 24.700000002980232
+        },
+        "detailCpuMsPerRender": {
+          "samples": 3,
+          "median": 2.5,
+          "p95": 3.0999999990065894,
+          "min": 2.2000000004967055,
+          "max": 3.0999999990065894
+        },
+        "longTasks": [
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          },
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          },
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          }
+        ],
+        "errors": []
+      },
+      {
+        "phase": "beforeEvidenceDeferral",
+        "name": "vehicle-management",
+        "auto": true,
+        "surroundings": true,
+        "targetIds": [
+          "architecture:[\"component\",\"architecture:[\\\"package\\\",\\\"apps/api/package.json\\\"]\",\"API\"]"
+        ],
+        "targetLabel": "API",
+        "times": [
+          121.69999999552965,
+          116.60000000149012,
+          106.89999999850988,
+          94.29999999701977,
+          90,
+          96.60000000149012,
+          131.79999999701977,
+          123.5,
+          87.29999999701977
+        ],
+        "inputToTwoRafMs": {
+          "samples": 9,
+          "median": 106.89999999850988,
+          "p95": 131.79999999701977,
+          "min": 87.29999999701977,
+          "max": 131.79999999701977
+        },
+        "contextToggleMs": {
+          "samples": 0,
+          "median": null,
+          "p95": null,
+          "min": null,
+          "max": null
+        },
+        "detailCpuMsPerRender": {
+          "samples": 3,
+          "median": 64.76666666815679,
+          "p95": 69.40000000347693,
+          "min": 54.56666666517655,
+          "max": 69.40000000347693
+        },
+        "longTasks": [
+          {
+            "samples": 3,
+            "medianMs": 91,
+            "p95Ms": 91,
+            "maxMs": 91,
+            "over50ms": 3
+          },
+          {
+            "samples": 3,
+            "medianMs": 73,
+            "p95Ms": 78,
+            "maxMs": 78,
+            "over50ms": 3
+          },
+          {
+            "samples": 3,
+            "medianMs": 97,
+            "p95Ms": 103,
+            "maxMs": 103,
+            "over50ms": 3
+          }
+        ],
+        "errors": []
+      },
+      {
+        "phase": "beforeEvidenceDeferral",
+        "name": "vehicle-management",
+        "auto": true,
+        "surroundings": false,
+        "targetIds": [
+          "architecture:[\"component\",\"architecture:[\\\"package\\\",\\\"apps/api/package.json\\\"]\",\"API\"]"
+        ],
+        "targetLabel": "API",
+        "times": [
+          125.5,
+          111.5,
+          120.5,
+          112.5,
+          82.60000000149012,
+          84.70000000298023,
+          85.40000000596046,
+          91.29999999701977,
+          89.39999999850988
+        ],
+        "inputToTwoRafMs": {
+          "samples": 9,
+          "median": 91.29999999701977,
+          "p95": 125.5,
+          "min": 82.60000000149012,
+          "max": 125.5
+        },
+        "contextToggleMs": {
+          "samples": 3,
+          "median": 25.099999994039536,
+          "p95": 31,
+          "min": 23.099999994039536,
+          "max": 31
+        },
+        "detailCpuMsPerRender": {
+          "samples": 3,
+          "median": 54.666666666666664,
+          "p95": 70.23333333184321,
+          "min": 51.83333333581686,
+          "max": 70.23333333184321
+        },
+        "longTasks": [
+          {
+            "samples": 3,
+            "medianMs": 87,
+            "p95Ms": 93,
+            "maxMs": 93,
+            "over50ms": 3
+          },
+          {
+            "samples": 3,
+            "medianMs": 62,
+            "p95Ms": 69,
+            "maxMs": 69,
+            "over50ms": 3
+          },
+          {
+            "samples": 3,
+            "medianMs": 69,
+            "p95Ms": 69,
+            "maxMs": 69,
+            "over50ms": 3
+          }
+        ],
+        "errors": []
+      },
+      {
+        "phase": "beforeEvidenceDeferral",
+        "name": "vehicle-management",
+        "auto": false,
+        "surroundings": true,
+        "targetIds": [
+          "architecture:[\"component\",\"architecture:[\\\"package\\\",\\\"apps/api/package.json\\\"]\",\"API\"]"
+        ],
+        "targetLabel": "API",
+        "times": [
+          139,
+          123.5,
+          130.5,
+          95.70000000298023,
+          88,
+          84.20000000298023,
+          95.30000000447035,
+          90.70000000298023,
+          86.89999999850988
+        ],
+        "inputToTwoRafMs": {
+          "samples": 9,
+          "median": 95.30000000447035,
+          "p95": 139,
+          "min": 84.20000000298023,
+          "max": 139
+        },
+        "contextToggleMs": {
+          "samples": 3,
+          "median": 25,
+          "p95": 35.100000001490116,
+          "min": 24.799999997019768,
+          "max": 35.100000001490116
+        },
+        "detailCpuMsPerRender": {
+          "samples": 3,
+          "median": 53.766666665673256,
+          "p95": 80.46666666616996,
+          "min": 53.13333333283663,
+          "max": 80.46666666616996
+        },
+        "longTasks": [
+          {
+            "samples": 3,
+            "medianMs": 104,
+            "p95Ms": 110,
+            "maxMs": 110,
+            "over50ms": 3
+          },
+          {
+            "samples": 3,
+            "medianMs": 66,
+            "p95Ms": 75,
+            "maxMs": 75,
+            "over50ms": 3
+          },
+          {
+            "samples": 3,
+            "medianMs": 69,
+            "p95Ms": 74,
+            "maxMs": 74,
+            "over50ms": 3
+          }
+        ],
+        "errors": []
+      },
+      {
+        "phase": "beforeEvidenceDeferral",
+        "name": "vehicle-management",
+        "auto": false,
+        "surroundings": false,
+        "targetIds": [
+          "architecture:[\"component\",\"architecture:[\\\"package\\\",\\\"apps/api/package.json\\\"]\",\"API\"]"
+        ],
+        "targetLabel": "API",
+        "times": [
+          117.89999999850988,
+          123.89999999850988,
+          111,
+          84.29999999701977,
+          85.39999999850988,
+          82.20000000298023,
+          89.5,
+          104.5,
+          115
+        ],
+        "inputToTwoRafMs": {
+          "samples": 9,
+          "median": 104.5,
+          "p95": 123.89999999850988,
+          "min": 82.20000000298023,
+          "max": 123.89999999850988
+        },
+        "contextToggleMs": {
+          "samples": 3,
+          "median": 23.100000001490116,
+          "p95": 31.100000001490116,
+          "min": 22.600000001490116,
+          "max": 31.100000001490116
+        },
+        "detailCpuMsPerRender": {
+          "samples": 3,
+          "median": 59.399999998509884,
+          "p95": 71.76666666567326,
+          "min": 50.699999998013176,
+          "max": 71.76666666567326
+        },
+        "longTasks": [
+          {
+            "samples": 3,
+            "medianMs": 86,
+            "p95Ms": 96,
+            "maxMs": 96,
+            "over50ms": 3
+          },
+          {
+            "samples": 3,
+            "medianMs": 64,
+            "p95Ms": 64,
+            "maxMs": 64,
+            "over50ms": 3
+          },
+          {
+            "samples": 3,
+            "medianMs": 78,
+            "p95Ms": 81,
+            "maxMs": 81,
+            "over50ms": 3
+          }
+        ],
+        "errors": []
+      },
+      {
+        "phase": "after",
+        "name": "git-lines",
+        "auto": true,
+        "surroundings": true,
+        "targetIds": [
+          "architecture:[\"component\",\"architecture:[\\\"package\\\",\\\"package.json\\\"]\",\"Git操作\"]"
+        ],
+        "targetLabel": "Git操作",
+        "times": [
+          63.100000001490116,
+          28,
+          27.30000000447035,
+          35,
+          29.200000002980232,
+          28.100000001490116,
+          33,
+          27.600000001490116,
+          28.799999997019768
+        ],
+        "inputToTwoRafMs": {
+          "samples": 9,
+          "median": 28.799999997019768,
+          "p95": 63.100000001490116,
+          "min": 27.30000000447035,
+          "max": 63.100000001490116
+        },
+        "contextToggleMs": {
+          "samples": 0,
+          "median": null,
+          "p95": null,
+          "min": null,
+          "max": null
+        },
+        "detailCpuMsPerRender": {
+          "samples": 3,
+          "median": 0.1333333303531011,
+          "p95": 0.16666666915019354,
+          "min": 0.09999999900658925,
+          "max": 0.16666666915019354
+        },
+        "longTasks": [
+          {
+            "samples": 1,
+            "medianMs": 53,
+            "p95Ms": 53,
+            "maxMs": 53,
+            "over50ms": 1
+          },
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          },
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          }
+        ],
+        "errors": []
+      },
+      {
+        "phase": "after",
+        "name": "git-lines",
+        "auto": true,
+        "surroundings": false,
+        "targetIds": [
+          "architecture:[\"component\",\"architecture:[\\\"package\\\",\\\"package.json\\\"]\",\"Git操作\"]"
+        ],
+        "targetLabel": "Git操作",
+        "times": [
+          28.600000001490116,
+          27.5,
+          28.200000002980232,
+          29.899999998509884,
+          28.899999998509884,
+          28.899999998509884,
+          28.80000000447035,
+          28.80000000447035,
+          29
+        ],
+        "inputToTwoRafMs": {
+          "samples": 9,
+          "median": 28.80000000447035,
+          "p95": 29.899999998509884,
+          "min": 27.5,
+          "max": 29.899999998509884
+        },
+        "contextToggleMs": {
+          "samples": 3,
+          "median": 24.100000001490116,
+          "p95": 27.5,
+          "min": 22.69999999552965,
+          "max": 27.5
+        },
+        "detailCpuMsPerRender": {
+          "samples": 3,
+          "median": 0.16666666666666666,
+          "p95": 0.20000000298023224,
+          "min": 0.13333333532015482,
+          "max": 0.20000000298023224
+        },
+        "longTasks": [
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          },
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          },
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          }
+        ],
+        "errors": []
+      },
+      {
+        "phase": "after",
+        "name": "git-lines",
+        "auto": false,
+        "surroundings": true,
+        "targetIds": [
+          "architecture:[\"component\",\"architecture:[\\\"package\\\",\\\"package.json\\\"]\",\"Git操作\"]"
+        ],
+        "targetLabel": "Git操作",
+        "times": [
+          29,
+          27.80000000447035,
+          28.80000000447035,
+          29,
+          28.899999998509884,
+          29,
+          28.700000002980232,
+          29,
+          30.700000002980232
+        ],
+        "inputToTwoRafMs": {
+          "samples": 9,
+          "median": 29,
+          "p95": 30.700000002980232,
+          "min": 27.80000000447035,
+          "max": 30.700000002980232
+        },
+        "contextToggleMs": {
+          "samples": 3,
+          "median": 23.599999994039536,
+          "p95": 24.900000005960464,
+          "min": 22.30000000447035,
+          "max": 24.900000005960464
+        },
+        "detailCpuMsPerRender": {
+          "samples": 3,
+          "median": 0.10000000149011612,
+          "p95": 0.1666666641831398,
+          "min": 0.10000000149011612,
+          "max": 0.1666666641831398
+        },
+        "longTasks": [
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          },
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          },
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          }
+        ],
+        "errors": []
+      },
+      {
+        "phase": "after",
+        "name": "git-lines",
+        "auto": false,
+        "surroundings": false,
+        "targetIds": [
+          "architecture:[\"component\",\"architecture:[\\\"package\\\",\\\"package.json\\\"]\",\"Git操作\"]"
+        ],
+        "targetLabel": "Git操作",
+        "times": [
+          28.80000000447035,
+          39,
+          30.5,
+          30.599999994039536,
+          28.899999998509884,
+          29.399999998509884,
+          29.299999997019768,
+          29.599999994039536,
+          32.30000000447035
+        ],
+        "inputToTwoRafMs": {
+          "samples": 9,
+          "median": 29.599999994039536,
+          "p95": 39,
+          "min": 28.80000000447035,
+          "max": 39
+        },
+        "contextToggleMs": {
+          "samples": 3,
+          "median": 23.100000001490116,
+          "p95": 24.200000002980232,
+          "min": 22.200000002980232,
+          "max": 24.200000002980232
+        },
+        "detailCpuMsPerRender": {
+          "samples": 3,
+          "median": 0.16666666666666666,
+          "p95": 0.16666666666666666,
+          "min": 0.10000000149011612,
+          "max": 0.16666666666666666
+        },
+        "longTasks": [
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          },
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          },
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          }
+        ],
+        "errors": []
+      },
+      {
+        "phase": "after",
+        "name": "vehicle-management",
+        "auto": true,
+        "surroundings": true,
+        "targetIds": [
+          "architecture:[\"component\",\"architecture:[\\\"package\\\",\\\"apps/api/package.json\\\"]\",\"API\"]"
+        ],
+        "targetLabel": "API",
+        "times": [
+          44.899999998509884,
+          43.5,
+          38.70000000298023,
+          43.600000001490116,
+          41.29999999701977,
+          47.69999999552965,
+          69.29999999701977,
+          44.19999999552965,
+          39.5
+        ],
+        "inputToTwoRafMs": {
+          "samples": 9,
+          "median": 43.600000001490116,
+          "p95": 69.29999999701977,
+          "min": 38.70000000298023,
+          "max": 69.29999999701977
+        },
+        "contextToggleMs": {
+          "samples": 0,
+          "median": null,
+          "p95": null,
+          "min": null,
+          "max": null
+        },
+        "detailCpuMsPerRender": {
+          "samples": 3,
+          "median": 1.5999999990065892,
+          "p95": 1.6666666666666667,
+          "min": 1.5999999990065892,
+          "max": 1.6666666666666667
+        },
+        "longTasks": [
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          },
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          },
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          }
+        ],
+        "errors": []
+      },
+      {
+        "phase": "after",
+        "name": "vehicle-management",
+        "auto": true,
+        "surroundings": false,
+        "targetIds": [
+          "architecture:[\"component\",\"architecture:[\\\"package\\\",\\\"apps/api/package.json\\\"]\",\"API\"]"
+        ],
+        "targetLabel": "API",
+        "times": [
+          33.599999994039536,
+          33.79999999701977,
+          35.20000000298023,
+          35.899999998509884,
+          35,
+          34.69999999552965,
+          36.20000000298023,
+          33.399999998509884,
+          33.5
+        ],
+        "inputToTwoRafMs": {
+          "samples": 9,
+          "median": 34.69999999552965,
+          "p95": 36.20000000298023,
+          "min": 33.399999998509884,
+          "max": 36.20000000298023
+        },
+        "contextToggleMs": {
+          "samples": 3,
+          "median": 25.600000001490116,
+          "p95": 30.100000001490116,
+          "min": 23.5,
+          "max": 30.100000001490116
+        },
+        "detailCpuMsPerRender": {
+          "samples": 3,
+          "median": 0.9666666686534882,
+          "p95": 1.1666666666666667,
+          "min": 0.866666667163372,
+          "max": 1.1666666666666667
+        },
+        "longTasks": [
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          },
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          },
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          }
+        ],
+        "errors": []
+      },
+      {
+        "phase": "after",
+        "name": "vehicle-management",
+        "auto": false,
+        "surroundings": true,
+        "targetIds": [
+          "architecture:[\"component\",\"architecture:[\\\"package\\\",\\\"apps/api/package.json\\\"]\",\"API\"]"
+        ],
+        "targetLabel": "API",
+        "times": [
+          48.79999999701977,
+          37.100000001490116,
+          38,
+          41.20000000298023,
+          37.79999999701977,
+          37.79999999701977,
+          38.400000005960464,
+          38.30000000447035,
+          37.600000001490116
+        ],
+        "inputToTwoRafMs": {
+          "samples": 9,
+          "median": 38,
+          "p95": 48.79999999701977,
+          "min": 37.100000001490116,
+          "max": 48.79999999701977
+        },
+        "contextToggleMs": {
+          "samples": 3,
+          "median": 25.600000001490116,
+          "p95": 26.299999997019768,
+          "min": 25.100000001490116,
+          "max": 26.299999997019768
+        },
+        "detailCpuMsPerRender": {
+          "samples": 3,
+          "median": 1.0666666676600773,
+          "p95": 1.2000000004967053,
+          "min": 0.9333333323399226,
+          "max": 1.2000000004967053
+        },
+        "longTasks": [
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          },
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          },
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          }
+        ],
+        "errors": []
+      },
+      {
+        "phase": "after",
+        "name": "vehicle-management",
+        "auto": false,
+        "surroundings": false,
+        "targetIds": [
+          "architecture:[\"component\",\"architecture:[\\\"package\\\",\\\"apps/api/package.json\\\"]\",\"API\"]"
+        ],
+        "targetLabel": "API",
+        "times": [
+          32.5,
+          33.600000001490116,
+          33.100000001490116,
+          35.899999998509884,
+          35.20000000298023,
+          36.20000000298023,
+          35,
+          34.5,
+          35.79999999701977
+        ],
+        "inputToTwoRafMs": {
+          "samples": 9,
+          "median": 35,
+          "p95": 36.20000000298023,
+          "min": 32.5,
+          "max": 36.20000000298023
+        },
+        "contextToggleMs": {
+          "samples": 3,
+          "median": 23.899999998509884,
+          "p95": 24.399999998509884,
+          "min": 23.80000000447035,
+          "max": 24.399999998509884
+        },
+        "detailCpuMsPerRender": {
+          "samples": 3,
+          "median": 1,
+          "p95": 1.0999999990065892,
+          "min": 0.8666666696468989,
+          "max": 1.0999999990065892
+        },
+        "longTasks": [
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          },
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          },
+          {
+            "samples": 0,
+            "medianMs": null,
+            "p95Ms": null,
+            "maxMs": null,
+            "over50ms": 0
+          }
+        ],
+        "errors": []
+      }
+    ]
+  }
+}

@@ -131,9 +131,11 @@ export function projectArchitectureScope(base: PreparedArchitectureScope, option
   const internalRelations = projected.filter(edge => edge.details?.architectureRelation === 'internal' && (shown.has(edge.source) || ancestors.has(edge.source)));
   const internalByOwner = new Map<string, SemanticEdge[]>();
   for (const edge of internalRelations) { const edges = internalByOwner.get(edge.source) ?? []; edges.push(edge); internalByOwner.set(edge.source, edges); }
-  const connected = new Set([...connections, ...boundary].flatMap(edge => [edge.source, edge.target]));
+  // Reading priority belongs to the open scope, not the temporarily selected outer node.
+  const connected = new Set([...connections.filter(edge => direct.has(edge.source) || direct.has(edge.target)), ...boundary].flatMap(edge => [edge.source, edge.target]));
   let nodes: SemanticNode[] = allowed.filter(node => shown.has(node.id)).map(node => ({ ...node, attributes: { ...node.attributes,
     architectureContext: Boolean(scopeId && !direct.has(node.id)), architecturePeripheral: Boolean(scopeId && !direct.has(node.id) && !connected.has(node.id)),
+    architectureScopeRole: !scopeId ? '' : direct.has(node.id) ? 'inside' : connected.has(node.id) ? 'direct' : 'surrounding',
     architectureInternalCount: architectureRelationCounts(internalByOwner.get(node.id) ?? []).records,
   } }));
   const representedNodeIds = nodes.map(node => node.id);

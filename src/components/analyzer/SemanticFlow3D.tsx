@@ -54,6 +54,9 @@ function Scene({ graph: sourceGraph, renderGraph, explorer, nodeDisplays: displa
     .map(path => !path.selected && explicitPathEdgeIds?.has(path.edge.id) ? { ...path, color: '#83a997' } : path), [pathGraph, positions, selectedIds, selectedEdgeId, direction, explicitPathEdgeIds]);
   const shownGraph = useMemo(() => ({ ...graph, edges: paths.map(path => path.edge) }), [graph, paths]);
   const emphasis = useMemo(() => resolveSemanticFlowHover(shownGraph, selectedIds, selectedEdgeId, hoverTarget), [shownGraph, selectedIds, selectedEdgeId, hoverTarget]);
+  const scopeActiveIds = useMemo(() => graph.architectureView?.scopeId ? new Set([...selectedIds, ...hoveredIds, ...explicitPathNodeIds ?? [], ...emphasis.nodeIds,
+    ...shownGraph.edges.filter(edge => selectedIds.has(edge.source) || selectedIds.has(edge.target) || edge.id === selectedEdgeId || explicitPathEdgeIds?.has(edge.id)).flatMap(edge => [edge.source, edge.target])]) : undefined,
+  [graph.architectureView?.scopeId, selectedIds, hoveredIds, explicitPathNodeIds, emphasis.nodeIds, shownGraph.edges, selectedEdgeId, explicitPathEdgeIds]);
   const roles = useMemo(() => semanticFlowNodeRoles(shownGraph, selectedIds, selectedEdgeId), [shownGraph, selectedIds, selectedEdgeId]);
   const relationKinds = useMemo(() => semanticFlowNodeRelationKinds(shownGraph, selectedIds, selectedEdgeId), [shownGraph, selectedIds, selectedEdgeId]);
   const flowPaths = useMemo(() => paths.filter(path => (graph.view !== 'architecture-map' || path.selected || emphasis.edgeIds.has(path.edge.id)) && (!emphasis.edgeIds.size || emphasis.edgeIds.has(path.edge.id))).map(path => ({ id: path.edge.id, color: path.color, points: path.points })), [paths, emphasis, graph.view]);
@@ -69,7 +72,7 @@ function Scene({ graph: sourceGraph, renderGraph, explorer, nodeDisplays: displa
     configureSemanticFlowViewport(camera as THREE.OrthographicCamera, size.width, size.height, overlayTop);
     labelDirty.current = true; invalidate();
   }, [camera, size.width, size.height, overlayTop, invalidate]);
-  useEffect(() => { labelDirty.current = true; invalidate(); }, [positions, selectedIds, matchIds, selectedEdgeId, hoveredIds, emphasis, roles, displays, size, overlayTop, labelObstacles, autoAggregation, invalidate]);
+  useEffect(() => { labelDirty.current = true; invalidate(); }, [positions, selectedIds, matchIds, selectedEdgeId, hoveredIds, emphasis, roles, displays, size, overlayTop, labelObstacles, autoAggregation, scopeActiveIds, invalidate]);
   useEffect(() => {
     stateRef.current.active = motion.enabled && motion.visible && flowPaths.length > 0;
     stateRef.current.reduced = motion.reduced; invalidate();
@@ -225,7 +228,7 @@ function Scene({ graph: sourceGraph, renderGraph, explorer, nodeDisplays: displa
     (edgeAsset.arrowMaterial.uniforms.viewport!.value as THREE.Vector2).set(size.width, size.height);
     cameraRef.current = { scale: zoom, viewportWidth: size.width, viewportHeight: size.height };
     if (labelDirty.current) {
-      const labels = projectSemanticFlowLabels(camera, size, zoom, labelOrder, selectedIds, matchIds, { quietBackground: autoAggregation && Boolean(selectedIds.size || selectedEdgeId || explicitPathNodeIds?.size), regions, relatedIds: connected, priorityIds, hoveredIds, overlayTop, previous: previousLabels.current, obstacles: labelObstacles, roles, relationKinds, displays, view: sourceGraph.view, emphasisIds: emphasis.nodeIds });
+      const labels = projectSemanticFlowLabels(camera, size, zoom, labelOrder, selectedIds, matchIds, { quietBackground: autoAggregation && Boolean(selectedIds.size || selectedEdgeId || explicitPathNodeIds?.size), regions, relatedIds: connected, priorityIds, hoveredIds, overlayTop, previous: previousLabels.current, obstacles: labelObstacles, roles, relationKinds, displays, view: sourceGraph.view, emphasisIds: emphasis.nodeIds, scopeActiveIds });
       previousLabels.current = labels;
       callbacks.current.onLabels(labels);
       callbacks.current.onConnections(semanticFlowConnectionNotices(camera, size, positions, new Set([...connected, ...priorityIds].filter(id => !selectedIds.has(id))), labels, overlayTop, labelObstacles));
@@ -360,7 +363,18 @@ export function SemanticFlow3D(props: Props) {
   const originalRelations = useMemo(() => inspectRelations ? props.graph.edges.map(edge => ({ ...edge, confidence: confidenceLabels[edge.confidence],
     evidenceCount: new Set(edge.evidence.map(item => JSON.stringify([item.path, item.start, item.end, item.description]))).size,
     siteCount: new Set(edge.evidence.map(item => JSON.stringify([item.path, item.start, item.end]))).size })) : [], [props.graph.edges, inspectRelations]);
-  const displays = useMemo(() => props.nodeDisplays ?? semanticNodeDisplays(props.graph.nodes), [props.nodeDisplays, props.graph.nodes]);
+  const displays = useMemo(() => {
+    const base = props.nodeDisplays ?? semanticNodeDisplays(props.graph.nodes);
+    if (!props.graph.architectureView?.scopeId || !aggregation.aggregates.length) return base;
+    const next = new Map(base);
+    for (const group of aggregation.aggregates) {
+      const roles = new Set(group.memberIds.map(id => base.get(id)?.scopeRole));
+      const scopeRole = roles.has('inside') ? 'inside' : roles.has('direct') ? 'direct' : 'surrounding';
+      const roleLabel = scopeRole === 'inside' ? '内部' : scopeRole === 'direct' ? roles.has('surrounding') ? '接続先を含む周辺' : '接続先' : '周辺';
+      next.set(group.id, { title: group.label, location: `${group.memberIds.length}対象・表示上の集合`, dataRole: `${roleLabel} · 表示上の集合`, scopeRole, tooltip: `${group.label}\n${roleLabel}\n${group.memberIds.length}対象を表示上でまとめています。` });
+    }
+    return next;
+  }, [props.nodeDisplays, props.graph.nodes, props.graph.architectureView?.scopeId, aggregation.aggregates]);
   const selectPoint = (id: string) => {
     const aggregate = aggregation.aggregates.find(group => group.id === id);
     if (aggregate) setInspection({ kind: 'group', id: aggregate.groupId });
@@ -418,6 +432,7 @@ export function SemanticFlow3D(props: Props) {
     <svg className="semantic-flow-label-leaders" aria-hidden="true">{labels.filter(label => !label.region && (aggregation.individualIds.has(label.id) || aggregation.aggregates.some(group => group.id === label.id))).map(label => <line key={label.id} ref={element => labelLayer.attachLeader(label.id, element)} />)}</svg>
     <div className="semantic-flow-3d-labels">{labels.filter(label => label.region ? regionNodes.has(label.id) : aggregation.individualIds.has(label.id) || aggregation.aggregates.some(group => group.id === label.id)).map(label => <button key={label.id} ref={element => labelLayer.attach(label.id, element)} type="button"
       data-flow-label-id={label.id} data-flow-inspected={label.id === inspectedId || undefined} data-flow-role={label.role} data-flow-emphasized={label.emphasized || undefined} className={`${label.selected ? 'is-selected' : ''}${label.match ? ' is-match' : ''}${label.hovered ? ' is-hovered' : ''}${label.related ? ' is-related' : ''}${label.region ? ' is-region' : ''}${label.aggregate ? ' is-aggregate' : ''}${label.emphasized ? ' is-emphasized' : ''}${label.dimmed ? ' is-dimmed' : ''}`} aria-pressed={label.region ? undefined : label.selected} title={`${label.tooltip ?? `${label.label}\n${label.path}`}${label.roleLabel ? `\n${label.roleLabel}` : ''}`}
+      data-architecture-scope-role={label.scopeRole} data-architecture-active={label.scopeActive || undefined}
       aria-label={label.region ? `${label.label}の領域へ移動 · ${label.path}` : undefined}
       onPointerMove={event => { if (!label.region && event.buttons === 0) onHover(label.id, undefined, label.id); }} onPointerLeave={() => onHover()} onFocus={() => { if (!label.region) { focusedIdRef.current = label.id; focusOwner.current = { id: label.id, handler: props.onHoverTarget }; setFocusedId(label.id); props.onHoverTarget?.({ kind: 'node', id: label.id }, { source: `3d-focus:${label.id}`, modality: 'focus' }); } }} onBlur={() => releaseFocus(label.id)}
       onClick={() => label.region ? props.onFocusRegion?.(regionNodes.get(label.id) ?? []) : selectPoint(label.id)}><strong>{label.label}</strong>{label.roleLabel && <span className="semantic-flow-3d-role">{label.roleLabel}</span>}{label.disambiguation && <small className="semantic-flow-3d-disambiguation">{label.disambiguation}</small>}{(label.region || label.selected || label.aggregate) && <small>{label.id === inspectedId ? `内訳を表示中 · ${label.path}` : label.region ? `所属 · ${label.path}` : label.path}</small>}</button>)}</div>

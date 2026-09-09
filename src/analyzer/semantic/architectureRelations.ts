@@ -19,11 +19,21 @@ export function architectureRelationClass(edge: SemanticEdge, source: string, ta
     ? 'internal' : 'self';
 }
 
+export function architectureRelationOriginals(edges: readonly SemanticRelationSource[]): SemanticRelationSource[] {
+  const originals = new Map<string, SemanticRelationSource>(), visited = new Set<SemanticRelationSource>();
+  const visit = (edge: SemanticRelationSource) => {
+    if (visited.has(edge)) return;
+    visited.add(edge);
+    const nested = (edge as SemanticEdge).provenance?.edges;
+    if (nested?.length) for (const original of nested) visit(original);
+    else originals.set(edge.id, edge);
+  };
+  for (const edge of edges) visit(edge);
+  return [...originals.values()];
+}
+
 export function architectureRelationCounts(edges: readonly SemanticEdge[]) {
-  const originals = new Map<string, SemanticRelationSource>(), sites = new Set<string>();
-  for (const edge of edges) for (const original of edge.provenance?.edges ?? [edge]) {
-    originals.set(original.id, original);
-    for (const item of original.evidence) sites.add(JSON.stringify([item.path, item.start, item.end]));
-  }
-  return { records: originals.size, sites: sites.size };
+  const originals = architectureRelationOriginals(edges), sites = new Set<string>();
+  for (const original of originals) for (const item of original.evidence) sites.add(JSON.stringify([item.path, item.start, item.end]));
+  return { records: originals.length, sites: sites.size };
 }

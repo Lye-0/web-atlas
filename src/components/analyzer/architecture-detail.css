@@ -35,3 +35,14 @@
 .architecture-request-inspection :is(strong, small) { display: block; overflow-wrap: anywhere; }
 .architecture-request-inspection small { margin-top: 4px; color: #a9c3b3; }
 .architecture-request-inspection button:focus-visible { outline: 2px solid #cfdec5; outline-offset: 2px; }
+.architecture-partner { min-width: 0; }
+.architecture-partner > details > summary { white-space: normal; }
+.architecture-partner > details > summary > span { min-width: 0; overflow-wrap: anywhere; }
+.architecture-partner summary :is(strong, small) { display: block; }
+.architecture-partner summary small { margin-top: 3px; color: #a8bfb1; font-size: 11px; font-weight: 400; }
+.architecture-summary-partners .architecture-partner > details { margin: 6px 0; }
+.architecture-detail .architecture-relation-group .architecture-relation-direction { font-size: 11px; color: #b0c5b8; margin: 4px 0; }
+.architecture-detail .architecture-relation-group .architecture-relation-status { margin-top: 2px; }
+.architecture-detail .architecture-relation-group > button { display: block; margin-top: 8px; }
+.architecture-count-definitions { font-size: 11px; color: #b4c9bd; }
+.architecture-request-origin { overflow-wrap: anywhere; font-weight: 600; }

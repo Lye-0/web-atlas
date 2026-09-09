@@ -87,7 +87,7 @@ export default function FlowAnalyzerPage({ view }: { view: SemanticExplorerViewI
     ?? graph.edges.find(edge => edge.id === session.selectedEdgeId);
   const results = useMemo(() => searchSemanticNodes(architectureBase?.allowed ?? filtered.nodes, session.search), [architectureBase, filtered.nodes, session.search]);
   const searchDisplays = useMemo(() => semanticNodeDisplays(graph.nodes), [graph.nodes]);
-  const stageDisplays = useMemo(() => view === 'architecture-map' ? semanticNodeDisplays(stageGraph.nodes) : searchDisplays, [view, stageGraph.nodes, searchDisplays]);
+  const stageDisplays = useMemo(() => view === 'architecture-map' ? semanticNodeDisplays(stageGraph.nodes, byId) : searchDisplays, [view, stageGraph.nodes, searchDisplays, byId]);
   const matchIds = useMemo(() => new Set(results.map(result => result.id)), [results]);
   const knownFiles = useMemo(() => new Set([...(store?.files.map(file => file.relativePath) ?? []), ...Object.keys(store?.sources ?? {}), ...Object.keys(store?.semanticSources ?? {})]), [store]);
   const explorer = useMemo(() => buildSemanticExplorer(graph, knownFiles), [graph, knownFiles]);
