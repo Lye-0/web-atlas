@@ -104,6 +104,14 @@
 - files: `src/components/analyzer/canvasDisposals.ts`, `src/components/analyzer/canvasDisposals.test.tsx`, `src/components/analyzer/SemanticFlow3D.tsx` …
 - memory: `agent-knowledge/entries/2026-09-09-canvas-document-disposal-317bd4.md`
 
+### 選択パネルのリサイズでOrbitControlsの注視点を失わない
+- id: `rm-20260909-orbit-resize-target`
+- type: `failure`
+- maturity: `candidate`
+- tags: `camera`, `orbit-controls`, `resize`, `selection`, `lifecycle`
+- files: `src/components/analyzer/SemanticFlow3D.tsx`, `src/components/analyzer/SemanticFlow3DCamera.test.tsx`, `docs/technical/semantic-analyzer.md`
+- memory: `agent-knowledge/entries/2026-09-09-orbit-resize-target-774d2a.md`
+
 ## deployment
 
 ### Workers Buildsでのpnpm install script許可

@@ -134,6 +134,10 @@ function Scene({ graph: sourceGraph, renderGraph, explorer, nodeDisplays: displa
     callbacks.current.onCamera({ position: camera.position.toArray(), target: control.target.toArray(), zoom: (camera as THREE.OrthographicCamera).zoom });
     publishProjection();
   }, [camera, publishProjection]);
+  // Resizing for the detail panel changes projection callbacks, not the orbit
+  // lifetime. Recreating controls would reset its target to the world origin.
+  const saveCurrentCamera = useRef(save);
+  useLayoutEffect(() => { saveCurrentCamera.current = save; }, [save]);
   useEffect(() => {
     const control = new OrbitControls(camera, gl.domElement); controls.current = control;
     control.enableDamping = false; control.screenSpacePanning = true; control.minZoom = .000001; control.maxZoom = 8;
@@ -142,17 +146,18 @@ function Scene({ graph: sourceGraph, renderGraph, explorer, nodeDisplays: displa
     control.listenToKeyEvents(gl.domElement);
     const unbindKeyboard = bindSemanticFlowKeyboard(gl.domElement, () => callbacks.current.onClear());
     // OrbitControls keyboard changes do not emit its pointer gesture end event.
-    const saveKeyboardCamera = (event: KeyboardEvent) => { if (event.key.startsWith('Arrow')) save(); };
+    const saveCamera = () => saveCurrentCamera.current();
+    const saveKeyboardCamera = (event: KeyboardEvent) => { if (event.key.startsWith('Arrow')) saveCamera(); };
     gl.domElement.addEventListener('keydown', saveKeyboardCamera);
     const change = () => { labelDirty.current = true; invalidate(); };
-    control.addEventListener('change', change); control.addEventListener('end', save);
+    control.addEventListener('change', change); control.addEventListener('end', saveCamera);
     const lost = (event: Event) => { event.preventDefault(); callbacks.current.onUnavailable(); };
     gl.domElement.addEventListener('webglcontextlost', lost);
     return registerCanvasDisposal(canvasDisposals, () => {
       unbindKeyboard(); gl.domElement.removeEventListener('keydown', saveKeyboardCamera); gl.domElement.removeEventListener('webglcontextlost', lost);
-      control.removeEventListener('change', change); control.removeEventListener('end', save); control.dispose(); controls.current = null;
+      control.removeEventListener('change', change); control.removeEventListener('end', saveCamera); control.dispose(); controls.current = null;
     });
-  }, [camera, gl, invalidate, save, canvasDisposals]);
+  }, [camera, gl, invalidate, canvasDisposals]);
   const fit = useCallback((ids?: string[], reset = false) => {
     const control = controls.current; if (!control) return;
     const requestedIds = new Set(ids);
