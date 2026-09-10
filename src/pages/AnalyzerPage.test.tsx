@@ -96,7 +96,8 @@ describe('Module Dependency exploration in the Analyzer shell', () => {
     const manual = () => Number(host.querySelector<HTMLElement>('[data-manual-member-count]')!.dataset.manualMemberCount);
     await act(async () => far().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
     expect(manual()).toBe(1); expect(far().getAttribute('aria-expanded')).toBe('false');
-    await act(async () => host.querySelector<HTMLButtonElement>('.analyzer-spatial-aggregate-label')!.click());
+    await act(async () => { const panel = host.querySelector<HTMLDetailsElement>('.auto-aggregation-panel')!; panel.open = true; panel.dispatchEvent(new Event('toggle')); });
+    await act(async () => host.querySelector<HTMLButtonElement>('.auto-aggregation-group-list button')!.click());
     const relations = host.querySelector<HTMLDetailsElement>('.auto-aggregation-body details')!;
     await act(async () => { relations.open = true; relations.dispatchEvent(new Event('toggle')); });
     await act(async () => host.querySelector<HTMLButtonElement>('[data-aggregation-relation-id]')!.click());

@@ -1,3 +1,4 @@
+import { AnalyzerEmptyState } from '../components/analyzer/AnalyzerEmptyState';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { filesFromDirectoryHandle, scanProjectFiles, useAnalyzerSession, type AnalyzerProjectStore, type AnalyzerViewSession } from '../analyzer';
@@ -180,6 +181,7 @@ export default function FlowAnalyzerPage({ view }: { view: SemanticExplorerViewI
     finally { if (current()) setRescanning(false); }
   };
   const activeFilters = [options.scope, options.kind, options.confidence, options.layer !== 'source', options.direction !== 'both', options.auxiliary, options.members?.length].filter(Boolean).length;
+  if (!store) return <div className="page-stack analyzer-page"><AnalyzerProjectHeader onScanned={replaceProject} /><AnalyzerEmptyState /></div>;
   return <div className="page-stack analyzer-page semantic-flow-page">
     <AnalyzerProjectHeader onScanned={replaceProject} />
     <section className="analyzer-shell" aria-labelledby="analyzer-view-title">
@@ -228,7 +230,7 @@ export default function FlowAnalyzerPage({ view }: { view: SemanticExplorerViewI
       }} loading={Boolean(store && !analysis && !error)} />
       <div {...architectureGesture.bindings} ref={fullscreen.root} className={`analyzer-workspace semantic-flow-workspace${session.detailOpen && (selected || selectedEdge) ? ' has-detail' : ''}${fullscreen.isFullscreen ? ' is-fullscreen' : ''}`}
         role={fullscreen.isFullscreen ? 'dialog' : undefined} aria-modal={fullscreen.isFullscreen || undefined} aria-label={fullscreen.isFullscreen ? `${view} 全画面表示` : undefined} onKeyDownCapture={event => { architectureGesture.bindings.onKeyDownCapture?.(); fullscreen.onKeyDownCapture(event); }}>
-        {store ? <SemanticFlowStage key={`${view}:${state.scanVersion}`} graph={stageGraph} explorer={explorer} nodeDisplays={stageDisplays} mode={flow.mode} direction={options.direction} selectedIds={selectedIds} selectedEdgeId={selectedEdge?.id} matchIds={matchIds} focus={focus}
+        {<SemanticFlowStage key={`${view}:${state.scanVersion}`} graph={stageGraph} explorer={explorer} nodeDisplays={stageDisplays} mode={flow.mode} direction={options.direction} selectedIds={selectedIds} selectedEdgeId={selectedEdge?.id} matchIds={matchIds} focus={focus}
           architectureControls={view === 'architecture-map' && flow.mode === '3d' && architectureBase?.scopeId ? <button type="button" aria-label="周辺構成" aria-pressed={session.architecture?.surroundings !== false} title="直接の接続先は残します" onClick={() => updateView(view, { architecture: { ...session.architecture, surroundings: session.architecture?.surroundings === false } })}>周辺構成：{session.architecture?.surroundings !== false ? '表示' : '非表示'}</button> : undefined}
           architectureOverlay={inspectedRequests && <ArchitectureRequestInspection group={inspectedRequests} nodes={byId} onSelect={selectNode} onClose={() => setRequestInspection(undefined)} expanded={session.architecture?.expandedRequestGroupIds?.includes(inspectedRequests.id) ?? false}
             onExpanded={expanded => updateView(view, { architecture: { ...session.architecture, expandedRequestGroupIds: [...session.architecture?.expandedRequestGroupIds?.filter(id => id !== inspectedRequests.id) ?? [], ...(expanded ? [inspectedRequests.id] : [])] } })} />}
@@ -244,8 +246,7 @@ export default function FlowAnalyzerPage({ view }: { view: SemanticExplorerViewI
           fineExpandedScopeIds={session.dataFineExpandedScopeIds ?? []} onFineExpandedScopeIds={dataFineExpandedScopeIds => updateView(view, { dataFineExpandedScopeIds })}
           hoverTarget={hoverTarget} onHoverTarget={onHoverTarget}
           onArchitectureNodeClick={architectureGesture.onNodeClick} onSelect={selectNode} onSelectEdge={selectEdge} onClear={clearSelection} isFullscreen={fullscreen.isFullscreen} onFullscreen={() => void fullscreen.toggle()}
-          onUnavailable={() => { setUnavailable3D(true); navigation.changeMode('2d'); }} />
-          : <div className="semantic-empty"><p>プロジェクトフォルダを選択すると、構造と関係を解析します。</p><p>ソースはブラウザ内で読み取り、外部へ送信しません。</p></div>}
+          onUnavailable={() => { setUnavailable3D(true); navigation.changeMode('2d'); }} />}
         {store && view === 'architecture-map' && session.detailOpen && (selected || selectedEdge) && <ArchitectureDetail key={selected?.id ?? selectedEdge?.id} node={stageGraph.nodes.find(n => n.id === selected?.id) ?? selected} edge={selectedEdge} graph={graph} visible={stageGraph} sources={store.semanticSources ?? store.sources} store={store} analysis={analysis!} canOpen={navigation.canOpenScope} onOpen={navigation.openScope} onReveal={id => navigation.jumpMode(flow.mode, id)} onSelect={selectNode} onSelectEdge={selectEdge} onJump={jump} onHoverTarget={onHoverTarget} onClose={() => { clearHover(); updateView(view, current => recordExplorerSelection(current, { selectedNodeId: current.selectedNodeId, selectedEdgeId: current.selectedEdgeId, detailOpen: false })); }} />}
         {store && view !== 'architecture-map' && session.detailOpen && (selected || selectedEdge) && <SemanticFlowDetail key={selected?.id ?? selectedEdge?.id} node={selected} edge={selectedEdge} nodes={allNodes} edges={graph.edges} sources={store.semanticSources ?? store.sources} view={view}
           openChoiceIds={session.modelOpenChoiceIds} onOpenChoiceIds={modelOpenChoiceIds => updateView(view, { modelOpenChoiceIds })}

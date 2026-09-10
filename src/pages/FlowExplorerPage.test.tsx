@@ -8,6 +8,7 @@ import type { SemanticAnalysis, SemanticNode } from '../analyzer/semantic/types'
 import { AnalyzerPage } from './AnalyzerPage';
 import type { SemanticFlowHoverHandler, SemanticFlowHoverTarget } from '../analyzer/semantic/flowRelationInteraction';
 
+vi.mock('../components/analyzer/AnalyzerEmptyOrbit', () => ({ AnalyzerEmptyOrbit: () => null }));
 vi.mock('../analyzer/semantic/client', () => ({ getSemanticAnalysis: vi.fn(), cancelSemanticAnalysis: vi.fn() }));
 vi.mock('../components/analyzer/SemanticFlow3D', () => ({ SemanticFlow3D: ({ graph, camera, command, onCamera, showGroupBounds, hoverTarget, onHoverTarget, explicitPathNodeIds, onClear, onSelect }: { graph: { nodes: { id: string }[] }; camera?: { zoom: number }; command?: { kind: string; ids?: string[] }; onCamera: (camera: unknown) => void; showGroupBounds?: boolean; hoverTarget?: SemanticFlowHoverTarget; onHoverTarget?: SemanticFlowHoverHandler; explicitPathNodeIds?: ReadonlySet<string>; onClear: () => void; onSelect: (id: string) => void }) =>
   <div data-cloud-path={[...explicitPathNodeIds ?? []].join(",")} data-cloud-count={graph.nodes.length} data-cloud-zoom={camera?.zoom ?? ''} data-cloud-command={command ? `${command.kind}:${command.ids?.join(',')}` : ''} data-cloud-bounds={String(showGroupBounds)} data-cloud-hover={hoverTarget?.id ?? ''}>
