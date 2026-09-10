@@ -1,14 +1,16 @@
 import { act, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { bindSemanticFlowKeyboard } from './semanticFlowKeyboard';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SemanticGraph } from '../../analyzer/semantic/types';
 import type { SemanticPosition } from '../../analyzer/semantic/presentation';
 import type { FlowConnectionNotice, FlowLabelPlacement } from './semanticFlowLabels';
 import type { SemanticFlowHoverHandler, SemanticFlowHoverTarget } from '../../analyzer/semantic/flowRelationInteraction';
 import { SemanticFlow3D } from './SemanticFlow3D';
+import type { AnalyzerViewSession } from '../../analyzer/session';
 
 const scene = vi.hoisted(() => ({ current: {} as {
-  positions: SemanticPosition[]; graph: SemanticGraph; onSelect: (id: string) => void;
+  positions: SemanticPosition[]; graph: SemanticGraph; onSelect: (id: string) => void; selectedIds: ReadonlySet<string>;
   onLabels: (labels: FlowLabelPlacement[]) => void; onConnections: (notices: FlowConnectionNotice[]) => void;
   onHover: (id?: string, edgeId?: string) => void; hoverTarget?: SemanticFlowHoverTarget; showGroupBounds?: boolean;
 } }));
@@ -24,35 +26,70 @@ const graph: SemanticGraph = { view: 'function-call-flow', nodes: [
 
 describe('3D presentation controls retain canonical selection', () => {
   let host: HTMLDivElement, root: Root;
-  const onSelect = vi.fn(), onFocus = vi.fn(), onCamera = vi.fn(), onHoverTarget = vi.fn();
-  const render = (selectedIds = new Set<string>(), selectedEdgeId?: string, options: { showGroupBounds?: boolean; hoverTarget?: SemanticFlowHoverTarget; onHoverTarget?: SemanticFlowHoverHandler } = {}) => act(async () => root.render(<SemanticFlow3D graph={graph} selectedIds={selectedIds} selectedEdgeId={selectedEdgeId} matchIds={new Set()} {...options} onHoverTarget={options.onHoverTarget ?? onHoverTarget}
-    motion={{ enabled: false, reduced: false, visible: true }} onCamera={onCamera} onSelect={onSelect} onSelectEdge={() => {}} onClear={() => {}} onUnavailable={() => {}} onFocusRegion={onFocus} />));
+  const onSelect = vi.fn(), onFocus = vi.fn(), onCamera = vi.fn(), onHoverTarget = vi.fn(), onClear = vi.fn();
+  const render = (selectedIds = new Set<string>(), selectedEdgeId?: string, options: { showGroupBounds?: boolean; hoverTarget?: SemanticFlowHoverTarget; onHoverTarget?: SemanticFlowHoverHandler; aggregationState?: AnalyzerViewSession['aggregation']; autoAggregation?: boolean } = {}) => act(async () => root.render(<SemanticFlow3D graph={graph} selectedIds={selectedIds} selectedEdgeId={selectedEdgeId} matchIds={new Set()} {...options} onHoverTarget={options.onHoverTarget ?? onHoverTarget}
+    motion={{ enabled: false, reduced: false, visible: true }} onCamera={onCamera} onSelect={onSelect} onSelectEdge={() => {}} onClear={onClear} onUnavailable={() => {}} onFocusRegion={onFocus} />));
   beforeEach(() => {
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
     host = document.createElement('div'); document.body.append(host); root = createRoot(host);
   });
   afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.clearAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 
-  it('opens and collapses a synthetic point without selecting it as an analyzer object or moving the camera', async () => {
-    await render();
-    const aggregate = scene.current.positions.find(item => item.node.attributes.displayAggregate)!;
-    expect(scene.current.positions).toHaveLength(2); expect(scene.current.graph).toBe(graph);
+  const openUnresolved = () => act(async () => {
+    const details = host.querySelector<HTMLDetailsElement>('.semantic-flow-unresolved-control')!;
+    details.open = true; details.dispatchEvent(new Event('toggle', { bubbles: true }));
+  });
+  const clickText = (text: string) => act(async () => [...host.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === text)!.click());
+
+  it.each([false, true])('keeps inspection outside the main selection when automatic omission is %s', async autoAggregation => {
+    await render(new Set(['caller']), undefined, { autoAggregation, aggregationState: { expandedGroupIds: [], collapsedGroupIds: [], unresolved: 'collapsed' } });
+    const aggregate = scene.current.positions.find(point => point.node.attributes.displayAggregate)!;
     await act(async () => scene.current.onSelect(aggregate.node.id));
-    expect(scene.current.positions).toHaveLength(4);
-    expect(host.querySelector('.semantic-flow-unresolved-control')?.getAttribute('open')).toBe('');
-    expect(onSelect).not.toHaveBeenCalled(); expect(onCamera).not.toHaveBeenCalled(); expect(onFocus).not.toHaveBeenCalled();
-    const collapse = [...host.querySelectorAll('button')].find(button => button.textContent === '集約表示へ戻す')!;
-    await act(async () => collapse.click());
-    expect(scene.current.positions).toHaveLength(2); expect(scene.current.graph.nodes).toHaveLength(3); expect(scene.current.graph.edges).toHaveLength(1);
+    expect([...scene.current.selectedIds]).toEqual(['caller']);
+    expect(onSelect).not.toHaveBeenCalled(); expect(onCamera).not.toHaveBeenCalled();
+    await act(async () => scene.current.onLabels([{ id: aggregate.node.id, label: 'calls', path: '1対象', aggregate: true, selected: false, match: false, x: 10, y: 10 }]));
+    const label = host.querySelector(`[data-flow-label-id="${aggregate.node.id}"]`)!;
+    expect(label.getAttribute('aria-pressed')).toBe('false'); expect(label.textContent).toContain('内訳を表示中');
   });
 
-  it('reveals canonical targets from a function, a relation and a direct selection while the aggregate stays closed', async () => {
+  it('accepts Escape before Scene initialization and clears only once after its native listener is ready', async () => {
     await render(new Set(['caller']));
-    expect(scene.current.positions.map(item => item.node.id)).toContain('first');
+    const canvas = document.createElement('canvas'); host.querySelector('[data-testid="canvas"]')!.append(canvas);
+    const escape = () => canvas.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    await act(async () => { escape(); }); expect(onClear).toHaveBeenCalledTimes(1);
+    const unbind = bindSemanticFlowKeyboard(canvas, onClear);
+    await act(async () => { escape(); }); expect(onClear).toHaveBeenCalledTimes(2);
+    unbind();
+    const prevented = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }); prevented.preventDefault();
+    await act(async () => { canvas.dispatchEvent(prevented); }); expect(onClear).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps small inputs individual until an explicit manual collapse, with no duplicated representative on expansion', async () => {
+    await render();
+    expect(scene.current.positions).toHaveLength(3); expect(scene.current.graph).toBe(graph);
+    await openUnresolved(); await clickText('すべての対象を点で展開');
+    expect(scene.current.positions).toHaveLength(3);
+    expect(host.querySelector('.semantic-flow-unresolved-control')?.getAttribute('open')).toBe('');
+    expect(onSelect).not.toHaveBeenCalled(); expect(onCamera).not.toHaveBeenCalled(); expect(onFocus).not.toHaveBeenCalled();
+    await clickText('集約表示へ戻す');
+    expect(scene.current.positions).toHaveLength(2); expect(scene.current.graph.nodes).toHaveLength(3); expect(scene.current.graph.edges).toHaveLength(1);
+    const aggregate = scene.current.positions.find(item => item.node.attributes.displayAggregate)!;
+    await act(async () => scene.current.onSelect(aggregate.node.id));
+    expect(host.querySelector('.auto-aggregation-panel h4')?.textContent).toContain('未特定');
+    await clickText('この所属の2対象を個別表示');
+    expect(scene.current.positions.map(point => point.node.id).sort()).toEqual(['caller', 'first', 'second']);
+    expect(onSelect).not.toHaveBeenCalled(); expect(onCamera).not.toHaveBeenCalled();
+  });
+
+  it('protects the original relation endpoints and selected unresolved targets while manual collapse remains in force even with auto OFF', async () => {
+    const options = { autoAggregation: false, aggregationState: { expandedGroupIds: [], collapsedGroupIds: [], unresolved: 'collapsed' as const } };
+    await render(new Set(['caller']), undefined, options);
+    expect(scene.current.positions.map(item => item.node.id)).toContain('caller');
     expect(scene.current.positions.map(item => item.node.id)).not.toContain('second');
-    await render(new Set(), 'call-1');
+    await render(new Set(), 'call-1', options);
     expect(scene.current.positions.find(item => item.node.id === 'first')?.node).toBe(graph.nodes[1]);
-    await render(new Set(['second']));
+    expect(scene.current.positions.find(item => item.node.attributes.displayAggregate)?.node.attributes.targetCount).toBe(1);
+    await render(new Set(['second']), undefined, options);
     expect(scene.current.positions.find(item => item.node.id === 'second')?.node).toBe(graph.nodes[2]);
     expect(host.querySelector('.semantic-flow-3d')?.getAttribute('data-unresolved-expanded')).toBe('false');
     expect(onCamera).not.toHaveBeenCalled();
@@ -60,8 +97,7 @@ describe('3D presentation controls retain canonical selection', () => {
 
   it('uses original IDs in member navigation and explicit movement to offscreen endpoints', async () => {
     await render();
-    const aggregate = scene.current.positions.find(item => item.node.attributes.displayAggregate)!;
-    await act(async () => scene.current.onSelect(aggregate.node.id));
+    await openUnresolved();
     const target = [...host.querySelectorAll('.semantic-flow-unresolved-control li button')].find(button => button.textContent?.includes('src/second.ts')) as HTMLButtonElement;
     await act(async () => target.click());
     expect(onSelect).toHaveBeenLastCalledWith('second'); expect(onFocus).toHaveBeenLastCalledWith(['second']);

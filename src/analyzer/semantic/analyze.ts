@@ -1,6 +1,12 @@
 import { Parser, type Language, type Node } from 'web-tree-sitter';
 import { semanticLanguage, responsibility } from './languages';
 import type { SemanticAnalysis, SemanticConfidence, SemanticEdge, SemanticEvidence, SemanticField, SemanticInput, SemanticKind, SemanticNode, SemanticViewId } from './types';
+import { createDataCompiler } from './dataCompiler';
+import { refineDataModels } from './dataModels';
+import { refineDataSchemas } from './dataSchemas';
+import { refineDataFlow } from './dataFlow';
+import { refineSchemaFiles } from './dataSchemaFiles';
+import { buildArchitectureModel } from './architecture';
 
 const functionTypes = new Set(['function_declaration', 'function_definition', 'function_expression', 'arrow_function', 'method_definition', 'method_declaration', 'constructor_declaration', 'function_item', 'method', 'singleton_method', 'local_function_statement', 'lambda_expression', 'function_literal', 'function_signature']);
 const modelTypes = new Set(['interface_declaration', 'type_alias_declaration', 'type_item', 'class_declaration', 'class_definition', 'class', 'struct_item', 'struct_specifier', 'type_spec', 'record_declaration', 'enum_declaration', 'enum_item', 'object_declaration', 'trait_item']);
@@ -423,9 +429,20 @@ export async function analyzeSemanticSources(input: SemanticInput, loadLanguage:
   }
   resolveRelationships(builder, input, functions, calls, assignments, bindings);
   const resultNodes = [...builder.nodes.values()];
-  return { nodes: resultNodes, edges: [...builder.edges.values()], coverage, warnings,
+  const analysis: SemanticAnalysis = { nodes: resultNodes, edges: [...builder.edges.values()], coverage, warnings,
+    flowFieldsByNode: Object.fromEntries(resultNodes.filter(node => node.kind === 'model' && node.fields !== undefined)
+      .map(node => [node.id, node.fields!.map(field => ({ ...field }))])),
     stats: { files: sources.length, functions: functions.filter(fn => !fn.node.attributes.initializer).length,
       models: resultNodes.filter(node => node.kind === 'model').length, unresolved: calls.filter(call => !call.target).length, elapsedMs: Math.round(performance.now() - started) } };
+  const compiler = createDataCompiler(input);
+  const schemas = refineDataSchemas(analysis, compiler);
+  const models = refineDataModels(analysis, compiler, schemas);
+  refineSchemaFiles(analysis, input);
+  refineDataFlow(analysis, compiler, models);
+  analysis.architecture = buildArchitectureModel(input, analysis);
+  analysis.stats.models = analysis.nodes.filter(node => node.kind === 'model' && !node.attributes.dataModelExcluded).length;
+  analysis.stats.elapsedMs = Math.round(performance.now() - started);
+  return analysis;
 }
 
 function resolveRelationships(builder: SemanticBuilder, input: SemanticInput, functions: FunctionRecord[], calls: CallRecord[], assignments: AssignmentRecord[], bindings: Map<string, ImportBinding[]>) {

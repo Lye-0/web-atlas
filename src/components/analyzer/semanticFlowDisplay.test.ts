@@ -6,6 +6,20 @@ const node = (id: string, overrides: Partial<SemanticNode> = {}): SemanticNode =
   group: 'Source', confidence: 'source', evidence: [{ path: 'src/example.ts', start: 40, end: 80, line: 5, endLine: 6, description: 'recorded source' }], attributes: {}, ...overrides });
 
 describe('human-readable flow names preserve recorded semantics', () => {
+  it('identifies same-definition parameters by recorded call sites without changing IDs or Evidence', () => {
+    const definition = node('definition', { kind: 'value', label: 'value', data: { role: 'parameter', expression: 'value' } });
+    const callA = node('callA', { kind: 'operation', line: 25, evidence: [{path:'src/example.ts',start:110,end:130,line:25,endLine:25,description:'call A'}] });
+    const callB = node('callB', { kind: 'operation', line: 28, evidence: [{path:'src/example.ts',start:150,end:170,line:28,endLine:28,description:'call B'}] });
+    const a = {...definition,id:'parameter-A',data:{...definition.data!,contextId:callA.id}}, b={...definition,id:'parameter-B',data:{...definition.data!,contextId:callB.id}};
+    const input=[definition,callA,callB,a,b],before=JSON.stringify(input),display=semanticNodeDisplays(input);
+    expect(display.get(a.id)!.disambiguation).toContain('呼び出し L25 (110–130)');
+    expect(display.get(b.id)!.disambiguation).toContain('呼び出し L28 (150–170)');
+    expect(display.get(a.id)!.location).not.toContain('対象 2');
+    expect(display.get(definition.id)!.location).toBe('src/example.ts:5');expect(JSON.stringify(input)).toBe(before);
+    const local = semanticNodeDisplays([a], new Map(input.map(node => [node.id, node])));
+    expect(local.get(a.id)!.location).toContain('呼び出し src/example.ts:25');
+    expect(local.size).toBe(1);
+  });
   it('uses the file-level initializer meaning, not the literal module label', () => {
     const initializer = node('initializer', { label: '<module>', path: 'scripts/build-extension.mjs', line: undefined, evidence: [], attributes: { initializer: true } });
     expect(semanticNodeDisplay(initializer)).toMatchObject({ title: 'ファイル直下の処理', location: 'scripts/build-extension.mjs' });

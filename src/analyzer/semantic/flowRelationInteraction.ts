@@ -22,8 +22,8 @@ export function semanticFlowNodeRoles(graph: SemanticGraph, selectedIds: Readonl
   for (const edge of graph.edges) {
     const source = edge.provenance?.edges[0]?.source ?? edge.source;
     const target = edge.provenance?.edges.at(-1)?.target ?? edge.target;
-    if (selectedIds.has(source)) merge(edge.target, 'outgoing');
-    if (selectedIds.has(target)) merge(edge.source, 'incoming');
+    if (selectedIds.has(source) || selectedIds.has(edge.source)) merge(edge.target, 'outgoing');
+    if (selectedIds.has(target) || selectedIds.has(edge.target)) merge(edge.source, 'incoming');
   }
   for (const node of graph.nodes) if (selectedIds.has(node.id)) roles.set(node.id, 'selected');
   return roles;
@@ -33,7 +33,7 @@ export function semanticFlowNodeRelationKinds(graph: SemanticGraph, selectedIds:
   const kinds = new Map<string, Set<string>>();
   for (const edge of graph.edges) {
     const source = edge.provenance?.edges[0]?.source ?? edge.source, target = edge.provenance?.edges.at(-1)?.target ?? edge.target;
-    if (selectedEdgeId ? edge.id !== selectedEdgeId && !edge.provenance?.edges.some(item => item.id === selectedEdgeId) : !selectedIds.has(source) && !selectedIds.has(target)) continue;
+    if (selectedEdgeId ? edge.id !== selectedEdgeId && !edge.provenance?.edges.some(item => item.id === selectedEdgeId) : !selectedIds.has(source) && !selectedIds.has(target) && !selectedIds.has(edge.source) && !selectedIds.has(edge.target)) continue;
     for (const id of [edge.source, edge.target]) {
       const values = kinds.get(id) ?? new Set<string>(); values.add(edge.kind); kinds.set(id, values);
     }
@@ -46,6 +46,8 @@ export function semanticFlowRoleLabel(role: SemanticFlowNodeRole, view: Semantic
   if (role === 'source') return '始点（Source）';
   if (role === 'target') return '終点（Target）';
   if (role === 'source-target') return '始点・終点（自己関係）';
+  if (view === 'data-flow') return role === 'incoming' ? '由来・入力' : role === 'outgoing' ? '結果・利用先' : '由来・利用先の両方';
+  if (view === 'data-model') return role === 'incoming' ? '参照する元・派生する型' : role === 'outgoing' ? '参照先・派生元' : '参照する元・先の両方';
   if (view === 'function-call-flow' && kinds?.size === 1 && kinds.has('calls')) return role === 'incoming' ? '呼び出し元' : role === 'outgoing' ? '呼び出し先' : '呼び出し元・先';
   if (view === 'function-call-flow' && kinds?.size === 1 && kinds.has('callback')) return role === 'incoming' ? 'コールバック元' : role === 'outgoing' ? 'コールバック先' : 'コールバック元・先';
   return role === 'incoming' ? '入る関係' : role === 'outgoing' ? '出る関係' : '入る・出る関係';
@@ -65,7 +67,7 @@ export function resolveSemanticFlowHover(graph: SemanticGraph, selectedIds: Read
     const matches = hoverTarget.kind === 'edge'
       ? edge.id === hoverTarget.id || Boolean(edge.provenance?.edges.some(original => original.id === hoverTarget.id))
       : selectedEdgeId ? selectedEdge && (edge.source === hoverTarget.id || edge.target === hoverTarget.id)
-        : edge.source === hoverTarget.id && selectedIds.has(target) || edge.target === hoverTarget.id && selectedIds.has(source);
+        : edge.source === hoverTarget.id && (selectedIds.has(target) || selectedIds.has(edge.target)) || edge.target === hoverTarget.id && (selectedIds.has(source) || selectedIds.has(edge.source));
     if (matches) { edgeIds.add(edge.id); nodeIds.add(edge.source); nodeIds.add(edge.target); }
   }
   return { edgeIds, nodeIds };

@@ -46,45 +46,17 @@ function runtimeGraph(analysis: SemanticAnalysis): { nodes: SemanticNode[]; edge
   return { nodes: analysis.nodes.filter(node => kept.has(node.id)).map(node => junctions.has(node.id) ? { ...node, attributes: { ...node.attributes, runtimeJunction: junctions.get(node.id)! } } : node), edges: projected };
 }
 
-function architectureGraph(nodes: SemanticNode[], edges: SemanticEdge[]): { nodes: SemanticNode[]; edges: SemanticEdge[] } {
-  const groups = new Map<string, SemanticNode>(); const owners = new Map<string, string>();
-  for (const node of nodes) {
-    if (node.kind === 'external' || node.kind === 'value' || node.kind === 'log') continue;
-    const packageName = node.path?.match(/^(?:apps|packages|services)\/([^/]+)/)?.[1];
-    const group = `${packageName ? `${packageName} / ` : ''}${node.group}`;
-    const id = `subsystem:${group}`; owners.set(node.id, id);
-    const existing = groups.get(id);
-    if (existing) {
-      existing.attributes.members = [...existing.attributes.members as string[], node.id];
-      existing.attributes.files = [...new Set([...existing.attributes.files as string[], ...(node.path ? [node.path] : [])])];
-      if (existing.evidence.length < 12) existing.evidence.push(...node.evidence.slice(0, 1));
-    } else groups.set(id, { id, kind: 'subsystem', label: group, group: packageName ?? 'System', confidence: node.confidence === 'observed' ? 'observed' : 'inferred', evidence: node.evidence.slice(0, 1), attributes: { members: [node.id], files: node.path ? [node.path] : [], auxiliary: node.group === 'Tests' || Boolean(node.attributes.generated), basis: '配置ディレクトリとソース上の役割から分類' } });
-  }
-  const groupedEdges = new Map<string, SemanticEdge>();
-  const counts = new Map<string, number>();
-  for (const edge of edges) {
-    const source = owners.get(edge.source), target = owners.get(edge.target);
-    if (!source || !target || source === target || edge.kind === 'observed-at') continue;
-    const id = `architecture:${source}:${target}:${edge.confidence === 'observed' ? 'observed' : 'static'}`;
-    const existing = groupedEdges.get(id);
-    counts.set(id, (counts.get(id) ?? 0) + 1);
-    if (existing) { if (existing.evidence.length < 30) existing.evidence.push(...edge.evidence.slice(0, 1)); existing.label = `${counts.get(id)} connections`; }
-    else groupedEdges.set(id, { ...edge, evidence: [...edge.evidence], id, source, target, kind: 'responsibility-dependency', label: '1 connection', views: ['architecture-map'] });
-  }
-  return { nodes: [...groups.values()], edges: [...groupedEdges.values()] };
-}
-
 export function projectSemanticView(analysis: SemanticAnalysis, view: SemanticViewId, traces?: TraceImport, layer: 'source' | 'observed' | 'combined' = 'source'): SemanticGraph {
+  if (view === 'architecture-map') return analysis.architecture ?? { view, nodes: [], edges: [] };
   let nodes: SemanticNode[]; let edges: SemanticEdge[];
   if (view === 'runtime-flow') ({ nodes, edges } = runtimeGraph(analysis));
   else {
-    edges = analysis.edges.filter(edge => edge.views.includes(view) || view === 'architecture-map' && ['calls', 'callback', 'uses-resource', 'http', 'handles', 'runtime-entry', 'registers-event', 'executes'].includes(edge.kind));
+    edges = analysis.edges.filter(edge => edge.views.includes(view));
     const used = new Set(edges.flatMap(edge => [edge.source, edge.target]));
     nodes = analysis.nodes.filter(node => used.has(node.id)
       || view === 'function-call-flow' && node.kind === 'function' && !node.attributes.initializer
-      || view === 'data-model' && node.kind === 'model'
-      || view === 'data-flow' && node.kind === 'value'
-      || view === 'architecture-map' && ['function', 'entry', 'model', 'resource'].includes(node.kind));
+      || view === 'data-model' && node.kind === 'model' && !node.attributes.dataModelExcluded
+      || view === 'data-flow' && (node.data || node.kind === 'value' && !node.attributes.dataFlowExcluded));
   }
   if (layer === 'observed') { nodes = []; edges = []; }
   if (layer !== 'source' && traces && view !== 'data-model') {
@@ -92,7 +64,11 @@ export function projectSemanticView(analysis: SemanticAnalysis, view: SemanticVi
     const traceIds = new Set(traceEdges.flatMap(edge => [edge.source, edge.target]));
     nodes = [...nodes, ...traces.nodes.filter(node => view !== 'data-flow' ? node.kind !== 'value' : traceIds.has(node.id))]; edges = [...edges, ...traceEdges];
   }
-  if (view === 'architecture-map') ({ nodes, edges } = architectureGraph(nodes, edges));
+
+  if ((view === 'runtime-flow' || view === 'function-call-flow') && analysis.flowFieldsByNode) {
+    const legacyFields = analysis.flowFieldsByNode;
+    nodes = nodes.map(node => Object.hasOwn(legacyFields, node.id) ? { ...node, fields: legacyFields[node.id] } : node);
+  }
   const ids = new Set(nodes.map(node => node.id));
   return { view, nodes, edges: edges.filter(edge => ids.has(edge.source) && ids.has(edge.target)) };
 }

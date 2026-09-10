@@ -19,7 +19,7 @@ describe('semantic source analysis', () => {
     expect(result.edges.some(edge => edge.kind === 'passes-to')).toBe(true);
     expect(result.edges.some(edge => edge.kind === 'returns')).toBe(true);
     expect(result.nodes.find(node => node.kind === 'model' && node.label === 'User')?.fields).toEqual(expect.arrayContaining([expect.objectContaining({ name: 'org', type: 'Organization' })]));
-    expect(result.edges.some(edge => edge.kind === 'model-reference')).toBe(true);
+    expect(result.edges.some(edge => edge.kind === 'field-type' && edge.label.includes('org'))).toBe(true);
   });
 
   it.each([

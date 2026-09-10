@@ -3,10 +3,10 @@ id: rm-20260907-flow-hover-input-ownership
 topic: analyzer-flow
 type: pattern
 status: active
-maturity: candidate
+maturity: reused
 created: 2026-09-07
-last_verified: 2026-09-07
-source_commit: "fcd28d0"
+last_verified: 2026-09-08
+source_commit: "f97bafe59bb72d7af596504bbc0de319a84cb625"
 related_files:
   - src/components/analyzer/useSemanticFlowHover.ts
   - src/components/analyzer/semanticFlowHoverBindings.ts
@@ -65,3 +65,9 @@ Do not apply:
 2. `pnpm exec vitest run src/components/analyzer/useSemanticFlowHover.test.tsx src/components/analyzer/polishHoverAccuracy.test.tsx src/components/analyzer/SemanticFlow3D.test.tsx src/pages/FlowExplorerPage.test.tsx`を実行する。
 3. 実画面で、ポインターを停止したまま長い詳細リストをキーボード移動し、フォーカス・強調ID・選択・検索・カメラを照合する。続けて実際にマウスを動かし、解除後のフォーカス復帰を確認する。
 4. ラベル／行の消失、モード切り替え、同じ選択を保持した履歴移動を確認する。実ブラウザで確認できない消失経路は、Reactの再現テストによる検証と区別して記録する。
+
+## Reuse Evidence
+
+共通3Dの表示owner・集約ラベルを導入する後続作業で、この入力元の境界を利用した。元対象のhover/focusは個別表示保護へ渡し、集約に伴うラベル消失が新しい入力を解除しない構造を維持した。現行useSemanticFlowHover、SemanticFlow3Dと既存hoverテストを再確認し、最終製品テスト・独立正確性検証で回帰なしを確認した。Views 8–9への適用は現行の共有rendererを確認して判断しており、無条件の他画面展開ではない。
+
+記録時のHEADに対する未コミット実装を検証した。現在のコードと入力を再確認してから再利用する。

@@ -8,8 +8,8 @@ export function semanticFlowPlot(width: number, height: number, overlayTop = 148
   return { top, bottom, height: bottom - top, centerY: (top + bottom) / 2 };
 }
 
-export function configureSemanticFlowViewport(camera: OrthographicCamera, width: number, height: number, overlayTop?: number) {
+export function configureSemanticFlowViewport(camera: OrthographicCamera, width: number, height: number, overlayTop?: number, anchor?: { width: number; centerY: number }) {
   const plot = semanticFlowPlot(width, height, overlayTop);
-  if (width > 0 && height > 0) camera.setViewOffset(width, height, 0, height / 2 - plot.centerY, width, height);
+  if (width > 0 && height > 0) camera.setViewOffset(width, height, anchor ? (width - anchor.width) / 2 : 0, height / 2 - (anchor?.centerY ?? plot.centerY), width, height);
   return plot;
 }

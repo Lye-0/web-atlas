@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { importExecutionTrace } from './traces';
 import { projectSemanticView, semanticNeighbours } from './project';
+import { buildArchitectureModel } from './architecture';
 import { layoutSemanticGraph, summarizeSemanticGraph } from './presentation';
 import type { SemanticAnalysis } from './types';
 const source: SemanticAnalysis = { nodes: [
@@ -52,6 +53,7 @@ describe('execution data and semantic projections', () => {
     expect(trace.nodes).toHaveLength(1); expect(trace.spans).toBe(1); expect(trace.warnings).toHaveLength(1);
   });
   it('keeps views distinct and evidence immutable when aggregating architecture', () => {
+    source.architecture = buildArchitectureModel({ sources: { 'src/main.ts': 'function run() {}', 'src/service.ts': 'function save() {}', 'src/model.ts': 'interface User {}' }, imports: [], resources: [] }, source);
     const before = JSON.stringify(source); const call = projectSemanticView(source, 'function-call-flow'); const model = projectSemanticView(source, 'data-model'); const architecture = projectSemanticView(source, 'architecture-map');
     expect(call.nodes.some(node => node.kind === 'model')).toBe(false); expect(model.nodes.every(node => node.kind === 'model')).toBe(true);
     expect(architecture.nodes.every(node => node.kind === 'subsystem')).toBe(true); expect(architecture.edges).toHaveLength(1);

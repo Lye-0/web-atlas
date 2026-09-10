@@ -45,6 +45,38 @@ describe('Module Dependency exploration in the Analyzer shell', () => {
     expect(host.querySelectorAll('.analyzer-spatial-edge-hit')).toHaveLength(0);
   });
 
+  it('keeps a closed directory closed when inspecting an original edge or explicitly focusing its endpoints', async () => {
+    const far = () => host.querySelector<HTMLButtonElement>('[aria-label="far, 1 modules"]')!;
+    const manual = () => Number(host.querySelector<HTMLElement>('[data-manual-member-count]')!.dataset.manualMemberCount);
+    await act(async () => far().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+    expect(manual()).toBe(1); expect(far().getAttribute('aria-expanded')).toBe('false');
+    await act(async () => host.querySelector<HTMLButtonElement>('.analyzer-spatial-aggregate-label')!.click());
+    const relations = host.querySelector<HTMLDetailsElement>('.auto-aggregation-body details')!;
+    await act(async () => { relations.open = true; relations.dispatchEvent(new Event('toggle')); });
+    await act(async () => host.querySelector<HTMLButtonElement>('[data-aggregation-relation-id]')!.click());
+    expect(far().getAttribute('aria-expanded')).toBe('false'); expect(manual()).toBe(0);
+    await act(async () => host.querySelector('[role="application"]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    expect(manual()).toBe(1);
+    await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="a.ts, src/near/a.ts"]')!.click());
+    await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="b.tsとの両端を表示"]')!.click());
+    expect(far().getAttribute('aria-expanded')).toBe('false'); expect(manual()).toBe(0);
+    await act(async () => host.querySelector('[role="application"]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    expect(manual()).toBe(1);
+  });
+
+  it('preserves the selected real module while toggling its directory and restores the manual set after clearing it', async () => {
+    const far = () => host.querySelector<HTMLButtonElement>('[aria-label="far, 1 modules"]')!;
+    const selected = () => host.querySelector<HTMLButtonElement>('[aria-label="b.ts, src/far/b.ts"]');
+    await act(async () => selected()!.click());
+    for (const expanded of [false, true, false]) {
+      await act(async () => far().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+      expect(far().getAttribute('aria-expanded')).toBe(String(expanded));
+      expect(selected()?.getAttribute('aria-pressed')).toBe('true');
+    }
+    await act(async () => host.querySelector('[role="application"]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    expect(host.querySelector<HTMLElement>('[data-manual-member-count]')!.dataset.manualMemberCount).toBe('1');
+  });
+
   it('focuses both true endpoints and selects the requested dependency from Detail', async () => {
     await act(async()=>host.querySelector<HTMLButtonElement>('[aria-label="a.ts, src/near/a.ts"]')!.click());
     await act(async()=>host.querySelector<HTMLButtonElement>('[aria-label="b.tsとの両端を表示"]')!.click());

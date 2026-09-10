@@ -1,14 +1,14 @@
 import { useCallback, useLayoutEffect, useMemo, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import type { AnalyzerViewSession, AnalyzerViewSessionUpdate } from '../../analyzer/session';
-import type { SemanticEdge } from '../../analyzer/semantic/types';
-import { explorerLocationForNode, explorerParentLocation, explorerProjectLocation, resolveExplorerLocation, type ExplorerLocation, type SemanticExplorerModel } from '../../analyzer/semantic/semanticExplorer';
+import type { SemanticEdge, SemanticExplorerViewId } from '../../analyzer/semantic/types';
+import { canOpenArchitectureScope, explorerLocationForNode, explorerParentLocation, explorerProjectLocation, resolveExplorerLocation, type ExplorerLocation, type SemanticExplorerModel } from '../../analyzer/semantic/semanticExplorer';
 import { enterExplorerVisit, explorerSelection, initialExplorer2D, recordExplorerScroll, type Explorer2DState, type ExplorerSelection, type ExplorerVisit } from '../../analyzer/semantic/semanticExplorerState';
 import { analyzerRoutes } from '../../utils/routes';
 
 interface RouteStamp { view: string; scanVersion: number; visitId: string }
 interface Props {
-  view: 'runtime-flow' | 'function-call-flow'; scanVersion: number; session: AnalyzerViewSession; explorer: SemanticExplorerModel; ready: boolean;
+  view: SemanticExplorerViewId; scanVersion: number; session: AnalyzerViewSession; explorer: SemanticExplorerModel; ready: boolean;
   edges: readonly SemanticEdge[];
   updateView: (view: Props['view'], update: AnalyzerViewSessionUpdate) => void;
   onFocus: (mode: '2d' | '3d', ids: string[]) => void;
@@ -51,36 +51,50 @@ export function useSemanticExplorerNavigation({ view, scanVersion, session, expl
       direction: params.get('direction') === 'incoming' ? 'incoming' : params.get('direction') === 'outgoing' ? 'outgoing' : 'both',
     }), scrollTop: 0 };
     else if (!stored.explorer && selectedTargets(stored)[0]) twoD = { location: explorerLocationForNode(model.current, selectedTargets(stored)[0]!), scrollTop: 0 };
-    const visit: ExplorerVisit = { id: `entry:${key}`, previousId: explicitJump ? 'previous-route' : undefined, mode, twoD, camera3d: stored.flowCameras?.['3d'] ?? stored.semanticCamera, ...explorerSelection(stored) };
+    const previousVisit = stored.explorer?.visits[stored.explorer.currentVisitId];
+    const activePath = previousVisit ? previousVisit.activePath : twoD.location.centerId && twoD.location.depth > 1 ? twoD.location : undefined;
+    const visit: ExplorerVisit = { id: `entry:${key}`, previousId: explicitJump ? 'previous-route' : undefined, mode, twoD, activePath: explicitJump ? undefined : activePath, camera3d: stored.flowCameras?.['3d'] ?? stored.semanticCamera, ...explorerSelection(stored) };
     updateView(view, state => enterExplorerVisit(state, visit)); writeRoute(visit, true);
     if (mode === '3d' && (explicitJump || !stored.explorer) && selectedTargets(stored).length) onFocus(mode, selectedTargets(stored));
   }, [ready, view, scanVersion, route.key, route.search, stamp, explicitJump, updateView, writeRoute, onFocus, selectedTargets]);
 
-  const push = useCallback((mode: '2d' | '3d', twoD: Explorer2DState, selection?: ExplorerSelection, focusIds?: string[]) => {
+  const push = useCallback((mode: '2d' | '3d', twoD: Explorer2DState, selection?: ExplorerSelection, focusIds?: string[], restoreMode = false) => {
     const stored = current.current;
+    const activePath = restoreMode ? stored.explorer?.visits[stored.explorer.currentVisitId]?.activePath
+      : mode === '2d' && twoD.location.centerId && twoD.location.depth > 1 ? twoD.location : undefined;
     const visit: ExplorerVisit = { id: `visit:${view}:${scanVersion}:${Date.now()}:${++serial.current}`, previousId: stored.explorer?.currentVisitId,
-      mode, twoD, camera3d: stored.flowCameras?.['3d'] ?? stored.semanticCamera, ...(selection ?? explorerSelection(stored)) };
+      mode, twoD, activePath, camera3d: model.current.view === 'architecture-map'
+        ? Object.values(stored.explorer?.visits ?? {}).reverse().find(visit => visit.mode === '3d' && visit.twoD.location.scopeId === twoD.location.scopeId)?.camera3d
+        : stored.flowCameras?.['3d'] ?? stored.semanticCamera, ...(selection ?? explorerSelection(stored)) };
+    if (model.current.view === 'architecture-map') current.current = enterExplorerVisit(stored, visit);
     updateView(view, state => enterExplorerVisit(state, visit)); writeRoute(visit, false);
     if (focusIds?.length) onFocus(mode, focusIds);
   }, [view, scanVersion, updateView, writeRoute, onFocus]);
-  const openLocation = useCallback((location: ExplorerLocation) => push('2d', { location, scrollTop: 0 }), [push]);
+  const openLocation = useCallback((location: ExplorerLocation) => {
+    if (model.current.view !== 'architecture-map') { push('2d', { location, scrollTop: 0 }); return; }
+    if (!canOpenArchitectureScope(model.current, location.scopeId) || (current.current.explorer?.twoD.location.scopeId ?? 'project') === location.scopeId) return;
+    const mode = current.current.flow?.mode ?? '2d';
+    const saved = Object.values(current.current.explorer?.visits ?? {}).reverse().find(visit => visit.mode === mode && visit.twoD.location.scopeId === location.scopeId);
+    push(mode, { location, scrollTop: 0, camera: saved?.twoD.camera }, { selectedNodeId: undefined, selectedEdgeId: undefined, detailOpen: false });
+  }, [push]);
   const openNode = useCallback((id: string) => push('2d', { location: explorerLocationForNode(model.current, id), scrollTop: 0 }, { selectedNodeId: id, selectedEdgeId: undefined, detailOpen: true }), [push]);
-  const jumpMode = useCallback((mode: '2d' | '3d', id: string) => push(mode,
-    mode === '2d' ? { location: explorerLocationForNode(model.current, id), scrollTop: 0 } : current.current.explorer?.twoD ?? initialExplorer2D(),
-    { selectedNodeId: id, selectedEdgeId: undefined, detailOpen: true }, mode === '3d' ? [id] : undefined), [push]);
+  const jumpMode = useCallback((mode: '2d' | '3d', id: string, semanticFieldId?: string) => push(mode,
+    mode === '2d' || model.current.view === 'architecture-map' ? { location: explorerLocationForNode(model.current, id), scrollTop: 0 } : current.current.explorer?.twoD ?? initialExplorer2D(),
+    { selectedNodeId: id, selectedEdgeId: undefined, semanticFieldId, detailOpen: true }, mode === '3d' ? [id] : undefined), [push]);
   const changeMode = useCallback((mode: '2d' | '3d') => {
     const stored = current.current; if (stored.flow?.mode === mode) return;
     let twoD = stored.explorer?.twoD ?? initialExplorer2D();
     const first = mode === '2d' ? !stored.explorer?.visited2D : !stored.explorer?.visited3D;
     const targets = selectedTargets(stored);
     if (first && targets[0] && mode === '2d') twoD = { location: explorerLocationForNode(model.current, targets[0]), scrollTop: 0 };
-    push(mode, twoD, undefined, first && mode === '3d' ? targets : undefined);
+    push(mode, twoD, undefined, first && mode === '3d' ? targets : undefined, true);
   }, [push, selectedTargets]);
   const location = useMemo(() => resolveExplorerLocation(explorer, session.explorer?.twoD.location ?? explorerProjectLocation), [explorer, session.explorer?.twoD.location]);
   const visit = session.explorer?.visits[session.explorer.currentVisitId];
   return {
-    location, visitId: visit?.id ?? `pending:${view}:${scanVersion}`, scrollTop: session.explorer?.twoD.scrollTop ?? 0, canBack: Boolean(visit?.previousId),
+    location, activePath: visit?.activePath, visitId: visit?.id ?? `pending:${view}:${scanVersion}`, scrollTop: session.explorer?.twoD.scrollTop ?? 0, canBack: Boolean(visit?.previousId),
     back: () => { if (visit?.previousId) navigate(-1); },
+    canOpenScope: (id: string) => canOpenArchitectureScope(model.current, id),
     openScope: (scopeId: string) => openLocation({ ...explorerProjectLocation, scopeId }), openNode, jumpMode, changeMode,
     revealNode: (id: string) => push('2d', { location: explorerLocationForNode(explorer, id), scrollTop: 0 }),
     parent: () => openLocation(explorerParentLocation(explorer, location)), project: () => openLocation({ ...explorerProjectLocation }),

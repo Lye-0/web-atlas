@@ -12,6 +12,7 @@ import type { ProjectedGraphEdge } from '../../analyzer/spatialProjectedGraph';
 import type { SpatialFlowPath, SpatialFlowState } from '../../analyzer/spatialFlow';
 import { SpatialFlowParticles } from './SpatialFlowParticles';
 import { analyzerDirectionColors } from '../../analyzer/edgeDirection';
+import type { DisplayAggregation } from '../../analyzer/autoAggregation';
 
 const floorRotation = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
 function elevation(node: PositionedNode) {
@@ -60,6 +61,7 @@ function Modules({ modules, selectedId, connectedIds, search, directions, camera
           gl_Position=projectionMatrix*modelViewMatrix*instanceMatrix*vec4(position,1.0); }`,
       fragmentShader: `uniform float scale; varying vec2 plateUv; varying vec3 face; varying vec3 rim;
         void main() {
+          if(scale*36.<3.) discard;
           vec2 q=abs((plateUv-.5)*vec2(150.,36.))-vec2(71.,14.);
           float d=length(max(q,0.))+min(max(q.x,q.y),0.)-4.;
           if(d>0.) discard;
@@ -260,8 +262,26 @@ function Edges({ edges, cameraRef, flowEnabled, flowActive, flowStateRef }: {
   </>;
 }
 
-export function SpatialAtlasScene({ regions, modules, edges, cameraRef, cameraModel, selectedNodeId, selectedRegionId, connectedIds, search, flowEnabled, flowActive, flowStateRef }: {
+function AtlasDots({ modules, aggregates, cameraRef }: { modules: readonly PositionedNode[]; aggregates: readonly DisplayAggregation[]; cameraRef: { current: SpatialCameraModel } }) {
+  const asset = useMemo(() => {
+    const vertices: number[] = [], kinds: number[] = [];
+    for (const point of modules) { vertices.push(point.x + ANALYZER_MODULE_NODE_WIDTH / 2, elevation(point), point.y + point.height / 2); kinds.push(0); }
+    for (const point of aggregates) { vertices.push(point.x, point.z, point.y); kinds.push(1); }
+    const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3)); geometry.setAttribute('aggregate', new THREE.Float32BufferAttribute(kinds, 1));
+    const material = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, uniforms: { scale: { value: 1 }, pixelRatio: { value: Math.min(window.devicePixelRatio || 1, 1.5) } },
+      vertexShader: 'attribute float aggregate; uniform float scale; uniform float pixelRatio; varying float hollow; varying float visiblePoint; void main(){ hollow=aggregate; visiblePoint=aggregate>.5 || scale*36.<3.?1.:0.; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); gl_PointSize=(aggregate>.5?13.:max(5.,150.*scale))*pixelRatio; }',
+      fragmentShader: 'varying float hollow; varying float visiblePoint; void main(){float d=length(gl_PointCoord-.5)*2.; if(visiblePoint<.5 || d>1.)discard; float opacity=(1.-smoothstep(.7,1.,d))*mix(1.,smoothstep(.3,.5,d),hollow); gl_FragColor=vec4(mix(vec3(.4,.58,.5),vec3(.91,.76,.48),hollow),opacity);\n#include <colorspace_fragment>\n}' });
+    const object = new THREE.Points(geometry, material); object.frustumCulled = false;
+    return { geometry, material, object };
+  }, [modules, aggregates]);
+  useEffect(() => () => { asset.geometry.dispose(); asset.material.dispose(); }, [asset]);
+  return <primitive object={asset.object} onBeforeRender={() => { asset.material.uniforms.scale!.value = cameraRef.current.scale; }} />;
+}
+
+const noAggregates: readonly DisplayAggregation[] = [];
+export function SpatialAtlasScene({ regions, modules, aggregates = noAggregates, edges, cameraRef, cameraModel, selectedNodeId, selectedRegionId, connectedIds, search, flowEnabled, flowActive, flowStateRef }: {
   regions: readonly PositionedSemanticRegion[]; modules: readonly PositionedNode[]; edges: readonly ProjectedGraphEdge[];
+  aggregates?: readonly DisplayAggregation[];
   cameraRef: { current: SpatialCameraModel }; cameraModel: SpatialCameraModel; selectedNodeId?: string; selectedRegionId?: string; connectedIds: ReadonlySet<string>; search:string;
   flowEnabled: boolean; flowActive: boolean; flowStateRef: { current: SpatialFlowState };
 }) {
@@ -284,7 +304,8 @@ export function SpatialAtlasScene({ regions, modules, edges, cameraRef, cameraMo
   return <>
     <color attach="background" args={['#050c09']}/>
     {regions.length>0 && <Regions regions={regions} selectedId={selectedRegionId}/>}
-    <group visible={cameraModel.scale*(modules[0]?.height??36)>=3}><Modules modules={modules} selectedId={selectedNodeId} connectedIds={connectedIds} search={search} directions={directions} cameraRef={cameraRef}/></group>
+    <AtlasDots modules={modules} aggregates={aggregates} cameraRef={cameraRef} />
+    <Modules modules={modules} selectedId={selectedNodeId} connectedIds={connectedIds} search={search} directions={directions} cameraRef={cameraRef}/>
     {visiblePages.map(page=><LabelPage key={page.id} modules={page.modules} cameraRef={cameraRef}/>)}
     {edges.length>0 && <Edges edges={edges} cameraRef={cameraRef} flowEnabled={flowEnabled} flowActive={flowActive} flowStateRef={flowStateRef} />}
   </>;

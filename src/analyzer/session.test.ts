@@ -44,6 +44,19 @@ function viewModel(): AnalyzerViewModel {
 }
 
 describe('Analyzer session store', () => {
+  it('shares only the automatic setting and retains per-view decisions until project replacement', () => {
+    let state = withProject(); expect(state.autoAggregation).toBe(true);
+    state = analyzerSessionReducer(state, { type: 'updateView', view: 'data-flow', update: { search: 'limit', selectedNodeId: 'limit', aggregation: { expandedGroupIds: ['open'], collapsedGroupIds: ['closed'], activeGroupIds: ['dense'] }, dataFineExpandedScopeIds: ['function:reader'] } });
+    state = analyzerSessionReducer(state, { type: 'updateView', view: 'data-model', update: { modelOpenChoiceIds: ['choice:a'], aggregation: { expandedGroupIds: [], collapsedGroupIds: [], activeGroupIds: ['models'] } } });
+    const views = state.views;
+    state = analyzerSessionReducer(state, { type: 'setAutoAggregation', enabled: false });
+    state = analyzerSessionReducer(state, { type: 'setActiveView', view: 'module-dependency' });
+    expect(state.views).toBe(views); expect(state.autoAggregation).toBe(false); expect(state.showFlowGroupBounds).toBe(true);
+    expect(state.views['data-flow'].aggregation?.activeGroupIds).toEqual(['dense']); expect(state.views['data-model'].aggregation?.activeGroupIds).toEqual(['models']);
+    state = analyzerSessionReducer(state, { type: 'replaceProject', store: projectStore('second') });
+    expect(state.autoAggregation).toBe(false); expect(state.views['data-flow'].aggregation).toBeUndefined(); expect(state.views['data-flow'].dataFineExpandedScopeIds).toBeUndefined(); expect(state.views['data-model'].modelOpenChoiceIds).toBeUndefined();
+  });
+
   it('retains the shared 3D bounds preference across flow views and projects without changing view state', () => {
     let state = withProject();
     expect(state.showFlowGroupBounds).toBe(true);

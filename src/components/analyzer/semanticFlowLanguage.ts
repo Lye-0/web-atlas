@@ -1,8 +1,21 @@
 import { confidenceLabels, type SemanticNode, type SemanticRelationSource, type SemanticViewId } from '../../analyzer/semantic/types';
+import { architectureRelationLabel } from '../../analyzer/semantic/architectureRelations';
 
 export type SemanticFlowLanguageView = SemanticViewId | 'module-dependency';
 
 export function semanticFlowDirectionLanguage(view: SemanticFlowLanguageView) {
+  if (view === 'architecture-map') return {
+    incoming: '関係元', outgoing: '関係先', caption: '矢印は参照・要求・設定の向き。種類は線の詳細で確認',
+    help: '青は選択対象から出る関係、橙は入る関係です。宣言依存、コード参照、呼び出し、通信要求、配置設定を区別します。粒子は方向の補助表示です。設定は稼働状況を示さず、集約された連続線は一連の実行を証明しません。',
+  };
+  if (view === 'data-flow') return {
+    incoming: '由来・入力', outgoing: '結果・利用先', caption: '矢印・粒子は値の由来から処理・結果・利用先への関係',
+    help: '代入、項目の取り出し、引数、加工、戻り値などの関係を、由来から利用先へ示します。青は選択対象から出る関係、橙は入る関係です。静的な粒子は実際の値・実行順・頻度・データ流量を表しません。',
+  };
+  if (view === 'data-model') return {
+    incoming: '参照する元・派生する型', outgoing: '参照先・派生元', caption: '矢印・粒子は型・スキーマ・テーブルの構造上の関係',
+    help: '項目の型を使うモデルから参照先へ、派生した型から元の型へ向かいます。外部キーは宣言元から参照先へ向かいます。青は選択対象から出る関係、橙は入る関係です。型の参照は実行時の値の流れではありません。',
+  };
   if (view === 'module-dependency') return {
     incoming: 'import元', outgoing: 'import先', caption: '矢印・粒子は import する側から読み込まれる側へ',
     help: '矢印と粒子は、importするファイルから読み込まれるファイルへ向かいます。青は選択対象がimportする先、琥珀色は選択対象をimportする元、緑は選択範囲内の依存です。粒子は依存の向きを示し、実行順や実行時間は表しません。',
@@ -17,7 +30,7 @@ export function semanticFlowDirectionLanguage(view: SemanticFlowLanguageView) {
   };
 }
 
-export const isUnresolvedCallNode = (node?: SemanticNode) => node?.kind === 'external' && node.confidence === 'unresolved';
+export const isUnresolvedCallNode = (node?: SemanticNode) => node?.kind === 'external' && node.confidence === 'unresolved' && !node.architecture;
 
 export function semanticNodeConfidence(node: SemanticNode) {
   if (isUnresolvedCallNode(node)) return '呼び出し先の定義を未特定';
@@ -53,7 +66,8 @@ export function semanticRelationExplanation(edge: SemanticRelationSource, target
   return '関係の一部を確定できていません。元の関係とEvidenceで、確認できている範囲を調べられます。';
 }
 
-export function semanticRelationLabel(edge: SemanticRelationSource) {
+export function semanticRelationLabel(edge: SemanticRelationSource, view?: SemanticViewId) {
+  if (view === 'architecture-map' || edge.details?.architectureRelation) return architectureRelationLabel(edge);
   switch (edge.kind) {
     case 'callback': return 'コールバックとして渡す';
     case 'handles': return '担当する処理';

@@ -16,7 +16,7 @@ export interface UnresolvedFlowPresentation {
 }
 
 export function buildUnresolvedFlowPresentation(graph: SemanticGraph, explorer?: SemanticExplorerModel): UnresolvedFlowPresentation {
-  const members = graph.nodes.filter(node => node.kind === 'external' && node.confidence === 'unresolved').sort((a, b) => a.id.localeCompare(b.id));
+  const members = graph.nodes.filter(node => !node.architecture && node.kind === 'external' && node.confidence === 'unresolved').sort((a, b) => a.id.localeCompare(b.id));
   const memberIds = new Set(members.map(node => node.id));
   const regular = layoutSemanticCloud({ ...graph, nodes: graph.nodes.filter(node => !memberIds.has(node.id)) }, explorer);
   const relations = graph.edges.filter(edge => memberIds.has(edge.source) || memberIds.has(edge.target));

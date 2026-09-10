@@ -8,3 +8,13 @@
 .semantic-flow-3d-labels button.is-emphasized { outline: 1px solid #d1e6db; outline-offset: 1px; z-index: 2; }
 .semantic-flow-3d-labels button.is-dimmed { opacity: .42; }
 .semantic-flow-3d-labels button.is-dimmed:focus-visible { opacity: 1; }
+
+/* The scope marker stays constant; interaction only temporarily raises contrast.
+   Fixed line boxes keep pointer hit regions and collision measurements stable. */
+.semantic-flow-3d-labels button[data-architecture-scope-role='inside'] { font-size: 12px; border-top: 2px solid #a3bfae; background: #142d23f2; color: #edf5ef; }
+.semantic-flow-3d-labels button[data-architecture-scope-role='inside'] strong { font-weight: 650; }
+.semantic-flow-3d-labels button[data-architecture-scope-role='direct'] { font-size: 11px; border-top: 1px solid #789987; color: #d2e2d7; }
+.semantic-flow-3d-labels button[data-architecture-scope-role='surrounding'] { font-size: 10px; border-top-style: dashed; background: #102019d9; color: #a5b8ac; }
+.semantic-flow-3d-labels button[data-architecture-scope-role='surrounding'] strong { font-weight: 450; }
+.semantic-flow-3d-labels button[data-architecture-scope-role]:is([data-architecture-active], .is-selected, .is-hovered, .is-match, :focus-visible) { opacity: 1; font-size: 12px; color: #edf5ef; border-top-color: #bdd8c8; background: #203c2ff2; }
+.semantic-flow-3d-labels button[data-architecture-scope-role]:is([data-architecture-active], .is-selected, .is-hovered, .is-match, :focus-visible) strong { font-weight: 650; }

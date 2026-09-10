@@ -18,12 +18,13 @@ describe('semantic accuracy contracts', () => {
   });
   it('tracks nested-call results and transformations without bypassing the callee', async () => {
     const result = await analyze({ 'app.ts': 'function clean(raw: string) { return raw.trim(); } function serialize(value: string) { return JSON.stringify(value); } function run(input: string) { const payload = serialize(clean(input)); return payload; }' });
-    const cleanCall = result.nodes.find(node => node.kind === 'operation' && node.attributes.callee === 'clean')!;
-    const serializeCall = result.nodes.find(node => node.kind === 'operation' && node.attributes.callee === 'serialize')!;
-    const payload = result.nodes.find(node => node.kind === 'value' && node.label === 'payload')!;
-    expect(result.edges.some(edge => edge.source === cleanCall.id && edge.target === serializeCall.id && edge.kind === 'argument-result')).toBe(true);
-    expect(result.edges.some(edge => edge.source === cleanCall.id && edge.target === payload.id)).toBe(false);
-    expect(result.edges.some(edge => edge.source === serializeCall.id && edge.target === payload.id)).toBe(true);
+    const cleanResult = result.nodes.find(node => node.data?.role === 'call-result' && node.data.expression === 'clean(input)' && !node.data.contextId)!;
+    const serializeResult = result.nodes.find(node => node.data?.role === 'call-result' && node.data.expression === 'serialize(clean(input))' && !node.data.contextId)!;
+    const actual = result.nodes.find(node => node.data?.role === 'argument' && node.data.expression === 'clean(input)' && !node.data.contextId)!;
+    const payload = result.nodes.find(node => node.data?.role === 'declaration' && node.label === 'payload')!;
+    expect(result.edges.some(edge => edge.source === cleanResult.id && edge.target === actual.id && edge.kind === 'argument')).toBe(true);
+    expect(result.edges.some(edge => edge.source === cleanResult.id && edge.target === payload.id)).toBe(false);
+    expect(result.edges.some(edge => edge.source === serializeResult.id && edge.target === payload.id && edge.kind === 'assign')).toBe(true);
     expect(result.edges.some(edge => edge.kind === 'receiver' && result.nodes.find(node => node.id === edge.source)?.label === 'raw')).toBe(true);
   });
   it('connects HTTP requests, handlers, runtime and persistence with evidence', async () => {
@@ -99,17 +100,21 @@ describe('semantic accuracy contracts', () => {
   });
   it('keeps branch alternatives and prevents block-local variables from escaping', async () => {
     const result = await analyze({ 'app.ts': 'function run(flag: boolean) { let value = 1; if (flag) { value = 2; const privateValue = 3; } consume(value); consume(privateValue); }' });
-    const uses = result.nodes.filter(node => node.kind === 'operation' && node.attributes.callee === 'consume');
-    expect(result.edges.filter(edge => edge.kind === 'argument' && edge.target === uses[0]?.id)).toHaveLength(2);
-    expect(result.edges.filter(edge => edge.kind === 'argument' && edge.target === uses[1]?.id)).toHaveLength(0);
+    const use = result.nodes.find(node => node.data?.role === 'use' && node.label === 'value')!;
+    expect(result.edges.filter(edge => edge.kind === 'origin' && edge.target === use.id)).toHaveLength(2);
+    expect(result.edges.filter(edge => edge.kind === 'origin' && edge.target === use.id).every(edge => edge.confidence === 'inferred')).toBe(true);
+    const unknown = result.nodes.find(node => node.data?.role === 'unknown' && node.label === 'privateValue')!;
+    expect(unknown.data?.resolution).toBe('unresolved');
+    expect(result.edges.filter(edge => edge.kind === 'origin' && edge.target === unknown.id)).toHaveLength(0);
   });
   it('links a fluent query result to the assigned data', async () => {
     const result = await analyze({ 'app.ts': "const users = sqliteTable('users', { id: text() }); function run() { const row = database.select().from(users).get(); return row; }" });
-    const model = result.nodes.find(node => node.kind === 'model' && node.label === 'users')!;
-    const row = result.nodes.find(node => node.kind === 'value' && node.label === 'row')!;
-    const next = new Set([model.id]); let added = true;
+    const callResult = result.nodes.find(node => node.data?.role === 'call-result' && node.data.expression === 'database.select()')!;
+    const row = result.nodes.find(node => node.data?.role === 'declaration' && node.label === 'row')!;
+    const next = new Set([callResult.id]); let added = true;
     while (added) { added = false; for (const edge of result.edges.filter(edge => edge.views.includes('data-flow'))) if (next.has(edge.source) && !next.has(edge.target)) { next.add(edge.target); added = true; } }
     expect(next.has(row.id)).toBe(true);
+    expect(result.edges.some(edge => edge.views.includes('data-flow') && /reads|writes/.test(edge.kind))).toBe(false);
   });
   it('composes controller prefixes and resolves imported Django handlers', async () => {
     const result = await analyze({ 'Users.ts': '@Controller("api/users") class Users { @Get(":id") getUser() { return load(); } }', 'urls.py': "from .views import users\nurlpatterns = [path('users/', users)]", 'views.py': 'def users(request):\n  return request' });
@@ -118,18 +123,20 @@ describe('semantic accuracy contracts', () => {
     expect(result.edges.some(edge => edge.source === endpoint.id && edge.kind === 'handles')).toBe(true);
   });
   it('expands local ORM column spreads and positional record fields', async () => {
-    const result = await analyze({ 'schema.ts': "const timestamps = { createdAt: text('created_at'), updatedAt: text('updated_at') }; const users = sqliteTable('users', { id: text('id').primaryKey(), ...timestamps });", 'User.cs': 'public record User(string Name, int Age);' });
+    const result = await analyze({ 'schema.ts': "import {sqliteTable,text} from 'drizzle-orm/sqlite-core'; const timestamps = { createdAt: text('created_at'), updatedAt: text('updated_at') }; const users = sqliteTable('users', { id: text('id').primaryKey(), ...timestamps });", 'User.cs': 'public record User(string Name, int Age);' });
     expect(result.nodes.find(node => node.kind === 'model' && node.label === 'users')?.fields?.map(field => field.name)).toEqual(['id', 'createdAt', 'updatedAt']);
     expect(result.nodes.find(node => node.kind === 'model' && node.label === 'User')?.fields?.map(field => field.name)).toEqual(['Name', 'Age']);
   });
   it('preserves argument positions and result bindings for destructuring', async () => {
     const result = await analyze({ 'app.ts': 'function save({id}: User, options: Options) { return options; } function run(user: User, config: Options) { const {payload} = decode(user); save(payload, config); return {payload}; }' });
-    const payload = result.nodes.find(node => node.kind === 'value' && node.label === 'payload')!;
-    const options = result.nodes.find(node => node.kind === 'value' && node.label === 'options')!;
-    const config = result.nodes.find(node => node.kind === 'value' && node.label === 'config')!;
+    const payload = result.nodes.find(node => node.data?.role === 'declaration' && node.label === 'payload')!;
+    const options = result.nodes.find(node => node.data?.role === 'parameter' && node.label === 'options' && node.data.contextId)!;
+    const config = result.nodes.find(node => node.data?.role === 'parameter' && node.label === 'config' && !node.data.contextId)!;
     expect(payload.attributes.destructured).toBe(true);
-    expect(result.edges.some(edge => edge.kind === 'passes-to' && edge.source === payload.id && edge.target === options.id)).toBe(false);
-    expect(result.edges.some(edge => edge.kind === 'passes-to' && edge.source === config.id && edge.target === options.id)).toBe(true);
-    expect(result.edges.some(edge => edge.kind === 'transforms' && edge.source === payload.id)).toBe(true);
+    const reaches = (id: string) => { const found = new Set([id]); for (let index = 0, queue = [id]; index < queue.length; index++) for (const edge of result.edges.filter(edge => edge.views.includes('data-flow') && edge.source === queue[index])) if (!found.has(edge.target)) { found.add(edge.target); queue.push(edge.target); } return found; };
+    expect(reaches(payload.id).has(options.id)).toBe(false);
+    expect(reaches(config.id).has(options.id)).toBe(true);
+    expect(result.edges.some(edge => edge.kind === 'passes-to' && edge.target === options.id && edge.details?.argumentIndex === 1)).toBe(true);
+    expect(result.edges.some(edge => edge.kind === 'origin' && edge.source === payload.id)).toBe(true);
   });
 });

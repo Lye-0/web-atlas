@@ -21,15 +21,20 @@ export function getSemanticAnalysis(store: AnalyzerProjectStore, onProgress?: (p
     const worker = new Worker(new URL('./semantic.worker.ts', import.meta.url), { type: 'module' });
     const listeners = new Set<(progress: Progress) => void>();
     const progress = { done: 0, total: Object.keys(store.sources).length };
+    let stopped = false;
+    const stopWorker = () => {
+      if (stopped) return;
+      stopped = true; worker.onmessage = null; worker.onerror = null; listeners.clear(); worker.terminate();
+    };
     let cancel = () => {};
     const promise = new Promise<SemanticAnalysis>((resolve, reject) => {
-      cancel = () => { worker.terminate(); reject(new Error('解析を中止しました。再実行できます。')); };
+      cancel = () => { stopWorker(); reject(new Error('解析を中止しました。再実行できます。')); };
       worker.onmessage = ({ data }) => {
         if (data.type === 'progress') { Object.assign(progress, { done: data.done, total: data.total }); listeners.forEach(listener => listener(progress)); }
-        if (data.type === 'complete') { worker.terminate(); resolve(data.analysis as SemanticAnalysis); }
-        if (data.type === 'error') { worker.terminate(); jobs.delete(store); reject(new Error(String(data.message))); }
+        if (data.type === 'complete') { stopWorker(); resolve(data.analysis as SemanticAnalysis); }
+        if (data.type === 'error') { stopWorker(); jobs.delete(store); reject(new Error(String(data.message))); }
       };
-      worker.onerror = event => { worker.terminate(); jobs.delete(store); reject(new Error(event.message || '解析エンジンでエラーが発生しました')); };
+      worker.onerror = event => { stopWorker(); jobs.delete(store); reject(new Error(event.message || '解析エンジンでエラーが発生しました')); };
       worker.postMessage(semanticInput(store));
     });
     job = { promise, listeners, cancel, progress }; jobs.set(store, job);

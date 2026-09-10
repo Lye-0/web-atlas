@@ -28,6 +28,18 @@ export function semanticMemberIds(node: SemanticNode): string[] {
 export function layoutSemanticFlow(graph: SemanticGraph, mode: '2d' | '3d', explorer?: SemanticExplorerModel): SemanticPosition[] {
   if (mode === '3d') return layoutSemanticCloud(graph, explorer);
   const depths = semanticDepths(graph);
+  if (graph.view === 'architecture-map') {
+    const levels = new Map<number, SemanticNode[]>();
+    for (const node of graph.nodes) { const depth = depths.get(node.id) ?? 0, members = levels.get(depth) ?? []; members.push(node); levels.set(depth, members); }
+    const positions: SemanticPosition[] = []; let x = 0;
+    for (const [, members] of [...levels].sort(([a], [b]) => a - b)) {
+      members.sort((a, b) => a.id.localeCompare(b.id));
+      const columns = Math.max(1, Math.ceil(members.length / 5)), rows = Math.ceil(members.length / columns);
+      members.forEach((node, index) => positions.push({ node, x: x + index % columns * 284, y: (Math.floor(index / columns) - (rows - 1) / 2) * 156, z: 0 }));
+      x += columns * 284 + 80;
+    }
+    return positions;
+  }
   const groups = new Map<string, { label: string; stages: Map<number, SemanticNode[]>; columns: number; rows: number; offset: number }>();
   for (const node of graph.nodes) {
     const identity = semanticRegionIdentity(node), depth = depths.get(node.id) ?? 0;
@@ -104,7 +116,7 @@ export function semanticFlowEdgePaths(graph: SemanticGraph, positions: readonly 
   return graph.edges.flatMap(edge => {
     const source = edge.provenance?.edges[0]?.source ?? edge.source;
     const target = edge.provenance?.edges.at(-1)?.target ?? edge.target;
-    const direction = analyzerEdgeDirection(source, target, selection);
+    const direction = analyzerEdgeDirection(source, target, selection) ?? analyzerEdgeDirection(edge.source, edge.target, selection);
     const selected = Boolean(direction || edge.id === selectedEdgeId || edge.provenance?.edges.some(item => item.id === selectedEdgeId));
     if (selectedOnly && !selected) return [];
     const a = byId.get(edge.source), b = byId.get(edge.target); if (!a || !b) return [];

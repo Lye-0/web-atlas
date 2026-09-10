@@ -8,6 +8,7 @@ export interface SemanticFlowRegion extends SemanticRegionIdentity, SemanticMapR
 
 /** Source locations come from recorded paths; runtime-only objects retain their known group. */
 export function semanticRegionIdentity(node: SemanticNode): SemanticRegionIdentity {
+  if (node.architecture) return { id: node.architecture.parentId ?? 'architecture-project', label: node.group || 'プロジェクト', kind: 'group' };
   if (node.kind === 'external') return { id: 'group:unresolved-calls', label: '定義先が未特定の呼び出し', kind: 'group' };
   const paths = node.path ? [node.path] : node.attributes.overview && Array.isArray(node.attributes.files) ? node.attributes.files : [];
   const directories = paths.map(path => path.replaceAll('\\', '/').replace(/^\.\//, '').split('/').slice(0, -1));

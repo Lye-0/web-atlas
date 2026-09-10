@@ -1,16 +1,29 @@
+import { useMemo } from 'react';
 import { explorerBreadcrumbs, explorerChildren, explorerEdgeVisible, explorerRegionIdentity, type ExplorerLocation, type SemanticExplorerModel } from '../../analyzer/semantic/semanticExplorer';
-import type { SemanticGraph } from '../../analyzer/semantic/types';
+import type { SemanticEdge, SemanticGraph } from '../../analyzer/semantic/types';
 import { semanticRelationLabel } from './semanticFlowLanguage';
 import { semanticNodeDisplay } from './semanticFlowDisplay';
+import { ArchitectureNavigation } from './ArchitectureNavigation';
+import type { SemanticFlowHoverTarget } from '../../analyzer/semantic/flowRelationInteraction';
 
 export interface SemanticExplorerNavigationActions {
+  projectLabel?: string; surroundings?: boolean; canOpenScope?: (id: string) => boolean;
   location: ExplorerLocation; visitId: string; scrollTop: number; canBack: boolean;
+  activePath?: ExplorerLocation;
   onBack: () => void; onParent: () => void; onProject: () => void; onOpenScope: (id: string) => void; onOpenNode: (id: string) => void;
   onCenter: (id: string) => void; onDefinition: (id: string) => void; onJumpMode: (mode: '2d' | '3d', id: string) => void;
   onDepth: (depth: number) => void; onScroll: (top: number) => void; onRevealSelection: () => void;
 }
 
-export function SemanticExplorerNavigation({ explorer, navigation, mode, graph, localGraph, selectedIds, selectedEdgeId }: {
+export function SemanticExplorerNavigation({ explorer, navigation, mode, graph, localGraph, selectedIds, selectedEdgeId, hoverTarget, onSelectEdge, relationHint }: {
+  explorer: SemanticExplorerModel; navigation: SemanticExplorerNavigationActions; mode: '2d' | '3d'; graph: SemanticGraph; localGraph: SemanticGraph; selectedIds: ReadonlySet<string>; selectedEdgeId?: string;
+  hoverTarget?: SemanticFlowHoverTarget; onSelectEdge?: (id: string) => void; relationHint?: SemanticEdge;
+}) {
+  if (graph.view === 'architecture-map') return <ArchitectureNavigation mode={mode} explorer={explorer} navigation={navigation} graph={graph} selectedId={[...selectedIds][0]} selectedEdgeId={hoverTarget?.kind === 'edge' ? hoverTarget.id : selectedEdgeId} onSelectEdge={onSelectEdge} relationHint={relationHint} />;
+  return <FlowNavigation explorer={explorer} navigation={navigation} mode={mode} graph={graph} localGraph={localGraph} selectedIds={selectedIds} selectedEdgeId={selectedEdgeId} />;
+}
+
+function FlowNavigation({ explorer, navigation, mode, graph, localGraph, selectedIds, selectedEdgeId }: {
   explorer: SemanticExplorerModel; navigation: SemanticExplorerNavigationActions; mode: '2d' | '3d'; graph: SemanticGraph; localGraph: SemanticGraph; selectedIds: ReadonlySet<string>; selectedEdgeId?: string;
 }) {
   const location = navigation.location, selectedId = [...selectedIds][0], selected = selectedId ? explorer.nodes.get(selectedId) : undefined;
@@ -18,14 +31,16 @@ export function SemanticExplorerNavigation({ explorer, navigation, mode, graph, 
   const center = location.centerId ? explorer.nodes.get(location.centerId) : undefined;
   const centerDisplay = center ? semanticNodeDisplay(center) : undefined;
   const selectedDisplay = selected ? semanticNodeDisplay(selected) : undefined;
-  const scope = explorer.scopes.get(location.scopeId), visibleIds = new Set(graph.nodes.map(node => node.id));
+  const scope = explorer.scopes.get(location.scopeId);
+  const visibleIds = useMemo(() => new Set(graph.nodes.map(node => node.id)), [graph.nodes]);
   const children = mode === '2d' && !center ? explorerChildren(explorer, location, visibleIds) : [];
-  const displayedIds = center ? new Set(localGraph.nodes.map(node => node.id)) : new Set(scope?.memberIds ?? []);
+  const displayedIds = useMemo(() => center ? new Set(localGraph.nodes.map(node => node.id)) : new Set(scope?.memberIds ?? []), [center, localGraph.nodes, scope]);
   const outside = mode === '2d' && selected && !displayedIds.has(selected.id);
-  const regionCount = new Set(graph.nodes.map(node => explorerRegionIdentity(explorer, node.id).id)).size;
+  const regionCount = useMemo(() => new Set(graph.nodes.map(node => explorerRegionIdentity(explorer, node.id).id)).size, [graph.nodes, explorer]);
   const selectedEdge = graph.edges.find(edge => edge.id === selectedEdgeId);
   const outsideEdge = mode === '2d' && selectedEdge && (!center || !localGraph.edges.some(edge => edge.id === selectedEdge.id));
-  const visibleEdges = localGraph.edges.filter(edge => explorerEdgeVisible(edge, selectedIds, location.direction, selectedEdgeId)).length;
+  const visibleEdges = mode === '2d' && center && location.direction !== 'both' && selectedIds.size
+    ? localGraph.edges.filter(edge => explorerEdgeVisible(edge, selectedIds, location.direction, selectedEdgeId)).length : localGraph.edges.length;
   return <div className="semantic-explorer-navigation">
     {mode === '2d' ? <>
       <div className="semantic-explorer-navigation-row"><div className="semantic-explorer-history" role="group" aria-label="階層の移動">

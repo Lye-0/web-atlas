@@ -1,0 +1,6327 @@
+{
+  "baseline": "907f640c46c9e5000d76bd7e43e688958c6092b9",
+  "date": "2026-09-09",
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36 Edg/152.0.0.0",
+    "width": 1600,
+    "height": 1000,
+    "dpr": 1
+  },
+  "measurement": "Windows Edge headless; local instrumented production snapshots; RAF intervals are main-thread callback intervals, not GPU render time; 3 runs; same immutable real inputs; fixed model identical SHA; surroundings changes projected workload, not canonical model. No baseline before automatic aggregation was introduced remeasured.",
+  "fixed": {
+    "sha256": "6500c0ab9d613592c4154b612125d3b0c3ce94b8269d3d61f82494a9520926ab",
+    "nodes": 47,
+    "edges": 46
+  },
+  "real": [
+    {
+      "stage": "baseline-current",
+      "name": "git-lines",
+      "readyMs": {
+        "n": 3,
+        "min": 3807,
+        "median": 3843,
+        "p95": 3853,
+        "max": 3853
+      },
+      "analysisMs": {
+        "n": 3,
+        "min": 1948,
+        "median": 1951,
+        "p95": 1958,
+        "max": 1958
+      },
+      "architectureMs": {
+        "n": 3,
+        "min": 221.39999999850988,
+        "median": 224,
+        "p95": 224.19999999552965,
+        "max": 224.19999999552965
+      },
+      "rootCount": "3",
+      "times": {
+        "select": {
+          "n": 15,
+          "min": 59,
+          "median": 65,
+          "p95": 114,
+          "max": 114
+        },
+        "drill": {
+          "n": 9,
+          "min": 53,
+          "median": 59,
+          "p95": 70,
+          "max": 70
+        },
+        "parent": {
+          "n": 9,
+          "min": 66,
+          "median": 67,
+          "p95": 83,
+          "max": 83
+        },
+        "to3D": {
+          "n": 21,
+          "min": 66,
+          "median": 67,
+          "p95": 371,
+          "max": 382
+        },
+        "rotate-true": {
+          "n": 9,
+          "min": 308,
+          "median": 313,
+          "p95": 315,
+          "max": 315
+        },
+        "aggregationToggle": {
+          "n": 3,
+          "min": 68,
+          "median": 69,
+          "p95": 69,
+          "max": 69
+        },
+        "rotate-false": {
+          "n": 9,
+          "min": 310,
+          "median": 314,
+          "p95": 348,
+          "max": 348
+        },
+        "to2D": {
+          "n": 18,
+          "min": 54,
+          "median": 68,
+          "p95": 87,
+          "max": 87
+        }
+      },
+      "rotation": [
+        {
+          "auto": true,
+          "rafMedianMs": {
+            "n": 3,
+            "min": 16.699999999999818,
+            "median": 16.699999999999818,
+            "p95": 16.699999999999818,
+            "max": 16.699999999999818
+          },
+          "rafP95Ms": {
+            "n": 3,
+            "min": 16.800000000000182,
+            "median": 16.800000000000182,
+            "p95": 16.800000000000182,
+            "max": 16.800000000000182
+          },
+          "longTasks": 0,
+          "labels": {
+            "n": 3,
+            "min": 4,
+            "median": 4,
+            "p95": 4,
+            "max": 4
+          },
+          "cpu": [
+            {
+              "hitSemanticFlowPoint": {
+                "calls": 3,
+                "totalMs": 0.10000000149011612,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 3,
+                  "medianMs": 0,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectSemanticFlowLabels": {
+                "calls": 51,
+                "totalMs": 9.100000001490116,
+                "maxMs": 0.3999999985098839,
+                "distribution": {
+                  "samples": 51,
+                  "medianMs": 0.19999999552965164,
+                  "p95Ms": 0.30000000447034836,
+                  "maxMs": 0.3999999985098839,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "semanticFlowConnectionNotices": {
+                "calls": 51,
+                "totalMs": 0.09999999403953552,
+                "maxMs": 0.09999999403953552,
+                "distribution": {
+                  "samples": 51,
+                  "medianMs": 0,
+                  "p95Ms": 0,
+                  "maxMs": 0.09999999403953552,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "SemanticFlow3D": {
+                "calls": 16,
+                "totalMs": 1.2999999970197678,
+                "maxMs": 0.20000000298023224,
+                "distribution": {
+                  "samples": 16,
+                  "medianMs": 0.10000000149011612,
+                  "p95Ms": 0.20000000298023224,
+                  "maxMs": 0.20000000298023224,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectAutoAggregation": {
+                "calls": 3,
+                "totalMs": 0.20000000298023224,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 3,
+                  "medianMs": 0.10000000149011612,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              }
+            },
+            {
+              "hitSemanticFlowPoint": {
+                "calls": 3,
+                "totalMs": 0.09999999403953552,
+                "maxMs": 0.09999999403953552,
+                "distribution": {
+                  "samples": 3,
+                  "medianMs": 0,
+                  "p95Ms": 0.09999999403953552,
+                  "maxMs": 0.09999999403953552,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectSemanticFlowLabels": {
+                "calls": 51,
+                "totalMs": 9.999999985098839,
+                "maxMs": 0.5999999940395355,
+                "distribution": {
+                  "samples": 51,
+                  "medianMs": 0.19999999552965164,
+                  "p95Ms": 0.30000000447034836,
+                  "maxMs": 0.5999999940395355,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "semanticFlowConnectionNotices": {
+                "calls": 51,
+                "totalMs": 0.8000000044703484,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 51,
+                  "medianMs": 0,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "SemanticFlow3D": {
+                "calls": 16,
+                "totalMs": 1.3000000044703484,
+                "maxMs": 0.20000000298023224,
+                "distribution": {
+                  "samples": 16,
+                  "medianMs": 0.10000000149011612,
+                  "p95Ms": 0.20000000298023224,
+                  "maxMs": 0.20000000298023224,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectAutoAggregation": {
+                "calls": 3,
+                "totalMs": 0.10000000149011612,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 3,
+                  "medianMs": 0,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              }
+            },
+            {
+              "hitSemanticFlowPoint": {
+                "calls": 3,
+                "totalMs": 0,
+                "maxMs": 0,
+                "distribution": {
+                  "samples": 3,
+                  "medianMs": 0,
+                  "p95Ms": 0,
+                  "maxMs": 0,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectSemanticFlowLabels": {
+                "calls": 51,
+                "totalMs": 10.300000011920929,
+                "maxMs": 0.3999999985098839,
+                "distribution": {
+                  "samples": 51,
+                  "medianMs": 0.20000000298023224,
+                  "p95Ms": 0.30000000447034836,
+                  "maxMs": 0.3999999985098839,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "semanticFlowConnectionNotices": {
+                "calls": 51,
+                "totalMs": 1.3000000044703484,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 51,
+                  "medianMs": 0,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "SemanticFlow3D": {
+                "calls": 16,
+                "totalMs": 1.7000000104308128,
+                "maxMs": 0.20000000298023224,
+                "distribution": {
+                  "samples": 16,
+                  "medianMs": 0.10000000149011612,
+                  "p95Ms": 0.20000000298023224,
+                  "maxMs": 0.20000000298023224,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectAutoAggregation": {
+                "calls": 3,
+                "totalMs": 0.20000000298023224,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 3,
+                  "medianMs": 0.10000000149011612,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              }
+            }
+          ]
+        },
+        {
+          "auto": false,
+          "rafMedianMs": {
+            "n": 3,
+            "min": 16.699999999999818,
+            "median": 16.699999999999818,
+            "p95": 16.699999999999818,
+            "max": 16.699999999999818
+          },
+          "rafP95Ms": {
+            "n": 3,
+            "min": 16.800000000000182,
+            "median": 16.800000000000182,
+            "p95": 16.800000000000182,
+            "max": 16.800000000000182
+          },
+          "longTasks": 0,
+          "labels": {
+            "n": 3,
+            "min": 4,
+            "median": 4,
+            "p95": 4,
+            "max": 4
+          },
+          "cpu": [
+            {
+              "hitSemanticFlowPoint": {
+                "calls": 3,
+                "totalMs": 0.10000000149011612,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 3,
+                  "medianMs": 0,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectSemanticFlowLabels": {
+                "calls": 51,
+                "totalMs": 9.199999995529652,
+                "maxMs": 0.30000000447034836,
+                "distribution": {
+                  "samples": 51,
+                  "medianMs": 0.19999999552965164,
+                  "p95Ms": 0.30000000447034836,
+                  "maxMs": 0.30000000447034836,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "semanticFlowConnectionNotices": {
+                "calls": 51,
+                "totalMs": 0.29999999701976776,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 51,
+                  "medianMs": 0,
+                  "p95Ms": 0.09999999403953552,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "SemanticFlow3D": {
+                "calls": 18,
+                "totalMs": 0.800000011920929,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 18,
+                  "medianMs": 0,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectAutoAggregation": {
+                "calls": 5,
+                "totalMs": 0.10000000149011612,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 5,
+                  "medianMs": 0,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              }
+            },
+            {
+              "hitSemanticFlowPoint": {
+                "calls": 3,
+                "totalMs": 0,
+                "maxMs": 0,
+                "distribution": {
+                  "samples": 3,
+                  "medianMs": 0,
+                  "p95Ms": 0,
+                  "maxMs": 0,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectSemanticFlowLabels": {
+                "calls": 51,
+                "totalMs": 9.799999989569187,
+                "maxMs": 0.5,
+                "distribution": {
+                  "samples": 51,
+                  "medianMs": 0.19999999552965164,
+                  "p95Ms": 0.30000000447034836,
+                  "maxMs": 0.5,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "semanticFlowConnectionNotices": {
+                "calls": 51,
+                "totalMs": 0.30000000447034836,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 51,
+                  "medianMs": 0,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "SemanticFlow3D": {
+                "calls": 17,
+                "totalMs": 0.5,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 17,
+                  "medianMs": 0,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectAutoAggregation": {
+                "calls": 5,
+                "totalMs": 0,
+                "maxMs": 0,
+                "distribution": {
+                  "samples": 5,
+                  "medianMs": 0,
+                  "p95Ms": 0,
+                  "maxMs": 0,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              }
+            },
+            {
+              "hitSemanticFlowPoint": {
+                "calls": 3,
+                "totalMs": 0.20000000298023224,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 3,
+                  "medianMs": 0.10000000149011612,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectSemanticFlowLabels": {
+                "calls": 51,
+                "totalMs": 9.599999986588955,
+                "maxMs": 0.3999999985098839,
+                "distribution": {
+                  "samples": 51,
+                  "medianMs": 0.19999999552965164,
+                  "p95Ms": 0.30000000447034836,
+                  "maxMs": 0.3999999985098839,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "semanticFlowConnectionNotices": {
+                "calls": 51,
+                "totalMs": 0.5000000074505806,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 51,
+                  "medianMs": 0,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "SemanticFlow3D": {
+                "calls": 18,
+                "totalMs": 1.1000000014901161,
+                "maxMs": 0.19999999552965164,
+                "distribution": {
+                  "samples": 18,
+                  "medianMs": 0.10000000149011612,
+                  "p95Ms": 0.19999999552965164,
+                  "maxMs": 0.19999999552965164,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectAutoAggregation": {
+                "calls": 5,
+                "totalMs": 0,
+                "maxMs": 0,
+                "distribution": {
+                  "samples": 5,
+                  "medianMs": 0,
+                  "p95Ms": 0,
+                  "maxMs": 0,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              }
+            }
+          ]
+        }
+      ],
+      "errors": []
+    },
+    {
+      "stage": "baseline-current",
+      "name": "vehicle-management",
+      "readyMs": {
+        "n": 3,
+        "min": 17086,
+        "median": 17321,
+        "p95": 19130,
+        "max": 19130
+      },
+      "analysisMs": {
+        "n": 3,
+        "min": 14114,
+        "median": 14235,
+        "p95": 15838,
+        "max": 15838
+      },
+      "architectureMs": {
+        "n": 3,
+        "min": 588.3000000044703,
+        "median": 648.3999999985099,
+        "p95": 697.2000000029802,
+        "max": 697.2000000029802
+      },
+      "rootCount": "29",
+      "times": {
+        "select": {
+          "n": 15,
+          "min": 64,
+          "median": 78,
+          "p95": 94,
+          "max": 94
+        },
+        "drill": {
+          "n": 9,
+          "min": 78,
+          "median": 81,
+          "p95": 103,
+          "max": 103
+        },
+        "parent": {
+          "n": 9,
+          "min": 83,
+          "median": 84,
+          "p95": 100,
+          "max": 100
+        },
+        "to3D": {
+          "n": 21,
+          "min": 66,
+          "median": 82,
+          "p95": 379,
+          "max": 379
+        },
+        "rotate-true": {
+          "n": 9,
+          "min": 308,
+          "median": 317,
+          "p95": 347,
+          "max": 347
+        },
+        "aggregationToggle": {
+          "n": 3,
+          "min": 64,
+          "median": 75,
+          "p95": 96,
+          "max": 96
+        },
+        "rotate-false": {
+          "n": 9,
+          "min": 307,
+          "median": 347,
+          "p95": 348,
+          "max": 348
+        },
+        "to2D": {
+          "n": 18,
+          "min": 72,
+          "median": 96,
+          "p95": 107,
+          "max": 107
+        }
+      },
+      "rotation": [
+        {
+          "auto": true,
+          "rafMedianMs": {
+            "n": 3,
+            "min": 16.69999999999709,
+            "median": 16.700000000000728,
+            "p95": 16.700000000000728,
+            "max": 16.700000000000728
+          },
+          "rafP95Ms": {
+            "n": 3,
+            "min": 16.799999999999272,
+            "median": 16.799999999999272,
+            "p95": 16.799999999999272,
+            "max": 16.799999999999272
+          },
+          "longTasks": 0,
+          "labels": {
+            "n": 3,
+            "min": 8,
+            "median": 8,
+            "p95": 8,
+            "max": 8
+          },
+          "cpu": [
+            {
+              "hitSemanticFlowPoint": {
+                "calls": 3,
+                "totalMs": 0,
+                "maxMs": 0,
+                "distribution": {
+                  "samples": 3,
+                  "medianMs": 0,
+                  "p95Ms": 0,
+                  "maxMs": 0,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectSemanticFlowLabels": {
+                "calls": 52,
+                "totalMs": 17.799999982118607,
+                "maxMs": 0.5,
+                "distribution": {
+                  "samples": 52,
+                  "medianMs": 0.30000000447034836,
+                  "p95Ms": 0.5,
+                  "maxMs": 0.5,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "semanticFlowConnectionNotices": {
+                "calls": 52,
+                "totalMs": 0.5999999940395355,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 52,
+                  "medianMs": 0,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "SemanticFlow3D": {
+                "calls": 50,
+                "totalMs": 2.8000000193715096,
+                "maxMs": 0.3999999985098839,
+                "distribution": {
+                  "samples": 50,
+                  "medianMs": 0,
+                  "p95Ms": 0.20000000298023224,
+                  "maxMs": 0.3999999985098839,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectAutoAggregation": {
+                "calls": 5,
+                "totalMs": 0.30000000447034836,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 5,
+                  "medianMs": 0.10000000149011612,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectAggregationRelations": {
+                "calls": 1,
+                "totalMs": 0.09999999403953552,
+                "maxMs": 0.09999999403953552,
+                "distribution": {
+                  "samples": 1,
+                  "medianMs": 0.09999999403953552,
+                  "p95Ms": 0.09999999403953552,
+                  "maxMs": 0.09999999403953552,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectAggregatedSemanticFlow": {
+                "calls": 1,
+                "totalMs": 0.29999999701976776,
+                "maxMs": 0.29999999701976776,
+                "distribution": {
+                  "samples": 1,
+                  "medianMs": 0.29999999701976776,
+                  "p95Ms": 0.29999999701976776,
+                  "maxMs": 0.29999999701976776,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              }
+            },
+            {
+              "hitSemanticFlowPoint": {
+                "calls": 3,
+                "totalMs": 0,
+                "maxMs": 0,
+                "distribution": {
+                  "samples": 3,
+                  "medianMs": 0,
+                  "p95Ms": 0,
+                  "maxMs": 0,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectSemanticFlowLabels": {
+                "calls": 52,
+                "totalMs": 17.80000001192093,
+                "maxMs": 0.6000000014901161,
+                "distribution": {
+                  "samples": 52,
+                  "medianMs": 0.30000000447034836,
+                  "p95Ms": 0.5,
+                  "maxMs": 0.6000000014901161,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "semanticFlowConnectionNotices": {
+                "calls": 52,
+                "totalMs": 1.2999999970197678,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 52,
+                  "medianMs": 0,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "SemanticFlow3D": {
+                "calls": 49,
+                "totalMs": 3.9000000059604645,
+                "maxMs": 0.3999999985098839,
+                "distribution": {
+                  "samples": 49,
+                  "medianMs": 0.10000000149011612,
+                  "p95Ms": 0.20000000298023224,
+                  "maxMs": 0.3999999985098839,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectAutoAggregation": {
+                "calls": 5,
+                "totalMs": 0.30000000447034836,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 5,
+                  "medianMs": 0.10000000149011612,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectAggregationRelations": {
+                "calls": 1,
+                "totalMs": 0.10000000149011612,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 1,
+                  "medianMs": 0.10000000149011612,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectAggregatedSemanticFlow": {
+                "calls": 1,
+                "totalMs": 0.3999999985098839,
+                "maxMs": 0.3999999985098839,
+                "distribution": {
+                  "samples": 1,
+                  "medianMs": 0.3999999985098839,
+                  "p95Ms": 0.3999999985098839,
+                  "maxMs": 0.3999999985098839,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              }
+            },
+            {
+              "hitSemanticFlowPoint": {
+                "calls": 3,
+                "totalMs": 0.10000000149011612,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 3,
+                  "medianMs": 0,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectSemanticFlowLabels": {
+                "calls": 52,
+                "totalMs": 17.599999986588955,
+                "maxMs": 0.5999999940395355,
+                "distribution": {
+                  "samples": 52,
+                  "medianMs": 0.30000000447034836,
+                  "p95Ms": 0.5,
+                  "maxMs": 0.5999999940395355,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "semanticFlowConnectionNotices": {
+                "calls": 52,
+                "totalMs": 0.8999999910593033,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 52,
+                  "medianMs": 0,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "SemanticFlow3D": {
+                "calls": 50,
+                "totalMs": 3.899999998509884,
+                "maxMs": 0.3999999985098839,
+                "distribution": {
+                  "samples": 50,
+                  "medianMs": 0.10000000149011612,
+                  "p95Ms": 0.20000000298023224,
+                  "maxMs": 0.3999999985098839,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectAutoAggregation": {
+                "calls": 5,
+                "totalMs": 0.3999999985098839,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 5,
+                  "medianMs": 0.10000000149011612,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectAggregationRelations": {
+                "calls": 1,
+                "totalMs": 0.10000000149011612,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 1,
+                  "medianMs": 0.10000000149011612,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectAggregatedSemanticFlow": {
+                "calls": 1,
+                "totalMs": 0.29999999701976776,
+                "maxMs": 0.29999999701976776,
+                "distribution": {
+                  "samples": 1,
+                  "medianMs": 0.29999999701976776,
+                  "p95Ms": 0.29999999701976776,
+                  "maxMs": 0.29999999701976776,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              }
+            }
+          ]
+        },
+        {
+          "auto": false,
+          "rafMedianMs": {
+            "n": 3,
+            "min": 16.69999999999709,
+            "median": 16.69999999999709,
+            "p95": 16.700000000000728,
+            "max": 16.700000000000728
+          },
+          "rafP95Ms": {
+            "n": 3,
+            "min": 16.799999999999272,
+            "median": 16.799999999999272,
+            "p95": 16.799999999999272,
+            "max": 16.799999999999272
+          },
+          "longTasks": 0,
+          "labels": {
+            "n": 3,
+            "min": 16,
+            "median": 16,
+            "p95": 16,
+            "max": 16
+          },
+          "cpu": [
+            {
+              "hitSemanticFlowPoint": {
+                "calls": 3,
+                "totalMs": 0.10000000149011612,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 3,
+                  "medianMs": 0,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectSemanticFlowLabels": {
+                "calls": 52,
+                "totalMs": 19.30000001937151,
+                "maxMs": 0.6000000014901161,
+                "distribution": {
+                  "samples": 52,
+                  "medianMs": 0.3999999985098839,
+                  "p95Ms": 0.6000000014901161,
+                  "maxMs": 0.6000000014901161,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "semanticFlowConnectionNotices": {
+                "calls": 52,
+                "totalMs": 0.800000011920929,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 52,
+                  "medianMs": 0,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "SemanticFlow3D": {
+                "calls": 67,
+                "totalMs": 4.099999971687794,
+                "maxMs": 0.20000000298023224,
+                "distribution": {
+                  "samples": 67,
+                  "medianMs": 0.09999999403953552,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.20000000298023224,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectAutoAggregation": {
+                "calls": 7,
+                "totalMs": 0,
+                "maxMs": 0,
+                "distribution": {
+                  "samples": 7,
+                  "medianMs": 0,
+                  "p95Ms": 0,
+                  "maxMs": 0,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              }
+            },
+            {
+              "hitSemanticFlowPoint": {
+                "calls": 3,
+                "totalMs": 0.10000000149011612,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 3,
+                  "medianMs": 0,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectSemanticFlowLabels": {
+                "calls": 52,
+                "totalMs": 17.89999996125698,
+                "maxMs": 0.5,
+                "distribution": {
+                  "samples": 52,
+                  "medianMs": 0.30000000447034836,
+                  "p95Ms": 0.5,
+                  "maxMs": 0.5,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "semanticFlowConnectionNotices": {
+                "calls": 52,
+                "totalMs": 0.5,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 52,
+                  "medianMs": 0,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "SemanticFlow3D": {
+                "calls": 67,
+                "totalMs": 4.799999997019768,
+                "maxMs": 0.20000000298023224,
+                "distribution": {
+                  "samples": 67,
+                  "medianMs": 0.10000000149011612,
+                  "p95Ms": 0.19999999552965164,
+                  "maxMs": 0.20000000298023224,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectAutoAggregation": {
+                "calls": 7,
+                "totalMs": 0,
+                "maxMs": 0,
+                "distribution": {
+                  "samples": 7,
+                  "medianMs": 0,
+                  "p95Ms": 0,
+                  "maxMs": 0,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              }
+            },
+            {
+              "hitSemanticFlowPoint": {
+                "calls": 3,
+                "totalMs": 0.19999999552965164,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 3,
+                  "medianMs": 0.09999999403953552,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectSemanticFlowLabels": {
+                "calls": 52,
+                "totalMs": 18.700000025331974,
+                "maxMs": 0.7000000029802322,
+                "distribution": {
+                  "samples": 52,
+                  "medianMs": 0.30000000447034836,
+                  "p95Ms": 0.5999999940395355,
+                  "maxMs": 0.7000000029802322,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "semanticFlowConnectionNotices": {
+                "calls": 52,
+                "totalMs": 0.7000000029802322,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 52,
+                  "medianMs": 0,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "SemanticFlow3D": {
+                "calls": 67,
+                "totalMs": 3.3999999910593033,
+                "maxMs": 0.20000000298023224,
+                "distribution": {
+                  "samples": 67,
+                  "medianMs": 0,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.20000000298023224,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectAutoAggregation": {
+                "calls": 7,
+                "totalMs": 0,
+                "maxMs": 0,
+                "distribution": {
+                  "samples": 7,
+                  "medianMs": 0,
+                  "p95Ms": 0,
+                  "maxMs": 0,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              }
+            }
+          ]
+        }
+      ],
+      "errors": []
+    },
+    {
+      "stage": "performance-final",
+      "name": "git-lines",
+      "readyMs": {
+        "n": 3,
+        "min": 3593,
+        "median": 4027,
+        "p95": 4030,
+        "max": 4030
+      },
+      "analysisMs": {
+        "n": 3,
+        "min": 2035,
+        "median": 2042,
+        "p95": 2084,
+        "max": 2084
+      },
+      "architectureMs": {
+        "n": 3,
+        "min": 228.30000000447035,
+        "median": 240.70000000298023,
+        "p95": 253.10000000149012,
+        "max": 253.10000000149012
+      },
+      "rootCount": "3",
+      "times": {
+        "select": {
+          "n": 15,
+          "min": 64,
+          "median": 65,
+          "p95": 126,
+          "max": 126
+        },
+        "drill": {
+          "n": 9,
+          "min": 63,
+          "median": 71,
+          "p95": 80,
+          "max": 80
+        },
+        "parent": {
+          "n": 9,
+          "min": 66,
+          "median": 67,
+          "p95": 76,
+          "max": 76
+        },
+        "to3D": {
+          "n": 21,
+          "min": 66,
+          "median": 67,
+          "p95": 384,
+          "max": 386
+        },
+        "rotate-true": {
+          "n": 9,
+          "min": 309,
+          "median": 313,
+          "p95": 330,
+          "max": 330
+        },
+        "aggregationToggle": {
+          "n": 3,
+          "min": 56,
+          "median": 57,
+          "p95": 69,
+          "max": 69
+        },
+        "rotate-false": {
+          "n": 9,
+          "min": 310,
+          "median": 314,
+          "p95": 347,
+          "max": 347
+        },
+        "to2D": {
+          "n": 18,
+          "min": 57,
+          "median": 65,
+          "p95": 93,
+          "max": 93
+        }
+      },
+      "rotation": [
+        {
+          "auto": true,
+          "rafMedianMs": {
+            "n": 3,
+            "min": 16.699999999999818,
+            "median": 16.699999999999818,
+            "p95": 16.699999999999818,
+            "max": 16.699999999999818
+          },
+          "rafP95Ms": {
+            "n": 3,
+            "min": 16.800000000000182,
+            "median": 16.800000000000182,
+            "p95": 16.800000000000182,
+            "max": 16.800000000000182
+          },
+          "longTasks": 0,
+          "labels": {
+            "n": 3,
+            "min": 2,
+            "median": 2,
+            "p95": 2,
+            "max": 2
+          },
+          "cpu": [
+            {
+              "hitSemanticFlowPoint": {
+                "calls": 3,
+                "totalMs": 0.19999999552965164,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 3,
+                  "medianMs": 0.09999999403953552,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectSemanticFlowLabels": {
+                "calls": 51,
+                "totalMs": 6.8000000193715096,
+                "maxMs": 0.20000000298023224,
+                "distribution": {
+                  "samples": 51,
+                  "medianMs": 0.10000000149011612,
+                  "p95Ms": 0.20000000298023224,
+                  "maxMs": 0.20000000298023224,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "semanticFlowConnectionNotices": {
+                "calls": 51,
+                "totalMs": 0.5,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 51,
+                  "medianMs": 0,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectAutoAggregation": {
+                "calls": 3,
+                "totalMs": 0.10000000149011612,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 3,
+                  "medianMs": 0,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "SemanticFlow3D": {
+                "calls": 6,
+                "totalMs": 0.5,
+                "maxMs": 0.19999999552965164,
+                "distribution": {
+                  "samples": 6,
+                  "medianMs": 0.10000000149011612,
+                  "p95Ms": 0.19999999552965164,
+                  "maxMs": 0.19999999552965164,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              }
+            },
+            {
+              "hitSemanticFlowPoint": {
+                "calls": 3,
+                "totalMs": 0.10000000149011612,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 3,
+                  "medianMs": 0,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectSemanticFlowLabels": {
+                "calls": 51,
+                "totalMs": 7.3000000193715096,
+                "maxMs": 0.29999999701976776,
+                "distribution": {
+                  "samples": 51,
+                  "medianMs": 0.10000000149011612,
+                  "p95Ms": 0.20000000298023224,
+                  "maxMs": 0.29999999701976776,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "semanticFlowConnectionNotices": {
+                "calls": 51,
+                "totalMs": 0.7000000104308128,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 51,
+                  "medianMs": 0,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectAutoAggregation": {
+                "calls": 3,
+                "totalMs": 0.20000000298023224,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 3,
+                  "medianMs": 0.10000000149011612,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "SemanticFlow3D": {
+                "calls": 6,
+                "totalMs": 0.6000000089406967,
+                "maxMs": 0.20000000298023224,
+                "distribution": {
+                  "samples": 6,
+                  "medianMs": 0.10000000149011612,
+                  "p95Ms": 0.20000000298023224,
+                  "maxMs": 0.20000000298023224,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              }
+            },
+            {
+              "hitSemanticFlowPoint": {
+                "calls": 3,
+                "totalMs": 0.10000000149011612,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 3,
+                  "medianMs": 0,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectSemanticFlowLabels": {
+                "calls": 51,
+                "totalMs": 8.800000004470348,
+                "maxMs": 0.9000000059604645,
+                "distribution": {
+                  "samples": 51,
+                  "medianMs": 0.19999999552965164,
+                  "p95Ms": 0.30000000447034836,
+                  "maxMs": 0.9000000059604645,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "semanticFlowConnectionNotices": {
+                "calls": 51,
+                "totalMs": 0.29999999701976776,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 51,
+                  "medianMs": 0,
+                  "p95Ms": 0.09999999403953552,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectAutoAggregation": {
+                "calls": 3,
+                "totalMs": 0.19999999552965164,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 3,
+                  "medianMs": 0.09999999403953552,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "SemanticFlow3D": {
+                "calls": 6,
+                "totalMs": 1,
+                "maxMs": 0.29999999701976776,
+                "distribution": {
+                  "samples": 6,
+                  "medianMs": 0.20000000298023224,
+                  "p95Ms": 0.29999999701976776,
+                  "maxMs": 0.29999999701976776,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              }
+            }
+          ]
+        },
+        {
+          "auto": false,
+          "rafMedianMs": {
+            "n": 3,
+            "min": 16.699999999999818,
+            "median": 16.699999999999818,
+            "p95": 16.699999999999818,
+            "max": 16.699999999999818
+          },
+          "rafP95Ms": {
+            "n": 3,
+            "min": 16.700000000000728,
+            "median": 16.800000000000182,
+            "p95": 16.800000000000182,
+            "max": 16.800000000000182
+          },
+          "longTasks": 0,
+          "labels": {
+            "n": 3,
+            "min": 2,
+            "median": 2,
+            "p95": 2,
+            "max": 2
+          },
+          "cpu": [
+            {
+              "hitSemanticFlowPoint": {
+                "calls": 3,
+                "totalMs": 0,
+                "maxMs": 0,
+                "distribution": {
+                  "samples": 3,
+                  "medianMs": 0,
+                  "p95Ms": 0,
+                  "maxMs": 0,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectSemanticFlowLabels": {
+                "calls": 51,
+                "totalMs": 6.100000008940697,
+                "maxMs": 0.30000000447034836,
+                "distribution": {
+                  "samples": 51,
+                  "medianMs": 0.10000000149011612,
+                  "p95Ms": 0.20000000298023224,
+                  "maxMs": 0.30000000447034836,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "semanticFlowConnectionNotices": {
+                "calls": 51,
+                "totalMs": 0.10000000149011612,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 51,
+                  "medianMs": 0,
+                  "p95Ms": 0,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectAutoAggregation": {
+                "calls": 5,
+                "totalMs": 0,
+                "maxMs": 0,
+                "distribution": {
+                  "samples": 5,
+                  "medianMs": 0,
+                  "p95Ms": 0,
+                  "maxMs": 0,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "SemanticFlow3D": {
+                "calls": 14,
+                "totalMs": 0.8999999836087227,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 14,
+                  "medianMs": 0.09999999403953552,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              }
+            },
+            {
+              "hitSemanticFlowPoint": {
+                "calls": 3,
+                "totalMs": 0,
+                "maxMs": 0,
+                "distribution": {
+                  "samples": 3,
+                  "medianMs": 0,
+                  "p95Ms": 0,
+                  "maxMs": 0,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectSemanticFlowLabels": {
+                "calls": 51,
+                "totalMs": 7.4000000059604645,
+                "maxMs": 0.30000000447034836,
+                "distribution": {
+                  "samples": 51,
+                  "medianMs": 0.19999999552965164,
+                  "p95Ms": 0.20000000298023224,
+                  "maxMs": 0.30000000447034836,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "semanticFlowConnectionNotices": {
+                "calls": 51,
+                "totalMs": 0.30000000447034836,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 51,
+                  "medianMs": 0,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectAutoAggregation": {
+                "calls": 5,
+                "totalMs": 0,
+                "maxMs": 0,
+                "distribution": {
+                  "samples": 5,
+                  "medianMs": 0,
+                  "p95Ms": 0,
+                  "maxMs": 0,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "SemanticFlow3D": {
+                "calls": 14,
+                "totalMs": 1.1000000089406967,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 14,
+                  "medianMs": 0.10000000149011612,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              }
+            },
+            {
+              "hitSemanticFlowPoint": {
+                "calls": 3,
+                "totalMs": 0,
+                "maxMs": 0,
+                "distribution": {
+                  "samples": 3,
+                  "medianMs": 0,
+                  "p95Ms": 0,
+                  "maxMs": 0,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectSemanticFlowLabels": {
+                "calls": 51,
+                "totalMs": 8.00000000745058,
+                "maxMs": 0.30000000447034836,
+                "distribution": {
+                  "samples": 51,
+                  "medianMs": 0.10000000149011612,
+                  "p95Ms": 0.30000000447034836,
+                  "maxMs": 0.30000000447034836,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "semanticFlowConnectionNotices": {
+                "calls": 51,
+                "totalMs": 0.4000000059604645,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 51,
+                  "medianMs": 0,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectAutoAggregation": {
+                "calls": 5,
+                "totalMs": 0.10000000149011612,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 5,
+                  "medianMs": 0,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "SemanticFlow3D": {
+                "calls": 14,
+                "totalMs": 1.2999999895691872,
+                "maxMs": 0.20000000298023224,
+                "distribution": {
+                  "samples": 14,
+                  "medianMs": 0.10000000149011612,
+                  "p95Ms": 0.20000000298023224,
+                  "maxMs": 0.20000000298023224,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              }
+            }
+          ]
+        }
+      ],
+      "errors": []
+    },
+    {
+      "stage": "performance-final",
+      "name": "vehicle-management",
+      "readyMs": {
+        "n": 3,
+        "min": 20784,
+        "median": 21596,
+        "p95": 22158,
+        "max": 22158
+      },
+      "analysisMs": {
+        "n": 3,
+        "min": 17568,
+        "median": 18202,
+        "p95": 18885,
+        "max": 18885
+      },
+      "architectureMs": {
+        "n": 3,
+        "min": 686.8999999985099,
+        "median": 811.5999999940395,
+        "p95": 818.5,
+        "max": 818.5
+      },
+      "rootCount": "24",
+      "times": {
+        "select": {
+          "n": 15,
+          "min": 64,
+          "median": 65,
+          "p95": 109,
+          "max": 109
+        },
+        "drill": {
+          "n": 9,
+          "min": 74,
+          "median": 85,
+          "p95": 129,
+          "max": 129
+        },
+        "parent": {
+          "n": 9,
+          "min": 83,
+          "median": 95,
+          "p95": 100,
+          "max": 100
+        },
+        "to3D": {
+          "n": 21,
+          "min": 83,
+          "median": 100,
+          "p95": 404,
+          "max": 420
+        },
+        "rotate-true": {
+          "n": 9,
+          "min": 305,
+          "median": 312,
+          "p95": 329,
+          "max": 329
+        },
+        "aggregationToggle": {
+          "n": 3,
+          "min": 64,
+          "median": 68,
+          "p95": 69,
+          "max": 69
+        },
+        "rotate-false": {
+          "n": 9,
+          "min": 309,
+          "median": 313,
+          "p95": 363,
+          "max": 363
+        },
+        "to2D": {
+          "n": 18,
+          "min": 99,
+          "median": 113,
+          "p95": 120,
+          "max": 120
+        }
+      },
+      "rotation": [
+        {
+          "auto": true,
+          "rafMedianMs": {
+            "n": 3,
+            "min": 16.69999999999709,
+            "median": 16.700000000000728,
+            "p95": 16.700000000000728,
+            "max": 16.700000000000728
+          },
+          "rafP95Ms": {
+            "n": 3,
+            "min": 16.700000000000728,
+            "median": 16.700000000000728,
+            "p95": 16.799999999999272,
+            "max": 16.799999999999272
+          },
+          "longTasks": 0,
+          "labels": {
+            "n": 3,
+            "min": 2,
+            "median": 2,
+            "p95": 2,
+            "max": 2
+          },
+          "cpu": [
+            {
+              "hitSemanticFlowPoint": {
+                "calls": 3,
+                "totalMs": 0.20000000298023224,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 3,
+                  "medianMs": 0.10000000149011612,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectSemanticFlowLabels": {
+                "calls": 51,
+                "totalMs": 9.900000005960464,
+                "maxMs": 0.30000000447034836,
+                "distribution": {
+                  "samples": 51,
+                  "medianMs": 0.20000000298023224,
+                  "p95Ms": 0.30000000447034836,
+                  "maxMs": 0.30000000447034836,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "semanticFlowConnectionNotices": {
+                "calls": 51,
+                "totalMs": 0.6000000014901161,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 51,
+                  "medianMs": 0,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "SemanticFlow3D": {
+                "calls": 19,
+                "totalMs": 1.7999999895691872,
+                "maxMs": 0.20000000298023224,
+                "distribution": {
+                  "samples": 19,
+                  "medianMs": 0.10000000149011612,
+                  "p95Ms": 0.20000000298023224,
+                  "maxMs": 0.20000000298023224,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectAutoAggregation": {
+                "calls": 3,
+                "totalMs": 0.10000000149011612,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 3,
+                  "medianMs": 0,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              }
+            },
+            {
+              "hitSemanticFlowPoint": {
+                "calls": 3,
+                "totalMs": 0.29999999701976776,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 3,
+                  "medianMs": 0.10000000149011612,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectSemanticFlowLabels": {
+                "calls": 51,
+                "totalMs": 9.000000014901161,
+                "maxMs": 0.30000000447034836,
+                "distribution": {
+                  "samples": 51,
+                  "medianMs": 0.19999999552965164,
+                  "p95Ms": 0.30000000447034836,
+                  "maxMs": 0.30000000447034836,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "semanticFlowConnectionNotices": {
+                "calls": 51,
+                "totalMs": 0.5000000074505806,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 51,
+                  "medianMs": 0,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "SemanticFlow3D": {
+                "calls": 19,
+                "totalMs": 1.8999999985098839,
+                "maxMs": 0.29999999701976776,
+                "distribution": {
+                  "samples": 19,
+                  "medianMs": 0.10000000149011612,
+                  "p95Ms": 0.29999999701976776,
+                  "maxMs": 0.29999999701976776,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectAutoAggregation": {
+                "calls": 3,
+                "totalMs": 0.10000000149011612,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 3,
+                  "medianMs": 0,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              }
+            },
+            {
+              "hitSemanticFlowPoint": {
+                "calls": 3,
+                "totalMs": 0.10000000149011612,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 3,
+                  "medianMs": 0,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectSemanticFlowLabels": {
+                "calls": 51,
+                "totalMs": 8.799999982118607,
+                "maxMs": 0.30000000447034836,
+                "distribution": {
+                  "samples": 51,
+                  "medianMs": 0.19999999552965164,
+                  "p95Ms": 0.29999999701976776,
+                  "maxMs": 0.30000000447034836,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "semanticFlowConnectionNotices": {
+                "calls": 51,
+                "totalMs": 0.800000011920929,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 51,
+                  "medianMs": 0,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "SemanticFlow3D": {
+                "calls": 19,
+                "totalMs": 2.0000000074505806,
+                "maxMs": 0.29999999701976776,
+                "distribution": {
+                  "samples": 19,
+                  "medianMs": 0.10000000149011612,
+                  "p95Ms": 0.29999999701976776,
+                  "maxMs": 0.29999999701976776,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectAutoAggregation": {
+                "calls": 3,
+                "totalMs": 0.29999999701976776,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 3,
+                  "medianMs": 0.10000000149011612,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              }
+            }
+          ]
+        },
+        {
+          "auto": false,
+          "rafMedianMs": {
+            "n": 3,
+            "min": 16.69999999999709,
+            "median": 16.69999999999709,
+            "p95": 16.69999999999709,
+            "max": 16.69999999999709
+          },
+          "rafP95Ms": {
+            "n": 3,
+            "min": 16.700000000000728,
+            "median": 16.799999999999272,
+            "p95": 16.80000000000291,
+            "max": 16.80000000000291
+          },
+          "longTasks": 0,
+          "labels": {
+            "n": 3,
+            "min": 3,
+            "median": 3,
+            "p95": 3,
+            "max": 3
+          },
+          "cpu": [
+            {
+              "hitSemanticFlowPoint": {
+                "calls": 3,
+                "totalMs": 0,
+                "maxMs": 0,
+                "distribution": {
+                  "samples": 3,
+                  "medianMs": 0,
+                  "p95Ms": 0,
+                  "maxMs": 0,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectSemanticFlowLabels": {
+                "calls": 51,
+                "totalMs": 8.199999995529652,
+                "maxMs": 0.30000000447034836,
+                "distribution": {
+                  "samples": 51,
+                  "medianMs": 0.19999999552965164,
+                  "p95Ms": 0.29999999701976776,
+                  "maxMs": 0.30000000447034836,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "semanticFlowConnectionNotices": {
+                "calls": 51,
+                "totalMs": 0.10000000149011612,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 51,
+                  "medianMs": 0,
+                  "p95Ms": 0,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectAutoAggregation": {
+                "calls": 5,
+                "totalMs": 0.10000000149011612,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 5,
+                  "medianMs": 0,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "SemanticFlow3D": {
+                "calls": 19,
+                "totalMs": 2.200000010430813,
+                "maxMs": 0.8000000044703484,
+                "distribution": {
+                  "samples": 19,
+                  "medianMs": 0.10000000149011612,
+                  "p95Ms": 0.8000000044703484,
+                  "maxMs": 0.8000000044703484,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              }
+            },
+            {
+              "hitSemanticFlowPoint": {
+                "calls": 3,
+                "totalMs": 0,
+                "maxMs": 0,
+                "distribution": {
+                  "samples": 3,
+                  "medianMs": 0,
+                  "p95Ms": 0,
+                  "maxMs": 0,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectSemanticFlowLabels": {
+                "calls": 51,
+                "totalMs": 9.100000001490116,
+                "maxMs": 0.30000000447034836,
+                "distribution": {
+                  "samples": 51,
+                  "medianMs": 0.19999999552965164,
+                  "p95Ms": 0.29999999701976776,
+                  "maxMs": 0.30000000447034836,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "semanticFlowConnectionNotices": {
+                "calls": 51,
+                "totalMs": 0.7999999970197678,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 51,
+                  "medianMs": 0,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectAutoAggregation": {
+                "calls": 5,
+                "totalMs": 0.10000000149011612,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 5,
+                  "medianMs": 0,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "SemanticFlow3D": {
+                "calls": 19,
+                "totalMs": 1.7999999970197678,
+                "maxMs": 0.29999999701976776,
+                "distribution": {
+                  "samples": 19,
+                  "medianMs": 0.10000000149011612,
+                  "p95Ms": 0.29999999701976776,
+                  "maxMs": 0.29999999701976776,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              }
+            },
+            {
+              "hitSemanticFlowPoint": {
+                "calls": 3,
+                "totalMs": 0.10000000149011612,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 3,
+                  "medianMs": 0,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectSemanticFlowLabels": {
+                "calls": 51,
+                "totalMs": 8.99999999254942,
+                "maxMs": 0.30000000447034836,
+                "distribution": {
+                  "samples": 51,
+                  "medianMs": 0.19999999552965164,
+                  "p95Ms": 0.30000000447034836,
+                  "maxMs": 0.30000000447034836,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "semanticFlowConnectionNotices": {
+                "calls": 51,
+                "totalMs": 0.7000000029802322,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 51,
+                  "medianMs": 0,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "projectAutoAggregation": {
+                "calls": 5,
+                "totalMs": 0.10000000149011612,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 5,
+                  "medianMs": 0,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              },
+              "SemanticFlow3D": {
+                "calls": 19,
+                "totalMs": 1.2999999970197678,
+                "maxMs": 0.10000000149011612,
+                "distribution": {
+                  "samples": 19,
+                  "medianMs": 0.10000000149011612,
+                  "p95Ms": 0.10000000149011612,
+                  "maxMs": 0.10000000149011612,
+                  "over50ms": 0
+                },
+                "samplesCapped": false
+              }
+            }
+          ]
+        }
+      ],
+      "errors": []
+    }
+  ],
+  "context": [
+    {
+      "name": "fixed",
+      "stage": "before",
+      "auto": true,
+      "surroundings": null,
+      "points": {
+        "n": 3,
+        "min": 12,
+        "median": 12,
+        "p95": 12,
+        "max": 12
+      },
+      "paths": {
+        "n": 3,
+        "min": 0,
+        "median": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "toggleMs": {
+        "n": 0
+      },
+      "rafMedianMs": {
+        "n": 3,
+        "min": 16.699999999999818,
+        "median": 16.699999999999818,
+        "p95": 16.699999999999818,
+        "max": 16.699999999999818
+      },
+      "rafP95Ms": {
+        "n": 3,
+        "min": 16.700000000000273,
+        "median": 16.800000000000182,
+        "p95": 16.800000000000182,
+        "max": 16.800000000000182
+      },
+      "longTasks": 0,
+      "labels": {
+        "n": 3,
+        "min": 8,
+        "median": 8,
+        "p95": 8,
+        "max": 8
+      },
+      "motion": [
+        {
+          "enabled": true,
+          "reduced": false,
+          "visible": true
+        },
+        {
+          "enabled": true,
+          "reduced": false,
+          "visible": true
+        },
+        {
+          "enabled": true,
+          "reduced": false,
+          "visible": true
+        }
+      ],
+      "cpu": [
+        {
+          "hitSemanticFlowPoint": {
+            "calls": 3,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 3,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectSemanticFlowLabels": {
+            "calls": 51,
+            "totalMs": 12.099999994039536,
+            "maxMs": 0.5,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0.20000000298023224,
+              "p95Ms": 0.3999999985098839,
+              "maxMs": 0.5,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "semanticFlowConnectionNotices": {
+            "calls": 51,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "SemanticFlow3D": {
+            "calls": 16,
+            "totalMs": 0.7999999895691872,
+            "maxMs": 0.20000000298023224,
+            "distribution": {
+              "samples": 16,
+              "medianMs": 0,
+              "p95Ms": 0.20000000298023224,
+              "maxMs": 0.20000000298023224,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAutoAggregation": {
+            "calls": 3,
+            "totalMs": 0.19999999552965164,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 3,
+              "medianMs": 0.09999999403953552,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        },
+        {
+          "hitSemanticFlowPoint": {
+            "calls": 3,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 3,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectSemanticFlowLabels": {
+            "calls": 51,
+            "totalMs": 12.499999970197678,
+            "maxMs": 0.5,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0.20000000298023224,
+              "p95Ms": 0.4000000059604645,
+              "maxMs": 0.5,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "semanticFlowConnectionNotices": {
+            "calls": 51,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "SemanticFlow3D": {
+            "calls": 16,
+            "totalMs": 0.6000000014901161,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 16,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAutoAggregation": {
+            "calls": 3,
+            "totalMs": 0.10000000149011612,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 3,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        },
+        {
+          "hitSemanticFlowPoint": {
+            "calls": 3,
+            "totalMs": 0.10000000149011612,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 3,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectSemanticFlowLabels": {
+            "calls": 51,
+            "totalMs": 10.199999988079071,
+            "maxMs": 0.4000000059604645,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0.20000000298023224,
+              "p95Ms": 0.29999999701976776,
+              "maxMs": 0.4000000059604645,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "semanticFlowConnectionNotices": {
+            "calls": 51,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "SemanticFlow3D": {
+            "calls": 16,
+            "totalMs": 0.6000000089406967,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 16,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAutoAggregation": {
+            "calls": 3,
+            "totalMs": 0.10000000149011612,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 3,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "fixed",
+      "stage": "before",
+      "auto": false,
+      "surroundings": null,
+      "points": {
+        "n": 3,
+        "min": 12,
+        "median": 12,
+        "p95": 12,
+        "max": 12
+      },
+      "paths": {
+        "n": 3,
+        "min": 0,
+        "median": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "toggleMs": {
+        "n": 0
+      },
+      "rafMedianMs": {
+        "n": 3,
+        "min": 16.699999999999818,
+        "median": 16.699999999999818,
+        "p95": 16.699999999999818,
+        "max": 16.699999999999818
+      },
+      "rafP95Ms": {
+        "n": 3,
+        "min": 16.700000000000273,
+        "median": 16.800000000000182,
+        "p95": 16.800000000000182,
+        "max": 16.800000000000182
+      },
+      "longTasks": 0,
+      "labels": {
+        "n": 3,
+        "min": 10,
+        "median": 10,
+        "p95": 10,
+        "max": 10
+      },
+      "motion": [
+        {
+          "enabled": true,
+          "reduced": false,
+          "visible": true
+        },
+        {
+          "enabled": true,
+          "reduced": false,
+          "visible": true
+        },
+        {
+          "enabled": true,
+          "reduced": false,
+          "visible": true
+        }
+      ],
+      "cpu": [
+        {
+          "hitSemanticFlowPoint": {
+            "calls": 3,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 3,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectSemanticFlowLabels": {
+            "calls": 51,
+            "totalMs": 10.899999998509884,
+            "maxMs": 0.3999999985098839,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0.20000000298023224,
+              "p95Ms": 0.30000000447034836,
+              "maxMs": 0.3999999985098839,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "semanticFlowConnectionNotices": {
+            "calls": 51,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "SemanticFlow3D": {
+            "calls": 19,
+            "totalMs": 0.7999999970197678,
+            "maxMs": 0.19999999552965164,
+            "distribution": {
+              "samples": 19,
+              "medianMs": 0,
+              "p95Ms": 0.19999999552965164,
+              "maxMs": 0.19999999552965164,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAutoAggregation": {
+            "calls": 3,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 3,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        },
+        {
+          "hitSemanticFlowPoint": {
+            "calls": 3,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 3,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectSemanticFlowLabels": {
+            "calls": 51,
+            "totalMs": 11.399999968707561,
+            "maxMs": 0.6000000014901161,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0.20000000298023224,
+              "p95Ms": 0.30000000447034836,
+              "maxMs": 0.6000000014901161,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "semanticFlowConnectionNotices": {
+            "calls": 51,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "SemanticFlow3D": {
+            "calls": 19,
+            "totalMs": 0.8999999985098839,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 19,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAutoAggregation": {
+            "calls": 3,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 3,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        },
+        {
+          "hitSemanticFlowPoint": {
+            "calls": 3,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 3,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectSemanticFlowLabels": {
+            "calls": 51,
+            "totalMs": 10.600000001490116,
+            "maxMs": 0.3999999985098839,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0.20000000298023224,
+              "p95Ms": 0.30000000447034836,
+              "maxMs": 0.3999999985098839,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "semanticFlowConnectionNotices": {
+            "calls": 51,
+            "totalMs": 0.20000000298023224,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "SemanticFlow3D": {
+            "calls": 19,
+            "totalMs": 0.6000000014901161,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 19,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAutoAggregation": {
+            "calls": 3,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 3,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "fixed",
+      "stage": "after",
+      "auto": true,
+      "surroundings": true,
+      "points": {
+        "n": 3,
+        "min": 46,
+        "median": 46,
+        "p95": 46,
+        "max": 46
+      },
+      "paths": {
+        "n": 3,
+        "min": 6,
+        "median": 6,
+        "p95": 6,
+        "max": 6
+      },
+      "toggleMs": {
+        "n": 0
+      },
+      "rafMedianMs": {
+        "n": 3,
+        "min": 16.699999999999818,
+        "median": 16.699999999999818,
+        "p95": 16.699999999999818,
+        "max": 16.699999999999818
+      },
+      "rafP95Ms": {
+        "n": 3,
+        "min": 16.700000000000273,
+        "median": 16.799999999999727,
+        "p95": 16.800000000000182,
+        "max": 16.800000000000182
+      },
+      "longTasks": 0,
+      "labels": {
+        "n": 3,
+        "min": 8,
+        "median": 8,
+        "p95": 8,
+        "max": 8
+      },
+      "motion": [
+        {
+          "enabled": true,
+          "reduced": false,
+          "visible": true
+        },
+        {
+          "enabled": true,
+          "reduced": false,
+          "visible": true
+        },
+        {
+          "enabled": true,
+          "reduced": false,
+          "visible": true
+        }
+      ],
+      "cpu": [
+        {
+          "hitSemanticFlowPoint": {
+            "calls": 3,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 3,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAutoAggregation": {
+            "calls": 7,
+            "totalMs": 0.5,
+            "maxMs": 0.19999999552965164,
+            "distribution": {
+              "samples": 7,
+              "medianMs": 0.10000000149011612,
+              "p95Ms": 0.19999999552965164,
+              "maxMs": 0.19999999552965164,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "SemanticFlow3D": {
+            "calls": 81,
+            "totalMs": 5.199999988079071,
+            "maxMs": 0.3999999985098839,
+            "distribution": {
+              "samples": 81,
+              "medianMs": 0.09999999403953552,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.3999999985098839,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectSemanticFlowLabels": {
+            "calls": 53,
+            "totalMs": 28.600000008940697,
+            "maxMs": 1.1000000014901161,
+            "distribution": {
+              "samples": 53,
+              "medianMs": 0.5,
+              "p95Ms": 1,
+              "maxMs": 1.1000000014901161,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "semanticFlowConnectionNotices": {
+            "calls": 53,
+            "totalMs": 0.5,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 53,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAggregationRelations": {
+            "calls": 1,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 1,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAggregatedSemanticFlow": {
+            "calls": 1,
+            "totalMs": 0.20000000298023224,
+            "maxMs": 0.20000000298023224,
+            "distribution": {
+              "samples": 1,
+              "medianMs": 0.20000000298023224,
+              "p95Ms": 0.20000000298023224,
+              "maxMs": 0.20000000298023224,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        },
+        {
+          "hitSemanticFlowPoint": {
+            "calls": 3,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 3,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAutoAggregation": {
+            "calls": 7,
+            "totalMs": 0.4000000059604645,
+            "maxMs": 0.20000000298023224,
+            "distribution": {
+              "samples": 7,
+              "medianMs": 0,
+              "p95Ms": 0.20000000298023224,
+              "maxMs": 0.20000000298023224,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "SemanticFlow3D": {
+            "calls": 81,
+            "totalMs": 5.100000008940697,
+            "maxMs": 0.6000000014901161,
+            "distribution": {
+              "samples": 81,
+              "medianMs": 0.09999999403953552,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.6000000014901161,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectSemanticFlowLabels": {
+            "calls": 53,
+            "totalMs": 26.899999998509884,
+            "maxMs": 1,
+            "distribution": {
+              "samples": 53,
+              "medianMs": 0.5,
+              "p95Ms": 0.8999999985098839,
+              "maxMs": 1,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "semanticFlowConnectionNotices": {
+            "calls": 53,
+            "totalMs": 1.1999999955296516,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 53,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAggregationRelations": {
+            "calls": 1,
+            "totalMs": 0.09999999403953552,
+            "maxMs": 0.09999999403953552,
+            "distribution": {
+              "samples": 1,
+              "medianMs": 0.09999999403953552,
+              "p95Ms": 0.09999999403953552,
+              "maxMs": 0.09999999403953552,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAggregatedSemanticFlow": {
+            "calls": 1,
+            "totalMs": 0.3999999985098839,
+            "maxMs": 0.3999999985098839,
+            "distribution": {
+              "samples": 1,
+              "medianMs": 0.3999999985098839,
+              "p95Ms": 0.3999999985098839,
+              "maxMs": 0.3999999985098839,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        },
+        {
+          "hitSemanticFlowPoint": {
+            "calls": 3,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 3,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAutoAggregation": {
+            "calls": 7,
+            "totalMs": 0.4999999850988388,
+            "maxMs": 0.29999999701976776,
+            "distribution": {
+              "samples": 7,
+              "medianMs": 0,
+              "p95Ms": 0.29999999701976776,
+              "maxMs": 0.29999999701976776,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "SemanticFlow3D": {
+            "calls": 81,
+            "totalMs": 5.699999995529652,
+            "maxMs": 0.6999999955296516,
+            "distribution": {
+              "samples": 81,
+              "medianMs": 0.09999999403953552,
+              "p95Ms": 0.20000000298023224,
+              "maxMs": 0.6999999955296516,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectSemanticFlowLabels": {
+            "calls": 53,
+            "totalMs": 29.30000001937151,
+            "maxMs": 1.1000000014901161,
+            "distribution": {
+              "samples": 53,
+              "medianMs": 0.5,
+              "p95Ms": 1,
+              "maxMs": 1.1000000014901161,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "semanticFlowConnectionNotices": {
+            "calls": 53,
+            "totalMs": 0.6999999955296516,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 53,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAggregationRelations": {
+            "calls": 1,
+            "totalMs": 0.20000000298023224,
+            "maxMs": 0.20000000298023224,
+            "distribution": {
+              "samples": 1,
+              "medianMs": 0.20000000298023224,
+              "p95Ms": 0.20000000298023224,
+              "maxMs": 0.20000000298023224,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAggregatedSemanticFlow": {
+            "calls": 1,
+            "totalMs": 0.30000000447034836,
+            "maxMs": 0.30000000447034836,
+            "distribution": {
+              "samples": 1,
+              "medianMs": 0.30000000447034836,
+              "p95Ms": 0.30000000447034836,
+              "maxMs": 0.30000000447034836,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "fixed",
+      "stage": "after",
+      "auto": true,
+      "surroundings": false,
+      "points": {
+        "n": 3,
+        "min": 12,
+        "median": 12,
+        "p95": 12,
+        "max": 12
+      },
+      "paths": {
+        "n": 3,
+        "min": 6,
+        "median": 6,
+        "p95": 6,
+        "max": 6
+      },
+      "toggleMs": {
+        "n": 3,
+        "min": 57,
+        "median": 57,
+        "p95": 57,
+        "max": 57
+      },
+      "rafMedianMs": {
+        "n": 3,
+        "min": 16.699999999999818,
+        "median": 16.699999999999818,
+        "p95": 16.699999999999818,
+        "max": 16.699999999999818
+      },
+      "rafP95Ms": {
+        "n": 3,
+        "min": 16.800000000000182,
+        "median": 16.800000000000182,
+        "p95": 16.800000000000182,
+        "max": 16.800000000000182
+      },
+      "longTasks": 0,
+      "labels": {
+        "n": 3,
+        "min": 13,
+        "median": 13,
+        "p95": 13,
+        "max": 13
+      },
+      "motion": [
+        {
+          "enabled": true,
+          "reduced": false,
+          "visible": true
+        },
+        {
+          "enabled": true,
+          "reduced": false,
+          "visible": true
+        },
+        {
+          "enabled": true,
+          "reduced": false,
+          "visible": true
+        }
+      ],
+      "cpu": [
+        {
+          "hitSemanticFlowPoint": {
+            "calls": 3,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 3,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectSemanticFlowLabels": {
+            "calls": 51,
+            "totalMs": 12.500000037252903,
+            "maxMs": 0.6000000014901161,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0.20000000298023224,
+              "p95Ms": 0.3999999985098839,
+              "maxMs": 0.6000000014901161,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "semanticFlowConnectionNotices": {
+            "calls": 51,
+            "totalMs": 0.699999988079071,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "SemanticFlow3D": {
+            "calls": 48,
+            "totalMs": 1.8000000268220901,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 48,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAutoAggregation": {
+            "calls": 3,
+            "totalMs": 0.10000000149011612,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 3,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        },
+        {
+          "hitSemanticFlowPoint": {
+            "calls": 3,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 3,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectSemanticFlowLabels": {
+            "calls": 51,
+            "totalMs": 13.400000043213367,
+            "maxMs": 0.6000000014901161,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0.29999999701976776,
+              "p95Ms": 0.3999999985098839,
+              "maxMs": 0.6000000014901161,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "semanticFlowConnectionNotices": {
+            "calls": 51,
+            "totalMs": 0.4000000059604645,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "SemanticFlow3D": {
+            "calls": 49,
+            "totalMs": 2.3999999836087227,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 49,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAutoAggregation": {
+            "calls": 3,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 3,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        },
+        {
+          "hitSemanticFlowPoint": {
+            "calls": 3,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 3,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectSemanticFlowLabels": {
+            "calls": 51,
+            "totalMs": 12.900000028312206,
+            "maxMs": 0.4000000059604645,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0.20000000298023224,
+              "p95Ms": 0.3999999985098839,
+              "maxMs": 0.4000000059604645,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "semanticFlowConnectionNotices": {
+            "calls": 51,
+            "totalMs": 0.29999999701976776,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0,
+              "p95Ms": 0.09999999403953552,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "SemanticFlow3D": {
+            "calls": 49,
+            "totalMs": 3.000000022351742,
+            "maxMs": 0.20000000298023224,
+            "distribution": {
+              "samples": 49,
+              "medianMs": 0.10000000149011612,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.20000000298023224,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAutoAggregation": {
+            "calls": 3,
+            "totalMs": 0.10000000149011612,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 3,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "fixed",
+      "stage": "after",
+      "auto": false,
+      "surroundings": true,
+      "points": {
+        "n": 3,
+        "min": 46,
+        "median": 46,
+        "p95": 46,
+        "max": 46
+      },
+      "paths": {
+        "n": 3,
+        "min": 6,
+        "median": 6,
+        "p95": 6,
+        "max": 6
+      },
+      "toggleMs": {
+        "n": 3,
+        "min": 60,
+        "median": 60,
+        "p95": 61,
+        "max": 61
+      },
+      "rafMedianMs": {
+        "n": 3,
+        "min": 16.699999999999818,
+        "median": 16.699999999999818,
+        "p95": 16.699999999999818,
+        "max": 16.699999999999818
+      },
+      "rafP95Ms": {
+        "n": 3,
+        "min": 16.700000000000728,
+        "median": 16.799999999999272,
+        "p95": 16.800000000000182,
+        "max": 16.800000000000182
+      },
+      "longTasks": 0,
+      "labels": {
+        "n": 3,
+        "min": 12,
+        "median": 12,
+        "p95": 12,
+        "max": 12
+      },
+      "motion": [
+        {
+          "enabled": true,
+          "reduced": false,
+          "visible": true
+        },
+        {
+          "enabled": true,
+          "reduced": false,
+          "visible": true
+        },
+        {
+          "enabled": true,
+          "reduced": false,
+          "visible": true
+        }
+      ],
+      "cpu": [
+        {
+          "hitSemanticFlowPoint": {
+            "calls": 3,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 3,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAutoAggregation": {
+            "calls": 5,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 5,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "SemanticFlow3D": {
+            "calls": 73,
+            "totalMs": 3.7999999970197678,
+            "maxMs": 0.20000000298023224,
+            "distribution": {
+              "samples": 73,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.20000000298023224,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectSemanticFlowLabels": {
+            "calls": 52,
+            "totalMs": 28.500000037252903,
+            "maxMs": 1.6999999955296516,
+            "distribution": {
+              "samples": 52,
+              "medianMs": 0.5,
+              "p95Ms": 1.1999999955296516,
+              "maxMs": 1.6999999955296516,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "semanticFlowConnectionNotices": {
+            "calls": 52,
+            "totalMs": 1.400000013411045,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 52,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        },
+        {
+          "hitSemanticFlowPoint": {
+            "calls": 3,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 3,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAutoAggregation": {
+            "calls": 5,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 5,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "SemanticFlow3D": {
+            "calls": 72,
+            "totalMs": 4.299999989569187,
+            "maxMs": 0.20000000298023224,
+            "distribution": {
+              "samples": 72,
+              "medianMs": 0.09999999403953552,
+              "p95Ms": 0.19999999552965164,
+              "maxMs": 0.20000000298023224,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectSemanticFlowLabels": {
+            "calls": 52,
+            "totalMs": 27.900000020861626,
+            "maxMs": 1.7000000029802322,
+            "distribution": {
+              "samples": 52,
+              "medianMs": 0.5,
+              "p95Ms": 1.0999999940395355,
+              "maxMs": 1.7000000029802322,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "semanticFlowConnectionNotices": {
+            "calls": 52,
+            "totalMs": 0.29999998211860657,
+            "maxMs": 0.09999999403953552,
+            "distribution": {
+              "samples": 52,
+              "medianMs": 0,
+              "p95Ms": 0.09999999403953552,
+              "maxMs": 0.09999999403953552,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        },
+        {
+          "hitSemanticFlowPoint": {
+            "calls": 3,
+            "totalMs": 0.20000000298023224,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 3,
+              "medianMs": 0.10000000149011612,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAutoAggregation": {
+            "calls": 5,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 5,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "SemanticFlow3D": {
+            "calls": 73,
+            "totalMs": 3.2000000029802322,
+            "maxMs": 0.19999999552965164,
+            "distribution": {
+              "samples": 73,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.19999999552965164,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectSemanticFlowLabels": {
+            "calls": 52,
+            "totalMs": 26.49999998509884,
+            "maxMs": 1.2000000029802322,
+            "distribution": {
+              "samples": 52,
+              "medianMs": 0.5,
+              "p95Ms": 1,
+              "maxMs": 1.2000000029802322,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "semanticFlowConnectionNotices": {
+            "calls": 52,
+            "totalMs": 0.5000000074505806,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 52,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "fixed",
+      "stage": "after",
+      "auto": false,
+      "surroundings": false,
+      "points": {
+        "n": 3,
+        "min": 12,
+        "median": 12,
+        "p95": 12,
+        "max": 12
+      },
+      "paths": {
+        "n": 3,
+        "min": 6,
+        "median": 6,
+        "p95": 6,
+        "max": 6
+      },
+      "toggleMs": {
+        "n": 3,
+        "min": 56,
+        "median": 58,
+        "p95": 60,
+        "max": 60
+      },
+      "rafMedianMs": {
+        "n": 3,
+        "min": 16.699999999999818,
+        "median": 16.699999999999818,
+        "p95": 16.699999999999818,
+        "max": 16.699999999999818
+      },
+      "rafP95Ms": {
+        "n": 3,
+        "min": 16.799999999999272,
+        "median": 16.800000000000182,
+        "p95": 16.800000000000182,
+        "max": 16.800000000000182
+      },
+      "longTasks": 0,
+      "labels": {
+        "n": 3,
+        "min": 10,
+        "median": 10,
+        "p95": 10,
+        "max": 10
+      },
+      "motion": [
+        {
+          "enabled": true,
+          "reduced": false,
+          "visible": true
+        },
+        {
+          "enabled": true,
+          "reduced": false,
+          "visible": true
+        },
+        {
+          "enabled": true,
+          "reduced": false,
+          "visible": true
+        }
+      ],
+      "cpu": [
+        {
+          "hitSemanticFlowPoint": {
+            "calls": 2,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 2,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAutoAggregation": {
+            "calls": 10,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 10,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "SemanticFlow3D": {
+            "calls": 44,
+            "totalMs": 1.6000000014901161,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 44,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectSemanticFlowLabels": {
+            "calls": 37,
+            "totalMs": 9.799999997019768,
+            "maxMs": 0.6000000014901161,
+            "distribution": {
+              "samples": 37,
+              "medianMs": 0.29999999701976776,
+              "p95Ms": 0.5,
+              "maxMs": 0.6000000014901161,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "semanticFlowConnectionNotices": {
+            "calls": 37,
+            "totalMs": 0.3999999985098839,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 37,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        },
+        {
+          "hitSemanticFlowPoint": {
+            "calls": 2,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 2,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAutoAggregation": {
+            "calls": 10,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 10,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "SemanticFlow3D": {
+            "calls": 44,
+            "totalMs": 2.499999985098839,
+            "maxMs": 0.20000000298023224,
+            "distribution": {
+              "samples": 44,
+              "medianMs": 0.09999999403953552,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.20000000298023224,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectSemanticFlowLabels": {
+            "calls": 37,
+            "totalMs": 9.900000020861626,
+            "maxMs": 0.5,
+            "distribution": {
+              "samples": 37,
+              "medianMs": 0.29999999701976776,
+              "p95Ms": 0.4000000059604645,
+              "maxMs": 0.5,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "semanticFlowConnectionNotices": {
+            "calls": 37,
+            "totalMs": 0.20000000298023224,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 37,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        },
+        {
+          "hitSemanticFlowPoint": {
+            "calls": 2,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 2,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAutoAggregation": {
+            "calls": 10,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 10,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "SemanticFlow3D": {
+            "calls": 43,
+            "totalMs": 1.5999999940395355,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 43,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectSemanticFlowLabels": {
+            "calls": 37,
+            "totalMs": 9.899999991059303,
+            "maxMs": 0.3999999985098839,
+            "distribution": {
+              "samples": 37,
+              "medianMs": 0.29999999701976776,
+              "p95Ms": 0.3999999985098839,
+              "maxMs": 0.3999999985098839,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "semanticFlowConnectionNotices": {
+            "calls": 37,
+            "totalMs": 0.3999999910593033,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 37,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "git-lines",
+      "stage": "after",
+      "auto": true,
+      "surroundings": true,
+      "points": {
+        "n": 3,
+        "min": 7,
+        "median": 7,
+        "p95": 7,
+        "max": 7
+      },
+      "paths": {
+        "n": 3,
+        "min": 29,
+        "median": 29,
+        "p95": 29,
+        "max": 29
+      },
+      "toggleMs": {
+        "n": 0
+      },
+      "rafMedianMs": {
+        "n": 3,
+        "min": 16.699999999999818,
+        "median": 16.699999999999818,
+        "p95": 16.699999999999818,
+        "max": 16.699999999999818
+      },
+      "rafP95Ms": {
+        "n": 3,
+        "min": 16.700000000000728,
+        "median": 16.799999999999272,
+        "p95": 16.800000000000182,
+        "max": 16.800000000000182
+      },
+      "longTasks": 0,
+      "labels": {
+        "n": 3,
+        "min": 7,
+        "median": 7,
+        "p95": 7,
+        "max": 7
+      },
+      "motion": [
+        {
+          "enabled": true,
+          "reduced": false,
+          "visible": true
+        },
+        {
+          "enabled": true,
+          "reduced": false,
+          "visible": true
+        },
+        {
+          "enabled": true,
+          "reduced": false,
+          "visible": true
+        }
+      ],
+      "cpu": [
+        {
+          "hitSemanticFlowPoint": {
+            "calls": 3,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 3,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAutoAggregation": {
+            "calls": 9,
+            "totalMs": 0.19999999552965164,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 9,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "SemanticFlow3D": {
+            "calls": 43,
+            "totalMs": 2.2999999821186066,
+            "maxMs": 0.20000000298023224,
+            "distribution": {
+              "samples": 43,
+              "medianMs": 0,
+              "p95Ms": 0.19999999552965164,
+              "maxMs": 0.20000000298023224,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectSemanticFlowLabels": {
+            "calls": 51,
+            "totalMs": 13.399999968707561,
+            "maxMs": 0.3999999985098839,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0.29999999701976776,
+              "p95Ms": 0.3999999985098839,
+              "maxMs": 0.3999999985098839,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "semanticFlowConnectionNotices": {
+            "calls": 51,
+            "totalMs": 0.5000000074505806,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        },
+        {
+          "hitSemanticFlowPoint": {
+            "calls": 3,
+            "totalMs": 0.09999999403953552,
+            "maxMs": 0.09999999403953552,
+            "distribution": {
+              "samples": 3,
+              "medianMs": 0,
+              "p95Ms": 0.09999999403953552,
+              "maxMs": 0.09999999403953552,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAutoAggregation": {
+            "calls": 9,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 9,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "SemanticFlow3D": {
+            "calls": 43,
+            "totalMs": 2.8000000044703484,
+            "maxMs": 0.20000000298023224,
+            "distribution": {
+              "samples": 43,
+              "medianMs": 0.10000000149011612,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.20000000298023224,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectSemanticFlowLabels": {
+            "calls": 51,
+            "totalMs": 13.399999976158142,
+            "maxMs": 0.5,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0.29999999701976776,
+              "p95Ms": 0.3999999985098839,
+              "maxMs": 0.5,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "semanticFlowConnectionNotices": {
+            "calls": 51,
+            "totalMs": 1.3000000044703484,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        },
+        {
+          "hitSemanticFlowPoint": {
+            "calls": 3,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 3,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAutoAggregation": {
+            "calls": 9,
+            "totalMs": 0.4000000059604645,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 9,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "SemanticFlow3D": {
+            "calls": 42,
+            "totalMs": 2.7000000029802322,
+            "maxMs": 0.20000000298023224,
+            "distribution": {
+              "samples": 42,
+              "medianMs": 0.09999999403953552,
+              "p95Ms": 0.20000000298023224,
+              "maxMs": 0.20000000298023224,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectSemanticFlowLabels": {
+            "calls": 51,
+            "totalMs": 13.50000000745058,
+            "maxMs": 0.5,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0.29999999701976776,
+              "p95Ms": 0.3999999985098839,
+              "maxMs": 0.5,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "semanticFlowConnectionNotices": {
+            "calls": 51,
+            "totalMs": 0.6000000014901161,
+            "maxMs": 0.20000000298023224,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.20000000298023224,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "git-lines",
+      "stage": "after",
+      "auto": true,
+      "surroundings": false,
+      "points": {
+        "n": 3,
+        "min": 7,
+        "median": 7,
+        "p95": 7,
+        "max": 7
+      },
+      "paths": {
+        "n": 3,
+        "min": 29,
+        "median": 29,
+        "p95": 29,
+        "max": 29
+      },
+      "toggleMs": {
+        "n": 3,
+        "min": 53,
+        "median": 54,
+        "p95": 56,
+        "max": 56
+      },
+      "rafMedianMs": {
+        "n": 3,
+        "min": 16.699999999999818,
+        "median": 16.699999999999818,
+        "p95": 16.699999999999818,
+        "max": 16.699999999999818
+      },
+      "rafP95Ms": {
+        "n": 3,
+        "min": 16.800000000000182,
+        "median": 16.800000000000182,
+        "p95": 16.800000000000182,
+        "max": 16.800000000000182
+      },
+      "longTasks": 0,
+      "labels": {
+        "n": 3,
+        "min": 8,
+        "median": 8,
+        "p95": 8,
+        "max": 8
+      },
+      "motion": [
+        {
+          "enabled": true,
+          "reduced": false,
+          "visible": true
+        },
+        {
+          "enabled": true,
+          "reduced": false,
+          "visible": true
+        },
+        {
+          "enabled": true,
+          "reduced": false,
+          "visible": true
+        }
+      ],
+      "cpu": [
+        {
+          "hitSemanticFlowPoint": {
+            "calls": 3,
+            "totalMs": 0.09999999403953552,
+            "maxMs": 0.09999999403953552,
+            "distribution": {
+              "samples": 3,
+              "medianMs": 0,
+              "p95Ms": 0.09999999403953552,
+              "maxMs": 0.09999999403953552,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAutoAggregation": {
+            "calls": 7,
+            "totalMs": 0.10000000149011612,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 7,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "SemanticFlow3D": {
+            "calls": 32,
+            "totalMs": 1.7999999970197678,
+            "maxMs": 0.20000000298023224,
+            "distribution": {
+              "samples": 32,
+              "medianMs": 0.09999999403953552,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.20000000298023224,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectSemanticFlowLabels": {
+            "calls": 51,
+            "totalMs": 11.499999955296516,
+            "maxMs": 0.3999999985098839,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0.20000000298023224,
+              "p95Ms": 0.3999999985098839,
+              "maxMs": 0.3999999985098839,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "semanticFlowConnectionNotices": {
+            "calls": 51,
+            "totalMs": 0.6000000014901161,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        },
+        {
+          "hitSemanticFlowPoint": {
+            "calls": 3,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 3,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectSemanticFlowLabels": {
+            "calls": 51,
+            "totalMs": 11.900000020861626,
+            "maxMs": 0.4000000059604645,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0.20000000298023224,
+              "p95Ms": 0.3999999985098839,
+              "maxMs": 0.4000000059604645,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "semanticFlowConnectionNotices": {
+            "calls": 51,
+            "totalMs": 1.0000000149011612,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAutoAggregation": {
+            "calls": 7,
+            "totalMs": 0.09999999403953552,
+            "maxMs": 0.09999999403953552,
+            "distribution": {
+              "samples": 7,
+              "medianMs": 0,
+              "p95Ms": 0.09999999403953552,
+              "maxMs": 0.09999999403953552,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "SemanticFlow3D": {
+            "calls": 31,
+            "totalMs": 1.4000000059604645,
+            "maxMs": 0.20000000298023224,
+            "distribution": {
+              "samples": 31,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.20000000298023224,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        },
+        {
+          "hitSemanticFlowPoint": {
+            "calls": 3,
+            "totalMs": 0.10000000149011612,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 3,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAutoAggregation": {
+            "calls": 7,
+            "totalMs": 0.4000000059604645,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 7,
+              "medianMs": 0.10000000149011612,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "SemanticFlow3D": {
+            "calls": 32,
+            "totalMs": 1.9000000059604645,
+            "maxMs": 0.20000000298023224,
+            "distribution": {
+              "samples": 32,
+              "medianMs": 0.09999999403953552,
+              "p95Ms": 0.19999999552965164,
+              "maxMs": 0.20000000298023224,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectSemanticFlowLabels": {
+            "calls": 51,
+            "totalMs": 10.499999970197678,
+            "maxMs": 0.30000000447034836,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0.20000000298023224,
+              "p95Ms": 0.30000000447034836,
+              "maxMs": 0.30000000447034836,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "semanticFlowConnectionNotices": {
+            "calls": 51,
+            "totalMs": 0.5,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "git-lines",
+      "stage": "after",
+      "auto": false,
+      "surroundings": true,
+      "points": {
+        "n": 3,
+        "min": 7,
+        "median": 7,
+        "p95": 7,
+        "max": 7
+      },
+      "paths": {
+        "n": 3,
+        "min": 29,
+        "median": 29,
+        "p95": 29,
+        "max": 29
+      },
+      "toggleMs": {
+        "n": 3,
+        "min": 59,
+        "median": 60,
+        "p95": 60,
+        "max": 60
+      },
+      "rafMedianMs": {
+        "n": 3,
+        "min": 16.69999999999891,
+        "median": 16.699999999999818,
+        "p95": 16.699999999999818,
+        "max": 16.699999999999818
+      },
+      "rafP95Ms": {
+        "n": 3,
+        "min": 16.799999999999272,
+        "median": 16.799999999999272,
+        "p95": 16.800000000000182,
+        "max": 16.800000000000182
+      },
+      "longTasks": 0,
+      "labels": {
+        "n": 3,
+        "min": 8,
+        "median": 8,
+        "p95": 8,
+        "max": 8
+      },
+      "motion": [
+        {
+          "enabled": true,
+          "reduced": false,
+          "visible": true
+        },
+        {
+          "enabled": true,
+          "reduced": false,
+          "visible": true
+        },
+        {
+          "enabled": true,
+          "reduced": false,
+          "visible": true
+        }
+      ],
+      "cpu": [
+        {
+          "hitSemanticFlowPoint": {
+            "calls": 2,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 2,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAutoAggregation": {
+            "calls": 10,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 10,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "SemanticFlow3D": {
+            "calls": 30,
+            "totalMs": 1.3999999985098839,
+            "maxMs": 0.20000000298023224,
+            "distribution": {
+              "samples": 30,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.20000000298023224,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectSemanticFlowLabels": {
+            "calls": 37,
+            "totalMs": 8.19999997317791,
+            "maxMs": 0.5,
+            "distribution": {
+              "samples": 37,
+              "medianMs": 0.20000000298023224,
+              "p95Ms": 0.30000000447034836,
+              "maxMs": 0.5,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "semanticFlowConnectionNotices": {
+            "calls": 37,
+            "totalMs": 0.30000000447034836,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 37,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        },
+        {
+          "hitSemanticFlowPoint": {
+            "calls": 2,
+            "totalMs": 0.10000000149011612,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 2,
+              "medianMs": 0.10000000149011612,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAutoAggregation": {
+            "calls": 10,
+            "totalMs": 0.20000000298023224,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 10,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "SemanticFlow3D": {
+            "calls": 29,
+            "totalMs": 1.7000000029802322,
+            "maxMs": 0.20000000298023224,
+            "distribution": {
+              "samples": 29,
+              "medianMs": 0.09999999403953552,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.20000000298023224,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectSemanticFlowLabels": {
+            "calls": 37,
+            "totalMs": 9.50000000745058,
+            "maxMs": 0.3999999985098839,
+            "distribution": {
+              "samples": 37,
+              "medianMs": 0.20000000298023224,
+              "p95Ms": 0.3999999985098839,
+              "maxMs": 0.3999999985098839,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "semanticFlowConnectionNotices": {
+            "calls": 37,
+            "totalMs": 0.20000000298023224,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 37,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        },
+        {
+          "hitSemanticFlowPoint": {
+            "calls": 2,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 2,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAutoAggregation": {
+            "calls": 10,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 10,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "SemanticFlow3D": {
+            "calls": 30,
+            "totalMs": 1.4999999776482582,
+            "maxMs": 0.20000000298023224,
+            "distribution": {
+              "samples": 30,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.20000000298023224,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectSemanticFlowLabels": {
+            "calls": 37,
+            "totalMs": 7.999999992549419,
+            "maxMs": 0.3999999985098839,
+            "distribution": {
+              "samples": 37,
+              "medianMs": 0.20000000298023224,
+              "p95Ms": 0.30000000447034836,
+              "maxMs": 0.3999999985098839,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "semanticFlowConnectionNotices": {
+            "calls": 37,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 37,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "git-lines",
+      "stage": "after",
+      "auto": false,
+      "surroundings": false,
+      "points": {
+        "n": 3,
+        "min": 7,
+        "median": 7,
+        "p95": 7,
+        "max": 7
+      },
+      "paths": {
+        "n": 3,
+        "min": 29,
+        "median": 29,
+        "p95": 29,
+        "max": 29
+      },
+      "toggleMs": {
+        "n": 3,
+        "min": 53,
+        "median": 54,
+        "p95": 57,
+        "max": 57
+      },
+      "rafMedianMs": {
+        "n": 3,
+        "min": 16.69999999999891,
+        "median": 16.69999999999891,
+        "p95": 16.69999999999891,
+        "max": 16.69999999999891
+      },
+      "rafP95Ms": {
+        "n": 3,
+        "min": 16.799999999999272,
+        "median": 16.799999999999272,
+        "p95": 16.799999999999272,
+        "max": 16.799999999999272
+      },
+      "longTasks": 0,
+      "labels": {
+        "n": 3,
+        "min": 8,
+        "median": 8,
+        "p95": 8,
+        "max": 8
+      },
+      "motion": [
+        {
+          "enabled": true,
+          "reduced": false,
+          "visible": true
+        },
+        {
+          "enabled": true,
+          "reduced": false,
+          "visible": true
+        },
+        {
+          "enabled": true,
+          "reduced": false,
+          "visible": true
+        }
+      ],
+      "cpu": [
+        {
+          "projectAutoAggregation": {
+            "calls": 8,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 8,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "SemanticFlow3D": {
+            "calls": 15,
+            "totalMs": 0.5000000074505806,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 15,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectSemanticFlowLabels": {
+            "calls": 9,
+            "totalMs": 1.7999999970197678,
+            "maxMs": 0.30000000447034836,
+            "distribution": {
+              "samples": 9,
+              "medianMs": 0.19999999552965164,
+              "p95Ms": 0.30000000447034836,
+              "maxMs": 0.30000000447034836,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "semanticFlowConnectionNotices": {
+            "calls": 9,
+            "totalMs": 0.20000000298023224,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 9,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        },
+        {
+          "projectAutoAggregation": {
+            "calls": 8,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 8,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "SemanticFlow3D": {
+            "calls": 15,
+            "totalMs": 0.9000000134110451,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 15,
+              "medianMs": 0.10000000149011612,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectSemanticFlowLabels": {
+            "calls": 9,
+            "totalMs": 1.6999999955296516,
+            "maxMs": 0.20000000298023224,
+            "distribution": {
+              "samples": 9,
+              "medianMs": 0.19999999552965164,
+              "p95Ms": 0.20000000298023224,
+              "maxMs": 0.20000000298023224,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "semanticFlowConnectionNotices": {
+            "calls": 9,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 9,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        },
+        {
+          "projectAutoAggregation": {
+            "calls": 7,
+            "totalMs": 0.10000000149011612,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 7,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "SemanticFlow3D": {
+            "calls": 14,
+            "totalMs": 0.5000000074505806,
+            "maxMs": 0.20000000298023224,
+            "distribution": {
+              "samples": 14,
+              "medianMs": 0,
+              "p95Ms": 0.20000000298023224,
+              "maxMs": 0.20000000298023224,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectSemanticFlowLabels": {
+            "calls": 9,
+            "totalMs": 2.5,
+            "maxMs": 0.5,
+            "distribution": {
+              "samples": 9,
+              "medianMs": 0.20000000298023224,
+              "p95Ms": 0.5,
+              "maxMs": 0.5,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "semanticFlowConnectionNotices": {
+            "calls": 9,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 9,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "vehicle-management",
+      "stage": "after",
+      "auto": true,
+      "surroundings": true,
+      "points": {
+        "n": 3,
+        "min": 26,
+        "median": 26,
+        "p95": 26,
+        "max": 26
+      },
+      "paths": {
+        "n": 3,
+        "min": 17,
+        "median": 17,
+        "p95": 17,
+        "max": 17
+      },
+      "toggleMs": {
+        "n": 0
+      },
+      "rafMedianMs": {
+        "n": 3,
+        "min": 16.700000000000728,
+        "median": 16.700000000000728,
+        "p95": 16.700000000000728,
+        "max": 16.700000000000728
+      },
+      "rafP95Ms": {
+        "n": 3,
+        "min": 16.700000000000728,
+        "median": 16.799999999999272,
+        "p95": 16.80000000000291,
+        "max": 16.80000000000291
+      },
+      "longTasks": 0,
+      "labels": {
+        "n": 3,
+        "min": 8,
+        "median": 8,
+        "p95": 8,
+        "max": 8
+      },
+      "motion": [
+        {
+          "enabled": true,
+          "reduced": false,
+          "visible": true
+        },
+        {
+          "enabled": true,
+          "reduced": false,
+          "visible": true
+        },
+        {
+          "enabled": true,
+          "reduced": false,
+          "visible": true
+        }
+      ],
+      "cpu": [
+        {
+          "hitSemanticFlowPoint": {
+            "calls": 3,
+            "totalMs": 0.20000000298023224,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 3,
+              "medianMs": 0.10000000149011612,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectSemanticFlowLabels": {
+            "calls": 51,
+            "totalMs": 16.100000023841858,
+            "maxMs": 0.6000000014901161,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0.29999999701976776,
+              "p95Ms": 0.5,
+              "maxMs": 0.6000000014901161,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "semanticFlowConnectionNotices": {
+            "calls": 51,
+            "totalMs": 0.6000000089406967,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "SemanticFlow3D": {
+            "calls": 55,
+            "totalMs": 3.6999999955296516,
+            "maxMs": 0.20000000298023224,
+            "distribution": {
+              "samples": 55,
+              "medianMs": 0.09999999403953552,
+              "p95Ms": 0.19999999552965164,
+              "maxMs": 0.20000000298023224,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAutoAggregation": {
+            "calls": 7,
+            "totalMs": 0.3999999985098839,
+            "maxMs": 0.20000000298023224,
+            "distribution": {
+              "samples": 7,
+              "medianMs": 0,
+              "p95Ms": 0.20000000298023224,
+              "maxMs": 0.20000000298023224,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        },
+        {
+          "hitSemanticFlowPoint": {
+            "calls": 3,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 3,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectSemanticFlowLabels": {
+            "calls": 51,
+            "totalMs": 16.099999986588955,
+            "maxMs": 0.6000000014901161,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0.29999999701976776,
+              "p95Ms": 0.5,
+              "maxMs": 0.6000000014901161,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "semanticFlowConnectionNotices": {
+            "calls": 51,
+            "totalMs": 0.4999999925494194,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "SemanticFlow3D": {
+            "calls": 56,
+            "totalMs": 3.6999999955296516,
+            "maxMs": 0.20000000298023224,
+            "distribution": {
+              "samples": 56,
+              "medianMs": 0.09999999403953552,
+              "p95Ms": 0.20000000298023224,
+              "maxMs": 0.20000000298023224,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAutoAggregation": {
+            "calls": 7,
+            "totalMs": 0.29999999701976776,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 7,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        },
+        {
+          "hitSemanticFlowPoint": {
+            "calls": 3,
+            "totalMs": 0.10000000149011612,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 3,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectSemanticFlowLabels": {
+            "calls": 51,
+            "totalMs": 15.199999995529652,
+            "maxMs": 0.5,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0.29999999701976776,
+              "p95Ms": 0.5,
+              "maxMs": 0.5,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "semanticFlowConnectionNotices": {
+            "calls": 51,
+            "totalMs": 0.4000000059604645,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "SemanticFlow3D": {
+            "calls": 57,
+            "totalMs": 3.700000025331974,
+            "maxMs": 0.20000000298023224,
+            "distribution": {
+              "samples": 57,
+              "medianMs": 0.10000000149011612,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.20000000298023224,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAutoAggregation": {
+            "calls": 7,
+            "totalMs": 0.5000000074505806,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 7,
+              "medianMs": 0.10000000149011612,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "vehicle-management",
+      "stage": "after",
+      "auto": true,
+      "surroundings": false,
+      "points": {
+        "n": 3,
+        "min": 12,
+        "median": 12,
+        "p95": 12,
+        "max": 12
+      },
+      "paths": {
+        "n": 3,
+        "min": 17,
+        "median": 17,
+        "p95": 17,
+        "max": 17
+      },
+      "toggleMs": {
+        "n": 3,
+        "min": 67,
+        "median": 68,
+        "p95": 70,
+        "max": 70
+      },
+      "rafMedianMs": {
+        "n": 3,
+        "min": 16.69999999999709,
+        "median": 16.69999999999709,
+        "p95": 16.700000000000728,
+        "max": 16.700000000000728
+      },
+      "rafP95Ms": {
+        "n": 3,
+        "min": 16.700000000000728,
+        "median": 16.799999999999272,
+        "p95": 16.799999999999272,
+        "max": 16.799999999999272
+      },
+      "longTasks": 0,
+      "labels": {
+        "n": 3,
+        "min": 5,
+        "median": 5,
+        "p95": 5,
+        "max": 5
+      },
+      "motion": [
+        {
+          "enabled": true,
+          "reduced": false,
+          "visible": true
+        },
+        {
+          "enabled": true,
+          "reduced": false,
+          "visible": true
+        },
+        {
+          "enabled": true,
+          "reduced": false,
+          "visible": true
+        }
+      ],
+      "cpu": [
+        {
+          "hitSemanticFlowPoint": {
+            "calls": 3,
+            "totalMs": 0.10000000149011612,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 3,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAutoAggregation": {
+            "calls": 7,
+            "totalMs": 0.20000000298023224,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 7,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "SemanticFlow3D": {
+            "calls": 41,
+            "totalMs": 2.4000000059604645,
+            "maxMs": 0.20000000298023224,
+            "distribution": {
+              "samples": 41,
+              "medianMs": 0.09999999403953552,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.20000000298023224,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectSemanticFlowLabels": {
+            "calls": 51,
+            "totalMs": 10.1000000461936,
+            "maxMs": 0.4000000059604645,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0.20000000298023224,
+              "p95Ms": 0.4000000059604645,
+              "maxMs": 0.4000000059604645,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "semanticFlowConnectionNotices": {
+            "calls": 51,
+            "totalMs": 0.8999999910593033,
+            "maxMs": 0.20000000298023224,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.20000000298023224,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        },
+        {
+          "hitSemanticFlowPoint": {
+            "calls": 3,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 3,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAutoAggregation": {
+            "calls": 7,
+            "totalMs": 0.3999999836087227,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 7,
+              "medianMs": 0.09999999403953552,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "SemanticFlow3D": {
+            "calls": 41,
+            "totalMs": 1.6999999806284904,
+            "maxMs": 0.19999999552965164,
+            "distribution": {
+              "samples": 41,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.19999999552965164,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectSemanticFlowLabels": {
+            "calls": 51,
+            "totalMs": 9.900000005960464,
+            "maxMs": 0.4000000059604645,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0.20000000298023224,
+              "p95Ms": 0.30000000447034836,
+              "maxMs": 0.4000000059604645,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "semanticFlowConnectionNotices": {
+            "calls": 51,
+            "totalMs": 0.7000000029802322,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        },
+        {
+          "hitSemanticFlowPoint": {
+            "calls": 3,
+            "totalMs": 0.09999999403953552,
+            "maxMs": 0.09999999403953552,
+            "distribution": {
+              "samples": 3,
+              "medianMs": 0,
+              "p95Ms": 0.09999999403953552,
+              "maxMs": 0.09999999403953552,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAutoAggregation": {
+            "calls": 7,
+            "totalMs": 0.20000000298023224,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 7,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "SemanticFlow3D": {
+            "calls": 41,
+            "totalMs": 2.400000013411045,
+            "maxMs": 0.20000000298023224,
+            "distribution": {
+              "samples": 41,
+              "medianMs": 0.09999999403953552,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.20000000298023224,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectSemanticFlowLabels": {
+            "calls": 51,
+            "totalMs": 10.699999995529652,
+            "maxMs": 0.30000000447034836,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0.20000000298023224,
+              "p95Ms": 0.30000000447034836,
+              "maxMs": 0.30000000447034836,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "semanticFlowConnectionNotices": {
+            "calls": 51,
+            "totalMs": 0.3999999910593033,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0,
+              "p95Ms": 0.09999999403953552,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "vehicle-management",
+      "stage": "after",
+      "auto": false,
+      "surroundings": true,
+      "points": {
+        "n": 3,
+        "min": 26,
+        "median": 26,
+        "p95": 26,
+        "max": 26
+      },
+      "paths": {
+        "n": 3,
+        "min": 17,
+        "median": 17,
+        "p95": 17,
+        "max": 17
+      },
+      "toggleMs": {
+        "n": 3,
+        "min": 58,
+        "median": 75,
+        "p95": 91,
+        "max": 91
+      },
+      "rafMedianMs": {
+        "n": 3,
+        "min": 16.69999999999709,
+        "median": 16.69999999999709,
+        "p95": 16.700000000000728,
+        "max": 16.700000000000728
+      },
+      "rafP95Ms": {
+        "n": 3,
+        "min": 16.799999999999272,
+        "median": 16.799999999999272,
+        "p95": 16.799999999999272,
+        "max": 16.799999999999272
+      },
+      "longTasks": 0,
+      "labels": {
+        "n": 3,
+        "min": 10,
+        "median": 10,
+        "p95": 10,
+        "max": 10
+      },
+      "motion": [
+        {
+          "enabled": true,
+          "reduced": false,
+          "visible": true
+        },
+        {
+          "enabled": true,
+          "reduced": false,
+          "visible": true
+        },
+        {
+          "enabled": true,
+          "reduced": false,
+          "visible": true
+        }
+      ],
+      "cpu": [
+        {
+          "hitSemanticFlowPoint": {
+            "calls": 3,
+            "totalMs": 0.10000000149011612,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 3,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectSemanticFlowLabels": {
+            "calls": 51,
+            "totalMs": 13.200000040233135,
+            "maxMs": 0.5,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0.29999999701976776,
+              "p95Ms": 0.4000000059604645,
+              "maxMs": 0.5,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "semanticFlowConnectionNotices": {
+            "calls": 51,
+            "totalMs": 0.29999999701976776,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0,
+              "p95Ms": 0.09999999403953552,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "SemanticFlow3D": {
+            "calls": 54,
+            "totalMs": 2.899999976158142,
+            "maxMs": 0.20000000298023224,
+            "distribution": {
+              "samples": 54,
+              "medianMs": 0,
+              "p95Ms": 0.19999999552965164,
+              "maxMs": 0.20000000298023224,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAutoAggregation": {
+            "calls": 3,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 3,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        },
+        {
+          "hitSemanticFlowPoint": {
+            "calls": 3,
+            "totalMs": 0.10000000149011612,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 3,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectSemanticFlowLabels": {
+            "calls": 51,
+            "totalMs": 14.200000017881393,
+            "maxMs": 0.5,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0.29999999701976776,
+              "p95Ms": 0.4000000059604645,
+              "maxMs": 0.5,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "semanticFlowConnectionNotices": {
+            "calls": 51,
+            "totalMs": 0.7000000029802322,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "SemanticFlow3D": {
+            "calls": 54,
+            "totalMs": 3.2999999821186066,
+            "maxMs": 0.20000000298023224,
+            "distribution": {
+              "samples": 54,
+              "medianMs": 0.09999999403953552,
+              "p95Ms": 0.20000000298023224,
+              "maxMs": 0.20000000298023224,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAutoAggregation": {
+            "calls": 3,
+            "totalMs": 0.10000000149011612,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 3,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        },
+        {
+          "hitSemanticFlowPoint": {
+            "calls": 3,
+            "totalMs": 0.10000000149011612,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 3,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectSemanticFlowLabels": {
+            "calls": 51,
+            "totalMs": 14.700000010430813,
+            "maxMs": 0.6000000014901161,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0.29999999701976776,
+              "p95Ms": 0.4000000059604645,
+              "maxMs": 0.6000000014901161,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "semanticFlowConnectionNotices": {
+            "calls": 51,
+            "totalMs": 0.7999999895691872,
+            "maxMs": 0.19999999552965164,
+            "distribution": {
+              "samples": 51,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.19999999552965164,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "SemanticFlow3D": {
+            "calls": 54,
+            "totalMs": 2.5000000074505806,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 54,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAutoAggregation": {
+            "calls": 3,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 3,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "vehicle-management",
+      "stage": "after",
+      "auto": false,
+      "surroundings": false,
+      "points": {
+        "n": 3,
+        "min": 12,
+        "median": 12,
+        "p95": 12,
+        "max": 12
+      },
+      "paths": {
+        "n": 3,
+        "min": 17,
+        "median": 17,
+        "p95": 17,
+        "max": 17
+      },
+      "toggleMs": {
+        "n": 3,
+        "min": 53,
+        "median": 66,
+        "p95": 67,
+        "max": 67
+      },
+      "rafMedianMs": {
+        "n": 3,
+        "min": 16.700000000000728,
+        "median": 16.700000000000728,
+        "p95": 16.700000000000728,
+        "max": 16.700000000000728
+      },
+      "rafP95Ms": {
+        "n": 3,
+        "min": 16.799999999999272,
+        "median": 16.799999999999272,
+        "p95": 16.799999999999272,
+        "max": 16.799999999999272
+      },
+      "longTasks": 0,
+      "labels": {
+        "n": 3,
+        "min": 4,
+        "median": 4,
+        "p95": 4,
+        "max": 4
+      },
+      "motion": [
+        {
+          "enabled": true,
+          "reduced": false,
+          "visible": true
+        },
+        {
+          "enabled": true,
+          "reduced": false,
+          "visible": true
+        },
+        {
+          "enabled": true,
+          "reduced": false,
+          "visible": true
+        }
+      ],
+      "cpu": [
+        {
+          "hitSemanticFlowPoint": {
+            "calls": 2,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 2,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectSemanticFlowLabels": {
+            "calls": 37,
+            "totalMs": 6.799999989569187,
+            "maxMs": 0.3999999985098839,
+            "distribution": {
+              "samples": 37,
+              "medianMs": 0.19999999552965164,
+              "p95Ms": 0.30000000447034836,
+              "maxMs": 0.3999999985098839,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "semanticFlowConnectionNotices": {
+            "calls": 37,
+            "totalMs": 0.30000000447034836,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 37,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "SemanticFlow3D": {
+            "calls": 27,
+            "totalMs": 1.400000013411045,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 27,
+              "medianMs": 0.09999999403953552,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAutoAggregation": {
+            "calls": 6,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 6,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        },
+        {
+          "hitSemanticFlowPoint": {
+            "calls": 2,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 2,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectSemanticFlowLabels": {
+            "calls": 37,
+            "totalMs": 7.499999992549419,
+            "maxMs": 0.30000000447034836,
+            "distribution": {
+              "samples": 37,
+              "medianMs": 0.20000000298023224,
+              "p95Ms": 0.30000000447034836,
+              "maxMs": 0.30000000447034836,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "semanticFlowConnectionNotices": {
+            "calls": 37,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 37,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "SemanticFlow3D": {
+            "calls": 27,
+            "totalMs": 1.6000000014901161,
+            "maxMs": 0.19999999552965164,
+            "distribution": {
+              "samples": 27,
+              "medianMs": 0.09999999403953552,
+              "p95Ms": 0.19999999552965164,
+              "maxMs": 0.19999999552965164,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAutoAggregation": {
+            "calls": 6,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 6,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        },
+        {
+          "hitSemanticFlowPoint": {
+            "calls": 2,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 2,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectSemanticFlowLabels": {
+            "calls": 37,
+            "totalMs": 6.8000000193715096,
+            "maxMs": 0.30000000447034836,
+            "distribution": {
+              "samples": 37,
+              "medianMs": 0.20000000298023224,
+              "p95Ms": 0.30000000447034836,
+              "maxMs": 0.30000000447034836,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "semanticFlowConnectionNotices": {
+            "calls": 37,
+            "totalMs": 0.20000000298023224,
+            "maxMs": 0.10000000149011612,
+            "distribution": {
+              "samples": 37,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.10000000149011612,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "SemanticFlow3D": {
+            "calls": 27,
+            "totalMs": 0.9999999925494194,
+            "maxMs": 0.19999999552965164,
+            "distribution": {
+              "samples": 27,
+              "medianMs": 0,
+              "p95Ms": 0.10000000149011612,
+              "maxMs": 0.19999999552965164,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          },
+          "projectAutoAggregation": {
+            "calls": 6,
+            "totalMs": 0,
+            "maxMs": 0,
+            "distribution": {
+              "samples": 6,
+              "medianMs": 0,
+              "p95Ms": 0,
+              "maxMs": 0,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        }
+      ]
+    }
+  ],
+  "stability": {
+    "rows": [
+      {
+        "cycle": 0,
+        "heap": {
+          "usedSize": 574643844,
+          "totalSize": 586870784,
+          "embedderHeapUsedSize": 2190168,
+          "backingStorageSize": 1805886
+        },
+        "dom": {
+          "documents": 1,
+          "nodes": 2116,
+          "jsEventListeners": 285
+        },
+        "canvases": 1
+      },
+      {
+        "cycle": 1,
+        "heap": {
+          "usedSize": 575047436,
+          "totalSize": 586084352,
+          "embedderHeapUsedSize": 2134936,
+          "backingStorageSize": 1806006
+        },
+        "dom": {
+          "documents": 1,
+          "nodes": 2117,
+          "jsEventListeners": 285
+        },
+        "canvases": 1
+      },
+      {
+        "cycle": 2,
+        "heap": {
+          "usedSize": 575284468,
+          "totalSize": 586346496,
+          "embedderHeapUsedSize": 2146320,
+          "backingStorageSize": 1806127
+        },
+        "dom": {
+          "documents": 1,
+          "nodes": 2118,
+          "jsEventListeners": 285
+        },
+        "canvases": 1
+      },
+      {
+        "cycle": 3,
+        "heap": {
+          "usedSize": 575440200,
+          "totalSize": 586346496,
+          "embedderHeapUsedSize": 2154896,
+          "backingStorageSize": 1806250
+        },
+        "dom": {
+          "documents": 1,
+          "nodes": 2119,
+          "jsEventListeners": 285
+        },
+        "canvases": 1
+      },
+      {
+        "cycle": 4,
+        "heap": {
+          "usedSize": 575567116,
+          "totalSize": 586346496,
+          "embedderHeapUsedSize": 2164840,
+          "backingStorageSize": 1806373
+        },
+        "dom": {
+          "documents": 1,
+          "nodes": 2120,
+          "jsEventListeners": 285
+        },
+        "canvases": 1
+      },
+      {
+        "cycle": 5,
+        "heap": {
+          "usedSize": 575674120,
+          "totalSize": 586346496,
+          "embedderHeapUsedSize": 2176168,
+          "backingStorageSize": 1806496
+        },
+        "dom": {
+          "documents": 1,
+          "nodes": 2121,
+          "jsEventListeners": 285
+        },
+        "canvases": 1
+      },
+      {
+        "cycle": 6,
+        "heap": {
+          "usedSize": 575762192,
+          "totalSize": 586346496,
+          "embedderHeapUsedSize": 2183120,
+          "backingStorageSize": 1806619
+        },
+        "dom": {
+          "documents": 1,
+          "nodes": 2122,
+          "jsEventListeners": 285
+        },
+        "canvases": 1
+      },
+      {
+        "cycle": 7,
+        "heap": {
+          "usedSize": 575896832,
+          "totalSize": 586346496,
+          "embedderHeapUsedSize": 2190392,
+          "backingStorageSize": 1806742
+        },
+        "dom": {
+          "documents": 1,
+          "nodes": 2123,
+          "jsEventListeners": 285
+        },
+        "canvases": 1
+      },
+      {
+        "cycle": "rapid-modes-0",
+        "heap": {
+          "usedSize": 576085292,
+          "totalSize": 586870784,
+          "embedderHeapUsedSize": 2562736,
+          "backingStorageSize": 1807659
+        },
+        "dom": {
+          "documents": 1,
+          "nodes": 2337,
+          "jsEventListeners": 315
+        },
+        "canvases": 1
+      },
+      {
+        "cycle": "rapid-modes-1",
+        "heap": {
+          "usedSize": 576225484,
+          "totalSize": 587132928,
+          "embedderHeapUsedSize": 2534208,
+          "backingStorageSize": 1808315
+        },
+        "dom": {
+          "documents": 1,
+          "nodes": 2337,
+          "jsEventListeners": 315
+        },
+        "canvases": 1
+      },
+      {
+        "cycle": "rapid-modes-2",
+        "heap": {
+          "usedSize": 576252696,
+          "totalSize": 587132928,
+          "embedderHeapUsedSize": 2526232,
+          "backingStorageSize": 1808981
+        },
+        "dom": {
+          "documents": 1,
+          "nodes": 2337,
+          "jsEventListeners": 315
+        },
+        "canvases": 1
+      },
+      {
+        "cycle": "rapid-modes-3",
+        "heap": {
+          "usedSize": 576318576,
+          "totalSize": 587919360,
+          "embedderHeapUsedSize": 2561960,
+          "backingStorageSize": 1809627
+        },
+        "dom": {
+          "documents": 1,
+          "nodes": 2337,
+          "jsEventListeners": 315
+        },
+        "canvases": 1
+      },
+      {
+        "cycle": "empty-project",
+        "heap": {
+          "usedSize": 33335828,
+          "totalSize": 36233216,
+          "embedderHeapUsedSize": 2152528,
+          "backingStorageSize": 1703211
+        },
+        "dom": {
+          "documents": 1,
+          "nodes": 838,
+          "jsEventListeners": 288
+        },
+        "canvases": 0
+      },
+      {
+        "cycle": "leave-analyzer",
+        "heap": {
+          "usedSize": 33890620,
+          "totalSize": 34922496,
+          "embedderHeapUsedSize": 3396992,
+          "backingStorageSize": 1707743
+        },
+        "dom": {
+          "documents": 1,
+          "nodes": 2050,
+          "jsEventListeners": 431
+        },
+        "canvases": 0
+      }
+    ],
+    "checks": [
+      {
+        "name": "Canvas survives 3D hierarchy cycle 0",
+        "value": true
+      },
+      {
+        "name": "Canvas survives 3D hierarchy cycle 1",
+        "value": true
+      },
+      {
+        "name": "Canvas survives 3D hierarchy cycle 2",
+        "value": true
+      },
+      {
+        "name": "Canvas survives 3D hierarchy cycle 3",
+        "value": true
+      },
+      {
+        "name": "Canvas survives 3D hierarchy cycle 4",
+        "value": true
+      },
+      {
+        "name": "Canvas survives 3D hierarchy cycle 5",
+        "value": true
+      },
+      {
+        "name": "Canvas survives 3D hierarchy cycle 6",
+        "value": true
+      },
+      {
+        "name": "Canvas survives 3D hierarchy cycle 7",
+        "value": true
+      },
+      {
+        "name": "empty removes canvas",
+        "value": true
+      }
+    ],
+    "errors": []
+  },
+  "sourceIntegrity": [
+    {
+      "name": "git-lines",
+      "head": "7a89625acba9cf64b1f0648fed64381330218184",
+      "trackedFiles": 145,
+      "changed": [],
+      "headUnchanged": true,
+      "statusUnchanged": true
+    },
+    {
+      "name": "vehicle-management",
+      "head": "8211ee8145425ef85b7cf1156a55cd0adf0db088",
+      "trackedFiles": 345,
+      "changed": [],
+      "headUnchanged": true,
+      "statusUnchanged": true
+    }
+  ],
+  "errors": []
+}
