@@ -205,3 +205,11 @@ export function layoutExplorerRelations(graph: SemanticGraph, centerId: string):
   return [...columns].flatMap(([column, nodes]) => [...nodes].sort((a, b) => a.label.localeCompare(b.label) || (a.path ?? '').localeCompare(b.path ?? '') || (a.line ?? 0) - (b.line ?? 0) || a.id.localeCompare(b.id))
     .map((node, index) => ({ node, x: column * 320, y: (index - (nodes.length - 1) / 2) * 88, z: 0 })));
 }
+
+/** Canonical hierarchy only: display aggregates and leaves cannot be opened. */
+export function canOpenArchitectureScope(model: SemanticExplorerModel, id: string): boolean {
+  if (model.view !== 'architecture-map') return false;
+  if (id === 'project') return true;
+  const node = model.nodes.get(id);
+  return Boolean(node?.architecture && !node.attributes.displayAggregate && !node.attributes.architectureRequestGroup && model.scopes.get(id)?.childIds.length);
+}

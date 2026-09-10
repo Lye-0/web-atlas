@@ -46,3 +46,11 @@
 .architecture-detail .architecture-relation-group > button { display: block; margin-top: 8px; }
 .architecture-count-definitions { font-size: 11px; color: #b4c9bd; }
 .architecture-request-origin { overflow-wrap: anywhere; font-weight: 600; }
+.architecture-evidence-heading { display: grid; gap: 3px; min-width: 0; overflow-wrap: anywhere; }
+.architecture-evidence-heading strong { color: #dcebe1; font-size: 12px; }
+.architecture-evidence-heading small { color: #9bb7a7; font-size: 11px; }
+.architecture-evidence-heading > span { font-size: 11px; line-height: 1.65; }
+.architecture-evidence-full-path { display: grid; gap: 5px; }
+.architecture-evidence-full-path code { display: block; white-space: normal; overflow-wrap: anywhere; user-select: text; }
+.architecture-evidence-full-path [role='status']:empty { display: none; }
+.architecture-evidence-entry pre { max-width: 100%; overflow-x: auto; white-space: pre; }

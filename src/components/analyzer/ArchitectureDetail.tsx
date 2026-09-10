@@ -6,12 +6,14 @@ import { stackPath } from '../../utils/routes';
 import { ArchitectureExpertLinks } from './ArchitectureExpertLinks';
 import { projectSemanticView } from '../../analyzer/semantic/project';
 import { semanticNavigationContext } from '../../analyzer/semantic/navigation';
-import { confidenceLabels, type SemanticAnalysis, type SemanticEdge, type SemanticEvidence, type SemanticGraph, type SemanticNode, type SemanticViewId } from '../../analyzer/semantic/types';
+import { confidenceLabels, type SemanticAnalysis, type SemanticEdge, type SemanticGraph, type SemanticNode, type SemanticViewId } from '../../analyzer/semantic/types';
 import { uniqueArchitectureEvidence } from '../../analyzer/semantic/architectureEvidence';
 import { architectureEnvironmentLabel, architectureKindLabels } from '../../analyzer/semantic/architectureMetadata';
 import { architectureRelationCounts, architectureRelationLabel, architectureRelationOriginals } from '../../analyzer/semantic/architectureRelations';
 import { architecturePartners, architectureRelationSummary, architectureRequestSources } from './architectureSummary';
 import { semanticNodeDisplays } from './semanticFlowDisplay';
+import { ArchitectureEvidenceHeading, ArchitectureEvidenceList as EvidenceList } from './ArchitectureEvidence';
+import { architectureEvidencePaths } from './architectureEvidencePaths';
 import { semanticFlowHoverBindings } from './semanticFlowHoverBindings';
 import type { SemanticFlowHoverHandler } from '../../analyzer/semantic/flowRelationInteraction';
 import './architecture-detail.css';
@@ -19,12 +21,6 @@ import './architecture-detail.css';
 function Disclosure({ title, children }: { title: ReactNode; children: () => ReactNode }) {
   const [open, setOpen] = useState(false);
   return <details className="analyzer-detail-accordion" onToggle={event => setOpen(event.currentTarget.open)}><summary>{title}</summary>{open && <div className="analyzer-detail-accordion-body">{children()}</div>}</details>;
-}
-function EvidenceList({ evidence, sources }: { evidence: SemanticEvidence[]; sources: Record<string, string> }) {
-  const [limit, setLimit] = useState(5);
-  return <>{evidence.slice(0, limit).map((item, index) => <Disclosure key={index} title={`${item.path}:${item.line} · ${item.description}`}>
-    {() => <pre>{sources[item.path]?.split('\n').slice(Math.max(0, item.line - 2), Math.min(item.endLine + 2, item.line + 15)).map((line, i) => `${Math.max(1, item.line - 1) + i}  ${line}`).join('\n') ?? '読み込まれたソースがありません'}</pre>}
-  </Disclosure>)}{evidence.length > limit && <button onClick={() => setLimit(limit + 15)}>根拠をさらに表示</button>}</>;
 }
 function NodeEvidence({ node, sources }: { node: SemanticNode; sources: Record<string, string> }) {
   const evidence = useMemo(() => uniqueArchitectureEvidence([...node.evidence, ...node.architecture?.roles.flatMap(role => role.evidence) ?? [], ...node.architecture?.configurationVariants?.flatMap(variant => variant.evidence) ?? []]), [node]);
@@ -43,18 +39,21 @@ function TechnologyLinks({ name }: { name: string }) {
 function RelationEvidence({ edges, sources }: { edges: SemanticEdge[]; sources: Record<string, string> }) {
   const [limit, setLimit] = useState(20);
   const originals = architectureRelationOriginals(edges), counts = architectureRelationSummary(edges);
-  return <Disclosure title="元の関係・Evidenceを開く">{() => <>
+  return <Disclosure title="元の関係・Evidenceを開く">{() => {
+    const paths = architectureEvidencePaths(originals.flatMap(original => original.evidence));
+    return <>
     <p>{counts.records}元関係 · {counts.evidence} Evidence · {counts.sites}ソース箇所</p>
     <details className="architecture-count-definitions"><summary>件数の数え方</summary><p>元関係は異なる関係IDの数、ソース箇所は同じファイル・開始位置・終了位置を一つとした数、Evidenceはその箇所と説明文を一つとした根拠項目数です。同じ箇所から複数の関係や説明が得られるため、数は一致するとは限りません。通信・実行回数ではありません。</p><p>集約線の連続は、一連の実行経路を保証しません。</p></details>
-    {originals.slice(0, limit).map(original => <Disclosure key={original.id} title={`${architectureRelationLabel(original)} · ${confidenceLabels[original.confidence]} · ${original.evidence[0]?.path ?? '箇所未指定'}:${original.evidence[0]?.line ?? ''}`}>
+    {originals.slice(0, limit).map(original => <Disclosure key={original.id} title={original.evidence[0] ? <ArchitectureEvidenceHeading item={original.evidence[0]} path={paths.get(original.evidence[0].path)} description={`${architectureRelationLabel(original)} · ${confidenceLabels[original.confidence]} · ${original.evidence[0].description}`} /> : `${architectureRelationLabel(original)} · ${confidenceLabels[original.confidence]} · 箇所未記録`}>
       {() => <><p>元の表記: {original.label}</p><p>種類: {original.kind} · {original.details?.environment || '環境共通・未指定'}</p><code>{original.source} → {original.target}</code><p><code>{original.id}</code></p><EvidenceList evidence={uniqueArchitectureEvidence(original.evidence)} sources={sources} /></>}
     </Disclosure>)}{originals.length > limit && <button onClick={() => setLimit(limit + 30)}>元関係をさらに表示</button>}
-  </>}</Disclosure>;
+  </>; }}</Disclosure>;
 }
 
-export function ArchitectureDetail({ node, edge, graph, visible, sources, store, analysis, onOpen, onReveal, onSelect, onSelectEdge, onJump, onClose, onHoverTarget }: {
+export function ArchitectureDetail({ node, edge, graph, visible, sources, store, analysis, canOpen, onOpen, onReveal, onSelect, onSelectEdge, onJump, onClose, onHoverTarget }: {
   node?: SemanticNode; edge?: SemanticEdge; graph: SemanticGraph; visible: SemanticGraph; sources: Record<string, string>;
   store: AnalyzerProjectStore; analysis: SemanticAnalysis;
+  canOpen?: (id: string) => boolean;
   onOpen: (id: string) => void; onReveal: (id: string) => void; onSelect: (id: string) => void; onSelectEdge: (id: string) => void; onClose: () => void;
   onJump: (id: string, view: SemanticViewId) => void; onHoverTarget?: SemanticFlowHoverHandler;
 }) {
@@ -93,7 +92,7 @@ export function ArchitectureDetail({ node, edge, graph, visible, sources, store,
         <div><dt>環境・設定</dt><dd>{arch.context.join(' / ') || '実行先未判定'} · {architectureEnvironmentLabel(arch.environments)}</dd></div>
       </dl>
       <div className="architecture-summary-partners"><strong>主な相手</strong>{partners.slice(0, 3).map(partnerEntry)}{partners.length > 3 && <small>ほか{partners.length - 3}相手。つながる相手で確認できます。</small>}{!partners.length && <p>現在の表示条件で、つながる相手はありません。</p>}</div>
-      {children.length > 0 && <button className="architecture-open-action" onClick={() => onOpen(node.id)}>{node.attributes.architectureContext ? 'この構成を開く' : '内部を開く'}</button>}
+      {(canOpen ? canOpen(node.id) : children.length > 0) && <button className="architecture-open-action" onClick={() => onOpen(node.id)}>{node.attributes.architectureContext ? 'この構成を開く' : '内部を開く'}</button>}
       <Disclosure title="専門Viewで調べる">{() => <><SemanticLinks analysis={analysis} node={node} onJump={onJump} /><ArchitectureExpertLinks node={node} store={store} /></>}</Disclosure>
       <Disclosure title={`内部の構成 · 全${children.length}要素 / 表示条件内の関係 ${architectureRelationCounts(internal).records}件`}>{() => <>
         <p>全構成の内訳（補助コードを含む）: {children.length}内部構成要素 · {arch.files.length}固有ファイル · {arch.memberIds.length}下位解析対象</p>
@@ -116,10 +115,12 @@ export function ArchitectureDetail({ node, edge, graph, visible, sources, store,
         {arch.identity && <><p>同一性: {arch.identity.status === 'confirmed' ? '識別情報から対応を確認' : '未確認'}</p><p>{arch.identity.reason}</p>{arch.identity.identifier && <p>識別子: <code>{arch.identity.identifier}</code></p>}{arch.identity.scope && <p>設定範囲: <code>{arch.identity.scope}</code></p>}</>}
         <small>ソースと設定から確認した構成です。現在の稼働は観測していません。</small>
       </>}</Disclosure>
-      <Disclosure title={`実行・配信・接続の設定 · ${arch.identity?.configurations.length ?? arch.configurationVariants?.length ?? 0}設定`}>{() => <>
-        {arch.entryPaths.map(path => <p key={path}>入口の宣言: <code>{path}</code></p>)}
-        {arch.configurationVariants?.map(variant => <p key={variant.environment}>{variant.environment || '既定設定'}: 名前の宣言 {variant.name || '未指定'}<br />入口 {variant.entryPath || '未指定（静的配信など）'}{variant.inherited.length > 0 && <small>上位の宣言を参照: {variant.inherited.join(', ')}。配備名は未観測</small>}</p>)}
-        {arch.identity?.configurations.map(setting => <Disclosure key={setting.id} title={`${setting.environment || '既定設定'} · ${setting.binding || setting.name || '対象設定'} · ${setting.path}`}>{() => <><p>名前: {setting.name || '未指定'} · 識別子: <code>{setting.identifier || '未指定'}</code></p><EvidenceList evidence={setting.evidence} sources={sources} /></>}</Disclosure>)}
+      <Disclosure title="実行・配信・接続">{() => <>
+        <section data-architecture-settings="entries"><h4>確認した入口の宣言：{arch.entryPaths.length}件</h4>{arch.entryPaths.map(path => <p key={path}><code>{path}</code></p>)}{!arch.entryPaths.length && <p>この解析範囲では入口宣言を確認していません。</p>}</section>
+        {arch.configurationVariants !== undefined && <section data-architecture-settings="variants"><h4>実行・配信の設定宣言：{arch.configurationVariants.length}件</h4>{arch.configurationVariants.map(variant => <div key={variant.environment}><p>{variant.environment || '既定設定'}: 名前の宣言 {variant.name || '未指定'}<br />入口 {variant.entryPath || '未指定（静的配信など）'}{variant.inherited.length > 0 && <small>上位の宣言を参照: {variant.inherited.join(', ')}。配備名は未観測</small>}</p><EvidenceList evidence={variant.evidence} sources={sources} /></div>)}</section>}
+        {arch.identity?.configurations !== undefined && <section data-architecture-settings="connections"><h4>接続先の設定：{arch.identity.configurations.length}件</h4>{arch.identity.configurations.map(setting => <Disclosure key={setting.id} title={`${setting.environment || '既定設定'} · ${setting.binding || setting.name || '対象設定'}`}>
+          {() => <><p>設定ファイル: <code>{setting.path}</code></p><p>名前: {setting.name || '未指定'} · 識別子: <code>{setting.identifier || '未指定'}</code></p><EvidenceList evidence={setting.evidence} sources={sources} /></>}</Disclosure>)}</section>}
+        {arch.configurationVariants === undefined && arch.identity?.configurations === undefined && <p data-architecture-settings="unknown">配信・接続の設定情報は、この構成の解析結果には記録されていません。設定が存在しないと確認した0件とは区別します。</p>}
       </>}</Disclosure>
       {arch.request && <Disclosure title="確認した要求式・箇所">{() => <><p>要求や設定のコードを確認しています。同じ相手への実行回数ではありません。</p><pre>{arch.request!.expression}</pre><code>{arch.request!.sourceId}</code></>}</Disclosure>}
     </>}

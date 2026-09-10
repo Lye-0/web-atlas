@@ -2,7 +2,7 @@ import type { AnalyzerViewSession } from '../session';
 import { explorerProjectLocation, type ExplorerLocation } from './semanticExplorer';
 
 export interface ExplorerCamera2D { x: number; y: number; scale: number }
-export interface ExplorerCamera3D { position: [number, number, number]; target: [number, number, number]; zoom: number }
+export type ExplorerCamera3D = NonNullable<AnalyzerViewSession['semanticCamera']>;
 export interface Explorer2DState { location: ExplorerLocation; camera?: ExplorerCamera2D; scrollTop: number }
 export interface ExplorerSelection { selectedNodeId?: string; selectedEdgeId?: string; semanticFieldId?: string; detailOpen: boolean }
 export interface ExplorerVisit extends ExplorerSelection {

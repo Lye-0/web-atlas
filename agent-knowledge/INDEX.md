@@ -20,6 +20,14 @@
 - files: `src/analyzer/semantic/architectureRelations.ts`, `src/analyzer/semantic/flowAutoAggregation.ts`, `src/components/analyzer/architectureSummary.ts` …
 - memory: `agent-knowledge/entries/2026-09-10-architecture-original-counts-b68c11.md`
 
+### 即時選択後の内部移動は、描画リサイズを越えて同じ入力対象を保つ
+- id: `rm-20260910-architecture-selection-gesture`
+- type: `pattern`
+- maturity: `candidate`
+- tags: `architecture`, `selection`, `double-click`, `resize`, `history`
+- files: `src/components/analyzer/useArchitectureNodeGesture.ts`, `src/components/analyzer/SemanticFlow2D.tsx`, `src/components/analyzer/SemanticFlow3D.tsx` …
+- memory: `agent-knowledge/entries/2026-09-10-architecture-selection-gesture-04c7e2.md`
+
 ## analyzer-flow
 
 ### Flowの共有ホバーは入力元と表示寿命を区別する

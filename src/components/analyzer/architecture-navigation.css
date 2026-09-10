@@ -1,0 +1,27 @@
+.architecture-navigation { container: architecture-navigation / inline-size; }
+.architecture-navigation-row { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
+.architecture-navigation-row > .semantic-explorer-history { flex: 0 0 auto; }
+.architecture-location { position: relative; display: flex; align-items: baseline; flex: 1; min-width: 0; padding-left: 12px; border-left: 1px solid #456454; gap: 4px; font-size: 12px; }
+.architecture-location-caption { flex: 0 0 auto; color: #a7c0b1; }
+.architecture-location ol, .architecture-location ul { list-style: none; padding: 0; margin: 0; }
+.architecture-location ol { display: flex; flex-wrap: wrap; align-items: baseline; gap: 5px; min-width: 0; }
+.architecture-location li { display: flex; align-items: baseline; min-width: 0; max-width: 100%; gap: 5px; }
+.architecture-location button { text-align: left; white-space: normal; overflow-wrap: anywhere; font-size: inherit; }
+.architecture-breadcrumb-separator { color: #86a693; user-select: none; }
+.architecture-current-location { color: #e7f2eb; font-weight: 650; overflow-wrap: anywhere; padding: 3px 5px; border-radius: 3px; }
+.architecture-current-location:focus-visible { outline: 2px solid #c2dfce; outline-offset: 2px; }
+.architecture-location .architecture-ancestor-collapsed { display: none; }
+.architecture-location.is-deep .architecture-ancestor-expanded { display: none; }
+.architecture-location.is-deep .architecture-ancestor-collapsed { display: flex; }
+.architecture-ancestor-collapsed details { position: static; }
+.architecture-ancestor-collapsed summary { padding: 3px 8px; cursor: pointer; border: 1px solid #43634f; border-radius: 3px; }
+.architecture-ancestor-collapsed ul { position: absolute; z-index: 8; left: 0; top: 100%; width: min(260px, 65vw); max-height: 210px; overflow: auto; padding: 6px; background: #10271df5; border: 1px solid #739783; }
+.architecture-ancestor-collapsed ul li { display: block; }
+.architecture-ancestor-collapsed ul button { display: block; width: 100%; }
+.architecture-scope-description { margin: 7px 0 3px; color: #b8d0c1; font-size: 11px; }
+@container architecture-navigation (max-width: 740px) {
+  .architecture-navigation-row { flex-direction: column; gap: 7px; align-items: stretch; }
+  .architecture-location { border-left: 0; border-top: 1px solid #345140; padding: 7px 0 0; }
+  .architecture-location .architecture-ancestor-expanded { display: none; }
+  .architecture-location .architecture-ancestor-collapsed { display: flex; }
+}

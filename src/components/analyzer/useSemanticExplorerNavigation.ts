@@ -2,7 +2,7 @@ import { useCallback, useLayoutEffect, useMemo, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import type { AnalyzerViewSession, AnalyzerViewSessionUpdate } from '../../analyzer/session';
 import type { SemanticEdge, SemanticExplorerViewId } from '../../analyzer/semantic/types';
-import { explorerLocationForNode, explorerParentLocation, explorerProjectLocation, resolveExplorerLocation, type ExplorerLocation, type SemanticExplorerModel } from '../../analyzer/semantic/semanticExplorer';
+import { canOpenArchitectureScope, explorerLocationForNode, explorerParentLocation, explorerProjectLocation, resolveExplorerLocation, type ExplorerLocation, type SemanticExplorerModel } from '../../analyzer/semantic/semanticExplorer';
 import { enterExplorerVisit, explorerSelection, initialExplorer2D, recordExplorerScroll, type Explorer2DState, type ExplorerSelection, type ExplorerVisit } from '../../analyzer/semantic/semanticExplorerState';
 import { analyzerRoutes } from '../../utils/routes';
 
@@ -66,13 +66,13 @@ export function useSemanticExplorerNavigation({ view, scanVersion, session, expl
       mode, twoD, activePath, camera3d: model.current.view === 'architecture-map'
         ? Object.values(stored.explorer?.visits ?? {}).reverse().find(visit => visit.mode === '3d' && visit.twoD.location.scopeId === twoD.location.scopeId)?.camera3d
         : stored.flowCameras?.['3d'] ?? stored.semanticCamera, ...(selection ?? explorerSelection(stored)) };
+    if (model.current.view === 'architecture-map') current.current = enterExplorerVisit(stored, visit);
     updateView(view, state => enterExplorerVisit(state, visit)); writeRoute(visit, false);
     if (focusIds?.length) onFocus(mode, focusIds);
   }, [view, scanVersion, updateView, writeRoute, onFocus]);
   const openLocation = useCallback((location: ExplorerLocation) => {
     if (model.current.view !== 'architecture-map') { push('2d', { location, scrollTop: 0 }); return; }
-    const scope = model.current.scopes.get(location.scopeId);
-    if (!scope || location.scopeId !== 'project' && !scope.childIds.length) return;
+    if (!canOpenArchitectureScope(model.current, location.scopeId) || (current.current.explorer?.twoD.location.scopeId ?? 'project') === location.scopeId) return;
     const mode = current.current.flow?.mode ?? '2d';
     const saved = Object.values(current.current.explorer?.visits ?? {}).reverse().find(visit => visit.mode === mode && visit.twoD.location.scopeId === location.scopeId);
     push(mode, { location, scrollTop: 0, camera: saved?.twoD.camera }, { selectedNodeId: undefined, selectedEdgeId: undefined, detailOpen: false });
@@ -94,6 +94,7 @@ export function useSemanticExplorerNavigation({ view, scanVersion, session, expl
   return {
     location, activePath: visit?.activePath, visitId: visit?.id ?? `pending:${view}:${scanVersion}`, scrollTop: session.explorer?.twoD.scrollTop ?? 0, canBack: Boolean(visit?.previousId),
     back: () => { if (visit?.previousId) navigate(-1); },
+    canOpenScope: (id: string) => canOpenArchitectureScope(model.current, id),
     openScope: (scopeId: string) => openLocation({ ...explorerProjectLocation, scopeId }), openNode, jumpMode, changeMode,
     revealNode: (id: string) => push('2d', { location: explorerLocationForNode(explorer, id), scrollTop: 0 }),
     parent: () => openLocation(explorerParentLocation(explorer, location)), project: () => openLocation({ ...explorerProjectLocation }),

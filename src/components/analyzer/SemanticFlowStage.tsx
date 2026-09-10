@@ -14,13 +14,14 @@ import type { FlowLabelObstacle } from './semanticFlowLabels';
 
 const SemanticFlow3D = lazy(() => import('./SemanticFlow3D').then(module => ({ default: module.SemanticFlow3D })));
 
-export function SemanticFlowStage({ graph, explorer, nodeDisplays, navigation, mode, direction, selectedIds, selectedEdgeId, matchIds, focus, cameras, onCamera, onMode, particleMode, onParticleMode, onSelect, onSelectEdge, onClear, isFullscreen, onFullscreen, onUnavailable, hoverTarget, onHoverTarget, showGroupBounds = true, onGroupBounds, autoAggregation = true, onAutoAggregation, aggregationState, onAggregationState, totalNodeCount, fineExpandedScopeIds, onFineExpandedScopeIds, architectureControls, architectureOverlay }: {
+export function SemanticFlowStage({ graph, explorer, nodeDisplays, navigation, mode, direction, selectedIds, selectedEdgeId, matchIds, focus, cameras, onCamera, onMode, particleMode, onParticleMode, onSelect, onArchitectureNodeClick, onSelectEdge, onClear, isFullscreen, onFullscreen, onUnavailable, hoverTarget, onHoverTarget, showGroupBounds = true, onGroupBounds, autoAggregation = true, onAutoAggregation, aggregationState, onAggregationState, totalNodeCount, fineExpandedScopeIds, onFineExpandedScopeIds, architectureControls, architectureOverlay }: {
   architectureControls?: ReactNode; architectureOverlay?: ReactNode;
   nodeDisplays?: SemanticFlowRenderProps['nodeDisplays'];
   graph: SemanticGraph; explorer?: SemanticExplorerModel; navigation?: SemanticExplorerNavigationActions; mode: '2d' | '3d'; direction?: 'both' | 'incoming' | 'outgoing'; selectedIds: ReadonlySet<string>; selectedEdgeId?: string; matchIds: ReadonlySet<string>;
   focus?: { nonce: number; ids: string[]; mode?: '2d' | '3d' }; cameras: AnalyzerViewSession['flowCameras'];
   onCamera: (mode: '2d' | '3d', camera: NonNullable<AnalyzerViewSession['flowCameras']>['2d' | '3d']) => void;
   onMode: (mode: '2d' | '3d') => void; particleMode?: SpatialParticleMode; onParticleMode: (mode: SpatialParticleMode) => void;
+  onArchitectureNodeClick?: SemanticFlowRenderProps['onArchitectureNodeClick'];
   onSelect: (id: string) => void; onSelectEdge: (id: string) => void; onClear: () => void;
   isFullscreen: boolean; onFullscreen: () => void; onUnavailable: () => void;
   hoverTarget?: SemanticFlowHoverTarget; onHoverTarget?: SemanticFlowHoverHandler;
@@ -71,6 +72,9 @@ export function SemanticFlowStage({ graph, explorer, nodeDisplays, navigation, m
   const command = commandState?.context === commandContext ? commandState.command : undefined;
   const clearSelection = useCallback(() => { setCommandState(undefined); onClear(); }, [onClear]);
   const selectNode = useCallback((id: string) => { setCommandState(undefined); onSelect(id); }, [onSelect]);
+  const selectArchitectureNode = useCallback<NonNullable<SemanticFlowRenderProps['onArchitectureNodeClick']>>((id, event, selectOverride) => {
+    setCommandState(undefined); onArchitectureNodeClick?.(id, event, selectOverride);
+  }, [onArchitectureNodeClick]);
   const selectEdge = useCallback((id: string) => { setCommandState(undefined); onSelectEdge(id); }, [onSelectEdge]);
   const nonce = useRef(0), previousFocus = useRef<number | undefined>(undefined);
   useEffect(() => { if (particleMode && currentParticleMode !== particleMode) setParticleMode(particleMode); }, [particleMode, currentParticleMode, setParticleMode]);
@@ -88,7 +92,7 @@ export function SemanticFlowStage({ graph, explorer, nodeDisplays, navigation, m
   const explicitPathNodeIds = useMemo(() => new Set([...(explicitPath?.nodes.map(node => node.id) ?? []), ...(graph.architectureView?.explicitNodeIds ?? [])]), [explicitPath, graph.architectureView?.explicitNodeIds]);
   const explicitPathEdgeIds = useMemo(() => new Set(explicitPath?.edges.map(edge => edge.id)), [explicitPath]);
   const overlayTop = controlsHeight + (navigation ? navigationHeight + 36 : 24);
-  const properties = { graph, explorer, nodeDisplays, visitId: navigation?.visitId, direction, selectedIds, selectedEdgeId, matchIds, motion, command, onSelect: selectNode, onSelectEdge: selectEdge, onClear: clearSelection, overlayTop, hoverTarget, onHoverTarget, showGroupBounds, extraLabelObstacles, onVisibleRelation: graph.view === 'architecture-map' ? onVisibleRelation : undefined,
+  const properties = { onArchitectureNodeClick: onArchitectureNodeClick ? selectArchitectureNode : undefined, graph, explorer, nodeDisplays, visitId: navigation?.visitId, direction, selectedIds, selectedEdgeId, matchIds, motion, command, onSelect: selectNode, onSelectEdge: selectEdge, onClear: clearSelection, overlayTop, hoverTarget, onHoverTarget, showGroupBounds, extraLabelObstacles, onVisibleRelation: graph.view === 'architecture-map' ? onVisibleRelation : undefined,
     autoAggregation, aggregationState, onAggregationState, explicitPathNodeIds, explicitPathEdgeIds, totalNodeCount, fineExpandedScopeIds, onFineExpandedScopeIds };
   const cameraApplicable = graph.view === 'architecture-map' || mode === '3d' || !navigation || Boolean(navigation.location.centerId);
   const cameraTitle = cameraApplicable ? undefined : 'この階層のブロックはスクロールで移動します';

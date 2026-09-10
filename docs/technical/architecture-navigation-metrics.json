@@ -1,0 +1,3426 @@
+{
+  "date": "2026-09-10",
+  "baseline": "2f0beeaf8f87cdd13c82d006629815784d326b39",
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36 Edg/152.0.0.0",
+    "width": 1600,
+    "height": 1000,
+    "dpr": 1
+  },
+  "method": "Local instrumented production builds; same 112/214 static input files; 3 runs per input; default particles; inside Git Lines host / vehicle-management API; 3 selection/clear and 3 16-step rotations for each auto/surroundings setting. RAF intervals are main-thread callback intervals, not GPU timing. Initial readiness is recorded separately and is not an optimization claim.",
+  "ready": [
+    {
+      "stage": "before",
+      "name": "git-lines",
+      "ms": [
+        3881,
+        4052,
+        4036
+      ]
+    },
+    {
+      "stage": "before",
+      "name": "vehicle-management",
+      "ms": [
+        19064,
+        18616,
+        19343
+      ]
+    },
+    {
+      "stage": "after",
+      "name": "git-lines",
+      "ms": [
+        3919,
+        3610,
+        3893
+      ]
+    },
+    {
+      "stage": "after",
+      "name": "vehicle-management",
+      "ms": [
+        16912,
+        16874,
+        16909
+      ]
+    }
+  ],
+  "rows": [
+    {
+      "stage": "before",
+      "name": "git-lines",
+      "auto": true,
+      "surroundings": true,
+      "runs": 3,
+      "points": [
+        7,
+        7,
+        7
+      ],
+      "paths": [
+        29,
+        29,
+        29
+      ],
+      "selectionMs": {
+        "samples": 9,
+        "median": 73,
+        "p95": 112,
+        "min": 72,
+        "max": 112
+      },
+      "selectionSamples": [
+        112,
+        73,
+        73,
+        96,
+        72,
+        73,
+        96,
+        73,
+        73
+      ],
+      "contextToggleMs": {
+        "samples": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "rotationGestureMs": {
+        "samples": 9,
+        "median": 330,
+        "p95": 346,
+        "min": 324,
+        "max": 346
+      },
+      "rafMedianMs": {
+        "samples": 3,
+        "median": 16.699999999999818,
+        "p95": 16.699999999999818,
+        "min": 16.699999999999818,
+        "max": 16.699999999999818
+      },
+      "rafP95Ms": {
+        "samples": 3,
+        "median": 16.799999999999272,
+        "p95": 16.800000000000182,
+        "min": 16.700000000000728,
+        "max": 16.800000000000182
+      },
+      "longTasks": 0,
+      "visibleLabels": [
+        7,
+        7,
+        7
+      ],
+      "labelProjection": [
+        {
+          "calls": 51,
+          "totalMs": 12.199999943375587,
+          "maxMs": 0.7000000029802322,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.4000000059604645,
+            "maxMs": 0.7000000029802322,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 51,
+          "totalMs": 13.100000023841858,
+          "maxMs": 0.6000000089406967,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.4000000059604645,
+            "maxMs": 0.6000000089406967,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 51,
+          "totalMs": 14.899999991059303,
+          "maxMs": 0.7999999970197678,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.29999999701976776,
+            "p95Ms": 0.4000000059604645,
+            "maxMs": 0.7999999970197678,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        }
+      ],
+      "architectureProjectionCalls": [
+        0,
+        0,
+        0
+      ],
+      "errors": []
+    },
+    {
+      "stage": "before",
+      "name": "git-lines",
+      "auto": true,
+      "surroundings": false,
+      "runs": 3,
+      "points": [
+        7,
+        7,
+        7
+      ],
+      "paths": [
+        29,
+        29,
+        29
+      ],
+      "selectionMs": {
+        "samples": 9,
+        "median": 71,
+        "p95": 106,
+        "min": 64,
+        "max": 106
+      },
+      "selectionSamples": [
+        67,
+        74,
+        71,
+        64,
+        71,
+        67,
+        92,
+        106,
+        78
+      ],
+      "contextToggleMs": {
+        "samples": 3,
+        "median": 951,
+        "p95": 956,
+        "min": 937,
+        "max": 956
+      },
+      "rotationGestureMs": {
+        "samples": 9,
+        "median": 326,
+        "p95": 330,
+        "min": 313,
+        "max": 330
+      },
+      "rafMedianMs": {
+        "samples": 3,
+        "median": 16.69999999999891,
+        "p95": 16.700000000000728,
+        "min": 16.69999999999891,
+        "max": 16.700000000000728
+      },
+      "rafP95Ms": {
+        "samples": 3,
+        "median": 16.799999999999272,
+        "p95": 16.80000000000109,
+        "min": 16.700000000000728,
+        "max": 16.80000000000109
+      },
+      "longTasks": 0,
+      "visibleLabels": [
+        8,
+        8,
+        8
+      ],
+      "labelProjection": [
+        {
+          "calls": 51,
+          "totalMs": 11.80000002682209,
+          "maxMs": 0.4000000059604645,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.30000001192092896,
+            "maxMs": 0.4000000059604645,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 51,
+          "totalMs": 13.200000017881393,
+          "maxMs": 0.5,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.29999999701976776,
+            "p95Ms": 0.3999999910593033,
+            "maxMs": 0.5,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 51,
+          "totalMs": 14.200000002980232,
+          "maxMs": 0.5,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.29999999701976776,
+            "p95Ms": 0.4000000059604645,
+            "maxMs": 0.5,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        }
+      ],
+      "architectureProjectionCalls": [
+        0,
+        0,
+        0
+      ],
+      "errors": []
+    },
+    {
+      "stage": "before",
+      "name": "git-lines",
+      "auto": false,
+      "surroundings": true,
+      "runs": 3,
+      "points": [
+        7,
+        7,
+        7
+      ],
+      "paths": [
+        29,
+        29,
+        29
+      ],
+      "selectionMs": {
+        "samples": 9,
+        "median": 98,
+        "p95": 115,
+        "min": 63,
+        "max": 115
+      },
+      "selectionSamples": [
+        65,
+        107,
+        71,
+        65,
+        98,
+        99,
+        63,
+        115,
+        104
+      ],
+      "contextToggleMs": {
+        "samples": 3,
+        "median": 58,
+        "p95": 59,
+        "min": 58,
+        "max": 59
+      },
+      "rotationGestureMs": {
+        "samples": 9,
+        "median": 326,
+        "p95": 347,
+        "min": 313,
+        "max": 347
+      },
+      "rafMedianMs": {
+        "samples": 3,
+        "median": 16.69999999999891,
+        "p95": 16.69999999999891,
+        "min": 16.69999999999891,
+        "max": 16.69999999999891
+      },
+      "rafP95Ms": {
+        "samples": 3,
+        "median": 16.799999999999272,
+        "p95": 16.799999999999272,
+        "min": 16.799999999999272,
+        "max": 16.799999999999272
+      },
+      "longTasks": 0,
+      "visibleLabels": [
+        8,
+        8,
+        8
+      ],
+      "labelProjection": [
+        {
+          "calls": 37,
+          "totalMs": 8.199999988079071,
+          "maxMs": 0.4000000059604645,
+          "distribution": {
+            "samples": 37,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.30000001192092896,
+            "maxMs": 0.4000000059604645,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 37,
+          "totalMs": 9.900000035762787,
+          "maxMs": 0.4000000059604645,
+          "distribution": {
+            "samples": 37,
+            "medianMs": 0.29999999701976776,
+            "p95Ms": 0.4000000059604645,
+            "maxMs": 0.4000000059604645,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 37,
+          "totalMs": 9.400000020861626,
+          "maxMs": 0.4000000059604645,
+          "distribution": {
+            "samples": 37,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.4000000059604645,
+            "maxMs": 0.4000000059604645,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        }
+      ],
+      "architectureProjectionCalls": [
+        0,
+        0,
+        0
+      ],
+      "errors": []
+    },
+    {
+      "stage": "before",
+      "name": "git-lines",
+      "auto": false,
+      "surroundings": false,
+      "runs": 3,
+      "points": [
+        7,
+        7,
+        7
+      ],
+      "paths": [
+        29,
+        29,
+        29
+      ],
+      "selectionMs": {
+        "samples": 9,
+        "median": 99,
+        "p95": 133,
+        "min": 64,
+        "max": 133
+      },
+      "selectionSamples": [
+        65,
+        106,
+        105,
+        89,
+        73,
+        133,
+        64,
+        99,
+        106
+      ],
+      "contextToggleMs": {
+        "samples": 3,
+        "median": 55,
+        "p95": 67,
+        "min": 54,
+        "max": 67
+      },
+      "rotationGestureMs": {
+        "samples": 9,
+        "median": 312,
+        "p95": 331,
+        "min": 308,
+        "max": 331
+      },
+      "rafMedianMs": {
+        "samples": 3,
+        "median": 16.69999999999891,
+        "p95": 16.69999999999891,
+        "min": 16.69999999999891,
+        "max": 16.69999999999891
+      },
+      "rafP95Ms": {
+        "samples": 3,
+        "median": 16.80000000000109,
+        "p95": 16.80000000000109,
+        "min": 16.700000000000728,
+        "max": 16.80000000000109
+      },
+      "longTasks": 0,
+      "visibleLabels": [
+        8,
+        8,
+        8
+      ],
+      "labelProjection": [
+        {
+          "calls": 8,
+          "totalMs": 1.899999976158142,
+          "maxMs": 0.29999999701976776,
+          "distribution": {
+            "samples": 8,
+            "medianMs": 0.29999999701976776,
+            "p95Ms": 0.29999999701976776,
+            "maxMs": 0.29999999701976776,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 7,
+          "totalMs": 1.5,
+          "maxMs": 0.4000000059604645,
+          "distribution": {
+            "samples": 7,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.4000000059604645,
+            "maxMs": 0.4000000059604645,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 8,
+          "totalMs": 1.7000000029802322,
+          "maxMs": 0.29999999701976776,
+          "distribution": {
+            "samples": 8,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.29999999701976776,
+            "maxMs": 0.29999999701976776,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        }
+      ],
+      "architectureProjectionCalls": [
+        0,
+        0,
+        0
+      ],
+      "errors": []
+    },
+    {
+      "stage": "before",
+      "name": "vehicle-management",
+      "auto": true,
+      "surroundings": true,
+      "runs": 3,
+      "points": [
+        26,
+        26,
+        26
+      ],
+      "paths": [
+        17,
+        17,
+        17
+      ],
+      "selectionMs": {
+        "samples": 9,
+        "median": 113,
+        "p95": 117,
+        "min": 96,
+        "max": 117
+      },
+      "selectionSamples": [
+        117,
+        97,
+        113,
+        109,
+        112,
+        115,
+        113,
+        114,
+        96
+      ],
+      "contextToggleMs": {
+        "samples": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "rotationGestureMs": {
+        "samples": 9,
+        "median": 313,
+        "p95": 331,
+        "min": 306,
+        "max": 331
+      },
+      "rafMedianMs": {
+        "samples": 3,
+        "median": 16.69999999999709,
+        "p95": 16.69999999999709,
+        "min": 16.69999999999709,
+        "max": 16.69999999999709
+      },
+      "rafP95Ms": {
+        "samples": 3,
+        "median": 16.799999999999272,
+        "p95": 16.799999999999272,
+        "min": 16.700000000000728,
+        "max": 16.799999999999272
+      },
+      "longTasks": 0,
+      "visibleLabels": [
+        7,
+        7,
+        7
+      ],
+      "labelProjection": [
+        {
+          "calls": 53,
+          "totalMs": 17.799999952316284,
+          "maxMs": 1.2999999970197678,
+          "distribution": {
+            "samples": 53,
+            "medianMs": 0.29999999701976776,
+            "p95Ms": 0.5,
+            "maxMs": 1.2999999970197678,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 52,
+          "totalMs": 14.699999958276749,
+          "maxMs": 0.5,
+          "distribution": {
+            "samples": 52,
+            "medianMs": 0.29999999701976776,
+            "p95Ms": 0.5,
+            "maxMs": 0.5,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 52,
+          "totalMs": 13.999999970197678,
+          "maxMs": 0.5,
+          "distribution": {
+            "samples": 52,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.5,
+            "maxMs": 0.5,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        }
+      ],
+      "architectureProjectionCalls": [
+        0,
+        0,
+        0
+      ],
+      "errors": []
+    },
+    {
+      "stage": "before",
+      "name": "vehicle-management",
+      "auto": true,
+      "surroundings": false,
+      "runs": 3,
+      "points": [
+        12,
+        12,
+        12
+      ],
+      "paths": [
+        17,
+        17,
+        17
+      ],
+      "selectionMs": {
+        "samples": 9,
+        "median": 99,
+        "p95": 102,
+        "min": 87,
+        "max": 102
+      },
+      "selectionSamples": [
+        89,
+        99,
+        99,
+        87,
+        99,
+        98,
+        102,
+        99,
+        99
+      ],
+      "contextToggleMs": {
+        "samples": 3,
+        "median": 969,
+        "p95": 1001,
+        "min": 933,
+        "max": 1001
+      },
+      "rotationGestureMs": {
+        "samples": 9,
+        "median": 326,
+        "p95": 331,
+        "min": 313,
+        "max": 331
+      },
+      "rafMedianMs": {
+        "samples": 3,
+        "median": 16.69999999999709,
+        "p95": 16.700000000000728,
+        "min": 16.69999999999709,
+        "max": 16.700000000000728
+      },
+      "rafP95Ms": {
+        "samples": 3,
+        "median": 16.799999999999272,
+        "p95": 16.799999999999272,
+        "min": 16.799999999999272,
+        "max": 16.799999999999272
+      },
+      "longTasks": 0,
+      "visibleLabels": [
+        5,
+        5,
+        5
+      ],
+      "labelProjection": [
+        {
+          "calls": 51,
+          "totalMs": 9.500000014901161,
+          "maxMs": 0.30000001192092896,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.29999999701976776,
+            "maxMs": 0.30000001192092896,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 51,
+          "totalMs": 11.799999982118607,
+          "maxMs": 0.4000000059604645,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.30000001192092896,
+            "maxMs": 0.4000000059604645,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 51,
+          "totalMs": 9.60000005364418,
+          "maxMs": 0.30000001192092896,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.30000001192092896,
+            "maxMs": 0.30000001192092896,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        }
+      ],
+      "architectureProjectionCalls": [
+        0,
+        0,
+        0
+      ],
+      "errors": []
+    },
+    {
+      "stage": "before",
+      "name": "vehicle-management",
+      "auto": false,
+      "surroundings": true,
+      "runs": 3,
+      "points": [
+        26,
+        26,
+        26
+      ],
+      "paths": [
+        17,
+        17,
+        17
+      ],
+      "selectionMs": {
+        "samples": 9,
+        "median": 99,
+        "p95": 119,
+        "min": 95,
+        "max": 119
+      },
+      "selectionSamples": [
+        95,
+        99,
+        117,
+        101,
+        99,
+        98,
+        119,
+        99,
+        99
+      ],
+      "contextToggleMs": {
+        "samples": 3,
+        "median": 64,
+        "p95": 75,
+        "min": 61,
+        "max": 75
+      },
+      "rotationGestureMs": {
+        "samples": 9,
+        "median": 313,
+        "p95": 314,
+        "min": 309,
+        "max": 314
+      },
+      "rafMedianMs": {
+        "samples": 3,
+        "median": 16.700000000000728,
+        "p95": 16.700000000000728,
+        "min": 16.69999999999709,
+        "max": 16.700000000000728
+      },
+      "rafP95Ms": {
+        "samples": 3,
+        "median": 16.799999999999272,
+        "p95": 16.799999999999272,
+        "min": 16.700000000000728,
+        "max": 16.799999999999272
+      },
+      "longTasks": 0,
+      "visibleLabels": [
+        8,
+        8,
+        8
+      ],
+      "labelProjection": [
+        {
+          "calls": 51,
+          "totalMs": 16.999999955296516,
+          "maxMs": 0.7999999970197678,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.29999999701976776,
+            "p95Ms": 0.5999999940395355,
+            "maxMs": 0.7999999970197678,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 52,
+          "totalMs": 15.699999958276749,
+          "maxMs": 0.6000000089406967,
+          "distribution": {
+            "samples": 52,
+            "medianMs": 0.29999999701976776,
+            "p95Ms": 0.5,
+            "maxMs": 0.6000000089406967,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 52,
+          "totalMs": 15.900000110268593,
+          "maxMs": 0.5999999940395355,
+          "distribution": {
+            "samples": 52,
+            "medianMs": 0.29999999701976776,
+            "p95Ms": 0.5,
+            "maxMs": 0.5999999940395355,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        }
+      ],
+      "architectureProjectionCalls": [
+        0,
+        0,
+        0
+      ],
+      "errors": []
+    },
+    {
+      "stage": "before",
+      "name": "vehicle-management",
+      "auto": false,
+      "surroundings": false,
+      "runs": 3,
+      "points": [
+        12,
+        12,
+        12
+      ],
+      "paths": [
+        17,
+        17,
+        17
+      ],
+      "selectionMs": {
+        "samples": 9,
+        "median": 99,
+        "p95": 106,
+        "min": 88,
+        "max": 106
+      },
+      "selectionSamples": [
+        106,
+        99,
+        98,
+        88,
+        99,
+        99,
+        90,
+        99,
+        100
+      ],
+      "contextToggleMs": {
+        "samples": 3,
+        "median": 84,
+        "p95": 103,
+        "min": 53,
+        "max": 103
+      },
+      "rotationGestureMs": {
+        "samples": 9,
+        "median": 313,
+        "p95": 329,
+        "min": 307,
+        "max": 329
+      },
+      "rafMedianMs": {
+        "samples": 3,
+        "median": 16.700000000000728,
+        "p95": 16.700000000000728,
+        "min": 16.700000000000728,
+        "max": 16.700000000000728
+      },
+      "rafP95Ms": {
+        "samples": 3,
+        "median": 16.799999999999272,
+        "p95": 16.80000000000291,
+        "min": 16.799999999999272,
+        "max": 16.80000000000291
+      },
+      "longTasks": 0,
+      "visibleLabels": [
+        4,
+        4,
+        4
+      ],
+      "labelProjection": [
+        {
+          "calls": 37,
+          "totalMs": 5.899999961256981,
+          "maxMs": 0.29999999701976776,
+          "distribution": {
+            "samples": 37,
+            "medianMs": 0.10000000894069672,
+            "p95Ms": 0.29999999701976776,
+            "maxMs": 0.29999999701976776,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 37,
+          "totalMs": 6.700000032782555,
+          "maxMs": 0.4000000059604645,
+          "distribution": {
+            "samples": 37,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.30000001192092896,
+            "maxMs": 0.4000000059604645,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 37,
+          "totalMs": 7.499999985098839,
+          "maxMs": 0.4000000059604645,
+          "distribution": {
+            "samples": 37,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.3999999910593033,
+            "maxMs": 0.4000000059604645,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        }
+      ],
+      "architectureProjectionCalls": [
+        0,
+        0,
+        0
+      ],
+      "errors": []
+    },
+    {
+      "stage": "after",
+      "name": "git-lines",
+      "auto": true,
+      "surroundings": true,
+      "runs": 3,
+      "points": [
+        7,
+        7,
+        7
+      ],
+      "paths": [
+        29,
+        29,
+        29
+      ],
+      "selectionMs": {
+        "samples": 9,
+        "median": 67,
+        "p95": 88,
+        "min": 67,
+        "max": 88
+      },
+      "selectionSamples": [
+        88,
+        78,
+        67,
+        77,
+        67,
+        67,
+        80,
+        67,
+        67
+      ],
+      "contextToggleMs": {
+        "samples": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "rotationGestureMs": {
+        "samples": 9,
+        "median": 314,
+        "p95": 314,
+        "min": 311,
+        "max": 314
+      },
+      "rafMedianMs": {
+        "samples": 3,
+        "median": 16.699999999999818,
+        "p95": 16.699999999999818,
+        "min": 16.699999999999818,
+        "max": 16.699999999999818
+      },
+      "rafP95Ms": {
+        "samples": 3,
+        "median": 16.800000000000182,
+        "p95": 16.800000000000182,
+        "min": 16.700000000000728,
+        "max": 16.800000000000182
+      },
+      "longTasks": 0,
+      "visibleLabels": [
+        7,
+        7,
+        7
+      ],
+      "labelProjection": [
+        {
+          "calls": 51,
+          "totalMs": 11.30000002682209,
+          "maxMs": 0.4000000059604645,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.4000000059604645,
+            "maxMs": 0.4000000059604645,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 51,
+          "totalMs": 10.899999991059303,
+          "maxMs": 0.30000001192092896,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.30000001192092896,
+            "maxMs": 0.30000001192092896,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 51,
+          "totalMs": 11.000000044703484,
+          "maxMs": 0.30000001192092896,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.29999999701976776,
+            "maxMs": 0.30000001192092896,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        }
+      ],
+      "architectureProjectionCalls": [
+        0,
+        0,
+        0
+      ],
+      "errors": []
+    },
+    {
+      "stage": "after",
+      "name": "git-lines",
+      "auto": true,
+      "surroundings": false,
+      "runs": 3,
+      "points": [
+        7,
+        7,
+        7
+      ],
+      "paths": [
+        29,
+        29,
+        29
+      ],
+      "selectionMs": {
+        "samples": 9,
+        "median": 66,
+        "p95": 67,
+        "min": 60,
+        "max": 67
+      },
+      "selectionSamples": [
+        60,
+        67,
+        67,
+        60,
+        67,
+        65,
+        61,
+        67,
+        66
+      ],
+      "contextToggleMs": {
+        "samples": 3,
+        "median": 939,
+        "p95": 955,
+        "min": 939,
+        "max": 955
+      },
+      "rotationGestureMs": {
+        "samples": 9,
+        "median": 313,
+        "p95": 314,
+        "min": 309,
+        "max": 314
+      },
+      "rafMedianMs": {
+        "samples": 3,
+        "median": 16.69999999999891,
+        "p95": 16.69999999999891,
+        "min": 16.69999999999891,
+        "max": 16.69999999999891
+      },
+      "rafP95Ms": {
+        "samples": 3,
+        "median": 16.799999999999272,
+        "p95": 16.80000000000109,
+        "min": 16.799999999999272,
+        "max": 16.80000000000109
+      },
+      "longTasks": 0,
+      "visibleLabels": [
+        8,
+        8,
+        8
+      ],
+      "labelProjection": [
+        {
+          "calls": 51,
+          "totalMs": 11.69999997317791,
+          "maxMs": 0.4000000059604645,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.30000001192092896,
+            "maxMs": 0.4000000059604645,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 51,
+          "totalMs": 11.299999937415123,
+          "maxMs": 0.7999999970197678,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.30000001192092896,
+            "maxMs": 0.7999999970197678,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 51,
+          "totalMs": 13.199999913573265,
+          "maxMs": 0.4000000059604645,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.29999999701976776,
+            "p95Ms": 0.3999999910593033,
+            "maxMs": 0.4000000059604645,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        }
+      ],
+      "architectureProjectionCalls": [
+        0,
+        0,
+        0
+      ],
+      "errors": []
+    },
+    {
+      "stage": "after",
+      "name": "git-lines",
+      "auto": false,
+      "surroundings": true,
+      "runs": 3,
+      "points": [
+        7,
+        7,
+        7
+      ],
+      "paths": [
+        29,
+        29,
+        29
+      ],
+      "selectionMs": {
+        "samples": 9,
+        "median": 67,
+        "p95": 68,
+        "min": 58,
+        "max": 68
+      },
+      "selectionSamples": [
+        58,
+        68,
+        67,
+        59,
+        68,
+        68,
+        59,
+        68,
+        67
+      ],
+      "contextToggleMs": {
+        "samples": 3,
+        "median": 59,
+        "p95": 60,
+        "min": 58,
+        "max": 60
+      },
+      "rotationGestureMs": {
+        "samples": 9,
+        "median": 313,
+        "p95": 314,
+        "min": 311,
+        "max": 314
+      },
+      "rafMedianMs": {
+        "samples": 3,
+        "median": 16.69999999999891,
+        "p95": 16.69999999999891,
+        "min": 16.69999999999891,
+        "max": 16.69999999999891
+      },
+      "rafP95Ms": {
+        "samples": 3,
+        "median": 16.80000000000109,
+        "p95": 16.80000000000109,
+        "min": 16.799999999999272,
+        "max": 16.80000000000109
+      },
+      "longTasks": 0,
+      "visibleLabels": [
+        7,
+        7,
+        7
+      ],
+      "labelProjection": [
+        {
+          "calls": 51,
+          "totalMs": 11.499999985098839,
+          "maxMs": 0.4000000059604645,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.3999999910593033,
+            "maxMs": 0.4000000059604645,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 51,
+          "totalMs": 10.600000083446503,
+          "maxMs": 0.30000001192092896,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.30000001192092896,
+            "maxMs": 0.30000001192092896,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 51,
+          "totalMs": 10.40000006556511,
+          "maxMs": 0.4000000059604645,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.30000001192092896,
+            "maxMs": 0.4000000059604645,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        }
+      ],
+      "architectureProjectionCalls": [
+        0,
+        0,
+        0
+      ],
+      "errors": []
+    },
+    {
+      "stage": "after",
+      "name": "git-lines",
+      "auto": false,
+      "surroundings": false,
+      "runs": 3,
+      "points": [
+        7,
+        7,
+        7
+      ],
+      "paths": [
+        29,
+        29,
+        29
+      ],
+      "selectionMs": {
+        "samples": 9,
+        "median": 67,
+        "p95": 70,
+        "min": 59,
+        "max": 70
+      },
+      "selectionSamples": [
+        70,
+        67,
+        67,
+        60,
+        67,
+        67,
+        59,
+        66,
+        67
+      ],
+      "contextToggleMs": {
+        "samples": 3,
+        "median": 56,
+        "p95": 57,
+        "min": 56,
+        "max": 57
+      },
+      "rotationGestureMs": {
+        "samples": 9,
+        "median": 313,
+        "p95": 318,
+        "min": 308,
+        "max": 318
+      },
+      "rafMedianMs": {
+        "samples": 3,
+        "median": 16.69999999999891,
+        "p95": 16.69999999999891,
+        "min": 16.69999999999891,
+        "max": 16.69999999999891
+      },
+      "rafP95Ms": {
+        "samples": 3,
+        "median": 16.799999999999272,
+        "p95": 16.799999999999272,
+        "min": 16.799999999999272,
+        "max": 16.799999999999272
+      },
+      "longTasks": 0,
+      "visibleLabels": [
+        7,
+        7,
+        7
+      ],
+      "labelProjection": [
+        {
+          "calls": 51,
+          "totalMs": 11.000000014901161,
+          "maxMs": 0.3999999910593033,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.30000001192092896,
+            "maxMs": 0.3999999910593033,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 52,
+          "totalMs": 10.400000005960464,
+          "maxMs": 0.3999999910593033,
+          "distribution": {
+            "samples": 52,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.29999999701976776,
+            "maxMs": 0.3999999910593033,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 51,
+          "totalMs": 10.799999952316284,
+          "maxMs": 0.30000001192092896,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.29999999701976776,
+            "maxMs": 0.30000001192092896,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        }
+      ],
+      "architectureProjectionCalls": [
+        0,
+        0,
+        0
+      ],
+      "errors": []
+    },
+    {
+      "stage": "after",
+      "name": "vehicle-management",
+      "auto": true,
+      "surroundings": true,
+      "runs": 3,
+      "points": [
+        26,
+        26,
+        26
+      ],
+      "paths": [
+        17,
+        17,
+        17
+      ],
+      "selectionMs": {
+        "samples": 9,
+        "median": 82,
+        "p95": 101,
+        "min": 80,
+        "max": 101
+      },
+      "selectionSamples": [
+        101,
+        80,
+        81,
+        94,
+        81,
+        97,
+        96,
+        80,
+        82
+      ],
+      "contextToggleMs": {
+        "samples": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "rotationGestureMs": {
+        "samples": 9,
+        "median": 314,
+        "p95": 330,
+        "min": 308,
+        "max": 330
+      },
+      "rafMedianMs": {
+        "samples": 3,
+        "median": 16.69999999999709,
+        "p95": 16.700000000000728,
+        "min": 16.69999999999709,
+        "max": 16.700000000000728
+      },
+      "rafP95Ms": {
+        "samples": 3,
+        "median": 16.799999999999272,
+        "p95": 16.799999999999272,
+        "min": 16.700000000000728,
+        "max": 16.799999999999272
+      },
+      "longTasks": 0,
+      "visibleLabels": [
+        6,
+        6,
+        6
+      ],
+      "labelProjection": [
+        {
+          "calls": 52,
+          "totalMs": 14.00000011920929,
+          "maxMs": 0.5,
+          "distribution": {
+            "samples": 52,
+            "medianMs": 0.29999999701976776,
+            "p95Ms": 0.4000000059604645,
+            "maxMs": 0.5,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 53,
+          "totalMs": 15.499999955296516,
+          "maxMs": 0.5999999940395355,
+          "distribution": {
+            "samples": 53,
+            "medianMs": 0.29999999701976776,
+            "p95Ms": 0.5,
+            "maxMs": 0.5999999940395355,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 52,
+          "totalMs": 13.100000023841858,
+          "maxMs": 0.5,
+          "distribution": {
+            "samples": 52,
+            "medianMs": 0.29999999701976776,
+            "p95Ms": 0.4000000059604645,
+            "maxMs": 0.5,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        }
+      ],
+      "architectureProjectionCalls": [
+        0,
+        0,
+        0
+      ],
+      "errors": []
+    },
+    {
+      "stage": "after",
+      "name": "vehicle-management",
+      "auto": true,
+      "surroundings": false,
+      "runs": 3,
+      "points": [
+        12,
+        12,
+        12
+      ],
+      "paths": [
+        17,
+        17,
+        17
+      ],
+      "selectionMs": {
+        "samples": 9,
+        "median": 82,
+        "p95": 83,
+        "min": 73,
+        "max": 83
+      },
+      "selectionSamples": [
+        73,
+        82,
+        82,
+        73,
+        82,
+        83,
+        73,
+        83,
+        82
+      ],
+      "contextToggleMs": {
+        "samples": 3,
+        "median": 953,
+        "p95": 983,
+        "min": 952,
+        "max": 983
+      },
+      "rotationGestureMs": {
+        "samples": 9,
+        "median": 314,
+        "p95": 347,
+        "min": 310,
+        "max": 347
+      },
+      "rafMedianMs": {
+        "samples": 3,
+        "median": 16.69999999999709,
+        "p95": 16.69999999999709,
+        "min": 16.69999999999709,
+        "max": 16.69999999999709
+      },
+      "rafP95Ms": {
+        "samples": 3,
+        "median": 16.799999999999272,
+        "p95": 16.80000000000291,
+        "min": 16.700000000000728,
+        "max": 16.80000000000291
+      },
+      "longTasks": 0,
+      "visibleLabels": [
+        5,
+        5,
+        5
+      ],
+      "labelProjection": [
+        {
+          "calls": 51,
+          "totalMs": 8.199999943375587,
+          "maxMs": 0.3999999910593033,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.19999998807907104,
+            "p95Ms": 0.29999999701976776,
+            "maxMs": 0.3999999910593033,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 51,
+          "totalMs": 9.30000002682209,
+          "maxMs": 0.30000001192092896,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.29999999701976776,
+            "maxMs": 0.30000001192092896,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 51,
+          "totalMs": 8.300000041723251,
+          "maxMs": 0.30000001192092896,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.19999998807907104,
+            "p95Ms": 0.29999999701976776,
+            "maxMs": 0.30000001192092896,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        }
+      ],
+      "architectureProjectionCalls": [
+        0,
+        0,
+        0
+      ],
+      "errors": []
+    },
+    {
+      "stage": "after",
+      "name": "vehicle-management",
+      "auto": false,
+      "surroundings": true,
+      "runs": 3,
+      "points": [
+        26,
+        26,
+        26
+      ],
+      "paths": [
+        17,
+        17,
+        17
+      ],
+      "selectionMs": {
+        "samples": 9,
+        "median": 83,
+        "p95": 117,
+        "min": 72,
+        "max": 117
+      },
+      "selectionSamples": [
+        89,
+        82,
+        82,
+        72,
+        84,
+        83,
+        72,
+        83,
+        117
+      ],
+      "contextToggleMs": {
+        "samples": 3,
+        "median": 60,
+        "p95": 73,
+        "min": 59,
+        "max": 73
+      },
+      "rotationGestureMs": {
+        "samples": 9,
+        "median": 314,
+        "p95": 327,
+        "min": 310,
+        "max": 327
+      },
+      "rafMedianMs": {
+        "samples": 3,
+        "median": 16.700000000000728,
+        "p95": 16.700000000000728,
+        "min": 16.69999999999709,
+        "max": 16.700000000000728
+      },
+      "rafP95Ms": {
+        "samples": 3,
+        "median": 16.799999999999272,
+        "p95": 16.799999999999272,
+        "min": 16.700000000000728,
+        "max": 16.799999999999272
+      },
+      "longTasks": 0,
+      "visibleLabels": [
+        8,
+        8,
+        8
+      ],
+      "labelProjection": [
+        {
+          "calls": 51,
+          "totalMs": 14.60000005364418,
+          "maxMs": 0.5,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.29999999701976776,
+            "p95Ms": 0.5,
+            "maxMs": 0.5,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 51,
+          "totalMs": 13.499999985098839,
+          "maxMs": 0.5,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.4000000059604645,
+            "maxMs": 0.5,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 51,
+          "totalMs": 15.800000011920929,
+          "maxMs": 0.8999999910593033,
+          "distribution": {
+            "samples": 51,
+            "medianMs": 0.29999999701976776,
+            "p95Ms": 0.5,
+            "maxMs": 0.8999999910593033,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        }
+      ],
+      "architectureProjectionCalls": [
+        0,
+        0,
+        0
+      ],
+      "errors": []
+    },
+    {
+      "stage": "after",
+      "name": "vehicle-management",
+      "auto": false,
+      "surroundings": false,
+      "runs": 3,
+      "points": [
+        12,
+        12,
+        12
+      ],
+      "paths": [
+        17,
+        17,
+        17
+      ],
+      "selectionMs": {
+        "samples": 9,
+        "median": 82,
+        "p95": 90,
+        "min": 71,
+        "max": 90
+      },
+      "selectionSamples": [
+        71,
+        82,
+        82,
+        73,
+        82,
+        82,
+        90,
+        83,
+        82
+      ],
+      "contextToggleMs": {
+        "samples": 3,
+        "median": 53,
+        "p95": 54,
+        "min": 53,
+        "max": 54
+      },
+      "rotationGestureMs": {
+        "samples": 9,
+        "median": 313,
+        "p95": 318,
+        "min": 309,
+        "max": 318
+      },
+      "rafMedianMs": {
+        "samples": 3,
+        "median": 16.69999999999709,
+        "p95": 16.700000000000728,
+        "min": 16.69999999999709,
+        "max": 16.700000000000728
+      },
+      "rafP95Ms": {
+        "samples": 3,
+        "median": 16.799999999999272,
+        "p95": 16.799999999999272,
+        "min": 16.799999999999272,
+        "max": 16.799999999999272
+      },
+      "longTasks": 0,
+      "visibleLabels": [
+        4,
+        4,
+        4
+      ],
+      "labelProjection": [
+        {
+          "calls": 37,
+          "totalMs": 6.699999988079071,
+          "maxMs": 0.29999999701976776,
+          "distribution": {
+            "samples": 37,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.29999999701976776,
+            "maxMs": 0.29999999701976776,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 37,
+          "totalMs": 6.89999994635582,
+          "maxMs": 0.3999999910593033,
+          "distribution": {
+            "samples": 37,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.29999999701976776,
+            "maxMs": 0.3999999910593033,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        },
+        {
+          "calls": 37,
+          "totalMs": 6.200000077486038,
+          "maxMs": 0.30000001192092896,
+          "distribution": {
+            "samples": 37,
+            "medianMs": 0.20000000298023224,
+            "p95Ms": 0.29999999701976776,
+            "maxMs": 0.30000001192092896,
+            "over50ms": 0
+          },
+          "samplesCapped": false
+        }
+      ],
+      "architectureProjectionCalls": [
+        0,
+        0,
+        0
+      ],
+      "errors": []
+    }
+  ],
+  "integrity": [
+    {
+      "name": "git-lines",
+      "head": "7a89625acba9cf64b1f0648fed64381330218184",
+      "trackedFiles": 145,
+      "changed": [
+        "README.md",
+        "docs/technical/graph-architecture.md",
+        "src/model/graphModel.ts",
+        "tests/unit/overlay-detail-presentation.test.ts",
+        "tests/unit/rebase-relation.test.ts",
+        "tests/unit/rewrite-collapse-relation.test.ts",
+        "webview/src/components/DetailPanel.tsx",
+        "webview/src/components/overlayDetailPresentation.ts",
+        "webview/src/styles.css"
+      ],
+      "headUnchanged": true,
+      "statusUnchanged": false
+    },
+    {
+      "name": "vehicle-management",
+      "head": "8211ee8145425ef85b7cf1156a55cd0adf0db088",
+      "trackedFiles": 345,
+      "changed": [],
+      "headUnchanged": true,
+      "statusUnchanged": true
+    }
+  ],
+  "finalGestureVerification": {
+    "method": "One additional run per project after leaf/display-group second-click protection, Stage command clearing and persistent pointer-down position. Same 4 settings; 3 selections and 3 rotations each. The prior 3-run comparison is retained above.",
+    "rows": [
+      {
+        "name": "git-lines",
+        "auto": true,
+        "surroundings": true,
+        "selectionMs": {
+          "median": 67,
+          "max": 74
+        },
+        "selectionSamples": [
+          67,
+          67,
+          74
+        ],
+        "rotationMs": {
+          "median": 313,
+          "max": 314
+        },
+        "rafP95": 16.800000000000182,
+        "longTasks": 0,
+        "errors": []
+      },
+      {
+        "name": "git-lines",
+        "auto": true,
+        "surroundings": false,
+        "selectionMs": {
+          "median": 66,
+          "max": 67
+        },
+        "selectionSamples": [
+          60,
+          66,
+          67
+        ],
+        "rotationMs": {
+          "median": 314,
+          "max": 314
+        },
+        "rafP95": 16.799999999999272,
+        "longTasks": 0,
+        "errors": []
+      },
+      {
+        "name": "git-lines",
+        "auto": false,
+        "surroundings": true,
+        "selectionMs": {
+          "median": 67,
+          "max": 67
+        },
+        "selectionSamples": [
+          60,
+          67,
+          67
+        ],
+        "rotationMs": {
+          "median": 314,
+          "max": 314
+        },
+        "rafP95": 16.80000000000109,
+        "longTasks": 0,
+        "errors": []
+      },
+      {
+        "name": "git-lines",
+        "auto": false,
+        "surroundings": false,
+        "selectionMs": {
+          "median": 67,
+          "max": 68
+        },
+        "selectionSamples": [
+          60,
+          67,
+          68
+        ],
+        "rotationMs": {
+          "median": 314,
+          "max": 330
+        },
+        "rafP95": 16.80000000000109,
+        "longTasks": 0,
+        "errors": []
+      },
+      {
+        "name": "vehicle-management",
+        "auto": true,
+        "surroundings": true,
+        "selectionMs": {
+          "median": 82,
+          "max": 100
+        },
+        "selectionSamples": [
+          80,
+          82,
+          100
+        ],
+        "rotationMs": {
+          "median": 313,
+          "max": 313
+        },
+        "rafP95": 16.799999999999272,
+        "longTasks": 0,
+        "errors": []
+      },
+      {
+        "name": "vehicle-management",
+        "auto": true,
+        "surroundings": false,
+        "selectionMs": {
+          "median": 82,
+          "max": 82
+        },
+        "selectionSamples": [
+          72,
+          82,
+          82
+        ],
+        "rotationMs": {
+          "median": 314,
+          "max": 315
+        },
+        "rafP95": 16.700000000000728,
+        "longTasks": 0,
+        "errors": []
+      },
+      {
+        "name": "vehicle-management",
+        "auto": false,
+        "surroundings": true,
+        "selectionMs": {
+          "median": 82,
+          "max": 83
+        },
+        "selectionSamples": [
+          73,
+          82,
+          83
+        ],
+        "rotationMs": {
+          "median": 314,
+          "max": 314
+        },
+        "rafP95": 16.700000000000728,
+        "longTasks": 0,
+        "errors": []
+      },
+      {
+        "name": "vehicle-management",
+        "auto": false,
+        "surroundings": false,
+        "selectionMs": {
+          "median": 82,
+          "max": 99
+        },
+        "selectionSamples": [
+          73,
+          82,
+          99
+        ],
+        "rotationMs": {
+          "median": 313,
+          "max": 314
+        },
+        "rafP95": 16.799999999999272,
+        "longTasks": 0,
+        "errors": []
+      }
+    ]
+  },
+  "fixedInputIntegrity": [
+    {
+      "name": "git-lines",
+      "files": 112,
+      "hashes": [
+        "5282d77d7dd4fdfb8bd2ba763c2b49a4acac0dcc26247791c3f66aa416c04f50",
+        "5282d77d7dd4fdfb8bd2ba763c2b49a4acac0dcc26247791c3f66aa416c04f50",
+        "5282d77d7dd4fdfb8bd2ba763c2b49a4acac0dcc26247791c3f66aa416c04f50"
+      ],
+      "equal": true
+    },
+    {
+      "name": "vehicle-management",
+      "files": 214,
+      "hashes": [
+        "0a3801d0cf0f6d888467bfa82d5dcf5852bc930b68f5bf166aa5507d95d5b5e0",
+        "0a3801d0cf0f6d888467bfa82d5dcf5852bc930b68f5bf166aa5507d95d5b5e0",
+        "0a3801d0cf0f6d888467bfa82d5dcf5852bc930b68f5bf166aa5507d95d5b5e0"
+      ],
+      "equal": true
+    },
+    {
+      "name": "web-atlas",
+      "files": 243,
+      "hashes": [
+        "4c42a715e5cbdbe7d9c89baa8c50aee95b7c90060289842e658d0b336d128e6c",
+        "4c42a715e5cbdbe7d9c89baa8c50aee95b7c90060289842e658d0b336d128e6c",
+        "4c42a715e5cbdbe7d9c89baa8c50aee95b7c90060289842e658d0b336d128e6c"
+      ],
+      "equal": true
+    }
+  ],
+  "browser": {
+    "navigation": [
+      {
+        "name": "git-lines",
+        "checks": [
+          {
+            "label": "root project name",
+            "pass": true
+          },
+          {
+            "label": "root is inert current span",
+            "pass": true
+          },
+          {
+            "label": "unselected 2D double click opens requested canonical scope",
+            "pass": true
+          },
+          {
+            "label": "2D double adds one visit",
+            "pass": true
+          },
+          {
+            "label": "single open creates only real ancestors",
+            "pass": true
+          },
+          {
+            "label": "internal leaf double does not fabricate scope",
+            "pass": true
+          },
+          {
+            "label": "single selection does not open scope",
+            "pass": true
+          },
+          {
+            "label": "entry declaration count equals rows",
+            "pass": true
+          },
+          {
+            "label": "settings heading has no misleading total",
+            "pass": true
+          },
+          {
+            "label": "selection did not append visits",
+            "pass": true
+          },
+          {
+            "label": "3D starts unselected",
+            "pass": true
+          },
+          {
+            "label": "unselected native 3D double opens same canonical scope",
+            "pass": true
+          },
+          {
+            "label": "3D double adds one visit",
+            "pass": true
+          },
+          {
+            "label": "external application available",
+            "pass": true
+          },
+          {
+            "label": "outside single preserves current scope",
+            "pass": true
+          },
+          {
+            "label": "outside selected identity",
+            "pass": true
+          },
+          {
+            "label": "outside selection caption",
+            "pass": true
+          },
+          {
+            "label": "outside open changes to actual scope",
+            "pass": true
+          },
+          {
+            "label": "outside breadcrumb has no false parent",
+            "pass": true
+          },
+          {
+            "label": "Back returns to prior sibling",
+            "pass": true
+          },
+          {
+            "label": "Back restores outside selection",
+            "pass": true
+          },
+          {
+            "label": "Parent returns to real project",
+            "pass": true
+          },
+          {
+            "label": "drag out and back neither opens nor adds history",
+            "pass": true
+          },
+          {
+            "label": "context off description",
+            "pass": true
+          },
+          {
+            "label": "context on description",
+            "pass": true
+          },
+          {
+            "label": "mode switch retains scope",
+            "pass": true
+          },
+          {
+            "label": "mode roundtrip retains scope",
+            "pass": true
+          },
+          {
+            "label": "body fits 1440",
+            "pass": true
+          },
+          {
+            "label": "navigation fits 1440",
+            "pass": true
+          },
+          {
+            "label": "detail fits 1440",
+            "pass": true
+          },
+          {
+            "label": "body fits 1024",
+            "pass": true
+          },
+          {
+            "label": "navigation fits 1024",
+            "pass": true
+          },
+          {
+            "label": "detail fits 1024",
+            "pass": true
+          },
+          {
+            "label": "body fits 768",
+            "pass": true
+          },
+          {
+            "label": "navigation fits 768",
+            "pass": true
+          },
+          {
+            "label": "detail fits 768",
+            "pass": true
+          },
+          {
+            "label": "body fits 390",
+            "pass": true
+          },
+          {
+            "label": "navigation fits 390",
+            "pass": true
+          },
+          {
+            "label": "detail fits 390",
+            "pass": true
+          }
+        ],
+        "errors": []
+      },
+      {
+        "name": "vehicle-management",
+        "checks": [
+          {
+            "label": "root project name",
+            "pass": true
+          },
+          {
+            "label": "root is inert current span",
+            "pass": true
+          },
+          {
+            "label": "unselected 2D double click opens requested canonical scope",
+            "pass": true
+          },
+          {
+            "label": "2D double adds one visit",
+            "pass": true
+          },
+          {
+            "label": "single open creates only real ancestors",
+            "pass": true
+          },
+          {
+            "label": "internal leaf double does not fabricate scope",
+            "pass": true
+          },
+          {
+            "label": "single selection does not open scope",
+            "pass": true
+          },
+          {
+            "label": "entry declaration count equals rows",
+            "pass": true
+          },
+          {
+            "label": "settings heading has no misleading total",
+            "pass": true
+          },
+          {
+            "label": "selection did not append visits",
+            "pass": true
+          },
+          {
+            "label": "3D starts unselected",
+            "pass": true
+          },
+          {
+            "label": "unselected native 3D double opens same canonical scope",
+            "pass": true
+          },
+          {
+            "label": "3D double adds one visit",
+            "pass": true
+          },
+          {
+            "label": "external application available",
+            "pass": true
+          },
+          {
+            "label": "outside single preserves current scope",
+            "pass": true
+          },
+          {
+            "label": "outside selected identity",
+            "pass": true
+          },
+          {
+            "label": "outside selection caption",
+            "pass": true
+          },
+          {
+            "label": "outside open changes to actual scope",
+            "pass": true
+          },
+          {
+            "label": "outside breadcrumb has no false parent",
+            "pass": true
+          },
+          {
+            "label": "Back returns to prior sibling",
+            "pass": true
+          },
+          {
+            "label": "Back restores outside selection",
+            "pass": true
+          },
+          {
+            "label": "Parent returns to real project",
+            "pass": true
+          },
+          {
+            "label": "drag out and back neither opens nor adds history",
+            "pass": true
+          },
+          {
+            "label": "context off description",
+            "pass": true
+          },
+          {
+            "label": "context on description",
+            "pass": true
+          },
+          {
+            "label": "mode switch retains scope",
+            "pass": true
+          },
+          {
+            "label": "mode roundtrip retains scope",
+            "pass": true
+          },
+          {
+            "label": "body fits 1440",
+            "pass": true
+          },
+          {
+            "label": "navigation fits 1440",
+            "pass": true
+          },
+          {
+            "label": "detail fits 1440",
+            "pass": true
+          },
+          {
+            "label": "body fits 1024",
+            "pass": true
+          },
+          {
+            "label": "navigation fits 1024",
+            "pass": true
+          },
+          {
+            "label": "detail fits 1024",
+            "pass": true
+          },
+          {
+            "label": "body fits 768",
+            "pass": true
+          },
+          {
+            "label": "navigation fits 768",
+            "pass": true
+          },
+          {
+            "label": "detail fits 768",
+            "pass": true
+          },
+          {
+            "label": "body fits 390",
+            "pass": true
+          },
+          {
+            "label": "navigation fits 390",
+            "pass": true
+          },
+          {
+            "label": "detail fits 390",
+            "pass": true
+          }
+        ],
+        "errors": []
+      }
+    ],
+    "fixture": [
+      {
+        "label": "deep breadcrumb current",
+        "pass": true
+      },
+      {
+        "label": "two variants",
+        "pass": true
+      },
+      {
+        "label": "native clipboard exact path",
+        "pass": true
+      },
+      {
+        "label": "source retains numbered lines",
+        "pass": true
+      },
+      {
+        "label": "code scroll remains local",
+        "pass": true
+      },
+      {
+        "label": "collapsed menu reachable 1440",
+        "pass": true
+      },
+      {
+        "label": "no fixture overflow 1440",
+        "pass": true
+      },
+      {
+        "label": "narrow evidence panel fits 1440",
+        "pass": true
+      },
+      {
+        "label": "ancestor menu opens real ancestor 1440",
+        "pass": true
+      },
+      {
+        "label": "focus follows navigation 1440",
+        "pass": true
+      },
+      {
+        "label": "collapsed menu reachable 1024",
+        "pass": true
+      },
+      {
+        "label": "no fixture overflow 1024",
+        "pass": true
+      },
+      {
+        "label": "narrow evidence panel fits 1024",
+        "pass": true
+      },
+      {
+        "label": "ancestor menu opens real ancestor 1024",
+        "pass": true
+      },
+      {
+        "label": "focus follows navigation 1024",
+        "pass": true
+      },
+      {
+        "label": "collapsed menu reachable 768",
+        "pass": true
+      },
+      {
+        "label": "no fixture overflow 768",
+        "pass": true
+      },
+      {
+        "label": "narrow evidence panel fits 768",
+        "pass": true
+      },
+      {
+        "label": "ancestor menu opens real ancestor 768",
+        "pass": true
+      },
+      {
+        "label": "focus follows navigation 768",
+        "pass": true
+      },
+      {
+        "label": "collapsed menu reachable 390",
+        "pass": true
+      },
+      {
+        "label": "no fixture overflow 390",
+        "pass": true
+      },
+      {
+        "label": "narrow evidence panel fits 390",
+        "pass": true
+      },
+      {
+        "label": "ancestor menu opens real ancestor 390",
+        "pass": true
+      },
+      {
+        "label": "focus follows navigation 390",
+        "pass": true
+      },
+      {
+        "label": "zero distinct from entries",
+        "pass": true
+      },
+      {
+        "label": "unrecorded separate from zero",
+        "pass": true
+      }
+    ],
+    "screenAnchor": [
+      {
+        "mode": "2D",
+        "before": {
+          "x": 416.9175109863281,
+          "y": 571.3050537109375,
+          "width": 223.96499633789062,
+          "height": 64.364990234375
+        },
+        "after": {
+          "x": 410.8800048828125,
+          "y": 565.2675170898438,
+          "width": 236.03997802734375,
+          "height": 76.44000244140625
+        },
+        "pass": true
+      },
+      {
+        "mode": "3D",
+        "before": {
+          "x": 231.8295064537077,
+          "y": 668.8196069660942
+        },
+        "after": {
+          "x": 231.82950645370775,
+          "y": 668.8196069660942
+        },
+        "pass": true
+      }
+    ],
+    "groupDouble": [
+      {
+        "mode": "2d",
+        "scope": "project",
+        "noHistory": true,
+        "inspection": true
+      },
+      {
+        "mode": "3d",
+        "scope": "project",
+        "noHistory": true,
+        "inspection": true
+      }
+    ],
+    "otherViews": [
+      {
+        "view": "architecture",
+        "actions": [
+          "実体のキーボード選択",
+          "拡大・縮小"
+        ],
+        "errors": []
+      },
+      {
+        "view": "workspace",
+        "actions": [
+          "実体のキーボード選択",
+          "拡大・縮小"
+        ],
+        "errors": []
+      },
+      {
+        "view": "command",
+        "actions": [
+          "実体のキーボード選択",
+          "拡大・縮小"
+        ],
+        "errors": []
+      },
+      {
+        "view": "dependencies",
+        "actions": [
+          "実体のキーボード選択",
+          "拡大・縮小"
+        ],
+        "errors": []
+      },
+      {
+        "view": "module-dependency",
+        "actions": [
+          "ON/OFF往復",
+          "検索から実体選択"
+        ],
+        "errors": []
+      }
+    ],
+    "flowRegression": [
+      {
+        "view": "data-flow",
+        "enabled": false,
+        "errors": [],
+        "captures": [
+          {
+            "name": "selected",
+            "scenes": [
+              {
+                "view": "data-flow",
+                "points": 38573,
+                "paths": 6,
+                "selected": 1
+              }
+            ]
+          },
+          {
+            "name": "detail-closed",
+            "scenes": [
+              {
+                "view": "data-flow",
+                "points": 38573,
+                "paths": 6,
+                "selected": 1
+              }
+            ]
+          },
+          {
+            "name": "rotated-zoomed",
+            "scenes": [
+              {
+                "view": "data-flow",
+                "points": 38573,
+                "paths": 6,
+                "selected": 1
+              }
+            ]
+          },
+          {
+            "name": "blank-position",
+            "scenes": [
+              {
+                "view": "data-flow",
+                "points": 38573,
+                "paths": 6,
+                "selected": 1
+              }
+            ]
+          },
+          {
+            "name": "cleared",
+            "scenes": [
+              {
+                "view": "data-flow",
+                "points": 38573,
+                "paths": 0,
+                "selected": 0
+              }
+            ]
+          },
+          {
+            "name": "normal-mode-return",
+            "scenes": [
+              {
+                "view": "data-flow",
+                "points": 38573,
+                "paths": 0,
+                "selected": 0
+              }
+            ]
+          },
+          {
+            "name": "replaced",
+            "scenes": [
+              {
+                "view": "data-flow",
+                "points": 38573,
+                "paths": 2,
+                "selected": 1
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "view": "data-flow",
+        "enabled": true,
+        "errors": [],
+        "captures": [
+          {
+            "name": "selected",
+            "scenes": [
+              {
+                "view": "data-flow",
+                "points": 5411,
+                "paths": 6,
+                "selected": 1
+              }
+            ]
+          },
+          {
+            "name": "detail-closed",
+            "scenes": [
+              {
+                "view": "data-flow",
+                "points": 5467,
+                "paths": 6,
+                "selected": 1
+              }
+            ]
+          },
+          {
+            "name": "rotated-zoomed",
+            "scenes": [
+              {
+                "view": "data-flow",
+                "points": 19877,
+                "paths": 6,
+                "selected": 1
+              }
+            ]
+          },
+          {
+            "name": "blank-position",
+            "scenes": [
+              {
+                "view": "data-flow",
+                "points": 19877,
+                "paths": 6,
+                "selected": 1
+              }
+            ]
+          },
+          {
+            "name": "cleared",
+            "scenes": [
+              {
+                "view": "data-flow",
+                "points": 19877,
+                "paths": 0,
+                "selected": 0
+              }
+            ]
+          },
+          {
+            "name": "normal-mode-return",
+            "scenes": [
+              {
+                "view": "data-flow",
+                "points": 21437,
+                "paths": 0,
+                "selected": 0
+              }
+            ]
+          },
+          {
+            "name": "replaced",
+            "scenes": [
+              {
+                "view": "data-flow",
+                "points": 19166,
+                "paths": 2,
+                "selected": 1
+              }
+            ]
+          },
+          {
+            "name": "before-inspection",
+            "scenes": [
+              {
+                "view": "data-flow",
+                "points": 17,
+                "paths": 2,
+                "selected": 1
+              }
+            ]
+          },
+          {
+            "name": "inspection",
+            "scenes": [
+              {
+                "view": "data-flow",
+                "points": 17,
+                "paths": 2,
+                "selected": 1
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "view": "data-model",
+        "enabled": false,
+        "errors": [],
+        "captures": [
+          {
+            "name": "selected",
+            "scenes": [
+              {
+                "view": "data-model",
+                "points": 120,
+                "paths": 10,
+                "selected": 1
+              }
+            ]
+          },
+          {
+            "name": "detail-closed",
+            "scenes": [
+              {
+                "view": "data-model",
+                "points": 120,
+                "paths": 10,
+                "selected": 1
+              }
+            ]
+          },
+          {
+            "name": "rotated-zoomed",
+            "scenes": [
+              {
+                "view": "data-model",
+                "points": 120,
+                "paths": 10,
+                "selected": 1
+              }
+            ]
+          },
+          {
+            "name": "blank-position",
+            "scenes": [
+              {
+                "view": "data-model",
+                "points": 120,
+                "paths": 10,
+                "selected": 1
+              }
+            ]
+          },
+          {
+            "name": "cleared",
+            "scenes": [
+              {
+                "view": "data-model",
+                "points": 120,
+                "paths": 0,
+                "selected": 0
+              }
+            ]
+          },
+          {
+            "name": "normal-mode-return",
+            "scenes": [
+              {
+                "view": "data-model",
+                "points": 120,
+                "paths": 0,
+                "selected": 0
+              }
+            ]
+          },
+          {
+            "name": "replaced",
+            "scenes": [
+              {
+                "view": "data-model",
+                "points": 120,
+                "paths": 0,
+                "selected": 1
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "view": "data-model",
+        "enabled": true,
+        "errors": [],
+        "captures": [
+          {
+            "name": "selected",
+            "scenes": [
+              {
+                "view": "data-model",
+                "points": 41,
+                "paths": 10,
+                "selected": 1
+              }
+            ]
+          },
+          {
+            "name": "detail-closed",
+            "scenes": [
+              {
+                "view": "data-model",
+                "points": 41,
+                "paths": 10,
+                "selected": 1
+              }
+            ]
+          },
+          {
+            "name": "rotated-zoomed",
+            "scenes": [
+              {
+                "view": "data-model",
+                "points": 79,
+                "paths": 10,
+                "selected": 1
+              }
+            ]
+          },
+          {
+            "name": "blank-position",
+            "scenes": [
+              {
+                "view": "data-model",
+                "points": 79,
+                "paths": 10,
+                "selected": 1
+              }
+            ]
+          },
+          {
+            "name": "cleared",
+            "scenes": [
+              {
+                "view": "data-model",
+                "points": 78,
+                "paths": 0,
+                "selected": 0
+              }
+            ]
+          },
+          {
+            "name": "normal-mode-return",
+            "scenes": [
+              {
+                "view": "data-model",
+                "points": 90,
+                "paths": 0,
+                "selected": 0
+              }
+            ]
+          },
+          {
+            "name": "replaced",
+            "scenes": [
+              {
+                "view": "data-model",
+                "points": 54,
+                "paths": 0,
+                "selected": 1
+              }
+            ]
+          },
+          {
+            "name": "before-inspection",
+            "scenes": [
+              {
+                "view": "data-model",
+                "points": 54,
+                "paths": 0,
+                "selected": 1
+              }
+            ]
+          },
+          {
+            "name": "inspection",
+            "scenes": [
+              {
+                "view": "data-model",
+                "points": 54,
+                "paths": 0,
+                "selected": 1
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "view": "runtime-flow",
+        "enabled": false,
+        "errors": [],
+        "captures": [
+          {
+            "name": "selected",
+            "scenes": [
+              {
+                "view": "runtime-flow",
+                "points": 105,
+                "paths": 4,
+                "selected": 1
+              }
+            ]
+          },
+          {
+            "name": "detail-closed",
+            "scenes": [
+              {
+                "view": "runtime-flow",
+                "points": 105,
+                "paths": 4,
+                "selected": 1
+              }
+            ]
+          },
+          {
+            "name": "rotated-zoomed",
+            "scenes": [
+              {
+                "view": "runtime-flow",
+                "points": 105,
+                "paths": 4,
+                "selected": 1
+              }
+            ]
+          },
+          {
+            "name": "blank-position",
+            "scenes": [
+              {
+                "view": "runtime-flow",
+                "points": 105,
+                "paths": 4,
+                "selected": 1
+              }
+            ]
+          },
+          {
+            "name": "cleared",
+            "scenes": [
+              {
+                "view": "runtime-flow",
+                "points": 105,
+                "paths": 0,
+                "selected": 0
+              }
+            ]
+          },
+          {
+            "name": "normal-mode-return",
+            "scenes": [
+              {
+                "view": "runtime-flow",
+                "points": 105,
+                "paths": 0,
+                "selected": 0
+              }
+            ]
+          },
+          {
+            "name": "replaced",
+            "scenes": [
+              {
+                "view": "runtime-flow",
+                "points": 105,
+                "paths": 2,
+                "selected": 1
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "view": "runtime-flow",
+        "enabled": true,
+        "errors": [],
+        "captures": [
+          {
+            "name": "selected",
+            "scenes": [
+              {
+                "view": "runtime-flow",
+                "points": 33,
+                "paths": 4,
+                "selected": 1
+              }
+            ]
+          },
+          {
+            "name": "detail-closed",
+            "scenes": [
+              {
+                "view": "runtime-flow",
+                "points": 33,
+                "paths": 4,
+                "selected": 1
+              }
+            ]
+          },
+          {
+            "name": "rotated-zoomed",
+            "scenes": [
+              {
+                "view": "runtime-flow",
+                "points": 77,
+                "paths": 4,
+                "selected": 1
+              }
+            ]
+          },
+          {
+            "name": "blank-position",
+            "scenes": [
+              {
+                "view": "runtime-flow",
+                "points": 77,
+                "paths": 4,
+                "selected": 1
+              }
+            ]
+          },
+          {
+            "name": "cleared",
+            "scenes": [
+              {
+                "view": "runtime-flow",
+                "points": 77,
+                "paths": 0,
+                "selected": 0
+              }
+            ]
+          },
+          {
+            "name": "normal-mode-return",
+            "scenes": [
+              {
+                "view": "runtime-flow",
+                "points": 79,
+                "paths": 0,
+                "selected": 0
+              }
+            ]
+          },
+          {
+            "name": "replaced",
+            "scenes": [
+              {
+                "view": "runtime-flow",
+                "points": 77,
+                "paths": 2,
+                "selected": 1
+              }
+            ]
+          },
+          {
+            "name": "before-inspection",
+            "scenes": [
+              {
+                "view": "runtime-flow",
+                "points": 77,
+                "paths": 2,
+                "selected": 1
+              }
+            ]
+          },
+          {
+            "name": "inspection",
+            "scenes": [
+              {
+                "view": "runtime-flow",
+                "points": 77,
+                "paths": 2,
+                "selected": 1
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "view": "function-call-flow",
+        "enabled": false,
+        "errors": [],
+        "captures": [
+          {
+            "name": "selected",
+            "scenes": [
+              {
+                "view": "function-call-flow",
+                "points": 2083,
+                "paths": 7,
+                "selected": 1
+              }
+            ]
+          },
+          {
+            "name": "detail-closed",
+            "scenes": [
+              {
+                "view": "function-call-flow",
+                "points": 2083,
+                "paths": 7,
+                "selected": 1
+              }
+            ]
+          },
+          {
+            "name": "rotated-zoomed",
+            "scenes": [
+              {
+                "view": "function-call-flow",
+                "points": 2083,
+                "paths": 7,
+                "selected": 1
+              }
+            ]
+          },
+          {
+            "name": "blank-position",
+            "scenes": [
+              {
+                "view": "function-call-flow",
+                "points": 2083,
+                "paths": 7,
+                "selected": 1
+              }
+            ]
+          },
+          {
+            "name": "cleared",
+            "scenes": [
+              {
+                "view": "function-call-flow",
+                "points": 2083,
+                "paths": 0,
+                "selected": 0
+              }
+            ]
+          },
+          {
+            "name": "normal-mode-return",
+            "scenes": [
+              {
+                "view": "function-call-flow",
+                "points": 2083,
+                "paths": 0,
+                "selected": 0
+              }
+            ]
+          },
+          {
+            "name": "replaced",
+            "scenes": [
+              {
+                "view": "function-call-flow",
+                "points": 2083,
+                "paths": 3,
+                "selected": 1
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "view": "function-call-flow",
+        "enabled": true,
+        "errors": [],
+        "captures": [
+          {
+            "name": "selected",
+            "scenes": [
+              {
+                "view": "function-call-flow",
+                "points": 2083,
+                "paths": 7,
+                "selected": 1
+              }
+            ]
+          },
+          {
+            "name": "detail-closed",
+            "scenes": [
+              {
+                "view": "function-call-flow",
+                "points": 2083,
+                "paths": 7,
+                "selected": 1
+              }
+            ]
+          },
+          {
+            "name": "rotated-zoomed",
+            "scenes": [
+              {
+                "view": "function-call-flow",
+                "points": 132,
+                "paths": 7,
+                "selected": 1
+              }
+            ]
+          },
+          {
+            "name": "blank-position",
+            "scenes": [
+              {
+                "view": "function-call-flow",
+                "points": 132,
+                "paths": 7,
+                "selected": 1
+              }
+            ]
+          },
+          {
+            "name": "cleared",
+            "scenes": [
+              {
+                "view": "function-call-flow",
+                "points": 129,
+                "paths": 0,
+                "selected": 0
+              }
+            ]
+          },
+          {
+            "name": "normal-mode-return",
+            "scenes": [
+              {
+                "view": "function-call-flow",
+                "points": 129,
+                "paths": 0,
+                "selected": 0
+              }
+            ]
+          },
+          {
+            "name": "replaced",
+            "scenes": [
+              {
+                "view": "function-call-flow",
+                "points": 131,
+                "paths": 3,
+                "selected": 1
+              }
+            ]
+          },
+          {
+            "name": "before-inspection",
+            "scenes": [
+              {
+                "view": "function-call-flow",
+                "points": 75,
+                "paths": 3,
+                "selected": 1
+              }
+            ]
+          },
+          {
+            "name": "inspection",
+            "scenes": [
+              {
+                "view": "function-call-flow",
+                "points": 75,
+                "paths": 3,
+                "selected": 1
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
