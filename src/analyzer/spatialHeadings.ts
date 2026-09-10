@@ -7,6 +7,8 @@ export interface SpatialHeadingModel {
   bounds: SpatialWorldRect;
   firstModuleTop?: SpatialWorldPoint;
   width: number;
+  /** A connected heading's lower edge is anchored in world coordinates. */
+  connected?: boolean;
 }
 
 export interface SpatialHeadingFrame {
@@ -34,11 +36,11 @@ export function projectSpatialHeadings(models: readonly SpatialHeadingModel[], c
     const anchor = projectSpatialPoint(model.anchor, camera);
     const bounds = projectWorldRect(model.bounds, camera);
     const firstTop = model.firstModuleTop ? projectSpatialPoint(model.firstModuleTop, camera).y : Infinity;
-    const width = Math.max(0, Math.min(model.width * scale, bounds.x + bounds.width - anchor.x - 12 * camera.scale));
+    const width = model.connected ? model.width * scale : Math.max(0, Math.min(model.width * scale, bounds.x + bounds.width - anchor.x - 12 * camera.scale));
     const frame: SpatialHeadingFrame = {
-      id: model.id, x: anchor.x, y: Math.min(anchor.y - 11 * scale, firstTop - 28 * scale),
+      id: model.id, x: anchor.x, y: model.connected ? anchor.y - 24 * scale : Math.min(anchor.y - 11 * scale, firstTop - 28 * scale),
       width, height: 24 * scale, scale,
-      visible: width >= 80 * scale && bounds.height >= 28 * scale,
+      visible: Boolean(model.connected) || width >= 80 * scale && bounds.height >= 28 * scale,
     };
     frame.visible &&= frame.x + width >= 0 && frame.y + frame.height >= 0
       && frame.x <= camera.viewportWidth && frame.y <= camera.viewportHeight;
@@ -50,7 +52,7 @@ export function projectSpatialHeadings(models: readonly SpatialHeadingModel[], c
       for (let y = Math.floor((frame.y - clearance) / cellSize); y <= Math.floor((frame.y + frame.height + clearance) / cellSize); y++) {
         const key = `${x}:${y}`;
         keys.push(key);
-        if (cells.get(key)?.some(other => frame.x < other.x + other.width + clearance
+        if (!model.connected && cells.get(key)?.some(other => frame.x < other.x + other.width + clearance
           && frame.x + width + clearance > other.x && frame.y < other.y + other.height + clearance
           && frame.y + frame.height + clearance > other.y)) frame.visible = false;
       }

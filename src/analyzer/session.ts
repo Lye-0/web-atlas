@@ -35,6 +35,7 @@ export interface AnalyzerSessionState {
   views: Record<AnalyzerViewId, AnalyzerViewSession>;
   scanVersion: number;
   showFlowGroupBounds?: boolean;
+  particleMode?: 'normal' | 'reduced' | 'off';
   autoAggregation?: boolean;
 }
 
@@ -44,6 +45,7 @@ export type AnalyzerSessionAction =
   | { type: 'replaceProject'; store: AnalyzerProjectStore; folderHandle?: DirectoryHandleLike }
   | { type: 'setActiveView'; view: AnalyzerViewId }
   | { type: 'setFlowGroupBounds'; visible: boolean }
+  | { type: 'setParticleMode'; mode: 'normal' | 'reduced' | 'off' }
   | { type: 'setAutoAggregation'; enabled: boolean }
   | { type: 'updateView'; view: AnalyzerViewId; update: AnalyzerViewSessionUpdate };
 
@@ -173,6 +175,7 @@ export function analyzerSessionReducer(state: AnalyzerSessionState, action: Anal
       views: Object.fromEntries(analyzerViewIds.map((view) => [view, createInitialAnalyzerViewSession()])) as Record<AnalyzerViewId, AnalyzerViewSession>,
       scanVersion: state.scanVersion + 1,
       showFlowGroupBounds: state.showFlowGroupBounds ?? true,
+      particleMode: state.particleMode,
       autoAggregation: state.autoAggregation ?? true,
     };
   }
@@ -182,6 +185,7 @@ export function analyzerSessionReducer(state: AnalyzerSessionState, action: Anal
   }
 
   if (action.type === 'setFlowGroupBounds') return (state.showFlowGroupBounds ?? true) === action.visible ? state : { ...state, showFlowGroupBounds: action.visible };
+  if (action.type === 'setParticleMode') return state.particleMode === action.mode ? state : { ...state, particleMode: action.mode };
   if (action.type === 'setAutoAggregation') return (state.autoAggregation ?? true) === action.enabled ? state : { ...state, autoAggregation: action.enabled };
 
   const currentView = state.views[action.view];

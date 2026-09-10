@@ -46,7 +46,7 @@ function RelationList({ nodeId, view, onSelectNode, onSelectRegion, onFocusConne
         return (
           <li key={relation.id}>
             <button type="button" onClick={() => targetRegion ? onSelectRegion?.(targetRegion.id, true) : target && onSelectNode(target.id, true)}>
-              <span>{relationLabelForNode(relation, nodeId)}</span>
+              <span>{relation.sourceId === nodeId ? '出る関係 → ' : '入る関係 ← '}{relationLabelForNode(relation, nodeId)}</span>
               <strong>{target?.label ?? targetRegion?.label}</strong>
             </button>
             {onFocusConnection && <button type="button" className="analyzer-connection-fit" onClick={() => onFocusConnection(relation.sourceId, relation.targetId)} aria-label={`${target?.label ?? targetRegion?.label}との両端を表示`}>両端を表示</button>}
@@ -135,7 +135,7 @@ function RegionRelationList({ region, view, onSelectNode, onSelectRegion }: { re
         return (
           <li key={relation.id}>
             <button type="button" onClick={() => targetRegion ? onSelectRegion?.(targetRegion.id, true) : target && onSelectNode(target.id, true)}>
-              <span>{relationLabelForNode(relation, region.id)}</span>
+              <span>{relation.sourceId === region.id ? '出る関係 → ' : '入る関係 ← '}{relationLabelForNode(relation, region.id)}</span>
               <strong>{target?.label ?? targetRegion?.label}</strong>
             </button>
           </li>
@@ -169,7 +169,7 @@ function RegionDetails({ region, view, store, onSelectNode, onSelectRegion }: { 
       <div className="analyzer-detail-heading">
         <div className="analyzer-detail-heading-top">
           <span className="analyzer-node-type">REGION / SCOPE</span>
-          <button type="button" className="analyzer-focus-selected" onClick={() => onSelectRegion?.(region.id, true)}>Focus Selected</button>
+          <button type="button" className="analyzer-focus-selected" onClick={() => onSelectRegion?.(region.id, true)}>選択へ移動</button>
         </div>
         <h2>{region.label}</h2>
         {region.subtitle && <p>{region.subtitle}</p>}
@@ -203,8 +203,7 @@ function RegionDetails({ region, view, store, onSelectNode, onSelectRegion }: { 
         <RegionRelationList region={region} view={view} onSelectNode={onSelectNode} onSelectRegion={onSelectRegion} />
       </section>
       <section className="analyzer-detail-section">
-        <h3>Metadata</h3>
-        <MetadataList metadata={region.metadata} />
+        <details><summary>補助情報</summary><MetadataList metadata={region.metadata} /></details>
       </section>
     </>
   );
@@ -234,7 +233,7 @@ function ModuleRegionDetails({ region, view, store, onSelectNode, onSelectRegion
       <div className="analyzer-detail-heading">
         <div className="analyzer-detail-heading-top">
           <span className="analyzer-node-type">{region.regionKind === 'directory' ? 'DIRECTORY' : 'PACKAGE / AREA'}</span>
-          <button type="button" className="analyzer-focus-selected" onClick={() => onSelectRegion?.(region.id, true)}>Focus Selected</button>
+          <button type="button" className="analyzer-focus-selected" onClick={() => onSelectRegion?.(region.id, true)}>選択へ移動</button>
         </div>
         <h2>{region.label}</h2>
         <p>{path}</p>
@@ -295,8 +294,7 @@ function ModuleRegionDetails({ region, view, store, onSelectNode, onSelectRegion
         <EvidenceList evidenceIds={region.evidenceIds} view={view} store={store} />
       </section>
       <section className="analyzer-detail-section">
-        <h3>Metadata</h3>
-        <MetadataList metadata={region.metadata} />
+        <details><summary>補助情報</summary><MetadataList metadata={region.metadata} /></details>
       </section>
     </>
   );
@@ -401,7 +399,7 @@ function NodeDetails({ node, view, store, expandedPresentationIds, onSelectNode,
       <div className="analyzer-detail-heading">
         <div className="analyzer-detail-heading-top">
           <span className="analyzer-node-type">{displayNodeType(node)}</span>
-          <button type="button" className="analyzer-focus-selected" onClick={() => onSelectNode(node.id, true)}>Focus Selected</button>
+          <button type="button" className="analyzer-focus-selected" onClick={() => onSelectNode(node.id, true)}>選択へ移動</button>
         </div>
         <h2>
           {dictionary
@@ -504,8 +502,7 @@ function NodeDetails({ node, view, store, expandedPresentationIds, onSelectNode,
       <RelationList onFocusConnection={onFocusConnection} nodeId={node.id} view={view} onSelectNode={onSelectNode} onSelectRegion={onSelectRegion} />
       </section>
       <section className="analyzer-detail-section">
-        <h3>Metadata</h3>
-        <MetadataList metadata={node.metadata} />
+        <details><summary>補助情報</summary><MetadataList metadata={node.metadata} /></details>
       </section>
     </>
   );
@@ -523,11 +520,11 @@ function EdgeDetails({ edge, view, store, onSelectNode, onSelectRegion, onFocusC
           <span className="analyzer-node-type">Relation</span>
         </div>
         <h2>{edge.label}</h2>
-        <p>{source?.label ?? edge.sourceId} → {target?.label ?? edge.targetId}</p>
+        <p>{source?.label ?? sourceRegion?.label ?? edge.sourceId} → {target?.label ?? targetRegion?.label ?? edge.targetId}</p>
       </div>
       <section className="analyzer-detail-section">
         <h3>Relation</h3>
-        <p className="analyzer-edge-summary">{source?.label ?? edge.sourceId} <span aria-hidden="true">→</span> {target?.label ?? edge.targetId}</p>
+        <p className="analyzer-edge-summary">{source?.label ?? sourceRegion?.label ?? edge.sourceId} <span aria-hidden="true">→</span> {target?.label ?? targetRegion?.label ?? edge.targetId}</p>
         <div className="analyzer-edge-actions">
           {onFocusConnection && <button type="button" onClick={() => onFocusConnection(edge.sourceId, edge.targetId)}>両端を表示</button>}
           {source && <button type="button" onClick={() => onSelectNode(source.id, true)}>Sourceを見る</button>}
@@ -546,13 +543,12 @@ function EdgeDetails({ edge, view, store, onSelectNode, onSelectRegion, onFocusC
           <dl className="analyzer-metadata-list analyzer-stack-usage-list">
             <div><dt>Kind</dt><dd>{metadataStringFromEdge(edge, 'dependencyKind') ?? edge.kind}</dd></div>
             <div><dt>Specifier</dt><dd>{metadataStringFromEdge(edge, 'specifier') ?? '—'}</dd></div>
-            <div><dt>Resolved To</dt><dd>{metadataStringFromEdge(edge, 'targetPath') ?? target?.subtitle ?? target?.label ?? edge.targetId}</dd></div>
+            <div><dt>Resolved To</dt><dd>{metadataStringFromEdge(edge, 'targetPath') ?? target?.subtitle ?? target?.label ?? targetRegion?.label ?? edge.targetId}</dd></div>
           </dl>
         </section>
       )}
       <section className="analyzer-detail-section">
-        <h3>Metadata</h3>
-        <MetadataList metadata={edge.metadata} />
+        <details><summary>補助情報</summary><MetadataList metadata={edge.metadata} /></details>
       </section>
     </>
   );
@@ -579,7 +575,7 @@ export function AnalyzerDetailPanel({ store, view, selectedNodeId, selectedRegio
         <div className="analyzer-detail-empty">
           <div className="analyzer-detail-heading-top">
             <span className="analyzer-panel-kicker">Selection</span>
-            <button type="button" className="analyzer-detail-close" onClick={onClose} aria-label="Close detail panel">Close</button>
+            <button type="button" className="analyzer-detail-close" onClick={onClose} aria-label="詳細を閉じる">閉じる</button>
           </div>
           <h2>Node、RegionまたはEdgeを選択</h2>
           <p>Graph上の要素を選ぶと、検出理由・直接Evidence・関係・metadataを表示します。</p>
@@ -587,21 +583,21 @@ export function AnalyzerDetailPanel({ store, view, selectedNodeId, selectedRegio
       ) : node ? (
         <>
           <div className="analyzer-detail-panel-close-row">
-            <button type="button" className="analyzer-detail-close" onClick={onClose} aria-label="Close detail panel">Close</button>
+            <button type="button" className="analyzer-detail-close" onClick={onClose} aria-label="詳細を閉じる">閉じる</button>
           </div>
           <NodeDetails onFocusConnection={onFocusConnection} node={node} view={view} store={store} expandedPresentationIds={expandedPresentationIds} onSelectNode={onSelectNode} onSelectRegion={onSelectRegion} onTogglePresentation={onTogglePresentation} />
         </>
       ) : region ? (
         <>
           <div className="analyzer-detail-panel-close-row">
-            <button type="button" className="analyzer-detail-close" onClick={onClose} aria-label="Close detail panel">Close</button>
+            <button type="button" className="analyzer-detail-close" onClick={onClose} aria-label="詳細を閉じる">閉じる</button>
           </div>
           <RegionDetails region={region} view={view} store={store} onSelectNode={onSelectNode} onSelectRegion={onSelectRegion} />
         </>
       ) : edge ? (
         <>
           <div className="analyzer-detail-panel-close-row">
-            <button type="button" className="analyzer-detail-close" onClick={onClose} aria-label="Close detail panel">Close</button>
+            <button type="button" className="analyzer-detail-close" onClick={onClose} aria-label="詳細を閉じる">閉じる</button>
           </div>
           <EdgeDetails onFocusConnection={onFocusConnection} edge={edge} view={view} store={store} onSelectNode={onSelectNode} onSelectRegion={onSelectRegion} />
         </>

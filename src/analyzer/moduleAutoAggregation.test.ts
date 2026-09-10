@@ -1,6 +1,33 @@
 import { describe, expect, it } from 'vitest';
 import type { AnalyzerEvidence } from './types';
-import { moduleRelationEvidenceCounts } from './moduleAutoAggregation';
+import { moduleAggregateRegions, moduleRelationEvidenceCounts } from './moduleAutoAggregation';
+import type { PositionedNode, PositionedSemanticRegion } from './layout';
+import type { DisplayAggregation } from './autoAggregation';
+
+describe('module aggregate heading ownership', () => {
+  const file = (id: string, regionPath: string[]): PositionedNode => ({ x: 0, y: 0, height: 36,
+    node: { id, label: id, type: 'module', evidenceIds: [], metadata: { regionPath } } });
+  const region = (id: string): PositionedSemanticRegion => ({ x: 0, y: 0, width: 300, height: 200, headingHeight: 30, memberGap: 10,
+    region: { id, label: id, entityKind: 'region', regionKind: 'directory', childIds: [], ports: [], selectable: true, evidenceIds: [], metadata: {} } });
+  const group: DisplayAggregation = { id: 'display', groupId: 'group', label: 'src', memberIds: ['a', 'b'], matchingCount: 0, mode: 'automatic', x: 0, y: 0, z: 0 };
+  const regions = ['package', 'src', 'src/a', 'src/b', 'other-package'].map(region);
+
+  it('uses the common ancestor of files across subdirectories without changing membership', () => {
+    const files = [file('a', ['package', 'src', 'src/a']), file('b', ['package', 'src', 'src/b'])];
+    expect(moduleAggregateRegions([group], files, regions).get('display')?.region.id).toBe('src');
+    expect(group.memberIds).toEqual(['a', 'b']);
+  });
+
+  it('attaches manual collapsed groups to the nearest visible common ancestor', () => {
+    const files = [file('a', ['package', 'src', 'src/a']), file('b', ['package', 'src', 'src/a'])];
+    expect(moduleAggregateRegions([{ ...group, mode: 'manual' }], files, regions.filter(r => r.region.id !== 'src/a')).get('display')?.region.id).toBe('src');
+  });
+
+  it('does not use matching labels or the first file to invent an owner across packages', () => {
+    expect(moduleAggregateRegions([group], [file('a', ['package']), file('b', ['other-package'])], regions).size).toBe(0);
+    expect(moduleAggregateRegions([group], [file('a', ['package'])], regions).size).toBe(0);
+  });
+});
 
 describe('module aggregation Evidence units', () => {
   const evidence = (id: string, line: number, filePath = 'src/main.ts'): AnalyzerEvidence => ({ id, filePath, contextStartLine: line, contextEndLine: line,

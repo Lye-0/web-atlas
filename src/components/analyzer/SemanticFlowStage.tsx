@@ -64,8 +64,7 @@ export function SemanticFlowStage({ graph, explorer, nodeDisplays, navigation, m
     if (controls.current) observer.observe(controls.current); if (navigationElement.current) observer.observe(navigationElement.current);
     return () => observer.disconnect();
   }, [hasNavigation, navigation?.visitId, mode]);
-  const flow = useSpatialFlowMotion(element);
-  const { mode: currentParticleMode, setMode: setParticleMode } = flow;
+  const flow = useSpatialFlowMotion(element, { mode: particleMode, onChange: onParticleMode });
   const [help, setHelp] = useState(false);
   const commandContext = useMemo(() => ({ visitId: navigation?.visitId, mode }), [navigation?.visitId, mode]);
   const [commandState, setCommandState] = useState<{ context: object; command: FlowCameraCommand }>();
@@ -77,7 +76,6 @@ export function SemanticFlowStage({ graph, explorer, nodeDisplays, navigation, m
   }, [onArchitectureNodeClick]);
   const selectEdge = useCallback((id: string) => { setCommandState(undefined); onSelectEdge(id); }, [onSelectEdge]);
   const nonce = useRef(0), previousFocus = useRef<number | undefined>(undefined);
-  useEffect(() => { if (particleMode && currentParticleMode !== particleMode) setParticleMode(particleMode); }, [particleMode, currentParticleMode, setParticleMode]);
   const run = useCallback((kind: FlowCameraCommand['kind'], ids?: string[]) => setCommandState({ context: commandContext, command: { kind, ids, nonce: ++nonce.current } }), [commandContext]);
   useEffect(() => {
     if (focus && (!focus.mode || focus.mode === mode) && focus.nonce !== previousFocus.current) { previousFocus.current = focus.nonce; run('focus', focus.ids); }
@@ -108,7 +106,7 @@ export function SemanticFlowStage({ graph, explorer, nodeDisplays, navigation, m
           || selectedEdgeId && !localGraph.edges.some(edge => edge.id === selectedEdgeId))) navigation.onRevealSelection();
         else run('focus', selectedEdgeId ? graph.edges.filter(edge => edge.id === selectedEdgeId).flatMap(edge => [edge.source, edge.target]) : [...selectedIds]);
       }}>選択へ移動</button>
-      <SpatialParticleControl mode={flow.mode} onChange={next => { flow.setMode(next); onParticleMode(next); }} onOpen={() => setHelp(false)} />
+      <SpatialParticleControl mode={flow.mode} onChange={flow.setMode} onOpen={() => setHelp(false)} />
       {mode === '3d' && <button type="button" className="semantic-flow-bounds-toggle" aria-label="分類の囲い" aria-pressed={showGroupBounds} onClick={() => onGroupBounds?.(!showGroupBounds)}>分類の囲い：{showGroupBounds ? 'ON' : 'OFF'}</button>}
       {mode === '3d' && <AutoAggregationToggle enabled={autoAggregation} onChange={enabled => onAutoAggregation?.(enabled)} />}
       {architectureControls}

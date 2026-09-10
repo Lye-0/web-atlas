@@ -70,6 +70,16 @@
 - files: `src/components/analyzer/semanticFlowLabels.ts`, `src/components/analyzer/semanticFlowLabels.test.ts`, `src/components/analyzer/SemanticFlow3D.tsx` …
 - memory: `agent-knowledge/entries/2026-09-09-flow-label-unique-placement-45ea82.md`
 
+## analyzer-interaction
+
+### 検索入力を表示展開の入力へ戻さない
+- id: `rm-20260910-analyzer-search-presentation-boundary`
+- type: `failure`
+- maturity: `candidate`
+- tags: `search`, `selection`, `camera`, `presentation`
+- files: `src/pages/AnalyzerPage.tsx`, `src/pages/AnalyzerPage.test.tsx`, `src/components/analyzer/AnalyzerGraphStage.tsx` …
+- memory: `agent-knowledge/entries/2026-09-10-analyzer-search-presentation-boundary-72f9ac.md`
+
 ## analyzer-model
 
 ### 派生した項目のコピーを、元の定義所有者へ置き換えない
@@ -97,6 +107,14 @@
 - tags: `r3f`, `lifecycle`, `heap`, `closure`
 - files: `src/components/analyzer/useDisposableFrame.ts`, `src/components/analyzer/useDisposableFrame.test.tsx`, `src/components/analyzer/semanticCanvasLifecycle.ts` …
 - memory: `agent-knowledge/entries/2026-09-09-r3f-retained-root-callbacks-a619d2.md`
+
+### 設定共有と粒子の描画仕様を別々に検証する
+- id: `rm-20260910-particle-renderer-contract`
+- type: `failure`
+- maturity: `candidate`
+- tags: `particles`, `presentation`, `shared-state`, `animation`
+- files: `src/analyzer/flowParticleStyle.ts`, `src/analyzer/spatialFlow.ts`, `src/components/analyzer/SvgFlowParticles.tsx` …
+- memory: `agent-knowledge/entries/2026-09-10-particle-renderer-contract-d2916e.md`
 
 ## analyzer-session
 

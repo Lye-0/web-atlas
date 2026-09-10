@@ -93,15 +93,16 @@ Analyzer shellは10個のViewを持ちます。View 1〜5のprojectorとrenderer
 - **Layout**: `layout.ts`のTab 5分岐から`spatialPacking.ts`の決定的なshelf packingを使用します。子Regionのサイズと親のheading / insetから包含boundsを作り、密なDirectoryのModule列数は件数から決めます。基礎Layoutは初期の全展開状態で固定し、手動折りたたみも表示投影で扱います。閉じた範囲のModule ID・位置をLayout入力から除くと、件数や選択保護を回復できないためです。選択・Camera・LOD・自動省略はLayoutを変更しません。空の展開Setは初期の全展開であり、最初のtoggleで明示的な展開Setへ変換します。
 - **3D / projection**: layout座標はx=right / y=down / z=elevation。Orthographic Cameraは固定pitch 17°・yaw 0°、操作は2D pan / zoomです。`SpatialAtlasScene.tsx`がRegion面・Module・接続線・方向マーカー・ファイル名を同じWebGL空間とdepth bufferで描きます。RegionとModuleはInstancedMesh、Region枠はLineSegments2、依存線は結合したTubeGeometryで一括描画します。角丸Module面・境界線・ファイルアイコンと、階層ごとのRegion面・枠・headingで包含を示します。
 - **Labels / input**: ファイル名は128 Module単位のCanvasTexture atlasとInstancedMeshで描画します。画面内と周囲300pxに関係するpageだけを必要な詳細度で作成し、破棄時にGPU resourceを解放します。DOM Module buttonは透明な操作・keyboard・accessible name・tooltipの層です。接続線はSVGへ重複描画せず、SVG pathは同じworld routeを投影した透明なhit targetのみです。Region heading・選択バッジ・DetailはDOMを使います。
-- **Region headings / controls**: Directory / Package名は塗りのない見出しと下線、DIR / PKG表記でFile Cardと区別します。自領域の最初のFileより上へ配置し、選択・展開操作を保持します。Canvasはworkspaceの高さ全体を使い、右上にはFit / Reset / zoom / 全画面 / helpだけの小さい操作部を重ねます。件数や依存方向はDetailで確認します。ResizeObserverは現在のCanvas stage要素だけを監視してDOM操作層とWebGLのviewportを一致させます。
+- **Region headings / controls**: Directory / Package名は塗りのない見出しと下線、DIR / PKG表記でFile Cardと区別します。自領域の最初のFileより上へ配置し、選択・展開操作を保持します。Canvasはworkspaceの高さ全体を使い、右上にはFit / Reset / zoom / 選択へ移動 / パーティクル / 既存の表示設定 / 全画面 / helpを重ねます。件数や依存方向はDetailで確認します。Canvas stageのResizeObserverでDOM操作層とWebGLのviewportを一致させ、操作部の高さはヘルプの位置だけに使います。
 - **Tab 5 Detail**: `ModuleDependencyDetails.tsx`がFile / Directory / dependency専用の詳細表示を担当します。名前・pathの後にimport先 / import元を置き、基本情報・Import宣言・Evidence・Metadataはaccordionに分けます。Directoryは内部依存数・含まれるFile・子Directoryも折りたたみます。一覧は6件から全件へ展開でき、外部・未解決のImport宣言も保持します。閉じたEvidenceはsource code blockを描画せず、選択対象が変わるとaccordionとpanel scrollを初期化します。View 1〜4の詳細表示は既存構成を維持します。
 - **Fullscreen**: `useWorkspaceFullscreen.ts`がworkspace単位のFullscreen APIとfullscreenchangeを扱います。未対応・利用不可の場合は同じworkspaceをviewport全体へ広げます。全画面ではCanvas・Detail・操作部だけを表示し、selectionとCameraを保持します。終了buttonまたはEscで元へ戻り、背景のscrollとfocusを復元します。全画面中のEscは選択を解除せず、Tab focusもworkspace内に保ちます。
 - **Edge / elevation**: `spatialBridge.ts`が実際のperimeter portから外向きの接線を持つ連続曲線を作ります。端点で水平になり、中央がModuleより高くなるarchと地面への薄い投影で高さを示します。portは相手の位置順に並べ、端点間の平面交差には決定的な高さを割り当てます。Tubeの外側の裏面で交差の隙間を作り、線幅はuniformでscreen pixel基準へ補正します。実targetと端点近くの方向マーカーは初回描画前にinstance bufferを初期化します。Camera操作では経路も高さも再計算しません。
-- **Flow animation**: Canvas右上の「パーティクル」は初期ONで、buttonのプルダウンから通常・控えめ・オフを選択できます。現在のmodeをbuttonとmenuの選択表示に反映し、外側のクリック・Escでmenuを閉じます。有効時は既存のTubeGeometryと同じring centerを使う粒を、import矢印と同じsource → targetへ流します。色は各依存線と共通で、短い残光と局所的な発光をshaderで描きます。`spatialFlow.ts`が曲線の累積距離と安定した位相を用意し、`SpatialFlowParticles.tsx`が512経路ごとに1つのinstanced描画へまとめます。粒数は1経路6〜24個です。描画中は距離uniformを更新し、経路・geometry・React stateはframeごとに再生成しません。「控えめ」は粒数を約半分、速度を45%、発光を70%に抑え、OSのreduced-motion設定も初期値へ反映します。Cameraと粒は`spatialInteraction.ts`の同じrequestAnimationFrameで、DOM更新後に1回描画します。OFF・依存線なし・Canvasが画面外・browser tabが非表示の間は連続描画を停止します。
+- **Flow animation**: Canvas右上の「パーティクル」は初期ONで、buttonのプルダウンから通常・控えめ・オフを選択できます。現在のmodeをbuttonとmenuの選択表示に反映し、外側のクリック・Escでmenuを閉じます。有効時は既存のTubeGeometryと同じring centerを使う粒を、import矢印と同じsource → targetへ流します。色は各依存線と共通で、短い残光と局所的な発光をshaderで描きます。`spatialFlow.ts`が曲線の累積距離と安定した位相を用意し、`SpatialFlowParticles.tsx`が512経路ごとに1つのinstanced描画へまとめます。全rendererで曲線長50単位あたり1粒を使います。描画中は距離uniformを更新し、経路・geometry・React stateはframeごとに再生成しません。「控えめ」は間隔を100単位へ広げ、大きさを80%、発光を70%に抑え、速度は通常と同じ65単位/秒に保ち、OSのreduced-motion設定も初期値へ反映します。Cameraと粒は`spatialInteraction.ts`の同じrequestAnimationFrameで、DOM更新後に1回描画します。OFF・依存線なし・Canvasが画面外・browser tabが非表示の間は連続描画を停止します。
 - **Offscreen connections**: 世界座標の経路を両端まで保持し、WebGLのviewport clippingで見える部分だけを描きます。片端・両端が画面外でも、画面を横切る接続を除外しません。SVG hit targetもsegment intersectionで判定します。画面端を偽の接続先へ置き換えません。Detailの関係先buttonで移動でき、各関係の「両端を表示」はその依存を選択してancestorを展開し、両Moduleと実際の橋の経路をFitします。部分FitでもRepository全体のworld boundsを使い、座標の原点を変えません。
 - **Selection / edges**: 未選択では依存線を出しません。Module選択はincoming / outgoingの直接関係、Directory / Package選択は境界をまたぐ実際のModule間の関係を表示します。各Fact edgeのID・source・targetとEvidenceは元の記録に保持します。個別表示中の同じFile pairの複数import宣言は別線を保ちます。自動・手動の集合が端点なら、表示ownerの組・方向・kind・confidenceごとに表示線をまとめ、内部関係も元の関係一覧へ保持します。表示線の選択は原関係の内訳を開き、原関係の選択は両Moduleを個別表示します。集合を実在Directoryや一つのModuleとして解析しません。import先は青、import元は琥珀色で、矢印はimportする側から読み込まれる側へ向きます。検索入力は閉じた範囲の全一致対象を展開せず、一致数を集合に示します。pan開始ではSVG pathへのnative focusとtext dragを抑止します。集約内訳の操作・スクロールはpan/zoomへ渡しません。
 - **LOD**: Moduleの元の占有範囲と座標は固定です。画面上の高さ18px未満ではファイル名を省略し、3px未満では各Moduleを同じ中心位置の個別点で表現します。形状と点の切り替えは同じlive camera scaleを使い、OFF中に全ModuleをRegion面へ消すことはありません。自動省略の代表点は件数付きの中空印で区別します。Region headingはズームに応じて文字・PKG / DIR・件数・展開記号を同じ比率で拡大縮小します（倍率の平方根、0.7〜1.8倍）。名前と件数の内容は距離で切り替えず、自領域の最初のFileより上へ配置します。選択Moduleの名前は遠距離でも別のバッジに保持します。選択によるCardの拡大や配置変更はしません。
 - **Shared automatic aggregation**: `moduleAutoAggregation.ts`が同一Directoryと上位DirectoryのModule集合を共通の`autoAggregation.ts`へ渡します。投影された所属範囲と全体の点近接密度を使い、少数で離れた入力を無条件にはまとめません。明示的なDirectory開閉と自動判断は別状態で、明示展開した範囲・選択・実関係の端点を保護します。元scope = 個別 + 自動メンバー + 手動メンバーを重複なく維持し、OFFは自動分だけを解除します。元関係数、Evidence IDの件数、file/highlight rangeで重複を除く根拠箇所数を分け、未取得の範囲数は0件と同一視しません。グローバル設定・View別の履歴・全件一覧・元座標とカメラの契約は[共通3D表示集約](semantic-analyzer.md#shared-3d-display-aggregation)を参照してください。
+- **Map annotations**: タブ5の選択名と集約先ラベルはCameraの倍率で文字・枠・余白・位置の間隔を縮小します。静止時はbase Cameraの倍率、操作中はoverlayのaffine transformを使い、ズーム終了時に固定サイズへ戻しません。集約先のクリック範囲は34pxを保ち、ラベルの重なり判定には表示倍率を適用します。
 - **Interaction / performance**: `spatialInteraction.ts`が入力をrequestAnimationFrameへ集約し、操作中はCameraと透明なFile / Edge操作overlayの単一affine transformを更新します。Directory / Package見出しは独立したDOM層に置き、`spatialHeadings.ts`の投影・文字倍率・表示判定をWebGL描画と同じframeで更新します。静止後も同じ投影を使い、文字サイズや位置の戻りを防ぎます。Fileの操作範囲は静止後に更新し、Session保存をdebounceします。新規gesture・Fit・Reset・Focusは古いtimerを取り消します。投影用Cameraの軸をmodel単位にcacheし、全Cardに対する二重の衝突判定をなくしました。見出し同士の衝突はscreen gridで近隣だけを判定し、選択・Package・Directoryの優先順を保ちます。見出しの更新ではlayoutや依存線を再構築しません。panでは矢印のinstance bufferも更新しません。Wheelは非passive listenerでページscrollを抑え、カーソル位置を中心に拡大縮小します。Card上からのdrag、矢印キー、Shift＋矢印キーの微調整、＋ / −、Home、Escape、DirectoryのEnterに対応します。
 
 `spatialRepository.test.ts`は1,200 Moduleの合成データで包含とincident保持を検証します。任意の実Repositoryを読み取り専用で検証する場合は、PowerShellで`$env:WEB_ATLAS_VALIDATION_REPOS='C:/path/to/repo-a;C:/path/to/repo-b'`を設定して`pnpm test`を実行します。未指定時は外部Repository検証のみskipします。`spatialBridge.test.ts`は端点・高さ・交差・viewport clippingを検証します。`AnalyzerSpatialGraphStage.test.tsx`は連続ズーム、Fitとtimerの競合、Wheel、keyboard、Far選択、画面外の相手への接続維持を実コンポーネントで検証します。`AnalyzerPage.test.tsx`は検索からの選択・解除と、Detailからの両端FitをSession込みで検証します。WebGLの描画と実機の操作性は別途browserで確認します。
@@ -124,7 +125,22 @@ Current Viewsとroute IDは次の10個です。
 
 Stack Mapは主要StackのScope帰属、Architecture Mapは実行単位・共有コード・内部構成・外部の相手を階層化し、設定環境と元関係を保持する構成図を示します。詳細は[Architecture Map](architecture-map.md)を参照してください。Package Dependencyは直接dependency宣言を示し、それぞれ別の投影を使用します。
 
-全ViewでNode search、type filter、Node / Semantic Region / Edge選択、detail panel、Evidence previewを利用できます。Stack MapではRegion検索時に親Regionと内部Stack Usageを保持し、Stack Usage検索時にも所属Regionを残します。Regionを選択するとRegion全体へFocusし、Projectとの正式なEdgeをrelated highlightします。Stack Mapで高degree Nodeを選ぶと、1-hopをprimary、2-hopをsecondary、3-hop以降をdeepとしてemphasisします。
+各Viewの対象とフィルターに応じて検索、選択、詳細とEvidenceを表示します。検索入力だけではカメラ・選択・レイアウトを変更しません。Stack Mapの検索結果を明示的に選んだ場合は所属Regionを維持して対象へ移動します。Region選択はProjectとの正式なEdgeを強調し、「選択へ移動」でその位置へ移動します。Stack Mapで高degree Nodeを選ぶと、1-hopをprimary、2-hopをsecondary、3-hop以降をdeepとしてemphasisします。
+
+## 共通操作（Views 1–10）
+
+View 1–4は既存のSVG/HTMLブロック図とブロック内展開、View 5はDirectory内のModule地図、View 6–9はExplorer 2D / 点群3D、View 10は階層構成図を維持します。共通化するのは次の操作契約であり、layout・解析・集約・階層モデルは統合しません。
+
+- 検索は`SearchResultStrip`の固定1行・横スクロール。論理対象を明示フィルターで絞って検索し、折りたたみや画面外だけでは除外しません。全候補を仮想化し、End/Homeや矢印キーから末尾まで到達できます。名前・別名・宣言コマンド・所属・パスを検索し、内部IDや全metadataは投入しません。入力中の強調と明示選択は別で、検索消去も選択・カメラを保持します。Aの`presentAnalyzerView`へ入力中のqueryを渡すと展開・routingまで変わるため、ページとstageは`search: ''`を渡し、結果と一致表示を別に計算します。
+- 操作順はFit / Reset / ＋ / − / 選択へ移動 / パーティクル / 全画面 / ヘルプ。既存の表示モード・自動省略・囲いは対応するViewに残します。Fitは表示中の範囲、選択へ移動は選択対象（Edgeなら両端と経路）、Resetはカメラだけを変更します。検索・選択・展開をResetから消去しません。
+- 空白クリックは選択由来の線・粒子・専用ラベルを解除し、パンは選択を保持します。詳細を閉じる操作はパネルだけを閉じます。プロジェクト変更は対象IDを破棄し、明示フィルターに含まれなくなった選択も解除します。
+- `session.particleMode`を全10タブで共有し、`useSpatialFlowMotion`から通常／控えめ／オフを読み書きします。未設定時はOSの動き軽減設定から初期化し、プロジェクト交換でも明示設定は保持します。旧`views[].flow.particleMode`は画面の初期化時に共通設定へ書き戻しません。ページ非表示・画面外・unmount時は描画を停止し、AのOFF時には粒子のSVG要素を生成しません。
+- Aの粒子は既存`edgePaths`と完全に同じsource→targetのSVG pathを使用します。選択に接続する線または明示選択Edgeに表示し、包含線（contains）も対象にします。Stack MapのProject→領域とWorkspaceのProject→Root Packageにも共通の粒子を表示します。描画は6〜10の3Dを基準とした共通の発光・尾を持つ粒子です。`flowParticleStyle.ts`が形状・発光とサイズ補正、`spatialFlow.ts`が速度65単位/秒・間隔50（控えめ100）・位相を定義します。Aおよび6〜10の2Dは`SvgFlowParticles`、WebGLは`SpatialFlowParticles`が同じプロファイルを描画します。OSの動き軽減設定は共通の控えめモードに反映します。方向色は`edgeDirection.ts`の入る関係（橙）・出る関係（青）を使用し、OFFでも線と矢印を残します。解析関係や実行状態を追加しません。
+- A/BのEvidenceは`EvidenceCodeBlock`でファイル名・行番号・完全パス・ソース範囲を表示します。ブロック内コードの文字選択・スクロールは親の選択やズームへ伝播しません。補助metadataは開閉可能で、元の値とDictionaryの確認済み対応を保持します。`useAnalyzerControlInset`は折り返した操作部の下へヘルプを配置し、計測値をグラフlayoutへ渡しません。
+
+全グラフの背景は`#050c09`の無地です。線の経路とView固有の構造は維持します。粒子統一の結果は[粒子・背景の統一](analyzer-particle-unification.md)を参照してください。
+
+実操作・各タブの適用範囲・性能比較は[共通UI検証記録](analyzer-common-ui-review.md)を参照してください。
 
 ## View 6–10 semantic analysis
 
@@ -132,7 +148,7 @@ Runtime Flow以降は独立したWorker解析・投影・Three.js rendererを使
 
 ## Analyzer session / Dictionary link
 
-Module DependencyのDirectory展開、選択Module / Region / Edge、検索時のancestor展開、Spatial camera transformも同じApp-lifetime Sessionのstable IDとして保持します。`schema === 2`のSpatial cameraだけを保存済みとして復元し、旧2D affine / origin前提のcameraは初期Fitへfallbackします。互換cameraは初期Fitで上書きしません。
+Module DependencyのDirectory展開、選択Module / Region / Edge、検索からの明示選択、Spatial camera transformも同じApp-lifetime Sessionのstable IDとして保持します。`schema === 2`のSpatial cameraだけを保存済みとして復元し、旧2D affine / origin前提のcameraは初期Fitへfallbackします。互換cameraは初期Fitで上書きしません。
 
 Module DependencyのFar / Medium / Nearは保存済みcameraのscaleから決定し、LODそのものを別のsemantic stateとして保存しません。したがってViewを離れて戻った場合も、Directoryのcollapse / expandとcamera scaleの組み合わせから同じ表示密度を再現します。
 

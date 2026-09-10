@@ -2,7 +2,7 @@ import { act, useEffect } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AnalyzerSessionProvider, scanProjectFiles, useAnalyzerSession, type AnalyzerProjectStore } from '../analyzer';
+import { AnalyzerSessionProvider, scanProjectFiles, useAnalyzerSession, type AnalyzerProjectStore, type AnalyzerViewId } from '../analyzer';
 import { AnalyzerPage } from './AnalyzerPage';
 
 vi.mock('@react-three/fiber', () => ({ Canvas: () => null, useFrame: vi.fn(), useThree: vi.fn() }));
@@ -12,6 +12,52 @@ function Project({ store }: { store: AnalyzerProjectStore }) {
   useEffect(() => replaceProject(store), [replaceProject, store]);
   return <AnalyzerPage />;
 }
+
+function SelectionProbe({ view }: { view: AnalyzerViewId }) {
+  const { state } = useAnalyzerSession();
+  return <output id="selection-probe">{JSON.stringify(state.views[view])}</output>;
+}
+
+describe.each(['architecture', 'workspace', 'command', 'dependencies'] as const)('%s common search and camera contract', view => {
+  let host: HTMLDivElement, root: Root;
+  beforeEach(async () => {
+    vi.spyOn(console, 'info').mockImplementation(() => {});
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+    const files = [
+      { path: 'package.json', text: JSON.stringify({ name: 'fixture', scripts: { build: Array.from({ length: 12 }, (_, i) => `pnpm --filter feature-${i} run build`).join(' && ') }, workspaces: ['packages/*'] }) },
+      { path: 'pnpm-workspace.yaml', text: 'packages:\n  - packages/*\n' },
+      ...Array.from({ length: 12 }, (_, i) => ({ path: `packages/feature-${i}/package.json`, text: JSON.stringify({ name: `feature-${i}`, scripts: { build: 'tsc --noEmit' }, dependencies: { react: '^19.0.0' } }) })),
+    ];
+    const store = await scanProjectFiles(files.map(item => ({ relativePath: item.path, name: item.path.split('/').at(-1)!, extension: '.json', size: item.text.length, readText: async () => item.text })));
+    host = document.createElement('div'); document.body.append(host); root = createRoot(host);
+    await act(async () => root.render(<MemoryRouter initialEntries={[`/analyzer/${view}`]}><AnalyzerSessionProvider><Project store={store} /><SelectionProbe view={view} /></AnalyzerSessionProvider></MemoryRouter>));
+  });
+  afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+  it('keeps every logical candidate reachable and only selects on explicit choice', async () => {
+    const input = host.querySelector<HTMLInputElement>('input[aria-label="Analyzer Nodeを検索"]')!;
+    const setQuery = (value: string) => act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value); input.dispatchEvent(new Event('input', { bubbles: true })); });
+    const state = () => JSON.parse(host.querySelector('#selection-probe')!.textContent!);
+    const geometry = () => [...host.querySelectorAll('.analyzer-node,.analyzer-semantic-region,.analyzer-edge-hit')].map(node => [node.getAttribute('style'), node.getAttribute('d')]);
+    const initialGeometry = geometry();
+    await setQuery(view === 'architecture' ? 'React' : view === 'command' ? 'tsc' : 'feature-');
+    expect(state().selectedNodeId).toBeUndefined(); expect(geometry()).toEqual(initialGeometry);
+    const count = Number(host.querySelector('[role="option"]')?.getAttribute('aria-setsize')); expect(count).toBeGreaterThan(8);
+    await act(async () => host.querySelector('[role="listbox"]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true })));
+    expect(document.activeElement?.getAttribute('aria-posinset')).toBe(String(count));
+    await act(async () => (document.activeElement as HTMLButtonElement).click());
+    const selected = state(); expect(selected.selectedNodeId).toBeDefined(); expect(selected.detailOpen).toBe(true);
+    const reset = [...host.querySelectorAll<HTMLButtonElement>('.analyzer-stage-controls button')].find(button => button.textContent === 'Reset')!;
+    await act(async () => reset.click()); expect(state().selectedNodeId).toBe(selected.selectedNodeId); expect(input.value).not.toBe('');
+    await setQuery(''); expect(state().selectedNodeId).toBe(selected.selectedNodeId);
+    await setQuery('no-match'); await act(async () => input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    expect(input.value).toBe(''); expect(state().selectedNodeId).toBe(selected.selectedNodeId);
+    await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="詳細を閉じる"]')!.click());
+    expect(state().selectedNodeId).toBe(selected.selectedNodeId); expect(state().detailOpen).toBe(false);
+    await act(async () => host.querySelector('[role="application"]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    expect(state().selectedNodeId).toBeUndefined(); expect(host.querySelectorAll('.analyzer-relation-particles,.analyzer-edge-group.is-connected')).toHaveLength(0);
+  });
+});
 
 describe('Module Dependency exploration in the Analyzer shell', () => {
   let host: HTMLDivElement, root: Root;

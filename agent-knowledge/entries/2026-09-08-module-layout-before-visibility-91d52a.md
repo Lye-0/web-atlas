@@ -5,7 +5,7 @@ type: failure
 status: active
 maturity: candidate
 created: 2026-09-08
-last_verified: 2026-09-09
+last_verified: 2026-09-10
 source_commit: "91b471a8997a50832c1330024f79e06274469e2b"
 related_files:
   - src/components/analyzer/AnalyzerSpatialGraphStage.tsx
@@ -51,6 +51,8 @@ Do not apply:
 - 記録時のHEADに対する未コミット実装で確立し、最終製品テストおよび独立正確性検証で再確認した。HEADは観測元であり、単独で修正内容を含むとは限らない。
 
 ## Verification
+
+2026-09-10の共通UI変更でもこの境界を再確認した。Resetはカメラだけに限定し、検索結果・元Edgeの選択から手動Directoryを永続展開しない経路は保持した。`AnalyzerPage.test.tsx`の閉Directory→元Edge→解除、`moduleAggregationControls.test.tsx`の元ID保全と、実ブラウザの双方向import・選択解除・共有設定切替を再実行した。共通部品の変更を理由にAへ全Module layout方式を適用しない。
 
 2026-09-09の追加検証では、rendererの保護だけでなくページの選択処理も確認した。元のedge選択がDirectoryを自動で開いており、両端の一時保護を解除しても手動閉状態へ戻らなかった。`AnalyzerPage`で選択と明示的な所属開閉を分離し、ページintegration testと実UI（2対象の閉scope→元imports両端→Escape→手動2対象）で復帰を確認した。rendererだけのunit testではこの経路を検出できない。
 

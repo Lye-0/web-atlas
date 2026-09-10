@@ -1,3 +1,4 @@
+import { SPATIAL_FLOW_MAX_FRAME_SECONDS } from './spatialFlow';
 import type { AnalyzerGraphTransform } from './camera';
 import type { AnalyzerZoomLevel } from './zoom';
 import { ANALYZER_FAR_ZOOM_THRESHOLD, ANALYZER_NEAR_ZOOM_THRESHOLD, semanticZoomLevelForScale } from './zoom';
@@ -212,7 +213,7 @@ export function createSpatialCameraLoop(options: SpatialCameraLoopOptions) {
       if (counters) counters.cameraVisualUpdates += 1;
       options.onVisualFrame(next);
     }
-    const elapsed = animating && lastAnimationTime !== undefined ? Math.max(0, Math.min(0.05, (timestamp - lastAnimationTime) / 1000)) : 0;
+    const elapsed = animating && lastAnimationTime !== undefined ? Math.max(0, Math.min(SPATIAL_FLOW_MAX_FRAME_SECONDS, (timestamp - lastAnimationTime) / 1000)) : 0;
     lastAnimationTime = animating ? timestamp : undefined;
     if (cameraChanged || animating) options.onRenderFrame?.(elapsed);
     if (animating && frame === undefined) frame = raf(flushVisual);

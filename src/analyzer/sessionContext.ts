@@ -8,6 +8,7 @@ export interface AnalyzerSessionContextValue {
   replaceProject: (store: AnalyzerProjectStore, folderHandle?: DirectoryHandleLike) => void;
   setActiveView: (view: AnalyzerViewId) => void;
   setFlowGroupBounds: (visible: boolean) => void;
+  setParticleMode: (mode: 'normal' | 'reduced' | 'off') => void;
   setAutoAggregation: (enabled: boolean) => void;
   updateView: (view: AnalyzerViewId, update: AnalyzerViewSessionUpdate) => void;
 }

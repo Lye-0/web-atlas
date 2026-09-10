@@ -68,13 +68,17 @@ export function EvidenceCodeBlock({ evidence, source, compact = false }: Evidenc
   if (!source) return <p className="analyzer-empty-evidence">Source context is unavailable.</p>;
   const lines = source.split(/\r?\n/);
   const { first: firstLine, last: lastLine } = lineWindow(evidence, lines.length, compact);
+  const start = evidence.highlightRanges[0]?.start.line ?? firstLine;
+  const end = evidence.highlightRanges.reduce((last, range) => Math.max(last, range.end.line), start);
+  const location = `${evidence.filePath.split('/').at(-1)}:${start}${end > start ? `–${end}` : ''}`;
   return (
     <div className={`analyzer-evidence-block${compact ? ' analyzer-evidence-block-compact' : ''}`}>
       <div className="analyzer-evidence-file">
-        <code>{evidence.filePath}</code>
+        <code title={evidence.filePath}>{location}</code>
         <span>{[evidenceRoleLabel(evidence.role), evidence.description ?? evidence.detectorId].filter(Boolean).join(' · ')}</span>
       </div>
-      <pre aria-label={`Evidence in ${evidence.filePath}`}><code>{lines.slice(firstLine - 1, lastLine).map((line, index) => {
+      {!compact && <p className="analyzer-evidence-path"><code>{evidence.filePath}</code></p>}
+      <pre tabIndex={0} aria-label={`Evidence in ${evidence.filePath}`}><code>{lines.slice(firstLine - 1, lastLine).map((line, index) => {
           const lineNumber = firstLine + index;
           const segments = splitLine(line, rangesForLine(evidence, lineNumber, line.length));
           return (

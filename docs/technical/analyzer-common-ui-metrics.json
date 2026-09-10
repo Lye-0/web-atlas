@@ -1,0 +1,5566 @@
+{
+  "date": "2026-09-10",
+  "baseline": "bf7c4392d67d1b727967d8d43623b46db9a34e7e",
+  "environment": "Edge headless, 1440 × 1000, DPR 1, production Vite builds with equal function instrumentation; source inputs are fixed masked local copies",
+  "units": "Milliseconds. RAF intervals are main-thread callbacks, not GPU draw time. Single paired runs; no claim of universal performance improvement.",
+  "performance": [
+    {
+      "input": "git-lines",
+      "view": "architecture",
+      "variant": "before",
+      "nodes": 7,
+      "edges": 3,
+      "expansion": "inline Evidence on another block",
+      "errors": [],
+      "samples": {
+        "idle": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {}
+        },
+        "select": {
+          "rafP95Ms": 16.7,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {
+            "presentAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.10000000894069672,
+              "maxMs": 0.10000000894069672,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.10000000894069672,
+                "p95Ms": 0.10000000894069672,
+                "maxMs": 0.10000000894069672,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "layoutAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.09999999403953552,
+              "maxMs": 0.09999999403953552,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.09999999403953552,
+                "p95Ms": 0.09999999403953552,
+                "maxMs": 0.09999999403953552,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "analyzerEdgePaths": {
+              "calls": 1,
+              "totalMs": 0.5,
+              "maxMs": 0.5,
+              "distribution": {
+                "samples": 1,
+                "medianMs": 0.5,
+                "p95Ms": 0.5,
+                "maxMs": 0.5,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "AnalyzerGraphStage": {
+              "calls": 3,
+              "totalMs": 1,
+              "maxMs": 0.7999999970197678,
+              "distribution": {
+                "samples": 3,
+                "medianMs": 0.10000000894069672,
+                "p95Ms": 0.7999999970197678,
+                "maxMs": 0.7999999970197678,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            }
+          }
+        },
+        "pan": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {
+            "AnalyzerGraphStage": {
+              "calls": 15,
+              "totalMs": 0.6000000089406967,
+              "maxMs": 0.10000000894069672,
+              "distribution": {
+                "samples": 15,
+                "medianMs": 0,
+                "p95Ms": 0.10000000894069672,
+                "maxMs": 0.10000000894069672,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            }
+          }
+        },
+        "expand": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {
+            "presentAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0,
+              "maxMs": 0,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0,
+                "p95Ms": 0,
+                "maxMs": 0,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "layoutAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.10000000894069672,
+              "maxMs": 0.10000000894069672,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.10000000894069672,
+                "p95Ms": 0.10000000894069672,
+                "maxMs": 0.10000000894069672,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "analyzerEdgePaths": {
+              "calls": 1,
+              "totalMs": 0.3999999910593033,
+              "maxMs": 0.3999999910593033,
+              "distribution": {
+                "samples": 1,
+                "medianMs": 0.3999999910593033,
+                "p95Ms": 0.3999999910593033,
+                "maxMs": 0.3999999910593033,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "AnalyzerGraphStage": {
+              "calls": 2,
+              "totalMs": 0.6000000089406967,
+              "maxMs": 0.6000000089406967,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.6000000089406967,
+                "p95Ms": 0.6000000089406967,
+                "maxMs": 0.6000000089406967,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "input": "git-lines",
+      "view": "architecture",
+      "variant": "after",
+      "nodes": 7,
+      "edges": 3,
+      "expansion": "inline Evidence on another block",
+      "errors": [],
+      "samples": {
+        "idle": {
+          "rafP95Ms": 16.7,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {}
+        },
+        "select": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {
+            "presentAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.10000000894069672,
+              "maxMs": 0.10000000894069672,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.10000000894069672,
+                "p95Ms": 0.10000000894069672,
+                "maxMs": 0.10000000894069672,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "layoutAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.09999999403953552,
+              "maxMs": 0.09999999403953552,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.09999999403953552,
+                "p95Ms": 0.09999999403953552,
+                "maxMs": 0.09999999403953552,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "analyzerEdgePaths": {
+              "calls": 1,
+              "totalMs": 0.6000000089406967,
+              "maxMs": 0.6000000089406967,
+              "distribution": {
+                "samples": 1,
+                "medianMs": 0.6000000089406967,
+                "p95Ms": 0.6000000089406967,
+                "maxMs": 0.6000000089406967,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "AnalyzerGraphStage": {
+              "calls": 3,
+              "totalMs": 1.199999988079071,
+              "maxMs": 0.8999999910593033,
+              "distribution": {
+                "samples": 3,
+                "medianMs": 0.20000000298023224,
+                "p95Ms": 0.8999999910593033,
+                "maxMs": 0.8999999910593033,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            }
+          }
+        },
+        "pan": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {
+            "AnalyzerGraphStage": {
+              "calls": 15,
+              "totalMs": 1,
+              "maxMs": 0.10000000894069672,
+              "distribution": {
+                "samples": 15,
+                "medianMs": 0.09999999403953552,
+                "p95Ms": 0.10000000894069672,
+                "maxMs": 0.10000000894069672,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            }
+          }
+        },
+        "expand": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {
+            "presentAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.10000000894069672,
+              "maxMs": 0.10000000894069672,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.10000000894069672,
+                "p95Ms": 0.10000000894069672,
+                "maxMs": 0.10000000894069672,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "layoutAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.19999998807907104,
+              "maxMs": 0.09999999403953552,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.09999999403953552,
+                "p95Ms": 0.09999999403953552,
+                "maxMs": 0.09999999403953552,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "analyzerEdgePaths": {
+              "calls": 1,
+              "totalMs": 0.9000000059604645,
+              "maxMs": 0.9000000059604645,
+              "distribution": {
+                "samples": 1,
+                "medianMs": 0.9000000059604645,
+                "p95Ms": 0.9000000059604645,
+                "maxMs": 0.9000000059604645,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "AnalyzerGraphStage": {
+              "calls": 2,
+              "totalMs": 1.3999999910593033,
+              "maxMs": 1.2999999970197678,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 1.2999999970197678,
+                "p95Ms": 1.2999999970197678,
+                "maxMs": 1.2999999970197678,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            }
+          }
+        },
+        "通常": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {},
+          "movingLines": 0,
+          "dashArrays": []
+        },
+        "控えめ": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {},
+          "movingLines": 0,
+          "dashArrays": []
+        }
+      }
+    },
+    {
+      "input": "git-lines",
+      "view": "workspace",
+      "variant": "before",
+      "nodes": 3,
+      "edges": 2,
+      "expansion": "inline Evidence on another block",
+      "errors": [],
+      "samples": {
+        "idle": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {}
+        },
+        "select": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {
+            "presentAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.10000000894069672,
+              "maxMs": 0.10000000894069672,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.10000000894069672,
+                "p95Ms": 0.10000000894069672,
+                "maxMs": 0.10000000894069672,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "layoutAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0,
+              "maxMs": 0,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0,
+                "p95Ms": 0,
+                "maxMs": 0,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "analyzerEdgePaths": {
+              "calls": 1,
+              "totalMs": 4.0999999940395355,
+              "maxMs": 4.0999999940395355,
+              "distribution": {
+                "samples": 1,
+                "medianMs": 4.0999999940395355,
+                "p95Ms": 4.0999999940395355,
+                "maxMs": 4.0999999940395355,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "AnalyzerGraphStage": {
+              "calls": 3,
+              "totalMs": 4.4000000059604645,
+              "maxMs": 4.300000011920929,
+              "distribution": {
+                "samples": 3,
+                "medianMs": 0.09999999403953552,
+                "p95Ms": 4.300000011920929,
+                "maxMs": 4.300000011920929,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            }
+          }
+        },
+        "pan": {
+          "rafP95Ms": 16.7,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {
+            "AnalyzerGraphStage": {
+              "calls": 15,
+              "totalMs": 0.800000011920929,
+              "maxMs": 0.10000000894069672,
+              "distribution": {
+                "samples": 15,
+                "medianMs": 0.09999999403953552,
+                "p95Ms": 0.10000000894069672,
+                "maxMs": 0.10000000894069672,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            }
+          }
+        },
+        "expand": {
+          "rafP95Ms": 16.7,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {
+            "presentAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0,
+              "maxMs": 0,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0,
+                "p95Ms": 0,
+                "maxMs": 0,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "layoutAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.09999999403953552,
+              "maxMs": 0.09999999403953552,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.09999999403953552,
+                "p95Ms": 0.09999999403953552,
+                "maxMs": 0.09999999403953552,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "analyzerEdgePaths": {
+              "calls": 1,
+              "totalMs": 5.5,
+              "maxMs": 5.5,
+              "distribution": {
+                "samples": 1,
+                "medianMs": 5.5,
+                "p95Ms": 5.5,
+                "maxMs": 5.5,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "AnalyzerGraphStage": {
+              "calls": 2,
+              "totalMs": 5.699999988079071,
+              "maxMs": 5.5999999940395355,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 5.5999999940395355,
+                "p95Ms": 5.5999999940395355,
+                "maxMs": 5.5999999940395355,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "input": "git-lines",
+      "view": "workspace",
+      "variant": "after",
+      "nodes": 3,
+      "edges": 2,
+      "expansion": "inline Evidence on another block",
+      "errors": [],
+      "samples": {
+        "idle": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {}
+        },
+        "select": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {
+            "presentAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0,
+              "maxMs": 0,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0,
+                "p95Ms": 0,
+                "maxMs": 0,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "layoutAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.09999999403953552,
+              "maxMs": 0.09999999403953552,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.09999999403953552,
+                "p95Ms": 0.09999999403953552,
+                "maxMs": 0.09999999403953552,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "analyzerEdgePaths": {
+              "calls": 1,
+              "totalMs": 4.100000008940697,
+              "maxMs": 4.100000008940697,
+              "distribution": {
+                "samples": 1,
+                "medianMs": 4.100000008940697,
+                "p95Ms": 4.100000008940697,
+                "maxMs": 4.100000008940697,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "AnalyzerGraphStage": {
+              "calls": 3,
+              "totalMs": 4.699999988079071,
+              "maxMs": 4.5,
+              "distribution": {
+                "samples": 3,
+                "medianMs": 0.09999999403953552,
+                "p95Ms": 4.5,
+                "maxMs": 4.5,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            }
+          }
+        },
+        "pan": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {
+            "AnalyzerGraphStage": {
+              "calls": 15,
+              "totalMs": 0.7000000178813934,
+              "maxMs": 0.10000000894069672,
+              "distribution": {
+                "samples": 15,
+                "medianMs": 0,
+                "p95Ms": 0.10000000894069672,
+                "maxMs": 0.10000000894069672,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            }
+          }
+        },
+        "expand": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {
+            "presentAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0,
+              "maxMs": 0,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0,
+                "p95Ms": 0,
+                "maxMs": 0,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "layoutAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.10000000894069672,
+              "maxMs": 0.10000000894069672,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.10000000894069672,
+                "p95Ms": 0.10000000894069672,
+                "maxMs": 0.10000000894069672,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "analyzerEdgePaths": {
+              "calls": 1,
+              "totalMs": 4,
+              "maxMs": 4,
+              "distribution": {
+                "samples": 1,
+                "medianMs": 4,
+                "p95Ms": 4,
+                "maxMs": 4,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "AnalyzerGraphStage": {
+              "calls": 2,
+              "totalMs": 4.100000008940697,
+              "maxMs": 4.100000008940697,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 4.100000008940697,
+                "p95Ms": 4.100000008940697,
+                "maxMs": 4.100000008940697,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            }
+          }
+        },
+        "通常": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {},
+          "movingLines": 0,
+          "dashArrays": []
+        },
+        "控えめ": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {},
+          "movingLines": 1,
+          "dashArrays": [
+            "1 99"
+          ]
+        }
+      }
+    },
+    {
+      "input": "git-lines",
+      "view": "command",
+      "variant": "before",
+      "nodes": 9,
+      "edges": 8,
+      "expansion": "inline Evidence on another block",
+      "errors": [],
+      "samples": {
+        "idle": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {}
+        },
+        "select": {
+          "rafP95Ms": 16.7,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {
+            "presentAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0,
+              "maxMs": 0,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0,
+                "p95Ms": 0,
+                "maxMs": 0,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "layoutAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.09999999403953552,
+              "maxMs": 0.09999999403953552,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.09999999403953552,
+                "p95Ms": 0.09999999403953552,
+                "maxMs": 0.09999999403953552,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "analyzerEdgePaths": {
+              "calls": 1,
+              "totalMs": 14.400000005960464,
+              "maxMs": 14.400000005960464,
+              "distribution": {
+                "samples": 1,
+                "medianMs": 14.400000005960464,
+                "p95Ms": 14.400000005960464,
+                "maxMs": 14.400000005960464,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "AnalyzerGraphStage": {
+              "calls": 3,
+              "totalMs": 14.799999997019768,
+              "maxMs": 14.700000002980232,
+              "distribution": {
+                "samples": 3,
+                "medianMs": 0.09999999403953552,
+                "p95Ms": 14.700000002980232,
+                "maxMs": 14.700000002980232,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            }
+          }
+        },
+        "pan": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {
+            "AnalyzerGraphStage": {
+              "calls": 15,
+              "totalMs": 0.7999999970197678,
+              "maxMs": 0.10000000894069672,
+              "distribution": {
+                "samples": 15,
+                "medianMs": 0.09999999403953552,
+                "p95Ms": 0.10000000894069672,
+                "maxMs": 0.10000000894069672,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            }
+          }
+        },
+        "expand": {
+          "rafP95Ms": 16.7,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {
+            "presentAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.09999999403953552,
+              "maxMs": 0.09999999403953552,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.09999999403953552,
+                "p95Ms": 0.09999999403953552,
+                "maxMs": 0.09999999403953552,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "layoutAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0,
+              "maxMs": 0,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0,
+                "p95Ms": 0,
+                "maxMs": 0,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "analyzerEdgePaths": {
+              "calls": 1,
+              "totalMs": 13.800000011920929,
+              "maxMs": 13.800000011920929,
+              "distribution": {
+                "samples": 1,
+                "medianMs": 13.800000011920929,
+                "p95Ms": 13.800000011920929,
+                "maxMs": 13.800000011920929,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "AnalyzerGraphStage": {
+              "calls": 2,
+              "totalMs": 14.099999994039536,
+              "maxMs": 14,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 14,
+                "p95Ms": 14,
+                "maxMs": 14,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "input": "git-lines",
+      "view": "command",
+      "variant": "after",
+      "nodes": 9,
+      "edges": 8,
+      "expansion": "inline Evidence on another block",
+      "errors": [],
+      "samples": {
+        "idle": {
+          "rafP95Ms": 16.7,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {}
+        },
+        "select": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {
+            "presentAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.10000000894069672,
+              "maxMs": 0.10000000894069672,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.10000000894069672,
+                "p95Ms": 0.10000000894069672,
+                "maxMs": 0.10000000894069672,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "layoutAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.09999999403953552,
+              "maxMs": 0.09999999403953552,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.09999999403953552,
+                "p95Ms": 0.09999999403953552,
+                "maxMs": 0.09999999403953552,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "analyzerEdgePaths": {
+              "calls": 1,
+              "totalMs": 14.700000002980232,
+              "maxMs": 14.700000002980232,
+              "distribution": {
+                "samples": 1,
+                "medianMs": 14.700000002980232,
+                "p95Ms": 14.700000002980232,
+                "maxMs": 14.700000002980232,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "AnalyzerGraphStage": {
+              "calls": 3,
+              "totalMs": 15.299999997019768,
+              "maxMs": 15,
+              "distribution": {
+                "samples": 3,
+                "medianMs": 0.20000000298023224,
+                "p95Ms": 15,
+                "maxMs": 15,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            }
+          }
+        },
+        "pan": {
+          "rafP95Ms": 16.7,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {
+            "AnalyzerGraphStage": {
+              "calls": 15,
+              "totalMs": 0.7999999970197678,
+              "maxMs": 0.20000000298023224,
+              "distribution": {
+                "samples": 15,
+                "medianMs": 0,
+                "p95Ms": 0.20000000298023224,
+                "maxMs": 0.20000000298023224,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            }
+          }
+        },
+        "expand": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {
+            "presentAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.19999998807907104,
+              "maxMs": 0.09999999403953552,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.09999999403953552,
+                "p95Ms": 0.09999999403953552,
+                "maxMs": 0.09999999403953552,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "layoutAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.10000000894069672,
+              "maxMs": 0.10000000894069672,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.10000000894069672,
+                "p95Ms": 0.10000000894069672,
+                "maxMs": 0.10000000894069672,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "analyzerEdgePaths": {
+              "calls": 1,
+              "totalMs": 21.599999994039536,
+              "maxMs": 21.599999994039536,
+              "distribution": {
+                "samples": 1,
+                "medianMs": 21.599999994039536,
+                "p95Ms": 21.599999994039536,
+                "maxMs": 21.599999994039536,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "AnalyzerGraphStage": {
+              "calls": 2,
+              "totalMs": 21.99999998509884,
+              "maxMs": 21.899999991059303,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 21.899999991059303,
+                "p95Ms": 21.899999991059303,
+                "maxMs": 21.899999991059303,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            }
+          }
+        },
+        "通常": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {},
+          "movingLines": 1,
+          "dashArrays": [
+            "1 49"
+          ]
+        },
+        "控えめ": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {},
+          "movingLines": 1,
+          "dashArrays": [
+            "1 99"
+          ]
+        }
+      }
+    },
+    {
+      "input": "git-lines",
+      "view": "dependencies",
+      "variant": "before",
+      "nodes": 7,
+      "edges": 6,
+      "expansion": "inline Evidence on another block",
+      "errors": [],
+      "samples": {
+        "idle": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {}
+        },
+        "select": {
+          "rafP95Ms": 16.8,
+          "longTasks": 1,
+          "longTaskMaxMs": 260,
+          "cpu": {
+            "presentAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.10000000894069672,
+              "maxMs": 0.10000000894069672,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.10000000894069672,
+                "p95Ms": 0.10000000894069672,
+                "maxMs": 0.10000000894069672,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "layoutAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.5999999940395355,
+              "maxMs": 0.5,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.5,
+                "p95Ms": 0.5,
+                "maxMs": 0.5,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "analyzerEdgePaths": {
+              "calls": 1,
+              "totalMs": 255.8999999910593,
+              "maxMs": 255.8999999910593,
+              "distribution": {
+                "samples": 1,
+                "medianMs": 255.8999999910593,
+                "p95Ms": 255.8999999910593,
+                "maxMs": 255.8999999910593,
+                "over50ms": 1
+              },
+              "samplesCapped": false
+            },
+            "AnalyzerGraphStage": {
+              "calls": 3,
+              "totalMs": 257.09999999403954,
+              "maxMs": 256.79999999701977,
+              "distribution": {
+                "samples": 3,
+                "medianMs": 0.20000000298023224,
+                "p95Ms": 256.79999999701977,
+                "maxMs": 256.79999999701977,
+                "over50ms": 1
+              },
+              "samplesCapped": false
+            }
+          }
+        },
+        "pan": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {
+            "AnalyzerGraphStage": {
+              "calls": 15,
+              "totalMs": 0.8999999910593033,
+              "maxMs": 0.10000000894069672,
+              "distribution": {
+                "samples": 15,
+                "medianMs": 0.09999999403953552,
+                "p95Ms": 0.10000000894069672,
+                "maxMs": 0.10000000894069672,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            }
+          }
+        },
+        "expand": {
+          "rafP95Ms": 16.7,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {
+            "presentAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0,
+              "maxMs": 0,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0,
+                "p95Ms": 0,
+                "maxMs": 0,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "layoutAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.10000000894069672,
+              "maxMs": 0.10000000894069672,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.10000000894069672,
+                "p95Ms": 0.10000000894069672,
+                "maxMs": 0.10000000894069672,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "analyzerEdgePaths": {
+              "calls": 1,
+              "totalMs": 10.5,
+              "maxMs": 10.5,
+              "distribution": {
+                "samples": 1,
+                "medianMs": 10.5,
+                "p95Ms": 10.5,
+                "maxMs": 10.5,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "AnalyzerGraphStage": {
+              "calls": 2,
+              "totalMs": 10.800000011920929,
+              "maxMs": 10.700000002980232,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 10.700000002980232,
+                "p95Ms": 10.700000002980232,
+                "maxMs": 10.700000002980232,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "input": "git-lines",
+      "view": "dependencies",
+      "variant": "after",
+      "nodes": 7,
+      "edges": 6,
+      "expansion": "inline Evidence on another block",
+      "errors": [],
+      "samples": {
+        "idle": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {}
+        },
+        "select": {
+          "rafP95Ms": 16.7,
+          "longTasks": 1,
+          "longTaskMaxMs": 268,
+          "cpu": {
+            "presentAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.20000001788139343,
+              "maxMs": 0.10000000894069672,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.10000000894069672,
+                "p95Ms": 0.10000000894069672,
+                "maxMs": 0.10000000894069672,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "layoutAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.7000000029802322,
+              "maxMs": 0.5999999940395355,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.5999999940395355,
+                "p95Ms": 0.5999999940395355,
+                "maxMs": 0.5999999940395355,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "analyzerEdgePaths": {
+              "calls": 1,
+              "totalMs": 264.59999999403954,
+              "maxMs": 264.59999999403954,
+              "distribution": {
+                "samples": 1,
+                "medianMs": 264.59999999403954,
+                "p95Ms": 264.59999999403954,
+                "maxMs": 264.59999999403954,
+                "over50ms": 1
+              },
+              "samplesCapped": false
+            },
+            "AnalyzerGraphStage": {
+              "calls": 3,
+              "totalMs": 265.70000000298023,
+              "maxMs": 265.6000000089407,
+              "distribution": {
+                "samples": 3,
+                "medianMs": 0.09999999403953552,
+                "p95Ms": 265.6000000089407,
+                "maxMs": 265.6000000089407,
+                "over50ms": 1
+              },
+              "samplesCapped": false
+            }
+          }
+        },
+        "pan": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {
+            "AnalyzerGraphStage": {
+              "calls": 15,
+              "totalMs": 1.2000000327825546,
+              "maxMs": 0.20000000298023224,
+              "distribution": {
+                "samples": 15,
+                "medianMs": 0.10000000894069672,
+                "p95Ms": 0.20000000298023224,
+                "maxMs": 0.20000000298023224,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            }
+          }
+        },
+        "expand": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {
+            "presentAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.20000001788139343,
+              "maxMs": 0.10000000894069672,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.10000000894069672,
+                "p95Ms": 0.10000000894069672,
+                "maxMs": 0.10000000894069672,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "layoutAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.09999999403953552,
+              "maxMs": 0.09999999403953552,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.09999999403953552,
+                "p95Ms": 0.09999999403953552,
+                "maxMs": 0.09999999403953552,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "analyzerEdgePaths": {
+              "calls": 1,
+              "totalMs": 10,
+              "maxMs": 10,
+              "distribution": {
+                "samples": 1,
+                "medianMs": 10,
+                "p95Ms": 10,
+                "maxMs": 10,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "AnalyzerGraphStage": {
+              "calls": 2,
+              "totalMs": 10.299999997019768,
+              "maxMs": 10.200000002980232,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 10.200000002980232,
+                "p95Ms": 10.200000002980232,
+                "maxMs": 10.200000002980232,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            }
+          }
+        },
+        "通常": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {},
+          "movingLines": 1,
+          "dashArrays": [
+            "1 49"
+          ]
+        },
+        "控えめ": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {},
+          "movingLines": 1,
+          "dashArrays": [
+            "1 99"
+          ]
+        }
+      }
+    },
+    {
+      "input": "vehicle-management",
+      "view": "architecture",
+      "variant": "before",
+      "nodes": 16,
+      "edges": 5,
+      "expansion": "inline Evidence on another block",
+      "errors": [],
+      "samples": {
+        "idle": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {}
+        },
+        "select": {
+          "rafP95Ms": 16.7,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {
+            "presentAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.10000000894069672,
+              "maxMs": 0.10000000894069672,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.10000000894069672,
+                "p95Ms": 0.10000000894069672,
+                "maxMs": 0.10000000894069672,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "layoutAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.09999999403953552,
+              "maxMs": 0.09999999403953552,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.09999999403953552,
+                "p95Ms": 0.09999999403953552,
+                "maxMs": 0.09999999403953552,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "analyzerEdgePaths": {
+              "calls": 1,
+              "totalMs": 1.2999999970197678,
+              "maxMs": 1.2999999970197678,
+              "distribution": {
+                "samples": 1,
+                "medianMs": 1.2999999970197678,
+                "p95Ms": 1.2999999970197678,
+                "maxMs": 1.2999999970197678,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "AnalyzerGraphStage": {
+              "calls": 3,
+              "totalMs": 2,
+              "maxMs": 1.7000000029802322,
+              "distribution": {
+                "samples": 3,
+                "medianMs": 0.20000000298023224,
+                "p95Ms": 1.7000000029802322,
+                "maxMs": 1.7000000029802322,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            }
+          }
+        },
+        "pan": {
+          "rafP95Ms": 16.7,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {
+            "AnalyzerGraphStage": {
+              "calls": 15,
+              "totalMs": 1.3000000268220901,
+              "maxMs": 0.20000000298023224,
+              "distribution": {
+                "samples": 15,
+                "medianMs": 0.09999999403953552,
+                "p95Ms": 0.20000000298023224,
+                "maxMs": 0.20000000298023224,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            }
+          }
+        },
+        "expand": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {
+            "presentAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0,
+              "maxMs": 0,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0,
+                "p95Ms": 0,
+                "maxMs": 0,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "layoutAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.10000000894069672,
+              "maxMs": 0.10000000894069672,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.10000000894069672,
+                "p95Ms": 0.10000000894069672,
+                "maxMs": 0.10000000894069672,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "analyzerEdgePaths": {
+              "calls": 1,
+              "totalMs": 1.0999999940395355,
+              "maxMs": 1.0999999940395355,
+              "distribution": {
+                "samples": 1,
+                "medianMs": 1.0999999940395355,
+                "p95Ms": 1.0999999940395355,
+                "maxMs": 1.0999999940395355,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "AnalyzerGraphStage": {
+              "calls": 2,
+              "totalMs": 1.300000011920929,
+              "maxMs": 1.2000000029802322,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 1.2000000029802322,
+                "p95Ms": 1.2000000029802322,
+                "maxMs": 1.2000000029802322,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "input": "vehicle-management",
+      "view": "architecture",
+      "variant": "after",
+      "nodes": 16,
+      "edges": 5,
+      "expansion": "inline Evidence on another block",
+      "errors": [],
+      "samples": {
+        "idle": {
+          "rafP95Ms": 16.7,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {}
+        },
+        "select": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {
+            "presentAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.10000000894069672,
+              "maxMs": 0.10000000894069672,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.10000000894069672,
+                "p95Ms": 0.10000000894069672,
+                "maxMs": 0.10000000894069672,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "layoutAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.19999998807907104,
+              "maxMs": 0.19999998807907104,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.19999998807907104,
+                "p95Ms": 0.19999998807907104,
+                "maxMs": 0.19999998807907104,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "analyzerEdgePaths": {
+              "calls": 1,
+              "totalMs": 1.9000000059604645,
+              "maxMs": 1.9000000059604645,
+              "distribution": {
+                "samples": 1,
+                "medianMs": 1.9000000059604645,
+                "p95Ms": 1.9000000059604645,
+                "maxMs": 1.9000000059604645,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "AnalyzerGraphStage": {
+              "calls": 3,
+              "totalMs": 2.2999999821186066,
+              "maxMs": 2.199999988079071,
+              "distribution": {
+                "samples": 3,
+                "medianMs": 0.09999999403953552,
+                "p95Ms": 2.199999988079071,
+                "maxMs": 2.199999988079071,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            }
+          }
+        },
+        "pan": {
+          "rafP95Ms": 16.7,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {
+            "AnalyzerGraphStage": {
+              "calls": 15,
+              "totalMs": 1.699999988079071,
+              "maxMs": 0.20000000298023224,
+              "distribution": {
+                "samples": 15,
+                "medianMs": 0.09999999403953552,
+                "p95Ms": 0.20000000298023224,
+                "maxMs": 0.20000000298023224,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            }
+          }
+        },
+        "expand": {
+          "rafP95Ms": 16.7,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {
+            "presentAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.20000001788139343,
+              "maxMs": 0.10000000894069672,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.10000000894069672,
+                "p95Ms": 0.10000000894069672,
+                "maxMs": 0.10000000894069672,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "layoutAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.20000000298023224,
+              "maxMs": 0.20000000298023224,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.20000000298023224,
+                "p95Ms": 0.20000000298023224,
+                "maxMs": 0.20000000298023224,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "analyzerEdgePaths": {
+              "calls": 1,
+              "totalMs": 1.5,
+              "maxMs": 1.5,
+              "distribution": {
+                "samples": 1,
+                "medianMs": 1.5,
+                "p95Ms": 1.5,
+                "maxMs": 1.5,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "AnalyzerGraphStage": {
+              "calls": 2,
+              "totalMs": 2.000000014901161,
+              "maxMs": 1.9000000059604645,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 1.9000000059604645,
+                "p95Ms": 1.9000000059604645,
+                "maxMs": 1.9000000059604645,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            }
+          }
+        },
+        "通常": {
+          "rafP95Ms": 16.7,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {},
+          "movingLines": 0,
+          "dashArrays": []
+        },
+        "控えめ": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {},
+          "movingLines": 0,
+          "dashArrays": []
+        }
+      }
+    },
+    {
+      "input": "vehicle-management",
+      "view": "workspace",
+      "variant": "before",
+      "nodes": 10,
+      "edges": 9,
+      "expansion": "inline Evidence on another block",
+      "errors": [],
+      "samples": {
+        "idle": {
+          "rafP95Ms": 16.7,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {}
+        },
+        "select": {
+          "rafP95Ms": 16.7,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {
+            "presentAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.09999999403953552,
+              "maxMs": 0.09999999403953552,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.09999999403953552,
+                "p95Ms": 0.09999999403953552,
+                "maxMs": 0.09999999403953552,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "layoutAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.20000000298023224,
+              "maxMs": 0.20000000298023224,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.20000000298023224,
+                "p95Ms": 0.20000000298023224,
+                "maxMs": 0.20000000298023224,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "analyzerEdgePaths": {
+              "calls": 1,
+              "totalMs": 37,
+              "maxMs": 37,
+              "distribution": {
+                "samples": 1,
+                "medianMs": 37,
+                "p95Ms": 37,
+                "maxMs": 37,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "AnalyzerGraphStage": {
+              "calls": 3,
+              "totalMs": 37.400000005960464,
+              "maxMs": 37.400000005960464,
+              "distribution": {
+                "samples": 3,
+                "medianMs": 0,
+                "p95Ms": 37.400000005960464,
+                "maxMs": 37.400000005960464,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            }
+          }
+        },
+        "pan": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {
+            "AnalyzerGraphStage": {
+              "calls": 15,
+              "totalMs": 0.800000011920929,
+              "maxMs": 0.20000000298023224,
+              "distribution": {
+                "samples": 15,
+                "medianMs": 0,
+                "p95Ms": 0.20000000298023224,
+                "maxMs": 0.20000000298023224,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            }
+          }
+        },
+        "expand": {
+          "rafP95Ms": 16.7,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {
+            "presentAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0,
+              "maxMs": 0,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0,
+                "p95Ms": 0,
+                "maxMs": 0,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "layoutAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.10000000894069672,
+              "maxMs": 0.10000000894069672,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.10000000894069672,
+                "p95Ms": 0.10000000894069672,
+                "maxMs": 0.10000000894069672,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "analyzerEdgePaths": {
+              "calls": 1,
+              "totalMs": 29.899999991059303,
+              "maxMs": 29.899999991059303,
+              "distribution": {
+                "samples": 1,
+                "medianMs": 29.899999991059303,
+                "p95Ms": 29.899999991059303,
+                "maxMs": 29.899999991059303,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "AnalyzerGraphStage": {
+              "calls": 2,
+              "totalMs": 30,
+              "maxMs": 30,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 30,
+                "p95Ms": 30,
+                "maxMs": 30,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "input": "vehicle-management",
+      "view": "workspace",
+      "variant": "after",
+      "nodes": 10,
+      "edges": 9,
+      "expansion": "inline Evidence on another block",
+      "errors": [],
+      "samples": {
+        "idle": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {}
+        },
+        "select": {
+          "rafP95Ms": 16.7,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {
+            "presentAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.09999999403953552,
+              "maxMs": 0.09999999403953552,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.09999999403953552,
+                "p95Ms": 0.09999999403953552,
+                "maxMs": 0.09999999403953552,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "layoutAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0,
+              "maxMs": 0,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0,
+                "p95Ms": 0,
+                "maxMs": 0,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "analyzerEdgePaths": {
+              "calls": 1,
+              "totalMs": 34.599999994039536,
+              "maxMs": 34.599999994039536,
+              "distribution": {
+                "samples": 1,
+                "medianMs": 34.599999994039536,
+                "p95Ms": 34.599999994039536,
+                "maxMs": 34.599999994039536,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "AnalyzerGraphStage": {
+              "calls": 3,
+              "totalMs": 35.099999994039536,
+              "maxMs": 35,
+              "distribution": {
+                "samples": 3,
+                "medianMs": 0.09999999403953552,
+                "p95Ms": 35,
+                "maxMs": 35,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            }
+          }
+        },
+        "pan": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {
+            "AnalyzerGraphStage": {
+              "calls": 15,
+              "totalMs": 1.0000000149011612,
+              "maxMs": 0.10000000894069672,
+              "distribution": {
+                "samples": 15,
+                "medianMs": 0.09999999403953552,
+                "p95Ms": 0.10000000894069672,
+                "maxMs": 0.10000000894069672,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            }
+          }
+        },
+        "expand": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {
+            "presentAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.09999999403953552,
+              "maxMs": 0.09999999403953552,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.09999999403953552,
+                "p95Ms": 0.09999999403953552,
+                "maxMs": 0.09999999403953552,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "layoutAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0,
+              "maxMs": 0,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0,
+                "p95Ms": 0,
+                "maxMs": 0,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "analyzerEdgePaths": {
+              "calls": 1,
+              "totalMs": 30.400000005960464,
+              "maxMs": 30.400000005960464,
+              "distribution": {
+                "samples": 1,
+                "medianMs": 30.400000005960464,
+                "p95Ms": 30.400000005960464,
+                "maxMs": 30.400000005960464,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "AnalyzerGraphStage": {
+              "calls": 2,
+              "totalMs": 30.600000008940697,
+              "maxMs": 30.600000008940697,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 30.600000008940697,
+                "p95Ms": 30.600000008940697,
+                "maxMs": 30.600000008940697,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            }
+          }
+        },
+        "通常": {
+          "rafP95Ms": 16.7,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {},
+          "movingLines": 1,
+          "dashArrays": [
+            "1 49"
+          ]
+        },
+        "控えめ": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {},
+          "movingLines": 1,
+          "dashArrays": [
+            "1 99"
+          ]
+        }
+      }
+    },
+    {
+      "input": "vehicle-management",
+      "view": "command",
+      "variant": "before",
+      "nodes": 15,
+      "edges": 17,
+      "expansion": "summary",
+      "errors": [],
+      "samples": {
+        "idle": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {}
+        },
+        "select": {
+          "rafP95Ms": 16.8,
+          "longTasks": 1,
+          "longTaskMaxMs": 66,
+          "cpu": {
+            "presentAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0,
+              "maxMs": 0,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0,
+                "p95Ms": 0,
+                "maxMs": 0,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "layoutAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.20000000298023224,
+              "maxMs": 0.20000000298023224,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.20000000298023224,
+                "p95Ms": 0.20000000298023224,
+                "maxMs": 0.20000000298023224,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "analyzerEdgePaths": {
+              "calls": 1,
+              "totalMs": 63.29999999701977,
+              "maxMs": 63.29999999701977,
+              "distribution": {
+                "samples": 1,
+                "medianMs": 63.29999999701977,
+                "p95Ms": 63.29999999701977,
+                "maxMs": 63.29999999701977,
+                "over50ms": 1
+              },
+              "samplesCapped": false
+            },
+            "AnalyzerGraphStage": {
+              "calls": 3,
+              "totalMs": 63.80000001192093,
+              "maxMs": 63.6000000089407,
+              "distribution": {
+                "samples": 3,
+                "medianMs": 0.10000000894069672,
+                "p95Ms": 63.6000000089407,
+                "maxMs": 63.6000000089407,
+                "over50ms": 1
+              },
+              "samplesCapped": false
+            }
+          }
+        },
+        "pan": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {
+            "AnalyzerGraphStage": {
+              "calls": 15,
+              "totalMs": 1.100000023841858,
+              "maxMs": 0.20000000298023224,
+              "distribution": {
+                "samples": 15,
+                "medianMs": 0.09999999403953552,
+                "p95Ms": 0.20000000298023224,
+                "maxMs": 0.20000000298023224,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            }
+          }
+        },
+        "expand": {
+          "rafP95Ms": 16.8,
+          "longTasks": 1,
+          "longTaskMaxMs": 291,
+          "cpu": {
+            "presentAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.10000000894069672,
+              "maxMs": 0.10000000894069672,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.10000000894069672,
+                "p95Ms": 0.10000000894069672,
+                "maxMs": 0.10000000894069672,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "layoutAnalyzerView": {
+              "calls": 2,
+              "totalMs": 1,
+              "maxMs": 0.7999999970197678,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.7999999970197678,
+                "p95Ms": 0.7999999970197678,
+                "maxMs": 0.7999999970197678,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "analyzerEdgePaths": {
+              "calls": 1,
+              "totalMs": 284.40000000596046,
+              "maxMs": 284.40000000596046,
+              "distribution": {
+                "samples": 1,
+                "medianMs": 284.40000000596046,
+                "p95Ms": 284.40000000596046,
+                "maxMs": 284.40000000596046,
+                "over50ms": 1
+              },
+              "samplesCapped": false
+            },
+            "AnalyzerGraphStage": {
+              "calls": 2,
+              "totalMs": 285.79999999701977,
+              "maxMs": 285.79999999701977,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 285.79999999701977,
+                "p95Ms": 285.79999999701977,
+                "maxMs": 285.79999999701977,
+                "over50ms": 1
+              },
+              "samplesCapped": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "input": "vehicle-management",
+      "view": "command",
+      "variant": "after",
+      "nodes": 15,
+      "edges": 17,
+      "expansion": "summary",
+      "errors": [],
+      "samples": {
+        "idle": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {}
+        },
+        "select": {
+          "rafP95Ms": 16.7,
+          "longTasks": 1,
+          "longTaskMaxMs": 58,
+          "cpu": {
+            "presentAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0,
+              "maxMs": 0,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0,
+                "p95Ms": 0,
+                "maxMs": 0,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "layoutAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.09999999403953552,
+              "maxMs": 0.09999999403953552,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.09999999403953552,
+                "p95Ms": 0.09999999403953552,
+                "maxMs": 0.09999999403953552,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "analyzerEdgePaths": {
+              "calls": 1,
+              "totalMs": 55.900000005960464,
+              "maxMs": 55.900000005960464,
+              "distribution": {
+                "samples": 1,
+                "medianMs": 55.900000005960464,
+                "p95Ms": 55.900000005960464,
+                "maxMs": 55.900000005960464,
+                "over50ms": 1
+              },
+              "samplesCapped": false
+            },
+            "AnalyzerGraphStage": {
+              "calls": 3,
+              "totalMs": 56.599999994039536,
+              "maxMs": 56.29999999701977,
+              "distribution": {
+                "samples": 3,
+                "medianMs": 0.20000000298023224,
+                "p95Ms": 56.29999999701977,
+                "maxMs": 56.29999999701977,
+                "over50ms": 1
+              },
+              "samplesCapped": false
+            }
+          }
+        },
+        "pan": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {
+            "AnalyzerGraphStage": {
+              "calls": 15,
+              "totalMs": 1.4999999552965164,
+              "maxMs": 0.19999998807907104,
+              "distribution": {
+                "samples": 15,
+                "medianMs": 0.09999999403953552,
+                "p95Ms": 0.19999998807907104,
+                "maxMs": 0.19999998807907104,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            }
+          }
+        },
+        "expand": {
+          "rafP95Ms": 16.8,
+          "longTasks": 1,
+          "longTaskMaxMs": 234,
+          "cpu": {
+            "presentAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.09999999403953552,
+              "maxMs": 0.09999999403953552,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.09999999403953552,
+                "p95Ms": 0.09999999403953552,
+                "maxMs": 0.09999999403953552,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "layoutAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.7999999970197678,
+              "maxMs": 0.7000000029802322,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.7000000029802322,
+                "p95Ms": 0.7000000029802322,
+                "maxMs": 0.7000000029802322,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "analyzerEdgePaths": {
+              "calls": 1,
+              "totalMs": 229.3999999910593,
+              "maxMs": 229.3999999910593,
+              "distribution": {
+                "samples": 1,
+                "medianMs": 229.3999999910593,
+                "p95Ms": 229.3999999910593,
+                "maxMs": 229.3999999910593,
+                "over50ms": 1
+              },
+              "samplesCapped": false
+            },
+            "AnalyzerGraphStage": {
+              "calls": 2,
+              "totalMs": 230.6000000089407,
+              "maxMs": 230.5,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 230.5,
+                "p95Ms": 230.5,
+                "maxMs": 230.5,
+                "over50ms": 1
+              },
+              "samplesCapped": false
+            }
+          }
+        },
+        "通常": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {},
+          "movingLines": 1,
+          "dashArrays": [
+            "1 49"
+          ]
+        },
+        "控えめ": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {},
+          "movingLines": 1,
+          "dashArrays": [
+            "1 99"
+          ]
+        }
+      }
+    },
+    {
+      "input": "vehicle-management",
+      "view": "dependencies",
+      "variant": "before",
+      "nodes": 16,
+      "edges": 17,
+      "expansion": "summary",
+      "errors": [],
+      "samples": {
+        "idle": {
+          "rafP95Ms": 16.7,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {}
+        },
+        "select": {
+          "rafP95Ms": 16.8,
+          "longTasks": 1,
+          "longTaskMaxMs": 430,
+          "cpu": {
+            "presentAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.20000000298023224,
+              "maxMs": 0.20000000298023224,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.20000000298023224,
+                "p95Ms": 0.20000000298023224,
+                "maxMs": 0.20000000298023224,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "layoutAnalyzerView": {
+              "calls": 2,
+              "totalMs": 1.1000000089406967,
+              "maxMs": 0.9000000059604645,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.9000000059604645,
+                "p95Ms": 0.9000000059604645,
+                "maxMs": 0.9000000059604645,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "analyzerEdgePaths": {
+              "calls": 1,
+              "totalMs": 425.20000000298023,
+              "maxMs": 425.20000000298023,
+              "distribution": {
+                "samples": 1,
+                "medianMs": 425.20000000298023,
+                "p95Ms": 425.20000000298023,
+                "maxMs": 425.20000000298023,
+                "over50ms": 1
+              },
+              "samplesCapped": false
+            },
+            "AnalyzerGraphStage": {
+              "calls": 3,
+              "totalMs": 427.2999999821186,
+              "maxMs": 427,
+              "distribution": {
+                "samples": 3,
+                "medianMs": 0.19999998807907104,
+                "p95Ms": 427,
+                "maxMs": 427,
+                "over50ms": 1
+              },
+              "samplesCapped": false
+            }
+          }
+        },
+        "pan": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {
+            "AnalyzerGraphStage": {
+              "calls": 15,
+              "totalMs": 1.7000000327825546,
+              "maxMs": 0.20000000298023224,
+              "distribution": {
+                "samples": 15,
+                "medianMs": 0.10000000894069672,
+                "p95Ms": 0.20000000298023224,
+                "maxMs": 0.20000000298023224,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            }
+          }
+        },
+        "expand": {
+          "rafP95Ms": 16.8,
+          "longTasks": 1,
+          "longTaskMaxMs": 192,
+          "cpu": {
+            "presentAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.20000000298023224,
+              "maxMs": 0.10000000894069672,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.10000000894069672,
+                "p95Ms": 0.10000000894069672,
+                "maxMs": 0.10000000894069672,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "layoutAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.19999998807907104,
+              "maxMs": 0.09999999403953552,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.09999999403953552,
+                "p95Ms": 0.09999999403953552,
+                "maxMs": 0.09999999403953552,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "analyzerEdgePaths": {
+              "calls": 1,
+              "totalMs": 188.59999999403954,
+              "maxMs": 188.59999999403954,
+              "distribution": {
+                "samples": 1,
+                "medianMs": 188.59999999403954,
+                "p95Ms": 188.59999999403954,
+                "maxMs": 188.59999999403954,
+                "over50ms": 1
+              },
+              "samplesCapped": false
+            },
+            "AnalyzerGraphStage": {
+              "calls": 2,
+              "totalMs": 189.1000000089407,
+              "maxMs": 189.1000000089407,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 189.1000000089407,
+                "p95Ms": 189.1000000089407,
+                "maxMs": 189.1000000089407,
+                "over50ms": 1
+              },
+              "samplesCapped": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "input": "vehicle-management",
+      "view": "dependencies",
+      "variant": "after",
+      "nodes": 13,
+      "edges": 15,
+      "expansion": "summary",
+      "errors": [],
+      "samples": {
+        "idle": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {}
+        },
+        "select": {
+          "rafP95Ms": 16.8,
+          "longTasks": 1,
+          "longTaskMaxMs": 410,
+          "cpu": {
+            "presentAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.10000000894069672,
+              "maxMs": 0.10000000894069672,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.10000000894069672,
+                "p95Ms": 0.10000000894069672,
+                "maxMs": 0.10000000894069672,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "layoutAnalyzerView": {
+              "calls": 2,
+              "totalMs": 1,
+              "maxMs": 0.7999999970197678,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.7999999970197678,
+                "p95Ms": 0.7999999970197678,
+                "maxMs": 0.7999999970197678,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "analyzerEdgePaths": {
+              "calls": 1,
+              "totalMs": 405.79999999701977,
+              "maxMs": 405.79999999701977,
+              "distribution": {
+                "samples": 1,
+                "medianMs": 405.79999999701977,
+                "p95Ms": 405.79999999701977,
+                "maxMs": 405.79999999701977,
+                "over50ms": 1
+              },
+              "samplesCapped": false
+            },
+            "AnalyzerGraphStage": {
+              "calls": 3,
+              "totalMs": 407.50000001490116,
+              "maxMs": 407.30000001192093,
+              "distribution": {
+                "samples": 3,
+                "medianMs": 0.10000000894069672,
+                "p95Ms": 407.30000001192093,
+                "maxMs": 407.30000001192093,
+                "over50ms": 1
+              },
+              "samplesCapped": false
+            }
+          }
+        },
+        "pan": {
+          "rafP95Ms": 16.7,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {
+            "AnalyzerGraphStage": {
+              "calls": 15,
+              "totalMs": 1.800000011920929,
+              "maxMs": 0.20000000298023224,
+              "distribution": {
+                "samples": 15,
+                "medianMs": 0.10000000894069672,
+                "p95Ms": 0.20000000298023224,
+                "maxMs": 0.20000000298023224,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            }
+          }
+        },
+        "expand": {
+          "rafP95Ms": 16.8,
+          "longTasks": 1,
+          "longTaskMaxMs": 183,
+          "cpu": {
+            "presentAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.09999999403953552,
+              "maxMs": 0.09999999403953552,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.09999999403953552,
+                "p95Ms": 0.09999999403953552,
+                "maxMs": 0.09999999403953552,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "layoutAnalyzerView": {
+              "calls": 2,
+              "totalMs": 0.20000000298023224,
+              "maxMs": 0.10000000894069672,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 0.10000000894069672,
+                "p95Ms": 0.10000000894069672,
+                "maxMs": 0.10000000894069672,
+                "over50ms": 0
+              },
+              "samplesCapped": false
+            },
+            "analyzerEdgePaths": {
+              "calls": 1,
+              "totalMs": 179.90000000596046,
+              "maxMs": 179.90000000596046,
+              "distribution": {
+                "samples": 1,
+                "medianMs": 179.90000000596046,
+                "p95Ms": 179.90000000596046,
+                "maxMs": 179.90000000596046,
+                "over50ms": 1
+              },
+              "samplesCapped": false
+            },
+            "AnalyzerGraphStage": {
+              "calls": 2,
+              "totalMs": 180.29999999701977,
+              "maxMs": 180.29999999701977,
+              "distribution": {
+                "samples": 2,
+                "medianMs": 180.29999999701977,
+                "p95Ms": 180.29999999701977,
+                "maxMs": 180.29999999701977,
+                "over50ms": 1
+              },
+              "samplesCapped": false
+            }
+          }
+        },
+        "通常": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {},
+          "movingLines": 1,
+          "dashArrays": [
+            "1 49"
+          ]
+        },
+        "控えめ": {
+          "rafP95Ms": 16.8,
+          "longTasks": 0,
+          "longTaskMaxMs": null,
+          "cpu": {},
+          "movingLines": 1,
+          "dashArrays": [
+            "1 99"
+          ]
+        }
+      }
+    }
+  ],
+  "comparison": [
+    {
+      "input": "git-lines",
+      "view": "architecture",
+      "p95": "idle 16.8→16.7, select 16.7→16.8, pan 16.8→16.8, expand 16.8→16.8",
+      "routing": "idle 0.00→0.00, select 0.50→0.60, pan 0.00→0.00, expand 0.40→0.90",
+      "longTasks": "idle 0→0, select 0→0, pan 0→0, expand 0→0",
+      "counts": [
+        7,
+        3
+      ],
+      "moving": [
+        0,
+        0
+      ]
+    },
+    {
+      "input": "git-lines",
+      "view": "workspace",
+      "p95": "idle 16.8→16.8, select 16.8→16.8, pan 16.7→16.8, expand 16.7→16.8",
+      "routing": "idle 0.00→0.00, select 4.10→4.10, pan 0.00→0.00, expand 5.50→4.00",
+      "longTasks": "idle 0→0, select 0→0, pan 0→0, expand 0→0",
+      "counts": [
+        3,
+        2
+      ],
+      "moving": [
+        0,
+        1
+      ]
+    },
+    {
+      "input": "git-lines",
+      "view": "command",
+      "p95": "idle 16.8→16.7, select 16.7→16.8, pan 16.8→16.7, expand 16.7→16.8",
+      "routing": "idle 0.00→0.00, select 14.40→14.70, pan 0.00→0.00, expand 13.80→21.60",
+      "longTasks": "idle 0→0, select 0→0, pan 0→0, expand 0→0",
+      "counts": [
+        9,
+        8
+      ],
+      "moving": [
+        1,
+        1
+      ]
+    },
+    {
+      "input": "git-lines",
+      "view": "dependencies",
+      "p95": "idle 16.8→16.8, select 16.8→16.7, pan 16.8→16.8, expand 16.7→16.8",
+      "routing": "idle 0.00→0.00, select 255.90→264.60, pan 0.00→0.00, expand 10.50→10.00",
+      "longTasks": "idle 0→0, select 1→1, pan 0→0, expand 0→0",
+      "counts": [
+        7,
+        6
+      ],
+      "moving": [
+        1,
+        1
+      ]
+    },
+    {
+      "input": "vehicle-management",
+      "view": "architecture",
+      "p95": "idle 16.8→16.7, select 16.7→16.8, pan 16.7→16.7, expand 16.8→16.7",
+      "routing": "idle 0.00→0.00, select 1.30→1.90, pan 0.00→0.00, expand 1.10→1.50",
+      "longTasks": "idle 0→0, select 0→0, pan 0→0, expand 0→0",
+      "counts": [
+        16,
+        5
+      ],
+      "moving": [
+        0,
+        0
+      ]
+    },
+    {
+      "input": "vehicle-management",
+      "view": "workspace",
+      "p95": "idle 16.7→16.8, select 16.7→16.7, pan 16.8→16.8, expand 16.7→16.8",
+      "routing": "idle 0.00→0.00, select 37.00→34.60, pan 0.00→0.00, expand 29.90→30.40",
+      "longTasks": "idle 0→0, select 0→0, pan 0→0, expand 0→0",
+      "counts": [
+        10,
+        9
+      ],
+      "moving": [
+        1,
+        1
+      ]
+    },
+    {
+      "input": "vehicle-management",
+      "view": "command",
+      "p95": "idle 16.8→16.8, select 16.8→16.7, pan 16.8→16.8, expand 16.8→16.8",
+      "routing": "idle 0.00→0.00, select 63.30→55.90, pan 0.00→0.00, expand 284.40→229.40",
+      "longTasks": "idle 0→0, select 1→1, pan 0→0, expand 1→1",
+      "counts": [
+        15,
+        17
+      ],
+      "moving": [
+        1,
+        1
+      ]
+    },
+    {
+      "input": "vehicle-management",
+      "view": "dependencies",
+      "p95": "idle 16.7→16.8, select 16.8→16.8, pan 16.8→16.7, expand 16.8→16.8",
+      "routing": "idle 0.00→0.00, select 425.20→405.80, pan 0.00→0.00, expand 188.60→179.90",
+      "longTasks": "idle 0→0, select 1→1, pan 0→0, expand 1→1",
+      "counts": [
+        13,
+        15
+      ],
+      "moving": [
+        1,
+        1
+      ]
+    }
+  ],
+  "legacy": [
+    {
+      "input": "git-lines",
+      "view": "architecture",
+      "checks": [
+        "typing preserves camera",
+        "typing preserves layout and routes",
+        "typing does not select",
+        "node selects details",
+        "code keyboard keeps camera",
+        "code click keeps selection",
+        "code wheel keeps camera",
+        "detail close keeps selection",
+        "drag retains selection",
+        "blank clears selection",
+        "blank clears selected edges and particles",
+        "edge selects details",
+        "通常 particles use exact routed source-target path",
+        "控えめ particles use exact routed source-target path",
+        "オフ particles use exact routed source-target path",
+        "off removes particles and retains arrow",
+        "reduced motion leaves static SVG marks",
+        "no overflow at 1440",
+        "no overflow at 1024",
+        "no overflow at 768",
+        "no overflow at 390"
+      ],
+      "modes": [
+        {
+          "name": "通常",
+          "paths": 0,
+          "dashes": [],
+          "duration": []
+        },
+        {
+          "name": "控えめ",
+          "paths": 0,
+          "dashes": [],
+          "duration": []
+        },
+        {
+          "name": "オフ",
+          "paths": 0,
+          "dashes": [],
+          "duration": []
+        }
+      ],
+      "errors": []
+    },
+    {
+      "input": "git-lines",
+      "view": "workspace",
+      "checks": [
+        "typing preserves camera",
+        "typing preserves layout and routes",
+        "typing does not select",
+        "node selects details",
+        "code keyboard keeps camera",
+        "code click keeps selection",
+        "code wheel keeps camera",
+        "detail close keeps selection",
+        "drag retains selection",
+        "blank clears selection",
+        "blank clears selected edges and particles",
+        "edge selects details",
+        "通常 particles use exact routed source-target path",
+        "控えめ particles use exact routed source-target path",
+        "オフ particles use exact routed source-target path",
+        "off removes particles and retains arrow",
+        "reduced motion leaves static SVG marks",
+        "no overflow at 1440",
+        "no overflow at 1024",
+        "no overflow at 768",
+        "no overflow at 390"
+      ],
+      "modes": [
+        {
+          "name": "通常",
+          "paths": 1,
+          "dashes": [
+            "1 49"
+          ],
+          "duration": [
+            "3.6s"
+          ]
+        },
+        {
+          "name": "控えめ",
+          "paths": 1,
+          "dashes": [
+            "1 99"
+          ],
+          "duration": [
+            "9s"
+          ]
+        },
+        {
+          "name": "オフ",
+          "paths": 0,
+          "dashes": [],
+          "duration": []
+        }
+      ],
+      "errors": []
+    },
+    {
+      "input": "git-lines",
+      "view": "command",
+      "checks": [
+        "typing preserves camera",
+        "typing preserves layout and routes",
+        "typing does not select",
+        "node selects details",
+        "code keyboard keeps camera",
+        "code click keeps selection",
+        "code wheel keeps camera",
+        "detail close keeps selection",
+        "drag retains selection",
+        "blank clears selection",
+        "blank clears selected edges and particles",
+        "edge selects details",
+        "通常 particles use exact routed source-target path",
+        "控えめ particles use exact routed source-target path",
+        "オフ particles use exact routed source-target path",
+        "off removes particles and retains arrow",
+        "reduced motion leaves static SVG marks",
+        "search leaves command entry intact",
+        "explicit entry changes",
+        "no overflow at 1440",
+        "no overflow at 1024",
+        "no overflow at 768",
+        "no overflow at 390"
+      ],
+      "modes": [
+        {
+          "name": "通常",
+          "paths": 1,
+          "dashes": [
+            "1 49"
+          ],
+          "duration": [
+            "3.6s"
+          ]
+        },
+        {
+          "name": "控えめ",
+          "paths": 1,
+          "dashes": [
+            "1 99"
+          ],
+          "duration": [
+            "9s"
+          ]
+        },
+        {
+          "name": "オフ",
+          "paths": 0,
+          "dashes": [],
+          "duration": []
+        }
+      ],
+      "errors": []
+    },
+    {
+      "input": "git-lines",
+      "view": "dependencies",
+      "checks": [
+        "typing preserves camera",
+        "typing preserves layout and routes",
+        "typing does not select",
+        "node selects details",
+        "code keyboard keeps camera",
+        "code click keeps selection",
+        "code wheel keeps camera",
+        "detail close keeps selection",
+        "drag retains selection",
+        "blank clears selection",
+        "blank clears selected edges and particles",
+        "edge selects details",
+        "通常 particles use exact routed source-target path",
+        "控えめ particles use exact routed source-target path",
+        "オフ particles use exact routed source-target path",
+        "off removes particles and retains arrow",
+        "reduced motion leaves static SVG marks",
+        "inline group expands",
+        "expanded particle routes stay attached",
+        "no overflow at 1440",
+        "no overflow at 1024",
+        "no overflow at 768",
+        "no overflow at 390"
+      ],
+      "modes": [
+        {
+          "name": "通常",
+          "paths": 1,
+          "dashes": [
+            "1 49"
+          ],
+          "duration": [
+            "3.6s"
+          ]
+        },
+        {
+          "name": "控えめ",
+          "paths": 1,
+          "dashes": [
+            "1 99"
+          ],
+          "duration": [
+            "9s"
+          ]
+        },
+        {
+          "name": "オフ",
+          "paths": 0,
+          "dashes": [],
+          "duration": []
+        }
+      ],
+      "errors": []
+    },
+    {
+      "input": "vehicle-management",
+      "view": "architecture",
+      "checks": [
+        "typing preserves camera",
+        "typing preserves layout and routes",
+        "typing does not select",
+        "node selects details",
+        "code keyboard keeps camera",
+        "code click keeps selection",
+        "code wheel keeps camera",
+        "detail close keeps selection",
+        "drag retains selection",
+        "blank clears selection",
+        "blank clears selected edges and particles",
+        "edge selects details",
+        "通常 particles use exact routed source-target path",
+        "控えめ particles use exact routed source-target path",
+        "オフ particles use exact routed source-target path",
+        "off removes particles and retains arrow",
+        "reduced motion leaves static SVG marks",
+        "no overflow at 1440",
+        "no overflow at 1024",
+        "no overflow at 768",
+        "no overflow at 390"
+      ],
+      "modes": [
+        {
+          "name": "通常",
+          "paths": 0,
+          "dashes": [],
+          "duration": []
+        },
+        {
+          "name": "控えめ",
+          "paths": 0,
+          "dashes": [],
+          "duration": []
+        },
+        {
+          "name": "オフ",
+          "paths": 0,
+          "dashes": [],
+          "duration": []
+        }
+      ],
+      "errors": []
+    },
+    {
+      "input": "vehicle-management",
+      "view": "workspace",
+      "checks": [
+        "typing preserves camera",
+        "typing preserves layout and routes",
+        "typing does not select",
+        "node selects details",
+        "code keyboard keeps camera",
+        "code click keeps selection",
+        "code wheel keeps camera",
+        "detail close keeps selection",
+        "drag retains selection",
+        "blank clears selection",
+        "blank clears selected edges and particles",
+        "edge selects details",
+        "通常 particles use exact routed source-target path",
+        "控えめ particles use exact routed source-target path",
+        "オフ particles use exact routed source-target path",
+        "off removes particles and retains arrow",
+        "reduced motion leaves static SVG marks",
+        "no overflow at 1440",
+        "no overflow at 1024",
+        "no overflow at 768",
+        "no overflow at 390"
+      ],
+      "modes": [
+        {
+          "name": "通常",
+          "paths": 1,
+          "dashes": [
+            "1 49"
+          ],
+          "duration": [
+            "3.6s"
+          ]
+        },
+        {
+          "name": "控えめ",
+          "paths": 1,
+          "dashes": [
+            "1 99"
+          ],
+          "duration": [
+            "9s"
+          ]
+        },
+        {
+          "name": "オフ",
+          "paths": 0,
+          "dashes": [],
+          "duration": []
+        }
+      ],
+      "errors": []
+    },
+    {
+      "input": "vehicle-management",
+      "view": "command",
+      "checks": [
+        "typing preserves camera",
+        "typing preserves layout and routes",
+        "typing does not select",
+        "node selects details",
+        "code keyboard keeps camera",
+        "code click keeps selection",
+        "code wheel keeps camera",
+        "detail close keeps selection",
+        "drag retains selection",
+        "blank clears selection",
+        "blank clears selected edges and particles",
+        "edge selects details",
+        "通常 particles use exact routed source-target path",
+        "控えめ particles use exact routed source-target path",
+        "オフ particles use exact routed source-target path",
+        "off removes particles and retains arrow",
+        "reduced motion leaves static SVG marks",
+        "inline group expands",
+        "expanded particle routes stay attached",
+        "search leaves command entry intact",
+        "explicit entry changes",
+        "no overflow at 1440",
+        "no overflow at 1024",
+        "no overflow at 768",
+        "no overflow at 390"
+      ],
+      "modes": [
+        {
+          "name": "通常",
+          "paths": 1,
+          "dashes": [
+            "1 49"
+          ],
+          "duration": [
+            "3.6s"
+          ]
+        },
+        {
+          "name": "控えめ",
+          "paths": 1,
+          "dashes": [
+            "1 99"
+          ],
+          "duration": [
+            "9s"
+          ]
+        },
+        {
+          "name": "オフ",
+          "paths": 0,
+          "dashes": [],
+          "duration": []
+        }
+      ],
+      "errors": []
+    },
+    {
+      "input": "vehicle-management",
+      "view": "dependencies",
+      "checks": [
+        "typing preserves camera",
+        "typing preserves layout and routes",
+        "typing does not select",
+        "node selects details",
+        "code keyboard keeps camera",
+        "code click keeps selection",
+        "code wheel keeps camera",
+        "detail close keeps selection",
+        "drag retains selection",
+        "blank clears selection",
+        "blank clears selected edges and particles",
+        "edge selects details",
+        "通常 particles use exact routed source-target path",
+        "控えめ particles use exact routed source-target path",
+        "オフ particles use exact routed source-target path",
+        "off removes particles and retains arrow",
+        "reduced motion leaves static SVG marks",
+        "inline group expands",
+        "expanded particle routes stay attached",
+        "no overflow at 1440",
+        "no overflow at 1024",
+        "no overflow at 768",
+        "no overflow at 390"
+      ],
+      "modes": [
+        {
+          "name": "通常",
+          "paths": 1,
+          "dashes": [
+            "1 49"
+          ],
+          "duration": [
+            "3.6s"
+          ]
+        },
+        {
+          "name": "控えめ",
+          "paths": 1,
+          "dashes": [
+            "1 99"
+          ],
+          "duration": [
+            "9s"
+          ]
+        },
+        {
+          "name": "オフ",
+          "paths": 0,
+          "dashes": [],
+          "duration": []
+        }
+      ],
+      "errors": []
+    },
+    {
+      "input": "small",
+      "view": "architecture",
+      "checks": [
+        "typing preserves camera",
+        "typing preserves layout and routes",
+        "typing does not select",
+        "End reaches final candidate",
+        "keyboard only scrolls result strip",
+        "all 72 candidates reachable",
+        "node selects details",
+        "code keyboard keeps camera",
+        "code click keeps selection",
+        "code wheel keeps camera",
+        "detail close keeps selection",
+        "drag retains selection",
+        "blank clears selection",
+        "blank clears selected edges and particles",
+        "edge selects details",
+        "通常 particles use exact routed source-target path",
+        "控えめ particles use exact routed source-target path",
+        "オフ particles use exact routed source-target path",
+        "off removes particles and retains arrow",
+        "reduced motion leaves static SVG marks",
+        "no overflow at 1440",
+        "no overflow at 1024",
+        "no overflow at 768",
+        "no overflow at 390"
+      ],
+      "modes": [
+        {
+          "name": "通常",
+          "paths": 0,
+          "dashes": [],
+          "duration": []
+        },
+        {
+          "name": "控えめ",
+          "paths": 0,
+          "dashes": [],
+          "duration": []
+        },
+        {
+          "name": "オフ",
+          "paths": 0,
+          "dashes": [],
+          "duration": []
+        }
+      ],
+      "errors": []
+    },
+    {
+      "input": "small",
+      "view": "workspace",
+      "checks": [
+        "typing preserves camera",
+        "typing preserves layout and routes",
+        "typing does not select",
+        "End reaches final candidate",
+        "keyboard only scrolls result strip",
+        "all 24 candidates reachable",
+        "node selects details",
+        "code keyboard keeps camera",
+        "code click keeps selection",
+        "code wheel keeps camera",
+        "detail close keeps selection",
+        "drag retains selection",
+        "blank clears selection",
+        "blank clears selected edges and particles",
+        "edge selects details",
+        "通常 particles use exact routed source-target path",
+        "控えめ particles use exact routed source-target path",
+        "オフ particles use exact routed source-target path",
+        "off removes particles and retains arrow",
+        "reduced motion leaves static SVG marks",
+        "no overflow at 1440",
+        "no overflow at 1024",
+        "no overflow at 768",
+        "no overflow at 390"
+      ],
+      "modes": [
+        {
+          "name": "通常",
+          "paths": 1,
+          "dashes": [
+            "1 49"
+          ],
+          "duration": [
+            "3.6s"
+          ]
+        },
+        {
+          "name": "控えめ",
+          "paths": 1,
+          "dashes": [
+            "1 99"
+          ],
+          "duration": [
+            "9s"
+          ]
+        },
+        {
+          "name": "オフ",
+          "paths": 0,
+          "dashes": [],
+          "duration": []
+        }
+      ],
+      "errors": []
+    },
+    {
+      "input": "small",
+      "view": "command",
+      "checks": [
+        "typing preserves camera",
+        "typing preserves layout and routes",
+        "typing does not select",
+        "node selects details",
+        "code keyboard keeps camera",
+        "code click keeps selection",
+        "code wheel keeps camera",
+        "detail close keeps selection",
+        "drag retains selection",
+        "blank clears selection",
+        "blank clears selected edges and particles",
+        "edge selects details",
+        "通常 particles use exact routed source-target path",
+        "控えめ particles use exact routed source-target path",
+        "オフ particles use exact routed source-target path",
+        "off removes particles and retains arrow",
+        "reduced motion leaves static SVG marks",
+        "search leaves command entry intact",
+        "explicit entry changes",
+        "no overflow at 1440",
+        "no overflow at 1024",
+        "no overflow at 768",
+        "no overflow at 390"
+      ],
+      "modes": [
+        {
+          "name": "通常",
+          "paths": 1,
+          "dashes": [
+            "1 49"
+          ],
+          "duration": [
+            "3.6s"
+          ]
+        },
+        {
+          "name": "控えめ",
+          "paths": 1,
+          "dashes": [
+            "1 99"
+          ],
+          "duration": [
+            "9s"
+          ]
+        },
+        {
+          "name": "オフ",
+          "paths": 0,
+          "dashes": [],
+          "duration": []
+        }
+      ],
+      "errors": []
+    },
+    {
+      "input": "small",
+      "view": "dependencies",
+      "checks": [
+        "typing preserves camera",
+        "typing preserves layout and routes",
+        "typing does not select",
+        "End reaches final candidate",
+        "keyboard only scrolls result strip",
+        "all 24 candidates reachable",
+        "node selects details",
+        "code keyboard keeps camera",
+        "code click keeps selection",
+        "code wheel keeps camera",
+        "detail close keeps selection",
+        "drag retains selection",
+        "blank clears selection",
+        "blank clears selected edges and particles",
+        "edge selects details",
+        "通常 particles use exact routed source-target path",
+        "控えめ particles use exact routed source-target path",
+        "オフ particles use exact routed source-target path",
+        "off removes particles and retains arrow",
+        "reduced motion leaves static SVG marks",
+        "inline group expands",
+        "expanded particle routes stay attached",
+        "no overflow at 1440",
+        "no overflow at 1024",
+        "no overflow at 768",
+        "no overflow at 390"
+      ],
+      "modes": [
+        {
+          "name": "通常",
+          "paths": 1,
+          "dashes": [
+            "1 49"
+          ],
+          "duration": [
+            "3.6s"
+          ]
+        },
+        {
+          "name": "控えめ",
+          "paths": 1,
+          "dashes": [
+            "1 99"
+          ],
+          "duration": [
+            "9s"
+          ]
+        },
+        {
+          "name": "オフ",
+          "paths": 0,
+          "dashes": [],
+          "duration": []
+        }
+      ],
+      "errors": []
+    }
+  ],
+  "sharedAndModule": [
+    {
+      "view": "architecture",
+      "sharedOff": true
+    },
+    {
+      "view": "workspace",
+      "sharedOff": true
+    },
+    {
+      "view": "command",
+      "sharedOff": true
+    },
+    {
+      "view": "dependencies",
+      "sharedOff": true
+    },
+    {
+      "view": "module-dependency",
+      "sharedOff": true
+    },
+    {
+      "view": "runtime-flow",
+      "sharedOff": true
+    },
+    {
+      "view": "function-call-flow",
+      "sharedOff": true
+    },
+    {
+      "view": "data-flow",
+      "sharedOff": true
+    },
+    {
+      "view": "data-model",
+      "sharedOff": true
+    },
+    {
+      "view": "architecture-map",
+      "sharedOff": true
+    },
+    {
+      "view": "module-dependency",
+      "bidirectional": true,
+      "directions": [
+        "imports",
+        "imported-by"
+      ],
+      "modes": [
+        {
+          "name": "通常",
+          "lines": "2",
+          "active": "true",
+          "reduced": "false"
+        },
+        {
+          "name": "控えめ",
+          "lines": "2",
+          "active": "true",
+          "reduced": "true"
+        },
+        {
+          "name": "オフ",
+          "lines": "2",
+          "active": "false",
+          "reduced": "false"
+        }
+      ],
+      "widths": [
+        {
+          "width": 1440,
+          "helpBelowControls": true
+        },
+        {
+          "width": 1024,
+          "helpBelowControls": true
+        },
+        {
+          "width": 768,
+          "helpBelowControls": true
+        },
+        {
+          "width": 390,
+          "helpBelowControls": true
+        }
+      ],
+      "clear": true,
+      "reset": true,
+      "focus": true,
+      "projectReplacement": true,
+      "errors": []
+    }
+  ],
+  "semanticModes": [
+    {
+      "input": "git-lines",
+      "view": "runtime-flow",
+      "modes": [
+        {
+          "name": "通常",
+          "points": 33,
+          "paths": 2,
+          "motion": {
+            "enabled": true,
+            "reduced": false,
+            "visible": true
+          }
+        },
+        {
+          "name": "控えめ",
+          "points": 33,
+          "paths": 2,
+          "motion": {
+            "enabled": true,
+            "reduced": true,
+            "visible": true
+          }
+        },
+        {
+          "name": "オフ",
+          "points": 33,
+          "paths": 2,
+          "motion": {
+            "enabled": false,
+            "reduced": false,
+            "visible": true
+          }
+        }
+      ],
+      "roundtripSelection": true,
+      "widths": [
+        {
+          "width": 1440,
+          "overflow": false
+        },
+        {
+          "width": 1024,
+          "overflow": false
+        },
+        {
+          "width": 768,
+          "overflow": false
+        },
+        {
+          "width": 390,
+          "overflow": false
+        }
+      ],
+      "errors": []
+    },
+    {
+      "input": "git-lines",
+      "view": "function-call-flow",
+      "modes": [
+        {
+          "name": "通常",
+          "points": 2111,
+          "paths": 3,
+          "motion": {
+            "enabled": true,
+            "reduced": false,
+            "visible": true
+          }
+        },
+        {
+          "name": "控えめ",
+          "points": 2111,
+          "paths": 3,
+          "motion": {
+            "enabled": true,
+            "reduced": true,
+            "visible": true
+          }
+        },
+        {
+          "name": "オフ",
+          "points": 2111,
+          "paths": 3,
+          "motion": {
+            "enabled": false,
+            "reduced": false,
+            "visible": true
+          }
+        }
+      ],
+      "roundtripSelection": true,
+      "widths": [
+        {
+          "width": 1440,
+          "overflow": false
+        },
+        {
+          "width": 1024,
+          "overflow": false
+        },
+        {
+          "width": 768,
+          "overflow": false
+        },
+        {
+          "width": 390,
+          "overflow": false
+        }
+      ],
+      "errors": []
+    },
+    {
+      "input": "git-lines",
+      "view": "data-flow",
+      "modes": [
+        {
+          "name": "通常",
+          "points": 5351,
+          "paths": 2,
+          "motion": {
+            "enabled": true,
+            "reduced": false,
+            "visible": true
+          }
+        },
+        {
+          "name": "控えめ",
+          "points": 5351,
+          "paths": 2,
+          "motion": {
+            "enabled": true,
+            "reduced": true,
+            "visible": true
+          }
+        },
+        {
+          "name": "オフ",
+          "points": 5351,
+          "paths": 2,
+          "motion": {
+            "enabled": false,
+            "reduced": false,
+            "visible": true
+          }
+        }
+      ],
+      "roundtripSelection": true,
+      "widths": [
+        {
+          "width": 1440,
+          "overflow": false
+        },
+        {
+          "width": 1024,
+          "overflow": false
+        },
+        {
+          "width": 768,
+          "overflow": false
+        },
+        {
+          "width": 390,
+          "overflow": false
+        }
+      ],
+      "errors": []
+    },
+    {
+      "input": "git-lines",
+      "view": "data-model",
+      "modes": [
+        {
+          "name": "通常",
+          "points": 41,
+          "paths": 4,
+          "motion": {
+            "enabled": true,
+            "reduced": false,
+            "visible": true
+          }
+        },
+        {
+          "name": "控えめ",
+          "points": 41,
+          "paths": 4,
+          "motion": {
+            "enabled": true,
+            "reduced": true,
+            "visible": true
+          }
+        },
+        {
+          "name": "オフ",
+          "points": 41,
+          "paths": 4,
+          "motion": {
+            "enabled": false,
+            "reduced": false,
+            "visible": true
+          }
+        }
+      ],
+      "roundtripSelection": true,
+      "widths": [
+        {
+          "width": 1440,
+          "overflow": false
+        },
+        {
+          "width": 1024,
+          "overflow": false
+        },
+        {
+          "width": 768,
+          "overflow": false
+        },
+        {
+          "width": 390,
+          "overflow": false
+        }
+      ],
+      "errors": []
+    },
+    {
+      "input": "git-lines",
+      "view": "architecture-map",
+      "modes": [
+        {
+          "name": "通常",
+          "points": 3,
+          "paths": 7,
+          "motion": {
+            "enabled": true,
+            "reduced": false,
+            "visible": true
+          }
+        },
+        {
+          "name": "控えめ",
+          "points": 3,
+          "paths": 7,
+          "motion": {
+            "enabled": true,
+            "reduced": true,
+            "visible": true
+          }
+        },
+        {
+          "name": "オフ",
+          "points": 3,
+          "paths": 7,
+          "motion": {
+            "enabled": false,
+            "reduced": false,
+            "visible": true
+          }
+        }
+      ],
+      "roundtripSelection": true,
+      "widths": [
+        {
+          "width": 1440,
+          "overflow": false
+        },
+        {
+          "width": 1024,
+          "overflow": false
+        },
+        {
+          "width": 768,
+          "overflow": false
+        },
+        {
+          "width": 390,
+          "overflow": false
+        }
+      ],
+      "errors": []
+    },
+    {
+      "input": "vehicle-management",
+      "view": "runtime-flow",
+      "modes": [
+        {
+          "name": "通常",
+          "points": 3760,
+          "paths": 1,
+          "motion": {
+            "enabled": true,
+            "reduced": false,
+            "visible": true
+          }
+        },
+        {
+          "name": "控えめ",
+          "points": 3760,
+          "paths": 1,
+          "motion": {
+            "enabled": true,
+            "reduced": true,
+            "visible": true
+          }
+        },
+        {
+          "name": "オフ",
+          "points": 3760,
+          "paths": 1,
+          "motion": {
+            "enabled": false,
+            "reduced": false,
+            "visible": true
+          }
+        }
+      ],
+      "roundtripSelection": true,
+      "widths": [
+        {
+          "width": 1440,
+          "overflow": false
+        },
+        {
+          "width": 1024,
+          "overflow": false
+        },
+        {
+          "width": 768,
+          "overflow": false
+        },
+        {
+          "width": 390,
+          "overflow": false
+        }
+      ],
+      "errors": []
+    },
+    {
+      "input": "vehicle-management",
+      "view": "function-call-flow",
+      "modes": [
+        {
+          "name": "通常",
+          "points": 8745,
+          "paths": 1,
+          "motion": {
+            "enabled": true,
+            "reduced": false,
+            "visible": true
+          }
+        },
+        {
+          "name": "控えめ",
+          "points": 8745,
+          "paths": 1,
+          "motion": {
+            "enabled": true,
+            "reduced": true,
+            "visible": true
+          }
+        },
+        {
+          "name": "オフ",
+          "points": 8745,
+          "paths": 1,
+          "motion": {
+            "enabled": false,
+            "reduced": false,
+            "visible": true
+          }
+        }
+      ],
+      "roundtripSelection": true,
+      "widths": [
+        {
+          "width": 1440,
+          "overflow": false
+        },
+        {
+          "width": 1024,
+          "overflow": false
+        },
+        {
+          "width": 768,
+          "overflow": false
+        },
+        {
+          "width": 390,
+          "overflow": false
+        }
+      ],
+      "errors": []
+    },
+    {
+      "input": "vehicle-management",
+      "view": "data-flow",
+      "modes": [
+        {
+          "name": "通常",
+          "points": 7624,
+          "paths": 4,
+          "motion": {
+            "enabled": true,
+            "reduced": false,
+            "visible": true
+          }
+        },
+        {
+          "name": "控えめ",
+          "points": 7624,
+          "paths": 4,
+          "motion": {
+            "enabled": true,
+            "reduced": true,
+            "visible": true
+          }
+        },
+        {
+          "name": "オフ",
+          "points": 7624,
+          "paths": 4,
+          "motion": {
+            "enabled": false,
+            "reduced": false,
+            "visible": true
+          }
+        }
+      ],
+      "roundtripSelection": true,
+      "widths": [
+        {
+          "width": 1440,
+          "overflow": false
+        },
+        {
+          "width": 1024,
+          "overflow": false
+        },
+        {
+          "width": 768,
+          "overflow": false
+        },
+        {
+          "width": 390,
+          "overflow": false
+        }
+      ],
+      "errors": []
+    },
+    {
+      "input": "vehicle-management",
+      "view": "data-model",
+      "modes": [
+        {
+          "name": "通常",
+          "points": 840,
+          "paths": 3,
+          "motion": {
+            "enabled": true,
+            "reduced": false,
+            "visible": true
+          }
+        },
+        {
+          "name": "控えめ",
+          "points": 840,
+          "paths": 3,
+          "motion": {
+            "enabled": true,
+            "reduced": true,
+            "visible": true
+          }
+        },
+        {
+          "name": "オフ",
+          "points": 840,
+          "paths": 3,
+          "motion": {
+            "enabled": false,
+            "reduced": false,
+            "visible": true
+          }
+        }
+      ],
+      "roundtripSelection": true,
+      "widths": [
+        {
+          "width": 1440,
+          "overflow": false
+        },
+        {
+          "width": 1024,
+          "overflow": false
+        },
+        {
+          "width": 768,
+          "overflow": false
+        },
+        {
+          "width": 390,
+          "overflow": false
+        }
+      ],
+      "errors": []
+    },
+    {
+      "input": "vehicle-management",
+      "view": "architecture-map",
+      "modes": [
+        {
+          "name": "通常",
+          "points": 26,
+          "paths": 17,
+          "motion": {
+            "enabled": true,
+            "reduced": false,
+            "visible": true
+          }
+        },
+        {
+          "name": "控えめ",
+          "points": 26,
+          "paths": 17,
+          "motion": {
+            "enabled": true,
+            "reduced": true,
+            "visible": true
+          }
+        },
+        {
+          "name": "オフ",
+          "points": 26,
+          "paths": 17,
+          "motion": {
+            "enabled": false,
+            "reduced": false,
+            "visible": true
+          }
+        }
+      ],
+      "roundtripSelection": true,
+      "widths": [
+        {
+          "width": 1440,
+          "overflow": false
+        },
+        {
+          "width": 1024,
+          "overflow": false
+        },
+        {
+          "width": 768,
+          "overflow": false
+        },
+        {
+          "width": 390,
+          "overflow": false
+        }
+      ],
+      "errors": []
+    }
+  ],
+  "semanticRegression": [
+    {
+      "view": "data-flow",
+      "autoAggregation": false,
+      "checks": [
+        {
+          "name": "selected",
+          "selected": 1,
+          "paths": 6
+        },
+        {
+          "name": "detail-closed",
+          "selected": 1,
+          "paths": 6
+        },
+        {
+          "name": "rotated-zoomed",
+          "selected": 1,
+          "paths": 6
+        },
+        {
+          "name": "blank-position",
+          "selected": 1,
+          "paths": 6
+        },
+        {
+          "name": "cleared",
+          "selected": 0,
+          "paths": 0
+        },
+        {
+          "name": "normal-mode-return",
+          "selected": 0,
+          "paths": 0
+        },
+        {
+          "name": "replaced",
+          "selected": 1,
+          "paths": 2
+        }
+      ],
+      "errors": []
+    },
+    {
+      "view": "data-flow",
+      "autoAggregation": true,
+      "checks": [
+        {
+          "name": "selected",
+          "selected": 1,
+          "paths": 6
+        },
+        {
+          "name": "detail-closed",
+          "selected": 1,
+          "paths": 6
+        },
+        {
+          "name": "rotated-zoomed",
+          "selected": 1,
+          "paths": 6
+        },
+        {
+          "name": "blank-position",
+          "selected": 1,
+          "paths": 6
+        },
+        {
+          "name": "cleared",
+          "selected": 0,
+          "paths": 0
+        },
+        {
+          "name": "normal-mode-return",
+          "selected": 0,
+          "paths": 0
+        },
+        {
+          "name": "replaced",
+          "selected": 1,
+          "paths": 2
+        },
+        {
+          "name": "before-inspection",
+          "selected": 1,
+          "paths": 2
+        },
+        {
+          "name": "inspection",
+          "selected": 1,
+          "paths": 2
+        }
+      ],
+      "errors": []
+    },
+    {
+      "view": "data-model",
+      "autoAggregation": false,
+      "checks": [
+        {
+          "name": "selected",
+          "selected": 1,
+          "paths": 10
+        },
+        {
+          "name": "detail-closed",
+          "selected": 1,
+          "paths": 10
+        },
+        {
+          "name": "rotated-zoomed",
+          "selected": 1,
+          "paths": 10
+        },
+        {
+          "name": "blank-position",
+          "selected": 1,
+          "paths": 10
+        },
+        {
+          "name": "cleared",
+          "selected": 0,
+          "paths": 0
+        },
+        {
+          "name": "normal-mode-return",
+          "selected": 0,
+          "paths": 0
+        },
+        {
+          "name": "replaced",
+          "selected": 1,
+          "paths": 0
+        }
+      ],
+      "errors": []
+    },
+    {
+      "view": "data-model",
+      "autoAggregation": true,
+      "checks": [
+        {
+          "name": "selected",
+          "selected": 1,
+          "paths": 10
+        },
+        {
+          "name": "detail-closed",
+          "selected": 1,
+          "paths": 10
+        },
+        {
+          "name": "rotated-zoomed",
+          "selected": 1,
+          "paths": 10
+        },
+        {
+          "name": "blank-position",
+          "selected": 1,
+          "paths": 10
+        },
+        {
+          "name": "cleared",
+          "selected": 0,
+          "paths": 0
+        },
+        {
+          "name": "normal-mode-return",
+          "selected": 0,
+          "paths": 0
+        },
+        {
+          "name": "replaced",
+          "selected": 1,
+          "paths": 0
+        },
+        {
+          "name": "before-inspection",
+          "selected": 1,
+          "paths": 0
+        },
+        {
+          "name": "inspection",
+          "selected": 1,
+          "paths": 0
+        }
+      ],
+      "errors": []
+    },
+    {
+      "view": "runtime-flow",
+      "autoAggregation": false,
+      "checks": [
+        {
+          "name": "selected",
+          "selected": 1,
+          "paths": 4
+        },
+        {
+          "name": "detail-closed",
+          "selected": 1,
+          "paths": 4
+        },
+        {
+          "name": "rotated-zoomed",
+          "selected": 1,
+          "paths": 4
+        },
+        {
+          "name": "blank-position",
+          "selected": 1,
+          "paths": 4
+        },
+        {
+          "name": "cleared",
+          "selected": 0,
+          "paths": 0
+        },
+        {
+          "name": "normal-mode-return",
+          "selected": 0,
+          "paths": 0
+        },
+        {
+          "name": "replaced",
+          "selected": 1,
+          "paths": 2
+        }
+      ],
+      "errors": []
+    },
+    {
+      "view": "runtime-flow",
+      "autoAggregation": true,
+      "checks": [
+        {
+          "name": "selected",
+          "selected": 1,
+          "paths": 4
+        },
+        {
+          "name": "detail-closed",
+          "selected": 1,
+          "paths": 4
+        },
+        {
+          "name": "rotated-zoomed",
+          "selected": 1,
+          "paths": 4
+        },
+        {
+          "name": "blank-position",
+          "selected": 1,
+          "paths": 4
+        },
+        {
+          "name": "cleared",
+          "selected": 0,
+          "paths": 0
+        },
+        {
+          "name": "normal-mode-return",
+          "selected": 0,
+          "paths": 0
+        },
+        {
+          "name": "replaced",
+          "selected": 1,
+          "paths": 2
+        },
+        {
+          "name": "before-inspection",
+          "selected": 1,
+          "paths": 2
+        },
+        {
+          "name": "inspection",
+          "selected": 1,
+          "paths": 2
+        }
+      ],
+      "errors": []
+    },
+    {
+      "view": "function-call-flow",
+      "autoAggregation": false,
+      "checks": [
+        {
+          "name": "selected",
+          "selected": 1,
+          "paths": 7
+        },
+        {
+          "name": "detail-closed",
+          "selected": 1,
+          "paths": 7
+        },
+        {
+          "name": "rotated-zoomed",
+          "selected": 1,
+          "paths": 7
+        },
+        {
+          "name": "blank-position",
+          "selected": 1,
+          "paths": 7
+        },
+        {
+          "name": "cleared",
+          "selected": 0,
+          "paths": 0
+        },
+        {
+          "name": "normal-mode-return",
+          "selected": 0,
+          "paths": 0
+        },
+        {
+          "name": "replaced",
+          "selected": 1,
+          "paths": 3
+        }
+      ],
+      "errors": []
+    },
+    {
+      "view": "function-call-flow",
+      "autoAggregation": true,
+      "checks": [
+        {
+          "name": "selected",
+          "selected": 1,
+          "paths": 7
+        },
+        {
+          "name": "detail-closed",
+          "selected": 1,
+          "paths": 7
+        },
+        {
+          "name": "rotated-zoomed",
+          "selected": 1,
+          "paths": 7
+        },
+        {
+          "name": "blank-position",
+          "selected": 1,
+          "paths": 7
+        },
+        {
+          "name": "cleared",
+          "selected": 0,
+          "paths": 0
+        },
+        {
+          "name": "normal-mode-return",
+          "selected": 0,
+          "paths": 0
+        },
+        {
+          "name": "replaced",
+          "selected": 1,
+          "paths": 3
+        },
+        {
+          "name": "before-inspection",
+          "selected": 1,
+          "paths": 3
+        },
+        {
+          "name": "inspection",
+          "selected": 1,
+          "paths": 3
+        }
+      ],
+      "errors": []
+    }
+  ],
+  "finalInteractions": [
+    {
+      "input": "small",
+      "view": "architecture",
+      "checks": [
+        "unique query never auto-selects",
+        "Reset retains query and selection",
+        "search Escape retains selection",
+        "fullscreen/menu Escape and focus trap retain selection",
+        "filter removes excluded selection",
+        "Dictionary link and Back retain project and selection",
+        "focus edge retains identity",
+        "logical nodes/relations/evidence unchanged by controls"
+      ],
+      "errors": []
+    },
+    {
+      "input": "small",
+      "view": "workspace",
+      "checks": [
+        "unique query never auto-selects",
+        "Reset retains query and selection",
+        "search Escape retains selection",
+        "fullscreen/menu Escape and focus trap retain selection",
+        "filter removes excluded selection",
+        "same-name packages have distinct paths",
+        "focus edge retains identity",
+        "particle offset advances source to target",
+        "offscreen stage removes particles",
+        "logical nodes/relations/evidence unchanged by controls"
+      ],
+      "errors": []
+    },
+    {
+      "input": "small",
+      "view": "command",
+      "checks": [
+        "unique query never auto-selects",
+        "Reset retains query and selection",
+        "search Escape retains selection",
+        "fullscreen/menu Escape and focus trap retain selection",
+        "filter removes excluded selection",
+        "focus edge retains identity",
+        "particle offset advances source to target",
+        "offscreen stage removes particles",
+        "logical nodes/relations/evidence unchanged by controls"
+      ],
+      "errors": []
+    },
+    {
+      "input": "small",
+      "view": "dependencies",
+      "checks": [
+        "unique query never auto-selects",
+        "Reset retains query and selection",
+        "search Escape retains selection",
+        "fullscreen/menu Escape and focus trap retain selection",
+        "filter removes excluded selection",
+        "same-name packages have distinct paths",
+        "external expansion roundtrip",
+        "focus edge retains identity",
+        "particle offset advances source to target",
+        "offscreen stage removes particles",
+        "logical nodes/relations/evidence unchanged by controls"
+      ],
+      "errors": []
+    },
+    {
+      "input": "git-lines",
+      "view": "architecture",
+      "checks": [
+        "unique query never auto-selects",
+        "Reset retains query and selection",
+        "search Escape retains selection",
+        "fullscreen/menu Escape and focus trap retain selection",
+        "filter removes excluded selection",
+        "Dictionary link and Back retain project and selection",
+        "focus edge retains identity",
+        "logical nodes/relations/evidence unchanged by controls"
+      ],
+      "errors": []
+    },
+    {
+      "input": "git-lines",
+      "view": "workspace",
+      "checks": [
+        "unique query never auto-selects",
+        "Reset retains query and selection",
+        "search Escape retains selection",
+        "fullscreen/menu Escape and focus trap retain selection",
+        "filter removes excluded selection",
+        "focus edge retains identity",
+        "particle offset advances source to target",
+        "offscreen stage removes particles",
+        "logical nodes/relations/evidence unchanged by controls"
+      ],
+      "errors": []
+    },
+    {
+      "input": "git-lines",
+      "view": "command",
+      "checks": [
+        "unique query never auto-selects",
+        "Reset retains query and selection",
+        "search Escape retains selection",
+        "fullscreen/menu Escape and focus trap retain selection",
+        "filter removes excluded selection",
+        "focus edge retains identity",
+        "particle offset advances source to target",
+        "offscreen stage removes particles",
+        "logical nodes/relations/evidence unchanged by controls"
+      ],
+      "errors": []
+    },
+    {
+      "input": "git-lines",
+      "view": "dependencies",
+      "checks": [
+        "unique query never auto-selects",
+        "Reset retains query and selection",
+        "search Escape retains selection",
+        "fullscreen/menu Escape and focus trap retain selection",
+        "filter removes excluded selection",
+        "external expansion roundtrip",
+        "focus edge retains identity",
+        "particle offset advances source to target",
+        "offscreen stage removes particles",
+        "logical nodes/relations/evidence unchanged by controls"
+      ],
+      "errors": []
+    },
+    {
+      "input": "vehicle-management",
+      "view": "architecture",
+      "checks": [
+        "unique query never auto-selects",
+        "Reset retains query and selection",
+        "search Escape retains selection",
+        "fullscreen/menu Escape and focus trap retain selection",
+        "filter removes excluded selection",
+        "Dictionary link and Back retain project and selection",
+        "focus edge retains identity",
+        "logical nodes/relations/evidence unchanged by controls"
+      ],
+      "errors": []
+    },
+    {
+      "input": "vehicle-management",
+      "view": "workspace",
+      "checks": [
+        "unique query never auto-selects",
+        "Reset retains query and selection",
+        "search Escape retains selection",
+        "fullscreen/menu Escape and focus trap retain selection",
+        "filter removes excluded selection",
+        "focus edge retains identity",
+        "particle offset advances source to target",
+        "offscreen stage removes particles",
+        "logical nodes/relations/evidence unchanged by controls"
+      ],
+      "errors": []
+    },
+    {
+      "input": "vehicle-management",
+      "view": "command",
+      "checks": [
+        "unique query never auto-selects",
+        "Reset retains query and selection",
+        "search Escape retains selection",
+        "fullscreen/menu Escape and focus trap retain selection",
+        "filter removes excluded selection",
+        "focus edge retains identity",
+        "particle offset advances source to target",
+        "offscreen stage removes particles",
+        "logical nodes/relations/evidence unchanged by controls"
+      ],
+      "errors": []
+    },
+    {
+      "input": "vehicle-management",
+      "view": "dependencies",
+      "checks": [
+        "unique query never auto-selects",
+        "Reset retains query and selection",
+        "search Escape retains selection",
+        "fullscreen/menu Escape and focus trap retain selection",
+        "filter removes excluded selection",
+        "external expansion roundtrip",
+        "focus edge retains identity",
+        "particle offset advances source to target",
+        "offscreen stage removes particles",
+        "logical nodes/relations/evidence unchanged by controls"
+      ],
+      "errors": []
+    }
+  ],
+  "particlePerformance": [
+    {
+      "input": "git-lines",
+      "view": "workspace",
+      "name": "通常",
+      "movingLines": 1,
+      "nodes": 3,
+      "edges": 2,
+      "sample": {
+        "rafIntervals": {
+          "samples": 59,
+          "medianMs": 16.700000000000045,
+          "p95Ms": 16.799999999999955,
+          "maxMs": 16.800000000000068,
+          "over50ms": 0
+        },
+        "longTasks": {
+          "samples": 0,
+          "medianMs": null,
+          "p95Ms": null,
+          "maxMs": null,
+          "over50ms": 0
+        },
+        "cpu": {
+          "AnalyzerGraphStage": {
+            "calls": 15,
+            "totalMs": 0.8000000268220901,
+            "maxMs": 0.20000000298023224,
+            "distribution": {
+              "samples": 15,
+              "medianMs": 0,
+              "p95Ms": 0.20000000298023224,
+              "maxMs": 0.20000000298023224,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        },
+        "environment": {
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36 Edg/152.0.0.0",
+          "width": 1440,
+          "height": 1000,
+          "dpr": 1
+        }
+      }
+    },
+    {
+      "input": "git-lines",
+      "view": "workspace",
+      "name": "控えめ",
+      "movingLines": 1,
+      "nodes": 3,
+      "edges": 2,
+      "sample": {
+        "rafIntervals": {
+          "samples": 60,
+          "medianMs": 16.699999999999818,
+          "p95Ms": 16.799999999999727,
+          "maxMs": 16.800000000000182,
+          "over50ms": 0
+        },
+        "longTasks": {
+          "samples": 0,
+          "medianMs": null,
+          "p95Ms": null,
+          "maxMs": null,
+          "over50ms": 0
+        },
+        "cpu": {
+          "AnalyzerGraphStage": {
+            "calls": 15,
+            "totalMs": 0.3999999910593033,
+            "maxMs": 0.10000000894069672,
+            "distribution": {
+              "samples": 15,
+              "medianMs": 0,
+              "p95Ms": 0.10000000894069672,
+              "maxMs": 0.10000000894069672,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        },
+        "environment": {
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36 Edg/152.0.0.0",
+          "width": 1440,
+          "height": 1000,
+          "dpr": 1
+        }
+      }
+    },
+    {
+      "input": "git-lines",
+      "view": "command",
+      "name": "通常",
+      "movingLines": 1,
+      "nodes": 9,
+      "edges": 8,
+      "sample": {
+        "rafIntervals": {
+          "samples": 60,
+          "medianMs": 16.699999999999818,
+          "p95Ms": 16.799999999999955,
+          "maxMs": 16.800000000000068,
+          "over50ms": 0
+        },
+        "longTasks": {
+          "samples": 0,
+          "medianMs": null,
+          "p95Ms": null,
+          "maxMs": null,
+          "over50ms": 0
+        },
+        "cpu": {
+          "AnalyzerGraphStage": {
+            "calls": 15,
+            "totalMs": 0.8999999761581421,
+            "maxMs": 0.10000000894069672,
+            "distribution": {
+              "samples": 15,
+              "medianMs": 0.09999999403953552,
+              "p95Ms": 0.10000000894069672,
+              "maxMs": 0.10000000894069672,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        },
+        "environment": {
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36 Edg/152.0.0.0",
+          "width": 1440,
+          "height": 1000,
+          "dpr": 1
+        }
+      }
+    },
+    {
+      "input": "git-lines",
+      "view": "command",
+      "name": "控えめ",
+      "movingLines": 1,
+      "nodes": 9,
+      "edges": 8,
+      "sample": {
+        "rafIntervals": {
+          "samples": 60,
+          "medianMs": 16.699999999999818,
+          "p95Ms": 16.799999999999727,
+          "maxMs": 16.800000000000182,
+          "over50ms": 0
+        },
+        "longTasks": {
+          "samples": 0,
+          "medianMs": null,
+          "p95Ms": null,
+          "maxMs": null,
+          "over50ms": 0
+        },
+        "cpu": {
+          "AnalyzerGraphStage": {
+            "calls": 15,
+            "totalMs": 1.3000000268220901,
+            "maxMs": 0.20000000298023224,
+            "distribution": {
+              "samples": 15,
+              "medianMs": 0.09999999403953552,
+              "p95Ms": 0.20000000298023224,
+              "maxMs": 0.20000000298023224,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        },
+        "environment": {
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36 Edg/152.0.0.0",
+          "width": 1440,
+          "height": 1000,
+          "dpr": 1
+        }
+      }
+    },
+    {
+      "input": "git-lines",
+      "view": "dependencies",
+      "name": "通常",
+      "movingLines": 1,
+      "nodes": 7,
+      "edges": 6,
+      "sample": {
+        "rafIntervals": {
+          "samples": 61,
+          "medianMs": 16.699999999999818,
+          "p95Ms": 16.799999999999955,
+          "maxMs": 16.800000000000182,
+          "over50ms": 0
+        },
+        "longTasks": {
+          "samples": 0,
+          "medianMs": null,
+          "p95Ms": null,
+          "maxMs": null,
+          "over50ms": 0
+        },
+        "cpu": {
+          "AnalyzerGraphStage": {
+            "calls": 15,
+            "totalMs": 3.1000000089406967,
+            "maxMs": 0.29999999701976776,
+            "distribution": {
+              "samples": 15,
+              "medianMs": 0.20000000298023224,
+              "p95Ms": 0.29999999701976776,
+              "maxMs": 0.29999999701976776,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        },
+        "environment": {
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36 Edg/152.0.0.0",
+          "width": 1440,
+          "height": 1000,
+          "dpr": 1
+        }
+      }
+    },
+    {
+      "input": "git-lines",
+      "view": "dependencies",
+      "name": "控えめ",
+      "movingLines": 1,
+      "nodes": 7,
+      "edges": 6,
+      "sample": {
+        "rafIntervals": {
+          "samples": 60,
+          "medianMs": 16.699999999999818,
+          "p95Ms": 16.800000000000182,
+          "maxMs": 16.800000000000182,
+          "over50ms": 0
+        },
+        "longTasks": {
+          "samples": 0,
+          "medianMs": null,
+          "p95Ms": null,
+          "maxMs": null,
+          "over50ms": 0
+        },
+        "cpu": {
+          "AnalyzerGraphStage": {
+            "calls": 15,
+            "totalMs": 2.899999976158142,
+            "maxMs": 0.29999999701976776,
+            "distribution": {
+              "samples": 15,
+              "medianMs": 0.20000000298023224,
+              "p95Ms": 0.29999999701976776,
+              "maxMs": 0.29999999701976776,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        },
+        "environment": {
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36 Edg/152.0.0.0",
+          "width": 1440,
+          "height": 1000,
+          "dpr": 1
+        }
+      }
+    },
+    {
+      "input": "vehicle-management",
+      "view": "workspace",
+      "name": "通常",
+      "movingLines": 1,
+      "nodes": 10,
+      "edges": 9,
+      "sample": {
+        "rafIntervals": {
+          "samples": 61,
+          "medianMs": 16.700000000000045,
+          "p95Ms": 16.799999999999955,
+          "maxMs": 16.800000000000182,
+          "over50ms": 0
+        },
+        "longTasks": {
+          "samples": 0,
+          "medianMs": null,
+          "p95Ms": null,
+          "maxMs": null,
+          "over50ms": 0
+        },
+        "cpu": {
+          "AnalyzerGraphStage": {
+            "calls": 15,
+            "totalMs": 1.1000000089406967,
+            "maxMs": 0.19999998807907104,
+            "distribution": {
+              "samples": 15,
+              "medianMs": 0.09999999403953552,
+              "p95Ms": 0.19999998807907104,
+              "maxMs": 0.19999998807907104,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        },
+        "environment": {
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36 Edg/152.0.0.0",
+          "width": 1440,
+          "height": 1000,
+          "dpr": 1
+        }
+      }
+    },
+    {
+      "input": "vehicle-management",
+      "view": "workspace",
+      "name": "控えめ",
+      "movingLines": 1,
+      "nodes": 10,
+      "edges": 9,
+      "sample": {
+        "rafIntervals": {
+          "samples": 60,
+          "medianMs": 16.699999999999818,
+          "p95Ms": 16.800000000000182,
+          "maxMs": 16.800000000000182,
+          "over50ms": 0
+        },
+        "longTasks": {
+          "samples": 0,
+          "medianMs": null,
+          "p95Ms": null,
+          "maxMs": null,
+          "over50ms": 0
+        },
+        "cpu": {
+          "AnalyzerGraphStage": {
+            "calls": 15,
+            "totalMs": 0.9999999850988388,
+            "maxMs": 0.10000000894069672,
+            "distribution": {
+              "samples": 15,
+              "medianMs": 0.09999999403953552,
+              "p95Ms": 0.10000000894069672,
+              "maxMs": 0.10000000894069672,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        },
+        "environment": {
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36 Edg/152.0.0.0",
+          "width": 1440,
+          "height": 1000,
+          "dpr": 1
+        }
+      }
+    },
+    {
+      "input": "vehicle-management",
+      "view": "command",
+      "name": "通常",
+      "movingLines": 1,
+      "nodes": 6,
+      "edges": 8,
+      "sample": {
+        "rafIntervals": {
+          "samples": 61,
+          "medianMs": 16.699999999999818,
+          "p95Ms": 16.799999999999955,
+          "maxMs": 16.800000000000182,
+          "over50ms": 0
+        },
+        "longTasks": {
+          "samples": 0,
+          "medianMs": null,
+          "p95Ms": null,
+          "maxMs": null,
+          "over50ms": 0
+        },
+        "cpu": {
+          "AnalyzerGraphStage": {
+            "calls": 15,
+            "totalMs": 1.5999999791383743,
+            "maxMs": 0.20000000298023224,
+            "distribution": {
+              "samples": 15,
+              "medianMs": 0.09999999403953552,
+              "p95Ms": 0.20000000298023224,
+              "maxMs": 0.20000000298023224,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        },
+        "environment": {
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36 Edg/152.0.0.0",
+          "width": 1440,
+          "height": 1000,
+          "dpr": 1
+        }
+      }
+    },
+    {
+      "input": "vehicle-management",
+      "view": "command",
+      "name": "控えめ",
+      "movingLines": 1,
+      "nodes": 6,
+      "edges": 8,
+      "sample": {
+        "rafIntervals": {
+          "samples": 61,
+          "medianMs": 16.699999999999818,
+          "p95Ms": 16.700000000000273,
+          "maxMs": 16.800000000000182,
+          "over50ms": 0
+        },
+        "longTasks": {
+          "samples": 0,
+          "medianMs": null,
+          "p95Ms": null,
+          "maxMs": null,
+          "over50ms": 0
+        },
+        "cpu": {
+          "AnalyzerGraphStage": {
+            "calls": 15,
+            "totalMs": 1.1999999582767487,
+            "maxMs": 0.20000000298023224,
+            "distribution": {
+              "samples": 15,
+              "medianMs": 0.09999999403953552,
+              "p95Ms": 0.20000000298023224,
+              "maxMs": 0.20000000298023224,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        },
+        "environment": {
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36 Edg/152.0.0.0",
+          "width": 1440,
+          "height": 1000,
+          "dpr": 1
+        }
+      }
+    },
+    {
+      "input": "vehicle-management",
+      "view": "dependencies",
+      "name": "通常",
+      "movingLines": 1,
+      "nodes": 13,
+      "edges": 15,
+      "sample": {
+        "rafIntervals": {
+          "samples": 60,
+          "medianMs": 16.699999999999818,
+          "p95Ms": 16.799999999999955,
+          "maxMs": 16.800000000000182,
+          "over50ms": 0
+        },
+        "longTasks": {
+          "samples": 0,
+          "medianMs": null,
+          "p95Ms": null,
+          "maxMs": null,
+          "over50ms": 0
+        },
+        "cpu": {
+          "AnalyzerGraphStage": {
+            "calls": 15,
+            "totalMs": 6.5,
+            "maxMs": 0.5999999940395355,
+            "distribution": {
+              "samples": 15,
+              "medianMs": 0.4000000059604645,
+              "p95Ms": 0.5999999940395355,
+              "maxMs": 0.5999999940395355,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        },
+        "environment": {
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36 Edg/152.0.0.0",
+          "width": 1440,
+          "height": 1000,
+          "dpr": 1
+        }
+      }
+    },
+    {
+      "input": "vehicle-management",
+      "view": "dependencies",
+      "name": "控えめ",
+      "movingLines": 1,
+      "nodes": 13,
+      "edges": 15,
+      "sample": {
+        "rafIntervals": {
+          "samples": 61,
+          "medianMs": 16.699999999999818,
+          "p95Ms": 16.799999999999727,
+          "maxMs": 16.800000000000182,
+          "over50ms": 0
+        },
+        "longTasks": {
+          "samples": 0,
+          "medianMs": null,
+          "p95Ms": null,
+          "maxMs": null,
+          "over50ms": 0
+        },
+        "cpu": {
+          "AnalyzerGraphStage": {
+            "calls": 15,
+            "totalMs": 7.800000011920929,
+            "maxMs": 0.7999999970197678,
+            "distribution": {
+              "samples": 15,
+              "medianMs": 0.5,
+              "p95Ms": 0.7999999970197678,
+              "maxMs": 0.7999999970197678,
+              "over50ms": 0
+            },
+            "samplesCapped": false
+          }
+        },
+        "environment": {
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36 Edg/152.0.0.0",
+          "width": 1440,
+          "height": 1000,
+          "dpr": 1
+        }
+      }
+    }
+  ],
+  "architectureNavigation": [
+    {
+      "input": "git-lines",
+      "checks": [
+        {
+          "label": "root project name",
+          "pass": true
+        },
+        {
+          "label": "root is inert current span",
+          "pass": true
+        },
+        {
+          "label": "unselected 2D double click opens requested canonical scope",
+          "pass": true
+        },
+        {
+          "label": "2D double adds one visit",
+          "pass": true
+        },
+        {
+          "label": "single open creates only real ancestors",
+          "pass": true
+        },
+        {
+          "label": "internal leaf double does not fabricate scope",
+          "pass": true
+        },
+        {
+          "label": "single selection does not open scope",
+          "pass": true
+        },
+        {
+          "label": "entry declaration count equals rows",
+          "pass": true
+        },
+        {
+          "label": "settings heading has no misleading total",
+          "pass": true
+        },
+        {
+          "label": "selection did not append visits",
+          "pass": true
+        },
+        {
+          "label": "3D starts unselected",
+          "pass": true
+        },
+        {
+          "label": "unselected native 3D double opens same canonical scope",
+          "pass": true
+        },
+        {
+          "label": "3D double adds one visit",
+          "pass": true
+        },
+        {
+          "label": "external application available",
+          "pass": true
+        },
+        {
+          "label": "outside single preserves current scope",
+          "pass": true
+        },
+        {
+          "label": "outside selected identity",
+          "pass": true
+        },
+        {
+          "label": "outside selection caption",
+          "pass": true
+        },
+        {
+          "label": "outside open changes to actual scope",
+          "pass": true
+        },
+        {
+          "label": "outside breadcrumb has no false parent",
+          "pass": true
+        },
+        {
+          "label": "Back returns to prior sibling",
+          "pass": true
+        },
+        {
+          "label": "Back restores outside selection",
+          "pass": true
+        },
+        {
+          "label": "Parent returns to real project",
+          "pass": true
+        },
+        {
+          "label": "drag out and back neither opens nor adds history",
+          "pass": true
+        },
+        {
+          "label": "context off description",
+          "pass": true
+        },
+        {
+          "label": "context on description",
+          "pass": true
+        },
+        {
+          "label": "mode switch retains scope",
+          "pass": true
+        },
+        {
+          "label": "mode roundtrip retains scope",
+          "pass": true
+        },
+        {
+          "label": "body fits 1440",
+          "pass": true
+        },
+        {
+          "label": "navigation fits 1440",
+          "pass": true
+        },
+        {
+          "label": "detail fits 1440",
+          "pass": true
+        },
+        {
+          "label": "body fits 1024",
+          "pass": true
+        },
+        {
+          "label": "navigation fits 1024",
+          "pass": true
+        },
+        {
+          "label": "detail fits 1024",
+          "pass": true
+        },
+        {
+          "label": "body fits 768",
+          "pass": true
+        },
+        {
+          "label": "navigation fits 768",
+          "pass": true
+        },
+        {
+          "label": "detail fits 768",
+          "pass": true
+        },
+        {
+          "label": "body fits 390",
+          "pass": true
+        },
+        {
+          "label": "navigation fits 390",
+          "pass": true
+        },
+        {
+          "label": "detail fits 390",
+          "pass": true
+        }
+      ],
+      "errors": []
+    },
+    {
+      "input": "vehicle-management",
+      "checks": [
+        {
+          "label": "root project name",
+          "pass": true
+        },
+        {
+          "label": "root is inert current span",
+          "pass": true
+        },
+        {
+          "label": "unselected 2D double click opens requested canonical scope",
+          "pass": true
+        },
+        {
+          "label": "2D double adds one visit",
+          "pass": true
+        },
+        {
+          "label": "single open creates only real ancestors",
+          "pass": true
+        },
+        {
+          "label": "internal leaf double does not fabricate scope",
+          "pass": true
+        },
+        {
+          "label": "single selection does not open scope",
+          "pass": true
+        },
+        {
+          "label": "entry declaration count equals rows",
+          "pass": true
+        },
+        {
+          "label": "settings heading has no misleading total",
+          "pass": true
+        },
+        {
+          "label": "selection did not append visits",
+          "pass": true
+        },
+        {
+          "label": "3D starts unselected",
+          "pass": true
+        },
+        {
+          "label": "unselected native 3D double opens same canonical scope",
+          "pass": true
+        },
+        {
+          "label": "3D double adds one visit",
+          "pass": true
+        },
+        {
+          "label": "external application available",
+          "pass": true
+        },
+        {
+          "label": "outside single preserves current scope",
+          "pass": true
+        },
+        {
+          "label": "outside selected identity",
+          "pass": true
+        },
+        {
+          "label": "outside selection caption",
+          "pass": true
+        },
+        {
+          "label": "outside open changes to actual scope",
+          "pass": true
+        },
+        {
+          "label": "outside breadcrumb has no false parent",
+          "pass": true
+        },
+        {
+          "label": "Back returns to prior sibling",
+          "pass": true
+        },
+        {
+          "label": "Back restores outside selection",
+          "pass": true
+        },
+        {
+          "label": "Parent returns to real project",
+          "pass": true
+        },
+        {
+          "label": "drag out and back neither opens nor adds history",
+          "pass": true
+        },
+        {
+          "label": "context off description",
+          "pass": true
+        },
+        {
+          "label": "context on description",
+          "pass": true
+        },
+        {
+          "label": "mode switch retains scope",
+          "pass": true
+        },
+        {
+          "label": "mode roundtrip retains scope",
+          "pass": true
+        },
+        {
+          "label": "body fits 1440",
+          "pass": true
+        },
+        {
+          "label": "navigation fits 1440",
+          "pass": true
+        },
+        {
+          "label": "detail fits 1440",
+          "pass": true
+        },
+        {
+          "label": "body fits 1024",
+          "pass": true
+        },
+        {
+          "label": "navigation fits 1024",
+          "pass": true
+        },
+        {
+          "label": "detail fits 1024",
+          "pass": true
+        },
+        {
+          "label": "body fits 768",
+          "pass": true
+        },
+        {
+          "label": "navigation fits 768",
+          "pass": true
+        },
+        {
+          "label": "detail fits 768",
+          "pass": true
+        },
+        {
+          "label": "body fits 390",
+          "pass": true
+        },
+        {
+          "label": "navigation fits 390",
+          "pass": true
+        },
+        {
+          "label": "detail fits 390",
+          "pass": true
+        }
+      ],
+      "errors": []
+    }
+  ],
+  "originalIntegrity": [
+    {
+      "project": "git-lines",
+      "trackedFiles": 147,
+      "contentUnchanged": true,
+      "headUnchanged": true,
+      "statusUnchanged": true,
+      "changed": []
+    },
+    {
+      "project": "vehicle-management",
+      "trackedFiles": 345,
+      "contentUnchanged": true,
+      "headUnchanged": true,
+      "statusUnchanged": true,
+      "changed": []
+    }
+  ],
+  "touch": {
+    "view": "workspace",
+    "input": "small",
+    "method": "Edge emulated touch, 390×844",
+    "candidates": 24,
+    "scrollTaps": 23,
+    "lastCandidateSelected": true,
+    "typingDidNotSelect": true
+  },
+  "tests": {
+    "build": "passed",
+    "lint": "passed",
+    "typecheck": "passed",
+    "testFilesPassed": 78,
+    "testFilesSkipped": 4,
+    "testsPassed": 684,
+    "testsSkipped": 8
+  }
+}

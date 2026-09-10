@@ -18,7 +18,7 @@ function Harness({ graph = view }: { graph?: AnalyzerViewModel }) {
   const [transform, setTransform] = useState<AnalyzerGraphTransform>({ x: 0, y: 0, scale: 0.7 });
   const [selected, setSelected] = useState<string>();
   return <AnalyzerSpatialGraphStage view={graph} selectedNodeId={selected} filter="all" search="" expandedPresentationIds={expanded}
-    onTogglePresentation={noop} onClearSelection={() => setSelected(undefined)} onResetPresentation={noop} onSelectNode={setSelected}
+    onTogglePresentation={noop} onClearSelection={() => setSelected(undefined)} onSelectNode={setSelected}
     onSelectRegion={noop} onSelectEdge={noop} transform={transform} hasStoredCamera
     onTransformChange={setTransform} cameraResetKey="test" onCountsChange={noop} />;
 }
@@ -100,19 +100,21 @@ describe('Spatial Atlas gesture integration', () => {
     hidden.mockRestore();
   });
 
-  it('provides a toolbar control that reduces flow speed without changing dependency selection', async () => {
+  it('keeps the shared flow speed when reducing particles without changing dependency selection', async () => {
     await act(async () => {
       host.querySelector<HTMLButtonElement>('[aria-label="a.ts, a.ts"]')!.click();
     });
     const stage = host.querySelector<HTMLElement>('[role="application"]')!;
     await act(async () => vi.advanceTimersByTime(100));
     const start = Number(stage.dataset.flowDistance);
+    const startFrames = Number(stage.dataset.flowFrames);
     await act(async () => vi.advanceTimersByTime(100));
-    const normal = Number(stage.dataset.flowDistance) - start;
+    const normal = (Number(stage.dataset.flowDistance) - start) / (Number(stage.dataset.flowFrames) - startFrames);
     await chooseParticleMode('控えめ');
     const slowStart = Number(stage.dataset.flowDistance);
+    const reducedStartFrames = Number(stage.dataset.flowFrames);
     await act(async () => vi.advanceTimersByTime(100));
-    expect(Number(stage.dataset.flowDistance) - slowStart).toBeLessThan(normal * 0.6);
+    expect((Number(stage.dataset.flowDistance) - slowStart) / (Number(stage.dataset.flowFrames) - reducedStartFrames)).toBeCloseTo(normal, 2);
     expect(particleButton().textContent).toContain('控えめ');
     expect(host.querySelector('[aria-label="a.ts, a.ts"]')!.getAttribute('aria-pressed')).toBe('true');
   });

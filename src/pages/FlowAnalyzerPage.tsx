@@ -36,7 +36,7 @@ const defaultOrbitFlow: NonNullable<AnalyzerViewSession['flow']> = { mode: '3d',
 const emptyAnalysis: SemanticAnalysis = { nodes: [], edges: [], coverage: [], warnings: [], stats: { files: 0, functions: 0, models: 0, unresolved: 0, elapsedMs: 0 } };
 
 export default function FlowAnalyzerPage({ view }: { view: SemanticExplorerViewId }) {
-  const { state, updateView, setActiveView, setFlowGroupBounds, setAutoAggregation, replaceProject } = useAnalyzerSession(), navigate = useNavigate();
+  const { state, updateView, setActiveView, setFlowGroupBounds, setParticleMode, setAutoAggregation, replaceProject } = useAnalyzerSession(), navigate = useNavigate();
   const store = state.store, session = state.views[view], options = session.semantic ?? semanticFlowDefaults;
   const flow = session.flow ?? (options.orbit ? defaultOrbitFlow : defaultFlow);
   const [loaded, setLoaded] = useState<{ store: AnalyzerProjectStore; analysis: SemanticAnalysis }>();
@@ -238,7 +238,7 @@ export default function FlowAnalyzerPage({ view }: { view: SemanticExplorerViewI
             onCenter: navigation.openNode, onDefinition: navigation.openDefinition, onJumpMode: navigation.jumpMode, onDepth: depth => navigation.changeLocal({ depth, direction: options.direction }),
             onScroll: navigation.saveScroll, onRevealSelection: revealSelection }}
           cameras={session.flowCameras ?? (options.orbit && session.semanticCamera ? { '3d': session.semanticCamera } : undefined)} onCamera={saveCamera} onMode={changeMode}
-          particleMode={flow.particleMode} onParticleMode={particleMode => updateView(view, { flow: { ...flow, particleMode } })}
+          particleMode={state.particleMode} onParticleMode={setParticleMode}
           showGroupBounds={state.showFlowGroupBounds ?? true} onGroupBounds={setFlowGroupBounds}
           autoAggregation={state.autoAggregation ?? true} onAutoAggregation={setAutoAggregation} aggregationState={session.aggregation} onAggregationState={aggregation => updateView(view, { aggregation })} totalNodeCount={view === 'architecture-map' ? architectureVisible.nodes.length : graph.nodes.length}
           fineExpandedScopeIds={session.dataFineExpandedScopeIds ?? []} onFineExpandedScopeIds={dataFineExpandedScopeIds => updateView(view, { dataFineExpandedScopeIds })}

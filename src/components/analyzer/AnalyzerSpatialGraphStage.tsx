@@ -62,11 +62,12 @@ import { configureSpatialCamera } from '../../analyzer/spatialThreeCamera';
 import { projectSpatialHeadings } from '../../analyzer/spatialHeadings';
 import { SPATIAL_FLOW_SPEED, type SpatialFlowState } from '../../analyzer/spatialFlow';
 import { useSpatialFlowMotion } from './useSpatialFlowMotion';
+import { useAnalyzerControlInset } from './useAnalyzerControlInset';
 import { SpatialParticleControl } from './SpatialParticleControl';
 import { SemanticFlowLegend } from './SemanticFlowLegend';
 import { semanticFlowDirectionLanguage } from './semanticFlowLanguage';
-import { prepareAutoAggregation, projectAutoAggregation, projectAggregationRelations, shortAggregationLabels, stableAggregationRepresentation, type AutoAggregationResult } from '../../analyzer/autoAggregation';
-import { moduleAggregationInput, moduleAggregationProjection, moduleManualGroups, moduleRelationEvidenceCounts } from '../../analyzer/moduleAutoAggregation';
+import { prepareAutoAggregation, projectAutoAggregation, projectAggregationRelations, stableAggregationRepresentation, type AutoAggregationResult } from '../../analyzer/autoAggregation';
+import { moduleAggregateRegions, moduleAggregationInput, moduleAggregationProjection, moduleManualGroups, moduleRelationEvidenceCounts } from '../../analyzer/moduleAutoAggregation';
 import type { AnalyzerViewSession } from '../../analyzer/session';
 import { AutoAggregationPanel, AutoAggregationToggle, type AggregationInspection, type AggregationGroupMode } from './AutoAggregationPanel';
 
@@ -80,7 +81,6 @@ interface AnalyzerSpatialGraphStageProps {
   expandedPresentationIds: ReadonlySet<string>;
   onTogglePresentation: (presentationId: string) => void;
   onClearSelection: () => void;
-  onResetPresentation: () => void;
   onSelectNode: (nodeId: string, focus?: boolean) => void;
   onSelectRegion: (regionId: string, focus?: boolean) => void;
   onSelectEdge: (edgeId: string) => void;
@@ -238,7 +238,6 @@ export function AnalyzerSpatialGraphStage({
   expandedPresentationIds,
   onTogglePresentation,
   onClearSelection,
-  onResetPresentation,
   onSelectNode,
   onSelectRegion,
   onSelectEdge,
@@ -286,6 +285,7 @@ export function AnalyzerSpatialGraphStage({
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [stageElement, setStageElement] = useState<HTMLDivElement | null>(null);
   const flow = useSpatialFlowMotion(stageElement);
+  useAnalyzerControlInset(stageElement);
   const attachStage = useCallback((element: HTMLDivElement | null) => {
     stageRef.current = element;
     setStageElement(element);
@@ -397,25 +397,14 @@ export function AnalyzerSpatialGraphStage({
     const saved = aggregationPreference.activeGroupIds ?? [];
     if (saved.length !== aggregation.activeGroupIds.size || saved.some(id => !aggregation.activeGroupIds.has(id))) changeAggregation({ ...aggregationPreference, activeGroupIds: [...aggregation.activeGroupIds] });
   }, [aggregation.activeGroupIds, autoAggregation, camera.viewportWidth, camera.viewportHeight, aggregationPreference, changeAggregation]);
-  const individualModules = useMemo(() => filteredModules.filter(point => aggregation.individualIds.has(point.node.id)), [filteredModules, aggregation.individualIds]);
-  const aggregateModules = useMemo<PositionedNode[]>(() => aggregation.aggregates.map(group => ({ x: group.x - ANALYZER_MODULE_NODE_WIDTH / 2, y: group.y - 18, height: 36,
-    node: { id: group.id, type: 'module', label: `${group.memberIds.length}対象 · ${group.label}`, evidenceIds: [], metadata: { displayAggregate: true, displayElevation: group.z, groupId: group.groupId } } })), [aggregation.aggregates]);
-  const aggregateLabels = useMemo(() => {
-    const shortNames = shortAggregationLabels(aggregation.aggregates), occupied: { x: number; y: number }[] = [];
-    return aggregation.aggregates.map(group => ({ group, point: projectSpatialPoint(group, camera) }))
-      .filter(({ point }) => Number.isFinite(point.x) && Number.isFinite(point.y) && point.x >= 0 && point.y >= 65 && point.x <= viewport.width && point.y <= viewport.height - 45)
-      .sort((a, b) => Number(b.group.groupId === inspection?.id) - Number(a.group.groupId === inspection?.id) || b.group.matchingCount - a.group.matchingCount)
-      .map(item => {
-        const priority = item.group.groupId === inspection?.id;
-        const visible = priority || occupied.length < 8 && !occupied.some(old => Math.abs(old.x - item.point.x) < 190 && Math.abs(old.y - item.point.y) < 50);
-        if (visible) occupied.push(item.point);
-        return { ...item, visible, label: shortNames.get(item.group.id) };
-      });
-  }, [aggregation.aggregates, camera, viewport.width, viewport.height, inspection]);
-  const renderedPositionedModules = useMemo(() => [...individualModules, ...aggregateModules], [individualModules, aggregateModules]);
-  const renderedById = useMemo(() => new Map([...positionedById, ...aggregateModules.map(point => [point.node.id, point] as const)]), [positionedById, aggregateModules]);
+  const aggregateRegions = useMemo(() => moduleAggregateRegions(aggregation.aggregates, filteredModules, visiblePositionedRegions), [aggregation.aggregates, filteredModules, visiblePositionedRegions]);
+  // An input without a shared visible ancestor keeps its original file endpoints.
+  const displayOwners = useMemo(() => new Map([...aggregation.ownerById].map(([id, owner]) => [id, owner !== id && !aggregateRegions.has(owner) ? id : owner])), [aggregation.ownerById, aggregateRegions]);
+  const individualModules = useMemo(() => filteredModules.filter(point => displayOwners.get(point.node.id) === point.node.id), [filteredModules, displayOwners]);
+  const renderedPositionedModules = individualModules;
+  const renderedById = useMemo<Map<string, SpatialEndpoint>>(() => new Map([...positionedById, ...aggregateRegions]), [positionedById, aggregateRegions]);
   const canonicalRelations = useMemo(() => view.edges.map(edge => ({ ...edge, source: edge.sourceId, target: edge.targetId, confidence: String(edge.metadata.confidence ?? 'source') })), [view.edges]);
-  const displayRelations = useMemo(() => projectAggregationRelations(canonicalRelations, aggregation.ownerById), [canonicalRelations, aggregation.ownerById]);
+  const displayRelations = useMemo(() => projectAggregationRelations(canonicalRelations, displayOwners), [canonicalRelations, displayOwners]);
   const originalRelationItems = useMemo(() => {
     const evidenceById = new Map(view.evidence.map(item => [item.id, item]));
     return canonicalRelations.map(edge => ({ ...edge, confidence: edge.confidence === 'source' ? 'ソースで確認' : edge.confidence, ...moduleRelationEvidenceCounts(edge, evidenceById) }));
@@ -560,8 +549,7 @@ export function AnalyzerSpatialGraphStage({
       onRenderFrame: (elapsed) => {
         const motion = flowStateRef.current;
         if (motion.active) {
-          motion.distance += elapsed * SPATIAL_FLOW_SPEED * (motion.reduced ? 0.45 : 1)
-            / Math.max(0.65, Math.sqrt(liveCameraRef.current.scale));
+          motion.distance += elapsed * SPATIAL_FLOW_SPEED;
           if (import.meta.env.DEV && stageRef.current) {
             stageRef.current.dataset.flowFrames = String(++flowFramesRef.current);
             stageRef.current.dataset.flowDistance = motion.distance.toFixed(2);
@@ -584,13 +572,12 @@ export function AnalyzerSpatialGraphStage({
   }, []);
 
   const resetTransform = useCallback(() => {
-    onResetPresentation();
     cameraRef.current.initialized = false;
     if (viewport.width > 0 && viewport.height > 0 && fitPoints.length > 0) {
       cameraRef.current.initialized = true;
       commitCamera(fitSpatialProjectedBounds(fitPoints, viewport.width, viewport.height, ANALYZER_SPATIAL_FIT_PADDING));
     }
-  }, [fitPoints, onResetPresentation, commitCamera, viewport.height, viewport.width]);
+  }, [fitPoints, commitCamera, viewport.height, viewport.width]);
 
   const changeZoom = useCallback((factor: number, anchorX = viewport.width / 2, anchorY = viewport.height / 2) => {
     interactingRef.current = true;
@@ -721,6 +708,34 @@ export function AnalyzerSpatialGraphStage({
     { x: 0, y: 0, scale: 1 }, 1000, 1000,
     ANALYZER_SPATIAL_TILT_DEGREES, ANALYZER_SPATIAL_YAW_DEGREES, worldBounds,
   ), [worldBounds]);
+  const headingModels = useMemo(() => {
+    const modules = new Map(allPositionedModules.map(node => [node.node.id, node]));
+    const connectedIds = new Set(spatialEdges.flatMap(edge => [aggregateRegions.get(edge.sourceId)?.region.id, aggregateRegions.get(edge.targetId)?.region.id]).filter(Boolean));
+    return visiblePositionedRegions.map(positioned => {
+      const region = positioned.region;
+      const label = regionDisplayLabel(region, uniqueRegionLabels, 'near');
+      const count = typeof region.metadata.moduleCount === 'number' ? region.metadata.moduleCount : region.childIds.length;
+      // Orthographic pan/zoom preserves the topmost corner. Resolve it only when layout changes.
+      const firstModuleTop = region.childIds.flatMap(id => {
+        const node = modules.get(id);
+        return node ? regionRectCorners(endpointWorldRect(node)) : [];
+      }).reduce<SpatialWorldPoint | undefined>((top, point) => !top
+        || projectSpatialPoint(point, routeCamera).y < projectSpatialPoint(top, routeCamera).y ? point : top, undefined);
+      const connected = connectedIds.has(region.id);
+      const originalAnchor = regionHeadingWorldAnchor(positioned, endpointElevation(positioned));
+      const screenAnchor = projectSpatialPoint(originalAnchor, routeCamera);
+      const bottomY = Math.min(screenAnchor.y + 13, firstModuleTop ? projectSpatialPoint(firstModuleTop, routeCamera).y - 4 : Infinity);
+      const anchor = connected ? spatialScreenPointToWorldAtElevation({ x: screenAnchor.x, y: bottomY }, endpointElevation(positioned), routeCamera) : originalAnchor;
+      return {
+        id: region.id, region, label, count,
+        anchor, connected,
+        bounds: endpointWorldRect(positioned), firstModuleTop,
+        width: spatialRegionHeadingWidth(label, `· ${count}`, 1, region.regionKind !== 'workspace-package') + 16,
+        priority: connected ? 120 : headingPriority(region, region.id === selectedRegionId),
+      };
+    }).sort((a, b) => b.priority - a.priority || (a.region.depth ?? 0) - (b.region.depth ?? 0) || a.id.localeCompare(b.id));
+  }, [allPositionedModules, routeCamera, selectedRegionId, uniqueRegionLabels, visiblePositionedRegions, spatialEdges, aggregateRegions]);
+
   const routeModules = useMemo(() => new Map(renderedPositionedModules.map((positioned) => [
     positioned.node.id, projectedModuleNode(positioned.node.id, moduleWorldAnchor(positioned, endpointElevation(positioned)), routeCamera, ANALYZER_MODULE_NODE_WIDTH, positioned.height),
   ])), [renderedPositionedModules, routeCamera]);
@@ -729,8 +744,8 @@ export function AnalyzerSpatialGraphStage({
   ])), [visiblePositionedRegions, routeCamera]);
   const routedEdges = useMemo(() => {
     const resolved = spatialEdges.flatMap((edge) => {
-      const source = renderedById.get(edge.sourceId);
-      const target = renderedById.get(edge.targetId);
+      const source = aggregateRegions.get(edge.sourceId) ?? renderedById.get(edge.sourceId);
+      const target = aggregateRegions.get(edge.targetId) ?? renderedById.get(edge.targetId);
       if (!source || !target) return [];
       const sourceBounds = edge.aggregated && isRegionEndpoint(source)
         ? routeRegions.get(source.region.id)
@@ -741,6 +756,18 @@ export function AnalyzerSpatialGraphStage({
       if (!sourceBounds || !targetBounds) return [];
       return [{ edge, source, target, sourceBounds, targetBounds }];
     });
+    const headingPorts = new Map<string, SpatialWorldPoint>();
+    const connections = new Map<string, string[]>();
+    for (const { edge } of resolved) for (const side of ['source', 'target'] as const) {
+      const region = aggregateRegions.get(side === 'source' ? edge.sourceId : edge.targetId);
+      if (!region) continue;
+      const keys = connections.get(region.region.id) ?? []; keys.push(edge.id + ':' + side); connections.set(region.region.id, keys);
+    }
+    for (const [id, keys] of connections) {
+      const heading = headingModels.find(model => model.id === id); if (!heading) continue;
+      const anchor = projectSpatialPoint(heading.anchor, routeCamera);
+      keys.sort().forEach((key, index) => headingPorts.set(key, spatialScreenPointToWorldAtElevation({ x: anchor.x + 8 + 40 * (index + 1) / (keys.length + 1), y: anchor.y }, heading.anchor.z, routeCamera)));
+    }
     const ports = assignProjectedPerimeterPorts(resolved.map(({ edge, sourceBounds, targetBounds }) => ({
       id: edge.id,
       source: sourceBounds,
@@ -756,8 +783,8 @@ export function AnalyzerSpatialGraphStage({
       const assigned = ports.get(edge.id);
       if (!assigned) return undefined;
       const assignedWorld = worldPorts.get(edge.id);
-      const sourceWorldPort = isRegionEndpoint(source) ? assignedWorld?.start : source.node.metadata.displayAggregate ? moduleWorldAnchor(source, endpointElevation(source)) : undefined;
-      const targetWorldPort = isRegionEndpoint(target) ? assignedWorld?.end : target.node.metadata.displayAggregate ? moduleWorldAnchor(target, endpointElevation(target)) : undefined;
+      const sourceWorldPort = headingPorts.get(edge.id + ':source') ?? (isRegionEndpoint(source) ? assignedWorld?.start : undefined);
+      const targetWorldPort = headingPorts.get(edge.id + ':target') ?? (isRegionEndpoint(target) ? assignedWorld?.end : undefined);
       const routePorts = {
         start: sourceWorldPort ? projectSpatialPoint(sourceWorldPort, routeCamera) : assigned.start,
         end: targetWorldPort ? projectSpatialPoint(targetWorldPort, routeCamera) : assigned.end,
@@ -765,7 +792,7 @@ export function AnalyzerSpatialGraphStage({
       const sourceName = endpointDisplayName(source, uniqueRegionLabels, 'near');
       const targetName = endpointDisplayName(target, uniqueRegionLabels, 'near');
       const direction = edgeDirection(edge);
-      const description = edge.aggregated ? `${sourceName} → ${targetName} · 表示上の集約 ${edge.count}関係 · ${edge.edge.label}` : `${sourceName} が ${targetName} を import`;
+      const description = edge.aggregated ? `${sourceName} → ${targetName} · この範囲内の ${edge.count}関係 · ${edge.edge.label}` : `${sourceName} が ${targetName} を import`;
       const start = sourceWorldPort ?? spatialScreenPointToWorldAtElevation(routePorts.start, endpointElevation(source), routeCamera);
       const end = targetWorldPort ?? spatialScreenPointToWorldAtElevation(routePorts.end, endpointElevation(target), routeCamera);
       return {
@@ -778,7 +805,7 @@ export function AnalyzerSpatialGraphStage({
       };
     }).filter((candidate): candidate is ProjectedGraphEdge => Boolean(candidate));
     return built;
-  }, [routeCamera, renderedById, routeModules, routeRegions, spatialEdges, spatialRouteObstacles, uniqueRegionLabels, edgeDirection]);
+  }, [routeCamera, renderedById, routeModules, routeRegions, spatialEdges, spatialRouteObstacles, uniqueRegionLabels, edgeDirection, aggregateRegions, headingModels]);
   routesRef.current = routedEdges;
   const projectedEdges = useMemo(() => routedEdges.map((edge) => {
     const points = edge.worldPoints.map((point) => projectSpatialPoint(point, camera));
@@ -787,27 +814,6 @@ export function AnalyzerSpatialGraphStage({
       visible: edge.readable && spatialPathIntersectsViewport(points, camera.viewportWidth, camera.viewportHeight),
     };
   }), [routedEdges, camera]);
-  const headingModels = useMemo(() => {
-    const modules = new Map(allPositionedModules.map(node => [node.node.id, node]));
-    return visiblePositionedRegions.map(positioned => {
-      const region = positioned.region;
-      const label = regionDisplayLabel(region, uniqueRegionLabels, 'near');
-      const count = typeof region.metadata.moduleCount === 'number' ? region.metadata.moduleCount : region.childIds.length;
-      // Orthographic pan/zoom preserves the topmost corner. Resolve it only when layout changes.
-      const firstModuleTop = region.childIds.flatMap(id => {
-        const node = modules.get(id);
-        return node ? regionRectCorners(endpointWorldRect(node)) : [];
-      }).reduce<SpatialWorldPoint | undefined>((top, point) => !top
-        || projectSpatialPoint(point, routeCamera).y < projectSpatialPoint(top, routeCamera).y ? point : top, undefined);
-      return {
-        id: region.id, region, label, count,
-        anchor: regionHeadingWorldAnchor(positioned, endpointElevation(positioned)),
-        bounds: endpointWorldRect(positioned), firstModuleTop,
-        width: spatialRegionHeadingWidth(label, `· ${count}`, 1, region.regionKind !== 'workspace-package') + 16,
-        priority: headingPriority(region, region.id === selectedRegionId),
-      };
-    }).sort((a, b) => b.priority - a.priority || (a.region.depth ?? 0) - (b.region.depth ?? 0) || a.id.localeCompare(b.id));
-  }, [allPositionedModules, routeCamera, selectedRegionId, uniqueRegionLabels, visiblePositionedRegions]);
 
   useLayoutEffect(() => {
     const paintHeadings = (liveCamera: SpatialCameraModel) => {
@@ -831,12 +837,15 @@ export function AnalyzerSpatialGraphStage({
   );
   const flowActive = flow.enabled && flow.visible && visibleProjectedEdges.length > 0;
   useLayoutEffect(() => {
-    flowStateRef.current.active = flowActive;
     flowStateRef.current.reduced = flow.reduced;
+    invalidateOutRef.current?.();
+  }, [flow.reduced]);
+  useLayoutEffect(() => {
+    flowStateRef.current.active = flowActive;
     loopRef.current?.setAnimating(flowActive);
     invalidateOutRef.current?.();
     return () => { loopRef.current?.setAnimating(false); };
-  }, [flowActive, flow.reduced]);
+  }, [flowActive]);
   const visibleCanvasModuleCount = useMemo(() => [...projectedModules.values()].filter(node => projectedRectIntersectsViewport(node.cardBounds, camera)).length, [projectedModules, camera]);
   const connectedIds = useMemo(() => new Set(spatialEdges.flatMap(edge => [edge.sourceId, edge.targetId])), [spatialEdges]);
   useEffect(() => {
@@ -905,20 +914,30 @@ export function AnalyzerSpatialGraphStage({
       aria-label="Module Dependency spatial graph. Drag to pan and use the wheel to zoom."
       data-display-point-count={aggregation.counts.representations} data-node-count={totalModuleCount}
     >
-      <div className="analyzer-stage-controls" aria-label="Spatial graph controls">
+      <div className="analyzer-stage-controls" aria-label="グラフ操作">
         <button type="button" onClick={fitCamera} title="現在表示しているMap全体を表示">Fit</button>
-        <button type="button" onClick={resetTransform} title="カメラと表示状態を初期化">Reset</button>
+        <button type="button" onClick={resetTransform} title="現在の図のカメラを初期位置へ戻す">Reset</button>
         <button type="button" onClick={() => changeZoom(1.14)} aria-label="Zoom in">+</button>
         <button type="button" onClick={() => changeZoom(0.88)} aria-label="Zoom out">−</button>
         <span ref={scaleLabelRef}>{Math.round(settledTransform.scale * 100)}%</span>
+        <button type="button" disabled={!selectedNodeId && !selectedRegionId && !selectedEdgeId} onClick={() => {
+          const edge = view.edges.find(edge => edge.id === selectedEdgeId);
+          const ids = edge ? [edge.sourceId, edge.targetId] : [selectedNodeId ?? selectedRegionId];
+          const endpoints = ids.flatMap(id => { const endpoint = id ? positionedById.get(id) : undefined; return endpoint ? [endpoint] : []; });
+          if (endpoints.length > 1) {
+            const elevated = routesRef.current.filter(route => ids.includes(route.sourceId) && ids.includes(route.targetId)).flatMap(route => route.worldPoints);
+            commitCamera(fitSpatialProjectedBounds([...endpoints.flatMap(endpoint => regionRectCorners(endpointWorldRect(endpoint))), ...elevated], viewport.width, viewport.height, ANALYZER_SPATIAL_FIT_PADDING, ANALYZER_SPATIAL_TILT_DEGREES, worldBounds));
+          }
+          else if (endpoints[0]) { const endpoint = endpoints[0]; const anchor = isRegionEndpoint(endpoint) ? regionHeadingWorldAnchor(endpoint, endpointElevation(endpoint)) : moduleWorldAnchor(endpoint, endpointElevation(endpoint)); commitCamera(focusSpatialCamera(anchor, settledTransform, viewport.width, viewport.height, worldBounds)); }
+        }}>選択へ移動</button>
         <SpatialParticleControl mode={flow.mode} onChange={flow.setMode} onOpen={() => setShowHelp(false)} />
         <AutoAggregationToggle enabled={autoAggregation} onChange={enabled => onAutoAggregation?.(enabled)} />
         <button type="button" aria-label="分類の囲い" aria-pressed={showGroupBounds} onClick={() => onGroupBounds?.(!showGroupBounds)}>分類の囲い：{showGroupBounds ? 'ON' : 'OFF'}</button>
         {onToggleFullscreen && <button type="button" onClick={onToggleFullscreen} aria-pressed={isFullscreen} aria-label={isFullscreen ? '全画面を終了' : '全画面表示'} title={isFullscreen ? '全画面を終了（Esc）' : '全画面表示'}>{isFullscreen ? '↙' : '⛶'}</button>}
-        <button type="button" className="analyzer-help-button" onClick={() => setShowHelp((current) => !current)} aria-expanded={showHelp} aria-controls="analyzer-spatial-help" aria-label="Spatial graph操作ヘルプ">?</button>
+        <button type="button" className="analyzer-help-button" onClick={() => setShowHelp((current) => !current)} aria-expanded={showHelp} aria-controls="analyzer-spatial-help" aria-label="グラフ操作ヘルプ">?</button>
       </div>
       {showHelp && (
-        <div id="analyzer-spatial-help" className="analyzer-stage-help" role="dialog" aria-label="Spatial graph操作ヘルプ">
+        <div id="analyzer-spatial-help" className="analyzer-stage-help" role="dialog" aria-label="グラフ操作ヘルプ">
           <strong>Spatial Atlas</strong>
           <p>ドラッグで移動、Wheelでカーソル位置を拡大縮小。矢印キーで移動、＋ / −でズーム、Homeで全体表示。「パーティクル」のメニューから通常・控えめ・オフを選べます。Directoryはダブルクリック、またはEnterで展開 / 折りたたみできます。Escで選択解除、全画面表示中はEscで通常表示へ戻ります。</p>
           <SemanticFlowLegend view="module-dependency" inline />
@@ -943,7 +962,7 @@ export function AnalyzerSpatialGraphStage({
             style={{ pointerEvents: 'none' }}
           >
             <SpatialCameraBinder modelRef={liveCameraRef} invalidateOut={invalidateOutRef} />
-              <SpatialAtlasScene regions={showGroupBounds ? visiblePositionedRegions : []} modules={individualModules} aggregates={aggregation.aggregates} edges={routedEdges}
+              <SpatialAtlasScene regions={showGroupBounds ? visiblePositionedRegions : []} modules={individualModules} edges={routedEdges}
               cameraRef={liveCameraRef} cameraModel={camera} selectedNodeId={selectedNodeId} selectedRegionId={selectedRegionId} connectedIds={connectedIds} search={search}
               flowEnabled={flow.enabled} flowActive={flowActive} flowStateRef={flowStateRef} />
           </Canvas>
@@ -984,11 +1003,11 @@ export function AnalyzerSpatialGraphStage({
               );
             })}
           </div>
-          <div ref={overlayRef} className="analyzer-spatial-overlay" aria-label="Module Dependency map controls" style={{ '--spatial-label-scale': labelScale } as CSSProperties}>
+          <div ref={overlayRef} className="analyzer-spatial-overlay" aria-label="Module Dependency map controls" style={{ '--spatial-label-scale': labelScale, '--spatial-annotation-scale': camera.scale } as CSSProperties}>
             {selectedNodeId && (() => {
               const node = projectedModules.get(selectedNodeId);
               if (!node || node.cardBounds.height >= 18 || !projectedRectIntersectsViewport(node.cardBounds, camera)) return null;
-              return <span className="analyzer-spatial-selected-indicator" style={{left:node.anchorX,top:node.cardBounds.y-12}}>{view.nodes.find(item=>item.id===selectedNodeId)?.label}</span>;
+              return <span className="analyzer-spatial-selected-indicator" style={{left:node.anchorX,top:node.cardBounds.y-12 * camera.scale}}>{view.nodes.find(item=>item.id===selectedNodeId)?.label}</span>;
             })()}
             {individualModules.map((positioned) => {
               const node = positioned.node;
@@ -1022,9 +1041,6 @@ export function AnalyzerSpatialGraphStage({
                 </button>
               );
             })}
-            {aggregateLabels.map(({ group, point, visible, label }) =>
-                <button key={group.id} type="button" className="analyzer-spatial-aggregate-label" data-label-visible={visible || undefined} style={{ left: point.x, top: point.y }} onClick={() => setInspection({ kind: 'group', id: group.groupId })}
-                  aria-label={`${group.label} · ${group.memberIds.length}対象の表示集合を確認`} title={group.label}><span>{label}<br />{inspection?.kind === 'group' && inspection.id === group.groupId ? '内訳を表示中 · ' : ''}{group.memberIds.length.toLocaleString()}対象{group.matchingCount ? ` · ${group.matchingCount}件一致` : ''}</span></button>)}
             <svg className="analyzer-spatial-graph-layer" width={Math.max(1, viewport.width)} height={Math.max(1, viewport.height)} viewBox={`0 0 ${Math.max(1, viewport.width)} ${Math.max(1, viewport.height)}`} aria-label="Module dependency relations">
               {visibleProjectedEdges.map((edge) => (
                 <g key={edge.id} className={`analyzer-spatial-edge${edge.selected ? ' is-selected' : ''}${edge.connected ? ' is-connected' : ''}${edge.dimmed ? ' is-dimmed' : ''}`}>

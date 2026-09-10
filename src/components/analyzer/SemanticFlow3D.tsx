@@ -14,7 +14,7 @@ import { confidenceLabels, type SemanticGraph } from '../../analyzer/semantic/ty
 import { AutoAggregationPanel, type AggregationInspection, type AggregationGroupMode } from './AutoAggregationPanel';
 import { semanticFlowRegions, semanticRegionIdentity } from '../../analyzer/semantic/flowRegions';
 import { explorerRegionIdentity, type SemanticExplorerModel } from '../../analyzer/semantic/semanticExplorer';
-import { SPATIAL_FLOW_PARTICLE_SPACING, SPATIAL_FLOW_SPEED, type SpatialFlowState } from '../../analyzer/spatialFlow';
+import { SPATIAL_FLOW_SPEED, SPATIAL_FLOW_MAX_FRAME_SECONDS, type SpatialFlowState } from '../../analyzer/spatialFlow';
 import { SpatialFlowParticles } from './SpatialFlowParticles';
 import type { SemanticFlowRenderProps } from './SemanticFlow2D';
 import { bindSemanticFlowKeyboard } from './semanticFlowKeyboard';
@@ -244,10 +244,10 @@ function Scene({ graph: sourceGraph, renderGraph, explorer, nodeDisplays: displa
       callbacks.current.onConnections(semanticFlowConnectionNotices(camera, size, positions, new Set([...connected, ...priorityIds].filter(id => !selectedIds.has(id))), labels, overlayTop, labelObstacles));
       labelDirty.current = false;
     }
-    if (stateRef.current.active) { stateRef.current.distance += Math.min(delta, .1) * SPATIAL_FLOW_SPEED; invalidate(); }
+    if (stateRef.current.active) { stateRef.current.distance += Math.min(delta, SPATIAL_FLOW_MAX_FRAME_SECONDS) * SPATIAL_FLOW_SPEED; invalidate(); }
   });
   return <><color attach="background" args={['#050c09']} />{showGroupBounds && <primitive object={boundaryAsset.object} />}<primitive object={edgeAsset.object} /><primitive object={edgeAsset.arrows} /><primitive object={nodeAsset.object} />
-    <SpatialFlowParticles paths={flowPaths} stateRef={stateRef} cameraRef={cameraRef} active={motion.enabled && motion.visible} spacing={SPATIAL_FLOW_PARTICLE_SPACING} />
+    <SpatialFlowParticles paths={flowPaths} stateRef={stateRef} cameraRef={cameraRef} active={motion.enabled && motion.visible} />
   </>;
 }
 

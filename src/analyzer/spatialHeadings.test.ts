@@ -11,6 +11,19 @@ const heading: SpatialHeadingModel = {
 const camera = (scale: number, x = 0, y = 0) => spatialCameraModel({ scale, x, y }, 1000, 600);
 
 describe('live spatial headings', () => {
+  it('keeps connected headings visible with their lower edge on the world anchor during zoom and pan', () => {
+    const connected = { ...heading, connected: true };
+    for (const scale of [0.08, 0.2, 0.7, 1, 2]) for (const pan of [0, 60]) {
+      const model = camera(scale, pan, pan);
+      const frame = projectSpatialHeadings([connected], model)[0]!;
+      const anchor = projectSpatialPoint(connected.anchor, model);
+      expect(frame.visible).toBe(true);
+      expect(frame.x).toBeCloseTo(anchor.x);
+      expect(frame.y + frame.height).toBeCloseTo(anchor.y);
+    }
+    expect(projectSpatialHeadings([connected], camera(0.2, 2000))[0]!.visible).toBe(false);
+  });
+
   it('scales the complete heading while keeping it within its region and above its files', () => {
     const frames = [0.4, 1, 2].map(scale => {
       const model = camera(scale);

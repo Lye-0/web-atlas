@@ -1,17 +1,16 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { ANALYZER_DEFAULT_TRANSFORM, ANALYZER_EXTERNAL_SUMMARY_ID, analyzerViewCounts, isCompatibleSpatialCameraTransform, presentationOwnsNode, presentAnalyzerView, projectAnalyzerView, regionMatchesSearch, restoreAnalyzerViewSession, useAnalyzerSession, viewNodeSearchText } from '../analyzer';
+import { ANALYZER_DEFAULT_TRANSFORM, ANALYZER_EXTERNAL_SUMMARY_ID, analyzerViewCounts, analyzerViewLabels, isCompatibleSpatialCameraTransform, presentationOwnsNode, presentAnalyzerView, projectAnalyzerView, restoreAnalyzerViewSession, useAnalyzerSession } from '../analyzer';
 import type { AnalyzerGraphTransform, AnalyzerProjectStore, AnalyzerSemanticRegion, AnalyzerViewCounts, AnalyzerViewId, AnalyzerViewModel, AnalyzerViewNode, AnalyzerViewSession, DirectoryHandleLike } from '../analyzer';
 import { AnalyzerDetailPanel } from '../components/analyzer/AnalyzerDetailPanel';
 import { AnalyzerEmptyOrbit } from '../components/analyzer/AnalyzerEmptyOrbit';
 import { AnalyzerGraphStage } from '../components/analyzer/AnalyzerGraphStage';
-import { AnalyzerProjectPicker } from '../components/analyzer/AnalyzerProjectPicker';
 import { AnalyzerToolbar } from '../components/analyzer/AnalyzerToolbar';
 import { useWorkspaceFullscreen } from '../components/analyzer/useWorkspaceFullscreen';
 import { isSemanticView } from '../analyzer/semantic/types';
 import { AnalyzerProjectHeader, AnalyzerViewHeading } from '../components/analyzer/AnalyzerViewChrome';
 import { SearchResultStrip } from '../components/analyzer/SearchResultStrip';
-import { compareAnalyzerSearchResults, matchAnalyzerSearch, moduleSearchDocument } from '../analyzer/search';
+import { analyzerEntitySearchDocument, compareAnalyzerSearchResults, matchAnalyzerSearch, moduleSearchDocument } from '../analyzer/search';
 
 const SemanticAnalyzerPage = lazy(() => import('./SemanticAnalyzerPage'));
 
@@ -41,7 +40,7 @@ function LegacyAnalyzerPage() {
   const view = viewFromPath(location.pathname);
   const { state: session, replaceProject, setActiveView, updateView, setAutoAggregation, setFlowGroupBounds } = useAnalyzerSession();
   const store = session.store;
-  const fullscreen = useWorkspaceFullscreen(view === 'module-dependency' && Boolean(store));
+  const fullscreen = useWorkspaceFullscreen(Boolean(store));
   const storedViewState = session.views[view];
   const [focusRequest, setFocusRequest] = useState<{ view: AnalyzerViewId; store: AnalyzerProjectStore | undefined; entityId: string; nonce: number; entityIds?: string[] }>();
   const focusNonce = useRef(0);
@@ -60,13 +59,14 @@ function LegacyAnalyzerPage() {
         const match = matchAnalyzerSearch(moduleSearchDocument(item), search);
         return match ? [{ item, match, label: item.label, path: String(item.metadata.modulePath ?? ''), id: item.id }] : [];
       }).sort(compareAnalyzerSearchResults).map(({ item }) => ({ kind: 'node', item }));
-    const nodes: AnalyzerSearchResult[] = model.nodes
-      .filter((node) => viewNodeSearchText(node).includes(search.trim().toLowerCase()))
-      .map((item) => ({ kind: 'node', item }));
-    const regions: AnalyzerSearchResult[] = (model.regions ?? [])
-      .filter((region) => regionMatchesSearch(region, search))
-      .map((item) => ({ kind: 'region', item }));
-    return [...nodes, ...regions].slice(0, 8);
+    const candidates: AnalyzerSearchResult[] = [
+      ...model.nodes.filter(node => filter === 'all' || node.type === filter).map(item => ({ kind: 'node' as const, item })),
+      ...(model.regions ?? []).filter(() => filter === 'all' || filter === 'stack-scope').map(item => ({ kind: 'region' as const, item })),
+    ];
+    return candidates.flatMap(result => {
+      const match = matchAnalyzerSearch(analyzerEntitySearchDocument(result.item), search);
+      return match ? [{ result, match, label: result.item.label, path: result.item.subtitle, id: result.item.id }] : [];
+    }).sort(compareAnalyzerSearchResults).map(({ result }) => result);
   }, [model, search, view, filter]);
 
   const fallbackCounts = useMemo(() => {
@@ -75,9 +75,9 @@ function LegacyAnalyzerPage() {
       const totalNodes = model.nodes.filter((node) => node.type === 'module').length;
       return { visibleNodes: 0, totalNodes, hiddenNodes: totalNodes };
     }
-    const presented = presentAnalyzerView(model, { expandedPresentationIds, filter, search, selectedEdgeId, selectedNodeId, selectedRegionId });
+    const presented = presentAnalyzerView(model, { expandedPresentationIds, filter, search: '', selectedEdgeId, selectedNodeId, selectedRegionId });
     return presented.counts ?? analyzerViewCounts(model);
-  }, [expandedPresentationIds, filter, model, search, selectedEdgeId, selectedNodeId, selectedRegionId, view]);
+  }, [expandedPresentationIds, filter, model, selectedEdgeId, selectedNodeId, selectedRegionId, view]);
   const nodeCounts = reportedCounts && reportedCounts.model === model ? reportedCounts.counts : fallbackCounts;
 
   useEffect(() => {
@@ -255,42 +255,11 @@ function LegacyAnalyzerPage() {
     updateView(view, update);
   }, [expandedPresentationIds, externalPresentationIds, model, selectedEdgeId, selectedNodeId, updateView, view]);
 
-  const resetPresentation = useCallback(() => {
-    updateView(view, {
-      expandedPresentationIds: new Set(),
-      search: '',
-      filter: 'all',
-      selectedNodeId: undefined,
-      selectedRegionId: undefined,
-      selectedEdgeId: undefined,
-      detailOpen: false,
-    });
-    setFocusRequest(undefined);
-  }, [updateView, view]);
-
-  useEffect(() => {
-    // Tab 5 search highlights candidates; only an explicit choice selects one.
-    // Otherwise clearing selection while a unique search is active reselects it.
-    if (view === 'module-dependency') return;
-    if (!search.trim() || searchResults.length !== 1 || selectedNodeId || selectedRegionId || selectedEdgeId) return;
-    const [result] = searchResults;
-    if (!result) return;
-    if (result.kind === 'region') selectRegion(result.item.id, true);
-    else selectNode(result.item.id, true);
-  }, [search, searchResults, selectedEdgeId, selectedNodeId, selectedRegionId, selectNode, selectRegion, view]);
-
   const activeFocusRequest = focusRequest?.view === view && focusRequest.store === store ? focusRequest : undefined;
 
   return (
     <div className="page-stack analyzer-page">
-      {view === 'module-dependency' ? <AnalyzerProjectHeader onScanned={handleScanned} /> : <section className="page-intro analyzer-intro">
-        <div>
-          <p className="eyebrow">04 / LOCAL ANALYSIS</p>
-          <h1>Analyzer</h1>
-          <p className="intro-copy">プロジェクトをScopeごとに分け、どのCanonical Stackを使っているかを直接Evidenceとともにたどります。</p>
-        </div>
-        <AnalyzerProjectPicker onScanned={handleScanned} />
-      </section>}
+      <AnalyzerProjectHeader onScanned={handleScanned} />
 
       {!store || !model ? (
         <section className="analyzer-empty-state" aria-labelledby="analyzer-empty-title">
@@ -318,8 +287,17 @@ function LegacyAnalyzerPage() {
             search={search}
             onSearchChange={(value) => updateView(view, { search: value })}
             filter={filter}
-            onFilterChange={(value) => updateView(view, { filter: value })}
+            onFilterChange={(value) => {
+              const includes = (id: string) => value === 'all' || model.nodes.some(node => node.id === id && node.type === value)
+                || value === 'stack-scope' && Boolean(model.regions?.some(region => region.id === id));
+              const selectedEdge = model.edges.find(edge => edge.id === selectedEdgeId);
+              const selectedIds = selectedEdge ? [selectedEdge.sourceId, selectedEdge.targetId] : [selectedNodeId, selectedRegionId].filter((id): id is string => Boolean(id));
+              const invalid = selectedIds.some(id => !includes(id));
+              setFocusRequest(undefined);
+              updateView(view, { filter: value, ...(invalid ? { selectedNodeId: undefined, selectedRegionId: undefined, selectedEdgeId: undefined, detailOpen: false } : {}) });
+            }}
             externalExpanded={externalExpanded}
+            externalToggleAvailable={externalPresentationIds.length > 0}
             onToggleExternal={toggleExternal}
             scripts={scripts}
             entryScriptId={effectiveEntryScriptId}
@@ -327,25 +305,15 @@ function LegacyAnalyzerPage() {
             counts={nodeCounts}
           />
 
-          {view === 'module-dependency' ? <SearchResultStrip query={search} selectedId={selectedNodeId}
+          <SearchResultStrip query={search} selectedId={selectedNodeId ?? selectedRegionId}
             items={searchResults.map(result => ({ id: result.item.id, label: result.item.label,
-              subtitle: String(result.item.metadata.modulePath ?? result.item.subtitle ?? ''),
-              reason: result.kind === 'node' ? matchAnalyzerSearch(moduleSearchDocument(result.item), search)?.reason : undefined }))}
-            onSelect={id => selectNode(id, true)} /> : searchResults.length > 0 && (
-            <div className="analyzer-search-results" role="listbox" aria-label="Analyzer search results">
-              {searchResults.map((result) => (
-                <button key={`${result.kind}:${result.item.id}`} type="button" onClick={() => result.kind === 'region' ? selectRegion(result.item.id, true) : selectNode(result.item.id, true)}>
-                  <span>{result.kind === 'region' ? 'REGION / SCOPE' : result.item.type}</span>
-                  <strong>{result.item.label}</strong>
-                  {result.item.subtitle && <small>{result.item.subtitle}</small>}
-                </button>
-              ))}
-            </div>
-          )}
+              subtitle: String(result.item.metadata.modulePath ?? result.item.metadata.scopePath ?? result.item.metadata.packagePath ?? result.item.subtitle ?? ''),
+              reason: matchAnalyzerSearch(analyzerEntitySearchDocument(result.item), search)?.reason }))}
+            onSelect={id => { const result = searchResults.find(result => result.item.id === id); if (result?.kind === 'region') selectRegion(id, true); else selectNode(id, true); }} />
 
           <div ref={fullscreen.root} className={`analyzer-workspace${detailOpen ? ' has-detail' : ''}${fullscreen.isFullscreen ? ' is-fullscreen' : ''}`}
             role={fullscreen.isFullscreen ? 'dialog' : undefined} aria-modal={fullscreen.isFullscreen || undefined}
-            aria-label={fullscreen.isFullscreen ? 'Module Dependency 全画面表示' : undefined} onKeyDownCapture={fullscreen.onKeyDownCapture}>
+            aria-label={fullscreen.isFullscreen ? `${analyzerViewLabels[view]} 全画面表示` : undefined} onKeyDownCapture={fullscreen.onKeyDownCapture}>
             {view === 'module-dependency' ? (
               <Suspense fallback={<div className="analyzer-graph-stage analyzer-spatial-graph-stage"><div className="analyzer-graph-empty">Loading spatial renderer…</div></div>}>
                 <AnalyzerSpatialGraphStage
@@ -362,7 +330,6 @@ function LegacyAnalyzerPage() {
                   expandedPresentationIds={expandedPresentationIds}
                   onTogglePresentation={(presentationId) => togglePresentation(presentationId)}
                   onClearSelection={clearSelection}
-                  onResetPresentation={resetPresentation}
                   onSelectNode={selectNode}
                   onSelectRegion={selectRegion}
                   onSelectEdge={selectEdge}
@@ -379,6 +346,8 @@ function LegacyAnalyzerPage() {
             ) : (
               <AnalyzerGraphStage
                 view={model}
+                isFullscreen={fullscreen.isFullscreen}
+                onToggleFullscreen={fullscreen.toggle}
                 selectedNodeId={selectedNodeId}
                 selectedRegionId={selectedRegionId}
                 selectedEdgeId={selectedEdgeId}
@@ -387,7 +356,6 @@ function LegacyAnalyzerPage() {
                 expandedPresentationIds={expandedPresentationIds}
                 onTogglePresentation={(presentationId) => togglePresentation(presentationId, { select: true })}
                 onClearSelection={clearSelection}
-                onResetPresentation={resetPresentation}
                 sources={store.sources}
                 onSelectNode={selectNode}
                 onSelectRegion={selectRegion}

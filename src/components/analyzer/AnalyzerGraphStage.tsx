@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { ANALYZER_DEFAULT_TRANSFORM, ANALYZER_EXTERNAL_SUMMARY_ID, ANALYZER_NODE_WIDTH, analyzerEdgeArrowMarkerId, analyzerEdgeObstacles, analyzerEdgePaths, analyzerEdgeRelatedToSelection, analyzerFocusDepths, analyzerForegroundEdges, analyzerPresentationCount, analyzerPresentationCountLabel, displayedZoomLevelForNode, evidenceRangeLabel, fitAnalyzerTransform, focusAnalyzerTransform, layoutAnalyzerView, nodeMatchesSearch, preserveAnalyzerTransformOnViewportResize, presentAnalyzerView, regionMatchesSearch, semanticZoomLevelForScale, shouldRunAnalyzerInitialFit, shouldShowAnalyzerEvidencePreview, type AnalyzerEdgeRoutingDiagnostic, type AnalyzerFanoutRoutingDiagnostic, type AnalyzerGraphTransform, type AnalyzerViewCounts, type AnalyzerViewEdge, type AnalyzerViewModel, type PositionedGraphEndpoint, type PositionedNode } from '../../analyzer';
+import { ANALYZER_DEFAULT_TRANSFORM, ANALYZER_EXTERNAL_SUMMARY_ID, ANALYZER_NODE_WIDTH, analyzerEdgeArrowMarkerId, analyzerEdgeObstacles, analyzerEdgePaths, analyzerEdgeRelatedToSelection, analyzerFocusDepths, analyzerForegroundEdges, analyzerPresentationCount, analyzerPresentationCountLabel, displayedZoomLevelForNode, evidenceRangeLabel, fitAnalyzerTransform, focusAnalyzerTransform, layoutAnalyzerView, preserveAnalyzerTransformOnViewportResize, presentAnalyzerView, semanticZoomLevelForScale, shouldRunAnalyzerInitialFit, shouldShowAnalyzerEvidencePreview, type AnalyzerEdgeRoutingDiagnostic, type AnalyzerFanoutRoutingDiagnostic, type AnalyzerGraphTransform, type AnalyzerViewCounts, type AnalyzerViewEdge, type AnalyzerViewModel, type PositionedGraphEndpoint, type PositionedNode } from '../../analyzer';
 import { analyzerRegionContextEntityIds, analyzerStackCountLabel, displayDictionaryStack, factDictionaryStackId, nodeTypeLabels } from '../../analyzer';
 import { stackPath } from '../../utils/routes';
+import { analyzerEntitySearchDocument, matchAnalyzerSearch } from '../../analyzer/search';
+import { analyzerDirectionColors, analyzerEdgeDirection } from '../../analyzer/edgeDirection';
+import { useSpatialFlowMotion } from './useSpatialFlowMotion';
+import { SpatialParticleControl } from './SpatialParticleControl';
+import { SvgFlowParticles } from './SvgFlowParticles';
+import { useAnalyzerControlInset } from './useAnalyzerControlInset';
 import { EvidencePreview } from './EvidenceCodeBlock';
 
 interface AnalyzerGraphStageProps {
@@ -15,7 +21,8 @@ interface AnalyzerGraphStageProps {
   expandedPresentationIds: ReadonlySet<string>;
   onTogglePresentation: (presentationId: string) => void;
   onClearSelection: () => void;
-  onResetPresentation: () => void;
+  isFullscreen?: boolean;
+  onToggleFullscreen?: () => void;
   sources: Record<string, string>;
   onSelectNode: (nodeId: string, focus?: boolean) => void;
   onSelectRegion: (regionId: string, focus?: boolean) => void;
@@ -115,7 +122,8 @@ export function AnalyzerGraphStage({
   expandedPresentationIds,
   onTogglePresentation,
   onClearSelection,
-  onResetPresentation,
+  isFullscreen,
+  onToggleFullscreen,
   onSelectNode,
   onSelectRegion,
   onSelectEdge,
@@ -128,6 +136,11 @@ export function AnalyzerGraphStage({
   onCountsChange,
 }: AnalyzerGraphStageProps) {
   const stageRef = useRef<HTMLDivElement>(null);
+  const [stageElement, setStageElement] = useState<HTMLDivElement | null>(null);
+  const attachStage = useCallback((element: HTMLDivElement | null) => { stageRef.current = element; setStageElement(element); }, []);
+  const flow = useSpatialFlowMotion(stageElement);
+  useAnalyzerControlInset(stageElement);
+  const selectedIds = useMemo(() => new Set([selectedNodeId, selectedRegionId].filter((id): id is string => Boolean(id))), [selectedNodeId, selectedRegionId]);
   const dragRef = useRef<{ pointerId: number; startX: number; startY: number; originX: number; originY: number; moved: boolean; background: boolean } | undefined>(undefined);
   const cameraRef = useRef<{ key: string; initialized: boolean }>({ key: '', initialized: false });
   const presentationCameraSnapshotRef = useRef<PresentationCameraSnapshot | undefined>(undefined);
@@ -136,6 +149,7 @@ export function AnalyzerGraphStage({
   const [hoveredEdgeId, setHoveredEdgeId] = useState<string | undefined>();
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const [showHelp, setShowHelp] = useState(false);
+  useEffect(() => { setHoveredEdgeId(undefined); }, [view, filter, selectedNodeId, selectedRegionId, selectedEdgeId]);
   const cameraKey = `${cameraResetKey}:${view.view}`;
   const expandedPresentationKey = useMemo(() => [...expandedPresentationIds].sort().join('\u0000'), [expandedPresentationIds]);
 
@@ -149,8 +163,8 @@ export function AnalyzerGraphStage({
   }, [onTogglePresentation]);
 
   const filteredView = useMemo<AnalyzerViewModel>(() => {
-    return presentAnalyzerView(view, { expandedPresentationIds, filter, search, selectedEdgeId, selectedNodeId, selectedRegionId });
-  }, [expandedPresentationIds, filter, search, selectedEdgeId, selectedNodeId, selectedRegionId, view]);
+    return presentAnalyzerView(view, { expandedPresentationIds, filter, search: '', selectedEdgeId, selectedNodeId, selectedRegionId });
+  }, [expandedPresentationIds, filter, selectedEdgeId, selectedNodeId, selectedRegionId, view]);
   useEffect(() => {
     if (filteredView.counts) onCountsChange(filteredView.counts);
   }, [filteredView.counts, onCountsChange]);
@@ -254,6 +268,9 @@ export function AnalyzerGraphStage({
     return { edgePaths, fanoutDiagnostics, edgeDiagnostics };
   }, [edgeFlowDirection, edgeObstacles, edgePositions, filteredView.edges, layout.height, layout.width]);
   const edgePaths = edgeRoutingResult.edgePaths;
+  const particlePaths = useMemo(() => foregroundEdges.filter(edge => edgePaths.has(edge.id)).map(edge => ({
+    id: edge.id, path: edgePaths.get(edge.id)!, color: analyzerDirectionColors[analyzerEdgeDirection(edge.sourceId, edge.targetId, selectedIds) ?? 'outgoing'],
+  })), [foregroundEdges, edgePaths, selectedIds]);
   const selectionContext = useMemo(() => {
     const connectedEntityIds = new Set<string>();
     const contextClusterIds = new Set<string>();
@@ -468,7 +485,6 @@ export function AnalyzerGraphStage({
   const changeZoom = (factor: number) => onTransformChange((current) => ({ ...current, scale: Math.max(0.35, Math.min(1.4, current.scale * factor)) }));
   const resetTransform = () => {
     cameraRef.current = { key: cameraKey, initialized: true };
-    onResetPresentation();
     onTransformChange(ANALYZER_DEFAULT_TRANSFORM);
   };
   const fit = () => {
@@ -476,6 +492,18 @@ export function AnalyzerGraphStage({
     if (!element) return;
     cameraRef.current = { key: cameraKey, initialized: true };
     onTransformChange(fitAnalyzerTransform(layout, element.clientWidth, element.clientHeight));
+  };
+  const focusSelection = () => {
+    if (!stageElement || !selectedPosition) return;
+    const edge = filteredView.edges.find(edge => edge.id === selectedEdgeId);
+    const endpoints = edge ? [edgePositions.get(edge.sourceId), edgePositions.get(edge.targetId)].filter((point): point is PositionedGraphEndpoint => Boolean(point)) : [];
+    if (endpoints.length === 2) {
+      const path = stageElement.querySelector<SVGGraphicsElement>('.analyzer-edge-group.is-selected .analyzer-edge-hit')?.getBBox?.();
+      const left = Math.min(...endpoints.map(point => point.x), path?.x ?? Infinity), top = Math.min(...endpoints.map(point => point.y), path?.y ?? Infinity);
+      const right = Math.max(...endpoints.map(point => point.x + endpointWidth(point)), path ? path.x + path.width : -Infinity), bottom = Math.max(...endpoints.map(point => point.y + point.height), path ? path.y + path.height : -Infinity);
+      const fitted = fitAnalyzerTransform({ ...layout, width: right - left, height: bottom - top }, stageElement.clientWidth, stageElement.clientHeight);
+      onTransformChange({ ...fitted, x: fitted.x - left * fitted.scale, y: fitted.y - top * fitted.scale });
+    } else onTransformChange(current => focusAnalyzerTransform(selectedPosition, stageElement.clientWidth, stageElement.clientHeight, current.scale));
   };
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
@@ -509,7 +537,7 @@ export function AnalyzerGraphStage({
     if (drag?.pointerId !== event.pointerId) return;
     dragRef.current = undefined;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-    if (clear && drag.background && !drag.moved) onClearSelection();
+    if (clear && drag.background && !drag.moved) { setHoveredEdgeId(undefined); onClearSelection(); }
   };
 
   const zoomAtPoint = useCallback((clientX: number, clientY: number, deltaY: number) => {
@@ -531,6 +559,7 @@ export function AnalyzerGraphStage({
     const element = stageRef.current;
     if (!element) return;
     const handleNativeWheel = (event: globalThis.WheelEvent) => {
+      if (event.target instanceof Element && event.target.closest('.analyzer-node-evidence-preview, .analyzer-stage-controls, .analyzer-stage-help')) return;
       if (event.cancelable) event.preventDefault();
       event.stopPropagation();
       zoomAtPoint(event.clientX, event.clientY, event.deltaY);
@@ -541,7 +570,7 @@ export function AnalyzerGraphStage({
 
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
+      if (event.key !== 'Escape' || event.defaultPrevented || (event.target instanceof Element && event.target.closest('button, input, select, textarea, .analyzer-stage-controls'))) return;
       onClearSelection();
       setShowHelp(false);
     };
@@ -576,7 +605,9 @@ export function AnalyzerGraphStage({
         : focusDepth === 2
           ? 'secondary'
           : 'deep';
-    const arrowMarkerId = analyzerEdgeArrowMarkerId({
+    const direction = analyzerEdgeDirection(edge.sourceId, edge.targetId, selectedIds) ?? (selected ? 'outgoing' : undefined);
+    const color = direction ? analyzerDirectionColors[direction] : undefined;
+    const arrowMarkerId = direction ? `analyzer-edge-arrow-${direction}` : analyzerEdgeArrowMarkerId({
       selected,
       connected,
       bundle: edge.presentation?.displayKind === 'bundle',
@@ -592,6 +623,7 @@ export function AnalyzerGraphStage({
           data-analyzer-fanout-detected={import.meta.env.DEV ? (routing?.fanoutDetected ? 'true' : 'false') : undefined}
           data-analyzer-bus-used={import.meta.env.DEV ? (routing?.busUsed ? 'true' : 'false') : undefined}
           d={path}
+          style={color ? { stroke: color } : undefined}
           markerEnd={`url(#${arrowMarkerId})`}
           role="button"
           tabIndex={0}
@@ -605,6 +637,8 @@ export function AnalyzerGraphStage({
           }}
           onMouseEnter={() => setHoveredEdgeId(edge.id)}
           onMouseLeave={() => setHoveredEdgeId(undefined)}
+          onFocus={() => setHoveredEdgeId(edge.id)}
+          onBlur={() => setHoveredEdgeId(undefined)}
         />
         {(selected || hoveredEdgeId === edge.id) && (
           <text className="analyzer-edge-label" x={(endpointCenter(source).x + endpointCenter(target).x) / 2} y={(endpointCenter(source).y + endpointCenter(target).y) / 2 - 8}>
@@ -618,7 +652,7 @@ export function AnalyzerGraphStage({
 
   return (
     <div
-      ref={stageRef}
+      ref={attachStage}
       className="analyzer-graph-stage"
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -627,27 +661,37 @@ export function AnalyzerGraphStage({
       onKeyDown={(event) => {
         if (event.key === 'Escape') {
           event.preventDefault();
-          onClearSelection();
+          if (showHelp) setShowHelp(false); else onClearSelection();
         }
       }}
       role="application"
       tabIndex={0}
       aria-label={`${view.view} graph stage. Drag to pan and use the wheel to zoom. Semantic zoom: ${zoomLevel}.`}
     >
-      <div className="analyzer-stage-controls" aria-label="Graph controls">
-        <button type="button" onClick={fit} title="現在のGraph全体を表示">Fit</button>
-        <button type="button" onClick={resetTransform} title="カメラと表示状態を初期化">Reset</button>
-        <button type="button" onClick={() => changeZoom(1.14)} aria-label="Zoom in">+</button>
-        <button type="button" onClick={() => changeZoom(0.88)} aria-label="Zoom out">−</button>
+      <div className="analyzer-stage-controls" aria-label="グラフ操作">
+        <button type="button" onClick={fit} title="現在表示している図全体を収める">Fit</button>
+        <button type="button" onClick={resetTransform} title="現在の図のカメラを初期位置へ戻す">Reset</button>
+        <button type="button" onClick={() => changeZoom(1.14)} aria-label="Zoom in" title="拡大">+</button>
+        <button type="button" onClick={() => changeZoom(0.88)} aria-label="Zoom out" title="縮小">−</button>
         <span>{Math.round(transform.scale * 100)}%</span>
-        <button type="button" className="analyzer-help-button" onClick={() => setShowHelp((current) => !current)} aria-expanded={showHelp} aria-controls="analyzer-graph-help" aria-label="Graph操作ヘルプ">?</button>
+        <button type="button" disabled={!selectedPosition} onClick={focusSelection}>選択へ移動</button>
+        <SpatialParticleControl mode={flow.mode} onChange={flow.setMode} onOpen={() => setShowHelp(false)} />
+        {onToggleFullscreen && <button type="button" onClick={onToggleFullscreen} aria-pressed={isFullscreen} aria-label={isFullscreen ? '全画面を終了' : '全画面表示'}>{isFullscreen ? '↙' : '⛶'}</button> }
+        <button type="button" className="analyzer-help-button" onClick={() => setShowHelp((current) => !current)} aria-expanded={showHelp} aria-controls="analyzer-graph-help" aria-label="グラフ操作ヘルプ">?</button>
       </div>
       {showHelp && (
-        <div id="analyzer-graph-help" className="analyzer-stage-help" role="dialog" aria-label="Graph操作ヘルプ">
-          <strong>Graph操作</strong>
+        <div id="analyzer-graph-help" className="analyzer-stage-help" role="dialog" aria-label="グラフ操作ヘルプ">
+          <strong>グラフ操作</strong>
+          <p><span style={{ color: analyzerDirectionColors.incoming }}>入る関係</span> / <span style={{ color: analyzerDirectionColors.outgoing }}>出る関係</span>。矢印と粒子は宣言・設定・依存などの関係元から関係先へ向かいます。具体的な意味と根拠は線の詳細で確認できます。</p>
           <p>背景をドラッグして移動、Wheelで拡大縮小。Node / Region / Edgeを選ぶと詳細が開き、背景クリックまたはEscで選択を解除します。</p>
+          <p>Fitは表示中の図を収め、Resetはカメラを初期位置へ戻します。ブロック内のコードはスクロール・文字選択できます。</p>
         </div>
       )}
+      <div className="analyzer-static-direction-legend" aria-label="選択対象を基準にした関係の向き">
+        <span style={{ color: analyzerDirectionColors.incoming }}>入る関係</span>
+        <span style={{ color: analyzerDirectionColors.outgoing }}>出る関係</span>
+        <small>{view.view === 'architecture' ? '所属' : view.view === 'workspace' ? '設定・宣言と対応' : view.view === 'command' ? '宣言された呼び出し・利用' : '宣言された依存'}</small>
+      </div>
       {filteredView.nodes.length === 0 && (filteredView.regions?.length ?? 0) === 0 ? (
         <div className="analyzer-graph-empty">現在のFilterに一致するNodeまたはRegionはありません。</div>
       ) : (
@@ -708,7 +752,7 @@ export function AnalyzerGraphStage({
               const region = positionedRegion.region;
               const selected = region.id === selectedRegionId;
               const searchValue = search.trim().toLowerCase();
-              const matches = !searchValue || regionMatchesSearch(region, searchValue);
+              const matches = !searchValue || Boolean(matchAnalyzerSearch(analyzerEntitySearchDocument(region), searchValue));
               return (
                 <section
                   key={region.id}
@@ -733,6 +777,7 @@ export function AnalyzerGraphStage({
             })}
             <svg className="analyzer-edge-layer analyzer-edge-layer-base" width={layout.width} height={layout.height} viewBox={`0 0 ${layout.width} ${layout.height}`} aria-label="Graph relations">
               <defs>
+                {Object.entries(analyzerDirectionColors).map(([direction, color]) => <marker key={direction} id={`analyzer-edge-arrow-${direction}`} markerWidth="9" markerHeight="9" refX="7.5" refY="4.5" orient="auto" markerUnits="userSpaceOnUse" viewBox="0 0 9 9"><path d="M 0 0 L 9 4.5 L 0 9 z" fill={color} /></marker>)}
                 <marker id="analyzer-edge-arrow-normal" markerWidth="9" markerHeight="9" refX="7.5" refY="4.5" orient="auto" markerUnits="userSpaceOnUse" viewBox="0 0 9 9">
                   <path d="M 0 0 L 9 4.5 L 0 9 z" fill="var(--connector)" />
                 </marker>
@@ -753,10 +798,11 @@ export function AnalyzerGraphStage({
             </svg>
             <svg className="analyzer-edge-layer analyzer-edge-layer-foreground" width={layout.width} height={layout.height} viewBox={`0 0 ${layout.width} ${layout.height}`}>
               {foregroundEdges.map(renderEdge)}
+              <SvgFlowParticles paths={particlePaths} scale={transform.scale} enabled={flow.enabled} visible={flow.visible} reduced={flow.reduced} />
             </svg>
             {layout.nodes.map((positionedNode) => {
               const node = positionedNode.node;
-              const matches = nodeMatchesSearch(node, search);
+              const matches = !search.trim() || Boolean(matchAnalyzerSearch(analyzerEntitySearchDocument(node), search));
               const selected = node.id === selectedNodeId;
               const summary = node.presentation?.role === 'summary';
               const summaryExpanded = summary && Boolean(filteredView.presentationGroups?.some((group) => group.id === node.id && group.expanded));
@@ -834,7 +880,7 @@ export function AnalyzerGraphStage({
                   )}
                   {compactEvidenceHint && <span className="analyzer-node-evidence-hint">Evidence · {compactEvidenceHint}</span>}
                   {hasEvidencePreview && (
-                    <div className="analyzer-node-evidence-preview">
+                    <div className="analyzer-node-evidence-preview" onClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()}>
                       <EvidencePreview evidenceIds={node.evidenceIds} evidence={view.evidence} sources={sources} compact />
                     </div>
                   )}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildSpatialFlowData, SPATIAL_FLOW_MAX_PARTICLES_PER_PATH, SPATIAL_FLOW_PARTICLE_SPACING } from './spatialFlow';
+import { buildSpatialFlowData, SPATIAL_FLOW_PARTICLE_SPACING } from './spatialFlow';
 
 describe('spatial flow paths', () => {
   it('retains source-to-target order, tube height, cumulative distance and direction color', () => {
@@ -13,12 +13,12 @@ describe('spatial flow paths', () => {
     expect(data.particles.every(particle => particle.length === 17)).toBe(true);
   });
 
-  it('bounds density on long paths and keeps phases stable through selection ordering changes', () => {
+  it('keeps fixed spacing on long paths and keeps phases stable through selection ordering changes', () => {
     const first = { id: 'first', points: [{ x: 0, y: 0, z: 0 }, { x: 100000, y: 0, z: 0 }], color: '#82c6e2' };
     const second = { ...first, id: 'second', color: '#dfb785' };
     const a = buildSpatialFlowData([first, second]);
     const b = buildSpatialFlowData([second, first]);
-    expect(a.particles).toHaveLength(2 * SPATIAL_FLOW_MAX_PARTICLES_PER_PATH);
+    expect(a.particles).toHaveLength(2 * Math.ceil(100000 / SPATIAL_FLOW_PARTICLE_SPACING));
     expect(a.particles.filter(p => p.color === first.color).map(p => p.offset))
       .toEqual(b.particles.filter(p => p.color === first.color).map(p => p.offset));
     expect(a.particles.every(p => p.offset >= 0 && p.offset < 1)).toBe(true);
@@ -30,8 +30,8 @@ describe('spatial flow paths', () => {
       { id: 'zero', points: [{ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 0 }], color: '#fff' }]).particles).toEqual([]);
   });
 
-  it('uses three times the initial density for short, medium and long connections', () => {
-    for (const [length, expected] of [[100, 6], [450, 9], [10000, 24]]) {
+  it('uses the common spacing for short, medium and long connections', () => {
+    for (const [length, expected] of [[100, 2], [450, 9], [10000, 200]]) {
       const data = buildSpatialFlowData([{ id: 'edge', points: [{ x: 0, y: 0, z: 0 }, { x: length!, y: 0, z: 0 }], color: '#82c6e2' }]);
       expect(data.particles).toHaveLength(expected!);
     }
@@ -41,12 +41,12 @@ describe('spatial flow paths', () => {
     for (const [length, expected] of [[100, 2], [500, 10], [10000, 200]]) {
       // Include a corner so allocation follows arc length, not endpoint distance.
       const points = [{ x: 0, y: 0, z: 0 }, { x: length! / 2, y: 0, z: 0 }, { x: length! / 2, y: length! / 2, z: 0 }];
-      const data = buildSpatialFlowData([{ id: 'edge', points, color: '#82c6e2' }], SPATIAL_FLOW_PARTICLE_SPACING);
+      const data = buildSpatialFlowData([{ id: 'edge', points, color: '#82c6e2' }]);
       expect(data.particles).toHaveLength(expected!);
       expect(data.particles.every(particle => particle.length === length)).toBe(true);
       expect(new Set(data.particles.map(particle => particle.offset)).size).toBe(1);
       expect(data.particles.at(-1)!.index).toBe(expected! - 1);
     }
-    expect(buildSpatialFlowData([{ id: 'zero', points: [], color: '#fff' }], SPATIAL_FLOW_PARTICLE_SPACING).particles).toEqual([]);
+    expect(buildSpatialFlowData([{ id: 'zero', points: [], color: '#fff' }]).particles).toEqual([]);
   });
 });
