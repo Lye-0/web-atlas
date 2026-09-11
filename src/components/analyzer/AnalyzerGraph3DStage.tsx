@@ -228,9 +228,9 @@ function Scene({ graph, points, edges, selected, priority, hovered, showGroupBou
       const hoveredPoint = previousHovered && byId.get(previousHovered.id);
       if (hoveredPoint?.visible && hoveredPoint.x === previousHovered!.x && hoveredPoint.y === previousHovered!.y
         && previousHovered!.labelY >= overlayTop && previousHovered!.labelX >= 4
-        && previousHovered!.labelX + 146 <= size.width - 4 && previousHovered!.labelY + 24 <= size.height - 30) {
+        && previousHovered!.labelX + 146 <= size.width - 4 && previousHovered!.labelY + (selected.has(previousHovered!.id) ? 40 : 24) <= size.height - 30) {
         hoveredPoint.labelX = previousHovered!.labelX; hoveredPoint.labelY = previousHovered!.labelY; hoveredPoint.labelled = true;
-        occupied.push({ x: hoveredPoint.labelX, y: hoveredPoint.labelY, w: 146, h: 24 });
+        occupied.push({ x: hoveredPoint.labelX, y: hoveredPoint.labelY, w: 146, h: selected.has(hoveredPoint.id) ? 40 : 24 });
       }
       const criticalCells = new Map<string, ScreenPoint[]>();
       for (const point of projected) if (priority.has(point.id) || selected.has(point.id)) {
@@ -248,7 +248,7 @@ function Scene({ graph, points, edges, selected, priority, hovered, showGroupBou
         if (occupied.length >= 120 && !selected.has(p.id) && p.id !== hovered) continue;
         const candidates = [[12, -12], [12, 12], [-158, -12], [-70, -36], [-70, 20]];
         for (const [dx, dy] of candidates) {
-          const x = p.x + dx!, y = p.y + dy!, w = 146, h = 24;
+          const x = p.x + dx!, y = p.y + dy!, w = 146, h = selected.has(p.id) ? 40 : 24;
           if (x < 4 || x + w > size.width - 4 || y < overlayTop || y + h > size.height - 30) continue;
           if (occupied.some(r => x < r.x + r.w + 4 && x + w + 4 > r.x && y < r.y + r.h + 4 && y + h + 4 > r.y)) continue;
           if (coversEndpoint(p.id, x, y, w, h)) continue;
@@ -395,8 +395,8 @@ export function AnalyzerGraph3DStage(props: Props) {
         const item = displayed.get(point.id); if (!item) return null;
         return <div key={point.id}>
           {!item.panel && (point.labelled || selected.has(point.id)) && <button type="button" className={`analyzer-3d-hit${selected.has(point.id) ? ' is-selected' : ''}`} style={{ left: point.x - 10, top: point.y - 10 }} aria-label={item.label} title={item.label} onPointerEnter={() => setHovered(point.id)} onPointerLeave={() => setHovered(undefined)} onClick={() => item.groupId ? setInspection({ kind: 'group', id: item.groupId }) : chooseNode(point.id)} />}
-          {point.labelled && <button type="button" className={`${item.panel ? 'analyzer-3d-panel' : 'analyzer-3d-label'}${selected.has(point.id) ? ' is-selected' : ''}${matchIds.has(point.id) ? ' is-match' : ''}`} data-flow-role={connectionRoles.has(point.id) ? connectionRoles.get(point.id)!.size > 1 ? 'both' : connectionRoles.get(point.id)!.has('outgoing') ? 'outgoing' : 'incoming' : undefined} data-node-id={point.id} data-entity-kind={item.original?.original.presentation?.role === 'summary' ? 'summary' : item.groupId ? 'aggregate' : 'node'} style={{ left: point.labelX, top: point.labelY, ...(item.panel ? { transform: `scale(${point.width / 166})`, transformOrigin: 'top left' } : {}) }} title={[item.label, item.subtitle].filter(Boolean).join('\n')} onPointerEnter={() => setHovered(point.id)} onPointerLeave={() => setHovered(undefined)}
-            onClick={() => item.groupId ? setInspection({ kind: 'group', id: item.groupId }) : chooseNode(point.id)} onDoubleClick={() => { if (item.original?.original.presentation?.role === 'summary') props.onTogglePresentation(point.id); }}><strong style={item.panel ? { fontSize: Math.max(11, 12 * point.width / 166) / (point.width / 166), lineHeight: 1.25 } : undefined}>{item.label}</strong>{item.panel && point.width / 166 >= .75 && <small>{item.subtitle ?? item.original?.original.type}</small>}</button>}
+          {point.labelled && <button type="button" className={`${item.panel ? 'analyzer-3d-panel' : 'analyzer-3d-label'}${selected.has(point.id) ? ' is-selected' : ''}${matchIds.has(point.id) ? ' is-match' : ''}`} aria-pressed={selected.has(point.id)} data-flow-role={selected.has(point.id) ? 'selected' : connectionRoles.has(point.id) ? connectionRoles.get(point.id)!.size > 1 ? 'both' : connectionRoles.get(point.id)!.has('outgoing') ? 'outgoing' : 'incoming' : undefined} data-node-id={point.id} data-entity-kind={item.original?.original.presentation?.role === 'summary' ? 'summary' : item.groupId ? 'aggregate' : 'node'} style={{ left: point.labelX, top: point.labelY, ...(item.panel ? { transform: `scale(${point.width / 166})`, transformOrigin: 'top left' } : {}) }} title={[item.label, item.subtitle].filter(Boolean).join('\n')} onPointerEnter={() => setHovered(point.id)} onPointerLeave={() => setHovered(undefined)}
+            onClick={() => item.groupId ? setInspection({ kind: 'group', id: item.groupId }) : chooseNode(point.id)} onDoubleClick={() => { if (item.original?.original.presentation?.role === 'summary') props.onTogglePresentation(point.id); }}><strong style={item.panel ? { fontSize: Math.max(11, 12 * point.width / 166) / (point.width / 166), lineHeight: 1.25 } : undefined}>{item.label}</strong>{selected.has(point.id) && <span className="semantic-flow-3d-role">選択中</span>}{item.panel && point.width / 166 >= .75 && <small>{item.subtitle ?? item.original?.original.type}</small>}</button>}
         </div>;
       })}
       {projection.regions.map(region => <button type="button" key={region.id} className="analyzer-3d-region" style={{ left: region.x, top: region.y }} title={region.label} onPointerEnter={() => setHovered(region.id)} onPointerLeave={() => setHovered(undefined)} onFocus={() => setHovered(region.id)} onBlur={() => setHovered(undefined)} onClick={() => { if (region.group) setInspection({ kind: 'group', id: region.id }); else { setInspection(undefined); props.onSelectRegion(region.id); } }}>{region.label}</button>)}

@@ -2867,6 +2867,7 @@ summary:focus-visible {
 }
 
 .analyzer-workspace {
+  --analyzer-stage-height: clamp(540px, 67vh, 760px);
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   align-items: stretch;
@@ -2881,7 +2882,7 @@ summary:focus-visible {
 .analyzer-graph-stage {
   position: relative;
   min-width: 0;
-  height: clamp(540px, 67vh, 760px);
+  height: var(--analyzer-stage-height, clamp(540px, 67vh, 760px));
   overflow: hidden;
   overscroll-behavior: contain;
   border: 1px solid var(--line);
@@ -2911,7 +2912,7 @@ summary:focus-visible {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  height: clamp(540px, 67vh, 760px);
+  height: var(--analyzer-stage-height, clamp(540px, 67vh, 760px));
 }
 .analyzer-spatial-workspace > .analyzer-spatial-graph-stage {
   flex: 1;
@@ -4345,7 +4346,7 @@ summary:focus-visible {
   position: relative;
   z-index: 5;
   min-width: 0;
-  max-height: clamp(540px, 67vh, 760px);
+  max-height: var(--analyzer-stage-height, clamp(540px, 67vh, 760px));
   overflow: auto;
   border: 1px solid var(--line);
   background: rgba(16, 21, 22, 0.82);
@@ -5024,9 +5025,12 @@ summary:focus-visible {
   grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
 }
 .analyzer-workspace:fullscreen .analyzer-spatial-workspace,
-.analyzer-workspace.is-fullscreen .analyzer-spatial-workspace {
+.analyzer-workspace.is-fullscreen .analyzer-spatial-workspace,
+.analyzer-workspace:fullscreen .analyzer-graph-stage,
+.analyzer-workspace.is-fullscreen .analyzer-graph-stage {
   height: 100%;
   min-height: 0;
+  max-height: none;
 }
 .analyzer-workspace:fullscreen .analyzer-detail-panel,
 .analyzer-workspace.is-fullscreen .analyzer-detail-panel {

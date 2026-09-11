@@ -86,7 +86,7 @@
 .semantic-flow-3d-labels { position:absolute; inset:0; overflow:hidden; pointer-events:none; }
 .semantic-flow-3d-labels button { position:absolute; left:0; top:0; transform:translate(9px,-50%); transition:none; will-change:transform; max-width:225px; display:grid; gap:4px; padding:3px 7px; text-align:left; border:1px solid #4c6a5f70; border-radius:4px; background:#11231dde; color:#d7e7dc; font-size:11px; line-height:1.35; pointer-events:auto; }
 .semantic-flow-3d-labels :is(strong,small) { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }.semantic-flow-3d-labels strong { font-weight:550; }.semantic-flow-3d-labels small { font-size:9px; color:#b8d1c2; }
-.semantic-flow-3d-labels button.is-selected { border-color:#bfe7d8; background:#234137f2; box-shadow:0 0 0 2px #bfe7d850; font-size:12px; }.semantic-flow-3d-labels button.is-match { color:#edcc94; }
+.semantic-flow-3d-labels button.is-match { color:#edcc94; }
 .semantic-flow-3d-labels button.is-related { border-color:#88ada180; }.semantic-flow-3d-labels button.is-hovered { z-index:2; border-color:#e0efe5; background:#1d382bf5; box-shadow:0 0 0 1px #cadfd960; }
 .semantic-flow-3d-labels button.is-region { padding:5px 8px; border-color:#698f7980; background:#0d2017ed; color:#c2dac9; font-size:12px; }.semantic-flow-3d-labels button.is-region small { color:#87a693; }
 .semantic-flow-label-leaders { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; overflow:hidden; }.semantic-flow-label-leaders line { stroke:#a1c4b2; stroke-width:.8; opacity:.58; }
