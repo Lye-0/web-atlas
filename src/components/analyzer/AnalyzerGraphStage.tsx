@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type CSSProperties, type PointerEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { ANALYZER_DEFAULT_TRANSFORM, ANALYZER_EXTERNAL_SUMMARY_ID, ANALYZER_NODE_WIDTH, analyzerEdgeArrowMarkerId, analyzerEdgeObstacles, analyzerEdgePaths, analyzerEdgeRelatedToSelection, analyzerFocusDepths, analyzerForegroundEdges, analyzerPresentationCount, analyzerPresentationCountLabel, displayedZoomLevelForNode, evidenceRangeLabel, fitAnalyzerTransform, focusAnalyzerTransform, layoutAnalyzerView, preserveAnalyzerTransformOnViewportResize, presentAnalyzerView, semanticZoomLevelForScale, shouldRunAnalyzerInitialFit, shouldShowAnalyzerEvidencePreview, type AnalyzerEdgeRoutingDiagnostic, type AnalyzerFanoutRoutingDiagnostic, type AnalyzerGraphTransform, type AnalyzerViewCounts, type AnalyzerViewEdge, type AnalyzerViewModel, type PositionedGraphEndpoint, type PositionedNode } from '../../analyzer';
 import { analyzerRegionContextEntityIds, analyzerStackCountLabel, displayDictionaryStack, factDictionaryStackId, nodeTypeLabels } from '../../analyzer';
@@ -11,7 +11,7 @@ import { SvgFlowParticles } from './SvgFlowParticles';
 import { useAnalyzerControlInset } from './useAnalyzerControlInset';
 import { EvidencePreview } from './EvidenceCodeBlock';
 
-interface AnalyzerGraphStageProps {
+interface AnalyzerGraphStageProps { controlsExtras?: ReactNode;
   onMode?: (mode: '2d' | '3d') => void;
   view: AnalyzerViewModel;
   selectedNodeId?: string;
@@ -113,7 +113,7 @@ function evidenceHint(node: AnalyzerViewModel['nodes'][number], view: AnalyzerVi
   return evidence ? evidenceRangeLabel(evidence) : undefined;
 }
 
-export function AnalyzerGraphStage({
+export function AnalyzerGraphStage({ controlsExtras,
   onMode,
   view,
   selectedNodeId,
@@ -674,7 +674,7 @@ export function AnalyzerGraphStage({
         onZoomIn={() => changeZoom(1.14)} onZoomOut={() => changeZoom(0.88)} zoomLabel={Math.round(transform.scale * 100) + '%'}
         canFocus={Boolean(selectedPosition)} onFocus={focusSelection}
         particleMode={flow.mode} onParticleMode={flow.setMode}
-        isFullscreen={isFullscreen} onFullscreen={onToggleFullscreen} help={showHelp} onHelp={setShowHelp} />
+        isFullscreen={isFullscreen} onFullscreen={onToggleFullscreen} help={showHelp} onHelp={setShowHelp}>{controlsExtras}</AnalyzerGraphControls>
       {showHelp && (
         <div id="analyzer-graph-help" className="analyzer-stage-help" role="dialog" aria-label="グラフ操作ヘルプ">
           <strong>グラフ操作</strong>

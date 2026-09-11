@@ -23,8 +23,13 @@ import { recoverableWebGLRenderer } from './recoverableWebGLRenderer';
 import { registerCanvasDisposal, useCanvasDisposals } from './canvasDisposals';
 import { AutoAggregationPanel, type AggregationInspection, type AggregationGroupMode } from './AutoAggregationPanel';
 import './analyzer-graph-3d.css';
+import { graph3DHoverEmphasis } from './graph3DHover';
+import { FlowLabelLayer, type FlowLabelContent, type FlowLabelPlacement, type FlowLabelObstacle } from './semanticFlowLabels';
+import { prepareGraph3DLabels, projectGraph3DLabels, type Graph3DLabelDescriptor, type Graph3DLabelCandidate } from './graph3DLabels';
+import { graph3DRegionAnchors, graph3DRegionEmphasis } from '../../analyzer/graph3DRegions';
 
 interface Props {
+  labelFocusId?: string;
   model: AnalyzerViewModel; state: AnalyzerViewSession; input: string; onMode: (mode: '2d' | '3d') => void;
   onCamera: (camera: Graph3DCamera) => void; onUnavailable: () => void;
   onSelectNode: (id: string) => void; onSelectRegion: (id: string) => void; onSelectEdge: (id: string) => void; onClear: () => void;
@@ -34,13 +39,13 @@ interface Props {
   showGroupBounds: boolean; onGroupBounds: (value: boolean) => void;
   onAggregation: (state: NonNullable<AnalyzerViewSession['graph3DAggregation']>) => void;
   onCounts: (counts: AnalyzerViewCounts) => void;
-  isFullscreen: boolean; onFullscreen: () => void;
+  isFullscreen: boolean; onFullscreen: () => void; controlsExtras?: ReactNode;
 }
 interface DisplayPoint { id: string; x: number; y: number; z: number; label: string; subtitle?: string; panel: boolean; original?: Graph3DPoint; groupId?: string }
 interface DisplayEdge { id: string; source: string; target: string; label: string; color: string; active: boolean; animate: boolean; aggregated: boolean; intensity: number }
 interface ScreenPoint { id: string; x: number; y: number; depth: number; width: number; height: number; labelX: number; labelY: number; visible: boolean; labelled: boolean; panel: boolean }
 interface ScreenEdge { path: string; source: string; target: string; id: string; a: [number, number]; b: [number, number]; color: string; label: string; active: boolean; aggregated: boolean }
-interface ScreenRegion { id: string; x: number; y: number; label: string; group?: boolean }
+interface ScreenRegion { id: string; x: number; y: number; label: string; group?: boolean; port?: boolean }
 interface Projection { points: ScreenPoint[]; edges: ScreenEdge[]; regions: ScreenRegion[] }
 interface CameraCommand { nonce: number; ids?: string[]; action?: 'fit' | 'reset' | 'in' | 'out' }
 const emptyProjection: Projection = { points: [], edges: [], regions: [] };
@@ -54,7 +59,9 @@ function panelPort(a: ScreenPoint, b: ScreenPoint): [number, number] {
   return [a.x + dx * factor, a.y + dy * factor];
 }
 
-function Scene({ graph, points, edges, selected, priority, hovered, showGroupBounds, selectedRegionId, command, savedCamera, input, motion, onCamera, onProjection, onDensity, onUnavailable, onBlank, onPoint, onHover, disposals, overlayTop }: {
+function Scene({ labelHovered, labelMatches, labelLayer, labelDescriptors, labelEndpoints, labelRelated, labelRoles, focusedId, labelObstacles, graph, points, edges, selected, priority, hovered, showGroupBounds, selectedRegionId, command, savedCamera, input, motion, onCamera, onProjection, onDensity, onUnavailable, onBlank, onPoint, onHover, disposals, overlayTop }: {
+  labelHovered?: string; labelMatches: ReadonlySet<string>; labelLayer: FlowLabelLayer; labelDescriptors: ReadonlyMap<string, Graph3DLabelDescriptor>; labelEndpoints: ReadonlySet<string>; labelRelated: ReadonlySet<string>;
+  labelRoles: ReadonlyMap<string, NonNullable<FlowLabelContent['role']>>; focusedId?: string; labelObstacles: readonly FlowLabelObstacle[];
   graph: AnalyzerGraph3D; points: DisplayPoint[]; edges: DisplayEdge[]; selected: ReadonlySet<string>; priority: ReadonlySet<string>; hovered?: string;
   selectedRegionId?: string; showGroupBounds: boolean; command: CameraCommand; savedCamera?: Graph3DCamera; input: string;
   motion: ReturnType<typeof useSpatialFlowMotion>; onCamera: Props['onCamera']; onProjection: (projection: Projection) => void;
@@ -62,9 +69,13 @@ function Scene({ graph, points, edges, selected, priority, hovered, showGroupBou
 }) {
   const { camera, gl, size, invalidate } = useThree();
   const controls = useRef<OrbitControls | null>(null), dirty = useRef(true), initialized = useRef(false), initialCamera = useRef(savedCamera);
-  const callbacks = useRef({ onCamera, onProjection, onDensity, onUnavailable, onBlank, onPoint, onHover });
-  useLayoutEffect(() => { callbacks.current = { onCamera, onProjection, onDensity, onUnavailable, onBlank, onPoint, onHover }; });
+  const callbacks = useRef({ labelLayer, labelDescriptors, onCamera, onProjection, onDensity, onUnavailable, onBlank, onPoint, onHover });
+  useLayoutEffect(() => { callbacks.current = { labelLayer, labelDescriptors, onCamera, onProjection, onDensity, onUnavailable, onBlank, onPoint, onHover }; });
   const hitPoints = useRef<ScreenPoint[]>([]);
+  const previousLabels = useRef<FlowLabelPlacement[]>([]);
+  const emphasis = useMemo(() => graph3DHoverEmphasis(edges, hovered), [edges, hovered]);
+  const anchors = useMemo(() => graph3DRegionAnchors(graph), [graph]);
+  const regionEmphasis = useMemo(() => graph3DRegionEmphasis(graph, selectedRegionId, hovered), [graph, selectedRegionId, hovered]);
   const [renderPaths, setRenderPaths] = useState<(SpatialRelationPath & { animate: boolean })[]>([]);
   const particlePaths = useMemo(() => renderPaths.filter(path => path.animate), [renderPaths]);
   const stateRef = useRef<SpatialFlowState>({ active: false, reduced: false, distance: 0 });
@@ -98,15 +109,18 @@ function Scene({ graph, points, edges, selected, priority, hovered, showGroupBou
     };
     const pointerUp = (event: PointerEvent) => { if (event.button === 0 && Math.hypot(event.clientX - down.x, event.clientY - down.y) < 4 && performance.now() - down.time < 500) { const id = hit(event); if (id) callbacks.current.onPoint(id); else callbacks.current.onBlank(); } };
     const pointerMove = (event: PointerEvent) => { if (!event.buttons) callbacks.current.onHover(hit(event)); };
+    const pointerLeave = () => callbacks.current.onHover(undefined);
     control.addEventListener('change', change); control.addEventListener('end', end);
     gl.domElement.addEventListener('webglcontextlost', lost); gl.domElement.addEventListener('keydown', key);
     gl.domElement.addEventListener('pointerdown', pointerDown); gl.domElement.addEventListener('pointerup', pointerUp);
     gl.domElement.addEventListener('pointermove', pointerMove);
+    gl.domElement.addEventListener('pointerleave', pointerLeave);
     return registerCanvasDisposal(disposals, () => {
       control.removeEventListener('change', change); control.removeEventListener('end', end); control.dispose(); controls.current = null;
       gl.domElement.removeEventListener('webglcontextlost', lost); gl.domElement.removeEventListener('keydown', key);
       gl.domElement.removeEventListener('pointerdown', pointerDown); gl.domElement.removeEventListener('pointerup', pointerUp);
       gl.domElement.removeEventListener('pointermove', pointerMove); hitPoints.current = [];
+      gl.domElement.removeEventListener('pointerleave', pointerLeave);
     });
   }, [camera, gl, invalidate, disposals]);
   useLayoutEffect(() => {
@@ -153,18 +167,22 @@ function Scene({ graph, points, edges, selected, priority, hovered, showGroupBou
       ortho.updateProjectionMatrix(); dirty.current = true; invalidate(); save.current();
     } else fit(command.ids, command.action === 'reset');
   } }, [command, fit, camera, invalidate]);
-  useEffect(() => { dirty.current = true; invalidate(); }, [points, edges, selected, priority, hovered, showGroupBounds, selectedRegionId, invalidate, overlayTop]);
+  useEffect(() => { dirty.current = true; invalidate(); }, [points, edges, selected, priority, hovered, showGroupBounds, selectedRegionId, invalidate, overlayTop, labelDescriptors, labelEndpoints, labelRelated, labelRoles, focusedId, labelObstacles, labelMatches, labelHovered]);
   useEffect(() => { stateRef.current.active = motion.enabled && motion.visible && particlePaths.length > 0; stateRef.current.reduced = motion.reduced; invalidate(); }, [motion.enabled, motion.visible, motion.reduced, particlePaths.length, invalidate]);
   const assets = useMemo(() => {
     const vertices: number[] = [], colors: number[] = [], sizes: number[] = [], hollow: number[] = [];
     for (const point of points) if (!point.panel) {
       const inHoveredRegion = graph.regions.some(region => region.original.id === hovered && region.memberIds.includes(point.id)) || graph.groups.some(group => group.id === hovered && (group.memberIds.includes(point.id) || point.groupId === group.id));
-      vertices.push(point.x, point.y, point.z); colors.push(...new THREE.Color(selected.has(point.id) || inHoveredRegion ? '#cefff1' : point.groupId ? '#edcc94' : priority.has(point.id) ? '#9bccd2' : '#7caa9a').toArray());
+      const color = new THREE.Color(selected.has(point.id) || inHoveredRegion || emphasis.nodeIds.has(point.id) ? '#cefff1' : point.groupId ? '#edcc94' : priority.has(point.id) ? '#9bccd2' : '#7caa9a');
+      if (emphasis.edgeIds.size && !emphasis.nodeIds.has(point.id)) color.multiplyScalar(.38);
+      vertices.push(point.x, point.y, point.z); colors.push(...color.toArray());
       sizes.push(point.groupId ? 13 : selected.has(point.id) ? 11 : point.original?.original.type === 'workspace-package' ? 10 : point.original?.original.type === 'external-package' ? 6 : 8);
       hollow.push(point.groupId ? 1 : 0);
     }
     for (const region of graph.regions) if (edges.some(edge => edge.source === region.original.id || edge.target === region.original.id)) {
-      vertices.push(...region.center); colors.push(...new THREE.Color(selectedRegionId === region.original.id || hovered === region.original.id ? '#cefff1' : '#7caa9a').toArray());
+      const color = new THREE.Color(selectedRegionId === region.original.id || hovered === region.original.id || emphasis.nodeIds.has(region.original.id) ? '#cefff1' : '#7caa9a');
+      if (emphasis.edgeIds.size && !emphasis.nodeIds.has(region.original.id)) color.multiplyScalar(.38);
+      vertices.push(...anchors.get(region.original.id)!); colors.push(...color.toArray());
       sizes.push(selectedRegionId === region.original.id ? 11 : 8); hollow.push(0);
     }
     const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3)); geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
@@ -175,14 +193,13 @@ function Scene({ graph, points, edges, selected, priority, hovered, showGroupBou
       fragmentShader: 'varying vec3 tint;varying float hollow;void main(){float d=length(gl_PointCoord-.5)*2.;if(d>1.)discard;gl_FragColor=vec4(tint,(1.-smoothstep(.6,1.,d))*mix(1.,smoothstep(.28,.48,d),hollow));\n#include <colorspace_fragment>\n}' });
     const object = new THREE.Points(geometry, material); object.frustumCulled = false; object.renderOrder = 3;
     return { geometry, material, object };
-  }, [points, selected, priority, hovered, graph.regions, graph.groups, edges, selectedRegionId, gl]);
+  }, [points, selected, priority, hovered, graph.regions, graph.groups, edges, selectedRegionId, anchors, gl, emphasis]);
   useEffect(() => () => { assets.geometry.dispose(); assets.material.dispose(); }, [assets]);
   const shownRegions = useMemo(() => graph.regions.filter(region => {
     if (!showGroupBounds) return false;
-    const focus = graph.regions.find(item => item.original.id === (hovered ?? selectedRegionId));
     return !region.original.parentRegionId || (region.original.depth ?? 0) < 2 || region.original.id === hovered || region.original.id === selectedRegionId
-      || region.memberIds.some(id => selected.has(id)) || Boolean(focus && focus.memberIds.some(id => region.memberIds.includes(id)));
-  }), [graph.regions, showGroupBounds, hovered, selectedRegionId, selected]);
+      || region.memberIds.some(id => selected.has(id)) || regionEmphasis.has(region.original.id);
+  }), [graph.regions, showGroupBounds, hovered, selectedRegionId, selected, regionEmphasis]);
   const shownBoundaries = useMemo(() => {
     const regions = shownRegions.map(region => ({ id: region.original.id, label: region.original.label, center: region.center, size: region.size, depth: region.original.depth ?? 0, group: false }));
     if (graph.source.view !== 'dependencies' || !showGroupBounds) return regions;
@@ -197,14 +214,15 @@ function Scene({ graph, points, edges, selected, priority, hovered, showGroupBou
     for (const region of shownBoundaries) {
       const corners = Array.from({ length: 8 }, (_, index) => region.center.map((v, axis) => v + (index & (1 << axis) ? 1 : -1) * region.size[axis]! / 2));
       const active = region.id === hovered || region.id === selectedRegionId;
-      const color = new THREE.Color(active ? '#ade1ca' : '#65897c').multiplyScalar(active ? .85 : Math.pow(.78, region.depth) * .4).toArray();
+      const emphasis = graph.source.view === 'module-dependency' ? regionEmphasis.get(region.id) : undefined;
+      const color = new THREE.Color(active ? '#ade1ca' : emphasis === 'ancestor' ? '#87ae9a' : '#65897c').multiplyScalar(emphasis === 'selected' ? 1 : active ? .85 : emphasis === 'ancestor' ? .58 : Math.pow(.78, region.depth) * .4).toArray();
       for (let index = 0; index < 8; index++) for (let axis = 0; axis < 3; axis++) if (!(index & (1 << axis))) { vertices.push(...corners[index]!, ...corners[index | (1 << axis)]!); colors.push(...color, ...color); }
     }
     const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
     geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
     const material = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: .8, depthWrite: false });
-    const object = new THREE.LineSegments(geometry, material); object.frustumCulled = false; return { geometry, material, object };
-  }, [shownBoundaries, hovered, selectedRegionId]);
+    material.name = "analyzer-region-bounds"; const object = new THREE.LineSegments(geometry, material); object.frustumCulled = false; return { geometry, material, object };
+  }, [shownBoundaries, hovered, selectedRegionId, graph.source.view, regionEmphasis]);
   useEffect(() => () => { bounds.geometry.dispose(); bounds.material.dispose(); }, [bounds]);
   useDisposableFrame((_, delta) => {
     const ortho = camera as THREE.OrthographicCamera;
@@ -217,44 +235,21 @@ function Scene({ graph, points, edges, selected, priority, hovered, showGroupBou
         return { ...p, id: point.id, width, height, panel: point.panel, labelX: p.x + (point.panel ? -width / 2 : 12), labelY: p.y + (point.panel ? -height / 2 : -12), visible: p.depth >= -1 && p.depth <= 1 && p.x > -width && p.x < size.width + width && p.y > -height && p.y < size.height + height, labelled: point.panel };
       });
       const byId = new Map(projected.map(point => [point.id, point]));
-      const previousHovered = hitPoints.current.find(point => point.id === hovered && point.labelled && !point.panel);
-      hitPoints.current = projected;
-      for (const region of graph.regions) { const p = screen(...region.center); byId.set(region.original.id, { ...p, id: region.original.id, width: 8, height: 8, panel: false, labelX: p.x, labelY: p.y, visible: true, labelled: false }); }
+      for (const region of graph.regions) { const p = screen(...anchors.get(region.original.id)!); byId.set(region.original.id, { ...p, id: region.original.id, width: 8, height: 8, panel: false, labelX: p.x, labelY: p.y, visible: p.depth >= -1 && p.depth <= 1, labelled: false }); }
       hitPoints.current = [...projected, ...graph.regions.filter(region => edges.some(edge => edge.source === region.original.id || edge.target === region.original.id)).map(region => byId.get(region.original.id)!)];
-      const occupied: { x: number; y: number; w: number; h: number }[] = projected.filter(p => p.visible && p.labelled).map(p => ({ x: p.labelX, y: p.labelY, w: p.width, h: p.height }));
-      // Hover must not move its own hit target: reprioritizing a label under a
-      // stationary pointer otherwise alternates enter/leave and rebuilds the
-      // particle material every frame. Camera movement still reprojects it.
-      const hoveredPoint = previousHovered && byId.get(previousHovered.id);
-      if (hoveredPoint?.visible && hoveredPoint.x === previousHovered!.x && hoveredPoint.y === previousHovered!.y
-        && previousHovered!.labelY >= overlayTop && previousHovered!.labelX >= 4
-        && previousHovered!.labelX + 146 <= size.width - 4 && previousHovered!.labelY + (selected.has(previousHovered!.id) ? 40 : 24) <= size.height - 30) {
-        hoveredPoint.labelX = previousHovered!.labelX; hoveredPoint.labelY = previousHovered!.labelY; hoveredPoint.labelled = true;
-        occupied.push({ x: hoveredPoint.labelX, y: hoveredPoint.labelY, w: 146, h: selected.has(hoveredPoint.id) ? 40 : 24 });
+      const candidates: Graph3DLabelCandidate[] = points.flatMap(point => { const p=byId.get(point.id)!, descriptor=labelDescriptors.get(point.groupId ? 'aggregate:'+point.groupId : 'node:'+point.id); return descriptor ? [{descriptor,x:p.x,y:p.y,depth:p.depth}] : []; });
+      const connectedRegions=new Set(edges.flatMap(edge=>[edge.source,edge.target]));
+      for(const region of graph.regions) {
+        const id=region.original.id, descriptor=labelDescriptors.get('region:'+id);
+        if(!descriptor || !(showGroupBounds && shownRegions.some(r=>r.original.id===id) || selectedRegionId===id || hovered===id || focusedId===id || graph.source.view==='architecture' && connectedRegions.has(id)))continue;
+        const p=graph.source.view==='architecture'?byId.get(id)!:screen(region.center[0],region.center[1]+region.size[1]/2,region.center[2]);
+        candidates.push({descriptor,x:p.x,y:p.y,depth:p.depth});
       }
-      const criticalCells = new Map<string, ScreenPoint[]>();
-      for (const point of projected) if (priority.has(point.id) || selected.has(point.id)) {
-        const key = `${Math.floor(point.x / 40)}:${Math.floor(point.y / 40)}`, cell = criticalCells.get(key) ?? [];
-        cell.push(point); criticalCells.set(key, cell);
-      }
-      const coversEndpoint = (id: string, x: number, y: number, w: number, h: number) => {
-        for (let cx = Math.floor((x - 12) / 40); cx <= Math.floor((x + w + 12) / 40); cx++) for (let cy = Math.floor((y - 12) / 40); cy <= Math.floor((y + h + 12) / 40); cy++) {
-          if (criticalCells.get(`${cx}:${cy}`)?.some(other => other.id !== id && other.x > x - 12 && other.x < x + w + 12 && other.y > y - 12 && other.y < y + h + 12)) return true;
-        }
-        return false;
-      };
-      const order = [...projected].filter(p => p.visible && !p.labelled).sort((a, b) => Number(selected.has(b.id) || hovered === b.id) - Number(selected.has(a.id) || hovered === a.id) || Number(priority.has(b.id)) - Number(priority.has(a.id)) || a.id.localeCompare(b.id));
-      for (const p of order) {
-        if (occupied.length >= 120 && !selected.has(p.id) && p.id !== hovered) continue;
-        const candidates = [[12, -12], [12, 12], [-158, -12], [-70, -36], [-70, 20]];
-        for (const [dx, dy] of candidates) {
-          const x = p.x + dx!, y = p.y + dy!, w = 146, h = selected.has(p.id) ? 40 : 24;
-          if (x < 4 || x + w > size.width - 4 || y < overlayTop || y + h > size.height - 30) continue;
-          if (occupied.some(r => x < r.x + r.w + 4 && x + w + 4 > r.x && y < r.y + r.h + 4 && y + h + 4 > r.y)) continue;
-          if (coversEndpoint(p.id, x, y, w, h)) continue;
-          p.labelX = x; p.labelY = y; p.labelled = true; occupied.push({ x, y, w, h }); break;
-        }
-      }
+      const selectedLabels=new Set([...selected,...selectedRegionId?[selectedRegionId]:[]]);
+      const labels=projectGraph3DLabels(candidates,{view:graph.source.view,zoom:ortho.zoom,width:size.width,height:size.height,top:overlayTop,bottom:size.height-12,
+        selected:selectedLabels,matches:labelMatches,emphasisIds:emphasis.nodeIds,hovered:new Set([hovered,labelHovered,focusedId].filter((id):id is string=>Boolean(id))),endpoints:labelEndpoints,related:new Set([...labelRelated,...regionEmphasis.keys()]),roles:labelRoles,previous:previousLabels.current,obstacles:labelObstacles});
+      previousLabels.current=labels; labelLayer.update(labels);
+      const named=new Set(labels.map(label=>labelDescriptors.get(label.id)?.entityId));for(const p of projected)p.labelled=named.has(p.id);
       const paths: (SpatialRelationPath & { animate: boolean })[] = [], screenEdges: ScreenEdge[] = [];
       const pairs = new Map<string, DisplayEdge[]>();
       for (const edge of edges) { const key = JSON.stringify([edge.source, edge.target].sort()), pair = pairs.get(key) ?? []; pair.push(edge); pairs.set(key, pair); }
@@ -270,7 +265,8 @@ function Scene({ graph, points, edges, selected, priority, hovered, showGroupBou
         screenEdges.push({ id: edge.id, source: edge.source, target: edge.target, a, b, path: screenPoints.map((point, i) => (i ? 'L' : 'M') + point.x + ',' + point.y).join(' '), color: edge.color, label: edge.label, active: edge.active, aggregated: edge.aggregated });
         paths.push({ id: edge.id, color: edge.color, points: curve.points, intensity: edge.intensity, animate: edge.animate });
       }
-      const regionLabels = shownBoundaries.map(region => { const p = screen(region.center[0], region.center[1] + region.size[1] / 2, region.center[2]); return { id: region.id, x: p.x, y: p.y, label: region.label, depth: p.depth, group: region.group }; }).filter(p => p.depth >= -1 && p.depth <= 1 && p.x >= 0 && p.x <= size.width && p.y > overlayTop && p.y < size.height - 25);
+      const regionLabels = (graph.source.view === 'architecture' ? graph.regions.filter(region=>connectedRegions.has(region.original.id)).map(region=>{const p=byId.get(region.original.id)!;return {id:region.original.id,x:p.x,y:p.y,label:region.original.label,depth:p.depth,port:true};})
+        : shownBoundaries.map(region => { const p = screen(region.center[0], region.center[1] + region.size[1] / 2, region.center[2]); return { id: region.id, x: p.x, y: p.y, label: region.label, depth: p.depth, group: region.group }; })).filter(p => p.depth >= -1 && p.depth <= 1 && p.x >= 0 && p.x <= size.width && p.y > overlayTop && p.y < size.height - 25);
       callbacks.current.onProjection({ points: projected, edges: screenEdges, regions: regionLabels }); setRenderPaths(paths);
     }
     if (stateRef.current.active) { stateRef.current.distance += Math.min(delta, SPATIAL_FLOW_MAX_FRAME_SECONDS) * SPATIAL_FLOW_SPEED; invalidate(); }
@@ -292,9 +288,20 @@ export function AnalyzerGraph3DStage(props: Props) {
   useAnalyzerControlInset(stage, setOverlayTop);
   const disposals = useCanvasDisposals();
   const [projection, setProjection] = useState<Projection>(emptyProjection), [density, setDensity] = useState<AggregationProjection>({ width: 1000, height: 600, zoom: 1 });
+  const [labelHovered, setLabelHovered] = useState<string>();
   const [hovered, setHovered] = useState<string>(), [inspection, setInspection] = useState<AggregationInspection>();
   const [command, setCommand] = useState<CameraCommand>({ nonce: 0 });
   const [help, setHelp] = useState(false);
+  const [labelContents,setLabelContents]=useState<FlowLabelContent[]>([]),[labelLayer]=useState(()=>new FlowLabelLayer(setLabelContents));
+  const [focusedId,setFocusedId]=useState<string>();
+  const [labelObstacles,setLabelObstacles]=useState<FlowLabelObstacle[]>([]);
+  useLayoutEffect(()=>{labelLayer.resume();return()=>labelLayer.suspend();},[labelLayer]);
+  useLayoutEffect(()=>{
+    if(!stage)return;const panels=[...stage.querySelectorAll<HTMLElement>('.analyzer-3d-inspection,.semantic-flow-direction-legend')];
+    const measure=()=>{const root=stage.getBoundingClientRect();const next=panels.map(panel=>{const r=panel.getBoundingClientRect();return {left:r.left-root.left,top:r.top-root.top,width:r.width,height:r.height};});setLabelObstacles(previous=>JSON.stringify(previous)===JSON.stringify(next)?previous:next);};measure();
+    if(typeof ResizeObserver==='undefined')return;const observer=new ResizeObserver(measure);observer.observe(stage);panels.forEach(panel=>observer.observe(panel));return()=>observer.disconnect();
+  },[stage]);
+  useEffect(()=>{setHovered(undefined);setFocusedId(undefined);},[graph,state.selectedNodeId,state.selectedRegionId,state.selectedEdgeId,state.filter]);
   const selected = useMemo(() => new Set([state.selectedNodeId].filter((id): id is string => Boolean(id))), [state.selectedNodeId]);
   const expanded = useMemo(() => new Set(state.graph3DAggregation?.expandedGroupIds ?? []), [state.graph3DAggregation]);
   const collapsed = useMemo(() => new Set(state.graph3DAggregation?.collapsedGroupIds ?? []), [state.graph3DAggregation]);
@@ -342,18 +349,32 @@ export function AnalyzerGraph3DStage(props: Props) {
     return roles;
   }, [relevantEdges, selected, regionMembers]);
   const displayEdges = useMemo<DisplayEdge[]>(() => {
-    const active = relations.filter(edge => edge.originals.some(original => relevantIds.has(original.id)));
-    const emphasized = new Set(active.filter(edge => edge.id === hovered || edge.source === hovered || edge.target === hovered).map(edge => edge.id));
-    return relations.filter(edge => !edge.internal && (model.view !== 'module-dependency' || edge.originals.some(original => relevantIds.has(original.id)))).map(edge => {
+    const visible = relations.filter(edge => !edge.internal && (model.view !== 'module-dependency' || edge.originals.some(original => relevantIds.has(original.id))));
+    const emphasized = graph3DHoverEmphasis(visible.map(edge => ({ ...edge, active: edge.originals.some(original => relevantIds.has(original.id)) })), hovered).edgeIds;
+    return visible.map(edge => {
       const active = edge.originals.some(original => relevantIds.has(original.id));
       const representative = edge.originals.find(original => relevantIds.has(original.id)) ?? edge.originals[0]!;
       const explicitSelection = edge.originals.some(original => original.id === selectedEdgeId);
       return { id: edge.id, source: edge.source, target: edge.target, label: edge.kind + (edge.aggregated ? ' · ' + edge.originals.length : ''),
         color: active ? graph3DRelationColor(representative.source, representative.target, selectionContext.ids, explicitSelection) : '#496660', active,
-        intensity: active ? emphasized.size && !emphasized.has(edge.id) ? .18 : 1 : .45,
+        intensity: emphasized.size ? emphasized.has(edge.id) ? 1 : .18 : active ? 1 : .45,
         animate: active && (!emphasized.size || emphasized.has(edge.id)), aggregated: edge.aggregated };
     });
   }, [relations, model.view, relevantIds, selectionContext, selectedEdgeId, hovered]);
+  const labelFocus = props.labelFocusId ?? focusedId;
+  const focusedOwner = labelFocus ? owners.get(labelFocus) ?? labelFocus : undefined;
+  const labelDescriptors=useMemo(()=>{
+    const result=new Map(prepareGraph3DLabels(graph));
+    for(const group of aggregation.aggregates){
+      const member=group.id===focusedOwner && labelFocus!==focusedOwner ? graph.points.find(point=>point.id===labelFocus)?.original : undefined;
+      const id='aggregate:'+group.groupId;
+      result.set(id,{id,entityId:group.id,kind:'aggregate',label:member?.label??group.label,kindLabel:member?'表示集合内の対象':'表示上のまとめ',context:group.memberIds.length+'対象',disambiguation:member?group.label:group.memberIds.length+'対象',tooltip:[member?.label,group.label,group.memberIds.length+'対象の表示上の集合'].filter(Boolean).join('\n'),group:group.groupId,importance:0});
+    }
+    return result;
+  },[graph,aggregation.aggregates,focusedOwner,labelFocus]);
+  const labelEndpoints=useMemo(()=>new Set(relations.filter(edge=>edge.originals.some(original=>original.id===selectedEdgeId)).flatMap(edge=>[edge.source,edge.target])),[relations,selectedEdgeId]);
+  const labelRelated=useMemo(()=>new Set(relevantEdges.flatMap(edge=>[owners.get(edge.sourceId)??edge.sourceId,owners.get(edge.targetId)??edge.targetId])),[relevantEdges,owners]);
+  const labelRoles=useMemo(()=>{const roles=new Map<string,NonNullable<FlowLabelContent['role']>>();for(const [id,directions]of connectionRoles)roles.set(owners.get(id)??id,directions.size>1?'both':directions.has('outgoing')?'outgoing':'incoming');return roles;},[connectionRoles,owners]);
   const focusRequest = props.focusRequest, onCounts = props.onCounts;
   useEffect(() => { if (focusRequest) setCommand(current => ({ nonce: current.nonce + 1, ids: focusRequest.entityIds ?? [focusRequest.entityId] })); }, [focusRequest]);
   const totalNodes = graph.points.filter(point => point.original.presentation?.role !== 'summary').length;
@@ -368,7 +389,7 @@ export function AnalyzerGraph3DStage(props: Props) {
   const chooseNode = (id: string) => { setInspection(undefined); props.onSelectNode(id); };
   const chooseEdge = (id: string) => { setInspection(undefined); props.onSelectEdge(id); };
   const displayed = new Map(displayPoints.map(point => [point.id, point]));
-  const labelledIds = new Set(projection.points.filter(point => point.visible && point.labelled).map(point => point.id));
+  const labelledIds = new Set(labelContents.map(label => labelDescriptors.get(label.id)?.entityId));
   const unlabelledConnections = [...new Set(relevantEdges.flatMap(edge => [edge.sourceId, edge.targetId]))].filter(id => graph.points.some(point => point.id === id) && !labelledIds.has(id)).length;
   return <div ref={setStage} className="analyzer-graph-stage analyzer-spatial-graph-stage semantic-flow-stage analyzer-graph-3d" data-view={model.view} data-render-mode="3d">
     <AnalyzerGraphControls mode="3d" onMode={props.onMode}
@@ -377,29 +398,30 @@ export function AnalyzerGraph3DStage(props: Props) {
       canFocus={Boolean(state.selectedNodeId || state.selectedRegionId || state.selectedEdgeId)} onFocus={() => setCommand(current => ({ nonce: current.nonce + 1, ids: state.selectedRegionId ? [state.selectedRegionId] : [...protectedIds] }))}
       particleMode={motion.mode} onParticleMode={motion.setMode} showGroupBounds={props.showGroupBounds} onGroupBounds={graph.regions.length || model.view === 'dependencies' ? props.onGroupBounds : undefined}
       autoAggregation={props.autoAggregation} onAutoAggregation={groups.length ? props.onAutoAggregation : undefined}
-      isFullscreen={props.isFullscreen} onFullscreen={props.onFullscreen} help={help} onHelp={setHelp} />
+      isFullscreen={props.isFullscreen} onFullscreen={props.onFullscreen} help={help} onHelp={setHelp}>{props.controlsExtras}</AnalyzerGraphControls>
     {help && <div className="analyzer-stage-help" role="dialog" aria-label="グラフ操作ヘルプ"><strong>3D全体図</strong><p>ドラッグで回転、右ドラッグで移動。点やラベルから対象を選択できます。ホイールと＋ / −で拡大縮小できます。</p><p>検索結果と「選択へ移動」で対象へ移動します。青は選択対象から出る関係、橙は入る関係です。所属の線は実在する包含関係を示します。</p><button type="button" onClick={() => setHelp(false)}>ヘルプを閉じる</button></div>}
     <CanvasBoundary onUnavailable={props.onUnavailable}><Canvas orthographic frameloop="demand" dpr={[1, 2]} onCreated={initializeSemanticCanvas} gl={defaults => recoverableWebGLRenderer({ ...defaults, antialias: true, alpha: true }, props.onUnavailable)} fallback={<p>3D表示を利用できません。</p>}>
-      <Scene graph={graph} points={displayPoints} edges={displayEdges} selected={selected} priority={protectedIds} hovered={hovered} showGroupBounds={props.showGroupBounds} selectedRegionId={state.selectedRegionId}
+      <Scene labelHovered={labelHovered} labelMatches={matchIds} labelLayer={labelLayer} labelDescriptors={labelDescriptors} labelEndpoints={labelEndpoints} labelRelated={labelRelated} labelRoles={labelRoles} focusedId={focusedOwner} labelObstacles={labelObstacles} graph={graph} points={displayPoints} edges={displayEdges} selected={selected} priority={protectedIds} hovered={hovered} showGroupBounds={props.showGroupBounds} selectedRegionId={state.selectedRegionId}
         command={command} savedCamera={state.graph3DCamera} input={props.input} motion={motion} onCamera={props.onCamera} onProjection={setProjection} onDensity={setDensity} onUnavailable={props.onUnavailable} onBlank={props.onClear}
         onPoint={id => { const point = displayed.get(id); if (point?.groupId) setInspection({ kind: 'group', id: point.groupId }); else if (graph.regions.some(region => region.original.id === id)) props.onSelectRegion(id); else chooseNode(id); }} onHover={setHovered} disposals={disposals} overlayTop={overlayTop} />
     </Canvas></CanvasBoundary>
     <svg className="analyzer-3d-overlay" aria-label="3Dの関係">
       {projection.edges.map(edge => <path key={edge.id} className="analyzer-3d-edge-hit" d={edge.path} fill="none" stroke="transparent" strokeWidth="12" tabIndex={0} role="button" aria-label={edge.label}
         data-edge-id={edge.id} data-source-id={edge.source} data-target-id={edge.target} data-direction-color={edge.color} data-active={edge.active}
-        onPointerEnter={() => setHovered(edge.id)} onPointerLeave={() => setHovered(undefined)}
+        onPointerMove={event => { if(event.buttons)return; const rect=event.currentTarget.ownerSVGElement!.getBoundingClientRect(),x=event.clientX-rect.left,y=event.clientY-rect.top; const point=projection.points.filter(p=>p.visible&&Math.hypot(p.x-x,p.y-y)<13).sort((a,b)=>Math.hypot(a.x-x,a.y-y)-Math.hypot(b.x-x,b.y-y))[0]; setHovered(point?.id??edge.id); }} onPointerLeave={() => setHovered(undefined)}
         onClick={() => edge.aggregated ? setInspection({ kind: 'relation', id: edge.id }) : chooseEdge(edge.id)} onKeyDown={event => { if (event.key === 'Enter') { if (edge.aggregated) setInspection({ kind: 'relation', id: edge.id }); else chooseEdge(edge.id); } }}><title>{edge.label}</title></path>)}
     </svg>
+    <svg className="analyzer-3d-label-leaders" aria-hidden="true">{labelContents.map(label=><line key={label.id} ref={element=>labelLayer.attachLeader(label.id,element)} />)}</svg>
     <div className="analyzer-3d-labels">
-      {projection.points.filter(point => point.visible).map(point => {
-        const item = displayed.get(point.id); if (!item) return null;
-        return <div key={point.id}>
-          {!item.panel && (point.labelled || selected.has(point.id)) && <button type="button" className={`analyzer-3d-hit${selected.has(point.id) ? ' is-selected' : ''}`} style={{ left: point.x - 10, top: point.y - 10 }} aria-label={item.label} title={item.label} onPointerEnter={() => setHovered(point.id)} onPointerLeave={() => setHovered(undefined)} onClick={() => item.groupId ? setInspection({ kind: 'group', id: item.groupId }) : chooseNode(point.id)} />}
-          {point.labelled && <button type="button" className={`${item.panel ? 'analyzer-3d-panel' : 'analyzer-3d-label'}${selected.has(point.id) ? ' is-selected' : ''}${matchIds.has(point.id) ? ' is-match' : ''}`} aria-pressed={selected.has(point.id)} data-flow-role={selected.has(point.id) ? 'selected' : connectionRoles.has(point.id) ? connectionRoles.get(point.id)!.size > 1 ? 'both' : connectionRoles.get(point.id)!.has('outgoing') ? 'outgoing' : 'incoming' : undefined} data-node-id={point.id} data-entity-kind={item.original?.original.presentation?.role === 'summary' ? 'summary' : item.groupId ? 'aggregate' : 'node'} style={{ left: point.labelX, top: point.labelY, ...(item.panel ? { transform: `scale(${point.width / 166})`, transformOrigin: 'top left' } : {}) }} title={[item.label, item.subtitle].filter(Boolean).join('\n')} onPointerEnter={() => setHovered(point.id)} onPointerLeave={() => setHovered(undefined)}
-            onClick={() => item.groupId ? setInspection({ kind: 'group', id: item.groupId }) : chooseNode(point.id)} onDoubleClick={() => { if (item.original?.original.presentation?.role === 'summary') props.onTogglePresentation(point.id); }}><strong style={item.panel ? { fontSize: Math.max(11, 12 * point.width / 166) / (point.width / 166), lineHeight: 1.25 } : undefined}>{item.label}</strong>{selected.has(point.id) && <span className="semantic-flow-3d-role">選択中</span>}{item.panel && point.width / 166 >= .75 && <small>{item.subtitle ?? item.original?.original.type}</small>}</button>}
-        </div>;
-      })}
-      {projection.regions.map(region => <button type="button" key={region.id} className="analyzer-3d-region" style={{ left: region.x, top: region.y }} title={region.label} onPointerEnter={() => setHovered(region.id)} onPointerLeave={() => setHovered(undefined)} onFocus={() => setHovered(region.id)} onBlur={() => setHovered(undefined)} onClick={() => { if (region.group) setInspection({ kind: 'group', id: region.id }); else { setInspection(undefined); props.onSelectRegion(region.id); } }}>{region.label}</button>)}
+      {projection.regions.filter(region=>region.port).map(region=><button key={region.id} type="button" className="analyzer-3d-scope-port" data-scope-port={region.id} style={{left:region.x-9,top:region.y-9}} aria-label={`${region.label} Scope接続点`} aria-pressed={selectedRegionId===region.id} onPointerMove={()=>setHovered(region.id)} onPointerLeave={()=>setHovered(undefined)} onFocus={()=>setFocusedId(region.id)} onBlur={()=>setFocusedId(undefined)} onClick={()=>props.onSelectRegion(region.id)}/>)}
+      {projection.points.filter(point=>point.visible&&(point.labelled||selected.has(point.id))).map(point=>{const item=displayed.get(point.id);return item&&<button type="button" key={point.id} className={'analyzer-3d-hit'+(selected.has(point.id)?' is-selected':'')} style={{left:point.x-10,top:point.y-10}} aria-label={item.label} title={item.label}
+        onPointerEnter={()=>setHovered(point.id)} onPointerLeave={()=>setHovered(undefined)} onFocus={()=>setFocusedId(point.id)} onBlur={()=>setFocusedId(undefined)} onClick={()=>item.groupId?setInspection({kind:'group',id:item.groupId}):chooseNode(point.id)} />;})}
+      {labelContents.map(label=>{const d=labelDescriptors.get(label.id);if(!d)return null;const item=displayed.get(d.entityId);return <button type="button" key={label.id} ref={element=>labelLayer.attach(label.id,element)}
+        className={'analyzer-3d-label'+(d.kind==='region'?' analyzer-3d-region':'')+(label.selected?' is-selected':'')+(label.hovered?' is-hovered':'')+(label.match?' is-match':'')+(label.emphasized?' is-emphasized':'')+(label.dimmed?' is-dimmed':'')} data-node-id={d.kind==='node'?d.entityId:undefined} data-region-id={d.kind==='region'?d.entityId:undefined} data-entity-id={d.entityId} data-entity-kind={d.kind} data-flow-role={label.role} aria-pressed={label.selected} title={d.tooltip}
+        onPointerMove={event=>{if(!event.buttons){setLabelHovered(d.entityId);setHovered(d.entityId);}}} onPointerLeave={()=>{setLabelHovered(undefined);setHovered(undefined);}} onFocus={()=>setFocusedId(d.entityId)} onBlur={()=>setFocusedId(id=>id===d.entityId?undefined:id)}
+        onClick={()=>d.kind==='region'?props.onSelectRegion(d.entityId):item?.groupId?setInspection({kind:'group',id:item.groupId}):chooseNode(d.entityId)} onDoubleClick={()=>{if(item?.original?.original.presentation?.role==='summary')props.onTogglePresentation(d.entityId);}}>
+        <strong>{label.label}</strong>{label.disambiguation&&<small>{label.disambiguation}</small>}{label.roleLabel&&<span className="semantic-flow-3d-role">{label.roleLabel}</span>}
+      </button>;})}
     </div>
     <div className="analyzer-3d-inspection">{unlabelledConnections > 0 && <p className="analyzer-3d-connection-notice">関係の両端 {unlabelledConnections}対象のラベルを省略、または画面外です。詳細の関係一覧・検索から移動できます。</p>}<AutoAggregationPanel enabled={props.autoAggregation} counts={model.view === 'command' ? { ...aggregation.counts, scope: scopeNodes, individual: visibleNodes, manualMembers: scopeNodes - visibleNodes, manualGroups: displayPoints.filter(point => point.original?.original.presentation?.role === 'summary').length } : aggregation.counts} groups={groups} aggregates={aggregation.aggregates} expandedIds={expanded} collapsedIds={collapsed} inspection={inspection} onInspection={setInspection} onGroupMode={groupMode}
       relations={relations} originalRelations={originals} nodeLabel={id => { const node = model.nodes.find(node => node.id === id); return { title: node?.label ?? id, subtitle: node?.subtitle }; }} onSelectNode={chooseNode} onSelectRelation={chooseEdge} totalCount={totalNodes} ownerById={owners} />

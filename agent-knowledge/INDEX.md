@@ -80,6 +80,14 @@
 - files: `src/pages/AnalyzerPage.tsx`, `src/pages/AnalyzerPage.test.tsx`, `src/components/analyzer/AnalyzerGraphStage.tsx` …
 - memory: `agent-knowledge/entries/2026-09-10-analyzer-search-presentation-boundary-72f9ac.md`
 
+### 全画面の浮動操作はworkspace内へportalする
+- id: `rm-20260912-fullscreen-control-portal`
+- type: `failure`
+- maturity: `candidate`
+- tags: `fullscreen`, `popover`, `positioning`
+- files: `src/components/analyzer/CommandEntryControl.tsx`, `src/components/analyzer/useWorkspaceFullscreen.ts`, `src/components/analyzer/analyzer-graph-controls.css`
+- memory: `agent-knowledge/entries/2026-09-12-fullscreen-control-portal-dc2a11.md`
+
 ## analyzer-model
 
 ### 派生した項目のコピーを、元の定義所有者へ置き換えない
@@ -131,6 +139,14 @@
 - tags: `r3f`, `webgl`, `initialization`, `fallback`
 - files: `src/components/analyzer/recoverableWebGLRenderer.ts`, `src/components/analyzer/recoverableWebGLRenderer.test.ts`, `src/components/analyzer/AnalyzerGraph3DStage.tsx` …
 - memory: `agent-knowledge/entries/2026-09-11-r3f-renderer-initialization-failure-38dfb1.md`
+
+### Scopeの中心を関係の接続先へ流用しない
+- id: `rm-20260912-scope-render-port-identity`
+- type: `constraint`
+- maturity: `candidate`
+- tags: `scope`, `endpoint`, `identity`, `3d`
+- files: `src/analyzer/graph3DRegions.ts`, `src/components/analyzer/AnalyzerGraph3DStage.tsx`, `src/components/analyzer/graph3DLabels.test.ts` …
+- memory: `agent-knowledge/entries/2026-09-12-scope-render-port-identity-dc2a11.md`
 
 ## analyzer-session
 

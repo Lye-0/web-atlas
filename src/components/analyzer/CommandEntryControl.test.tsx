@@ -1,0 +1,6 @@
+import {act,useState} from 'react';import {createRoot} from 'react-dom/client';import {expect,it,vi} from 'vitest';import {CommandEntryControl} from './CommandEntryControl';import type {PackageScriptFact} from '../../analyzer';
+it('uses the same entry across normal and fullscreen controls without executing commands',async()=>{
+ vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT',true);const scripts=['build','dev'].map(id=>({id,packageName:'app',scriptName:id})) as PackageScriptFact[];
+ function Harness(){const [entry,setEntry]=useState('build');return <><CommandEntryControl scripts={scripts} entryScriptId={entry} onChange={setEntry}/><CommandEntryControl compact scripts={scripts} entryScriptId={entry} onChange={setEntry}/></>;}
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);try{await act(async()=>root.render(<Harness/>));expect(host.querySelector('button')).toBeNull();const select=host.querySelectorAll('select')[1]!;await act(async()=>{select.value='dev';select.dispatchEvent(new Event('change',{bubbles:true}));});expect(host.querySelector('select')!.value).toBe('dev');expect(select.value).toBe('dev');expect(host.querySelectorAll('select')).toHaveLength(2);expect(host.querySelector('[role=dialog]')).toBeNull();}finally{await act(async()=>root.unmount());host.remove();vi.unstubAllGlobals();}
+});

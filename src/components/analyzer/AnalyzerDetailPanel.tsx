@@ -5,8 +5,9 @@ import type { AnalyzerProjectStore, AnalyzerSemanticRegion, AnalyzerViewEdge, An
 import { stackPath } from '../../utils/routes';
 import { EvidenceCodeBlock } from './EvidenceCodeBlock';
 import { ModuleDependencyDetails } from './ModuleDependencyDetails';
+import { dependencyDetailRelations } from '../../analyzer/dependencyDetailRelations';
 
-interface AnalyzerDetailPanelProps {
+interface AnalyzerDetailPanelProps { onLabelFocus?: (id?: string) => void;
   spatialDetails?: boolean;
   store: AnalyzerProjectStore;
   view: AnalyzerViewModel;
@@ -47,7 +48,7 @@ function RelationList({ nodeId, view, onSelectNode, onSelectRegion, onFocusConne
         if (!target && !targetRegion) return null;
         return (
           <li key={relation.id}>
-            <button type="button" onClick={() => targetRegion ? onSelectRegion?.(targetRegion.id, true) : target && onSelectNode(target.id, true)}>
+            <button type="button" data-analyzer-entity-id={targetId} onClick={() => targetRegion ? onSelectRegion?.(targetRegion.id, true) : target && onSelectNode(target.id, true)}>
               <span>{relation.sourceId === nodeId ? '出る関係 → ' : '入る関係 ← '}{relationLabelForNode(relation, nodeId)}</span>
               <strong>{target?.label ?? targetRegion?.label}</strong>
             </button>
@@ -57,6 +58,24 @@ function RelationList({ nodeId, view, onSelectNode, onSelectRegion, onFocusConne
       })}
     </ul>
   );
+}
+
+function DependencyDeclaration({edge,view,store,onFocusConnection}:{edge:AnalyzerViewEdge;view:AnalyzerViewModel;store:AnalyzerProjectStore;onFocusConnection?:(source:string,target:string)=>void}) {
+  const [open,setOpen]=useState(false);
+  return <details className="analyzer-dependency-declaration" open={open} onToggle={event=>setOpen(event.currentTarget.open)}><summary>{[edge.metadata.packageName,edge.metadata.dependencyType,edge.metadata.versionRange].filter(Boolean).join(' · ')||'依存宣言とEvidence'}</summary>
+    {open&&<><EvidenceList evidenceIds={edge.evidenceIds} view={view} store={store}/>{onFocusConnection&&<button type="button" onClick={()=>onFocusConnection(edge.sourceId,edge.targetId)}>両端を表示</button>}</>}
+  </details>;
+}
+
+function DependencyRelations({nodeId,view,store,onSelectNode,onFocusConnection}:{nodeId:string;view:AnalyzerViewModel;store:AnalyzerProjectStore;onSelectNode:(id:string,focus?:boolean)=>void;onFocusConnection?:(source:string,target:string)=>void}) {
+  const {declarations,summaries,outgoingTargets,incomingSources}=dependencyDetailRelations(view,nodeId);
+  return <><section className="analyzer-detail-section" data-dependency-declarations><h3>依存先・利用元</h3>
+    <p className="analyzer-muted-copy">依存先 {outgoingTargets}対象 · 利用元 {incomingSources}対象 · 依存宣言 {declarations.length}件</p>
+    <ul className="analyzer-relation-list">{declarations.map(edge=>{const outgoing=edge.sourceId===nodeId,targetId=outgoing?edge.targetId:edge.sourceId,target=view.nodes.find(n=>n.id===targetId);return <li key={edge.id} data-relation-id={edge.id}>
+      <button type="button" data-analyzer-entity-id={targetId} onClick={()=>onSelectNode(targetId,true)}><span>{outgoing?'依存先':'利用元'}</span><strong>{target?.label??targetId}</strong></button>
+      <DependencyDeclaration edge={edge} view={view} store={store} onFocusConnection={onFocusConnection}/>
+    </li>;})}</ul>
+  </section>{summaries.length>0&&<section className="analyzer-detail-section" data-dependency-summaries><h3>表示上のまとめ</h3><ul className="analyzer-relation-list">{summaries.map(({node})=><li key={node.id}><button type="button" onClick={()=>onSelectNode(node.id)}><span>表示集合 · メンバー {node.presentation?.childNodeIds?.length??0}対象</span><strong>{node.label}の内訳を開く</strong></button></li>)}</ul></section>}</>;
 }
 
 function MetadataList({ metadata }: { metadata: AnalyzerViewNode['metadata'] }) {
@@ -136,7 +155,7 @@ function RegionRelationList({ region, view, onSelectNode, onSelectRegion }: { re
         if (!target && !targetRegion) return null;
         return (
           <li key={relation.id}>
-            <button type="button" onClick={() => targetRegion ? onSelectRegion?.(targetRegion.id, true) : target && onSelectNode(target.id, true)}>
+            <button type="button" data-analyzer-entity-id={targetId} onClick={() => targetRegion ? onSelectRegion?.(targetRegion.id, true) : target && onSelectNode(target.id, true)}>
               <span>{relation.sourceId === region.id ? '出る関係 → ' : '入る関係 ← '}{relationLabelForNode(relation, region.id)}</span>
               <strong>{target?.label ?? targetRegion?.label}</strong>
             </button>
@@ -499,10 +518,10 @@ function NodeDetails({ node, view, store, expandedPresentationIds, onSelectNode,
           </button>
         </section>
       )}
-      <section className="analyzer-detail-section">
-        <h3>Relations</h3>
-      <RelationList onFocusConnection={onFocusConnection} nodeId={node.id} view={view} onSelectNode={onSelectNode} onSelectRegion={onSelectRegion} />
-      </section>
+      {view.view !== 'dependencies' && <section className="analyzer-detail-section"><h3>Relations</h3>
+        <RelationList onFocusConnection={onFocusConnection} nodeId={node.id} view={view} onSelectNode={onSelectNode} onSelectRegion={onSelectRegion} />
+      </section>}
+      {view.view === 'dependencies' && <DependencyRelations nodeId={node.id} view={view} store={store} onSelectNode={onSelectNode} onFocusConnection={onFocusConnection}/>}
       <section className="analyzer-detail-section">
         <details><summary>補助情報</summary><MetadataList metadata={node.metadata} /></details>
       </section>
@@ -567,19 +586,19 @@ function CommandOriginal({ node, store }: { node: AnalyzerViewNode; store: Analy
   return <section className="analyzer-detail-section"><h3>Command 原文</h3><pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{command}</pre><button type="button" onClick={() => { navigator.clipboard.writeText(command).then(() => setStatus('コピーしました'), () => setStatus('コピーできませんでした。原文を選択してコピーできます。')); }}>コマンドをコピー</button><span role="status">{status}</span></section>;
 }
 
-export function AnalyzerDetailPanel({ store, view, selectedNodeId, selectedRegionId, selectedEdgeId, expandedPresentationIds, onSelectNode, onSelectRegion, onTogglePresentation, onClose, onFocusConnection, spatialDetails }: AnalyzerDetailPanelProps) {
+export function AnalyzerDetailPanel({ onLabelFocus, store, view, selectedNodeId, selectedRegionId, selectedEdgeId, expandedPresentationIds, onSelectNode, onSelectRegion, onTogglePresentation, onClose, onFocusConnection, spatialDetails }: AnalyzerDetailPanelProps) {
   const node = selectedNodeId ? view.nodes.find((candidate) => candidate.id === selectedNodeId) : undefined;
   const region = selectedRegionId ? view.regions?.find((candidate) => candidate.id === selectedRegionId) : undefined;
   const edge = selectedEdgeId ? view.edges.find((candidate) => candidate.id === selectedEdgeId) : undefined;
   if (view.view === 'module-dependency' && (node || region || edge)) {
-    return <aside key={node?.id ?? region?.id ?? edge?.id} className="analyzer-detail-panel is-module-detail" aria-label="Analyzer detail panel">
+    return <aside key={node?.id ?? region?.id ?? edge?.id} className="analyzer-detail-panel is-module-detail" aria-label="Analyzer detail panel" onFocusCapture={event=>onLabelFocus?.((event.target as HTMLElement).closest<HTMLElement>('[data-analyzer-entity-id]')?.dataset.analyzerEntityId)} onBlurCapture={event=>{if(!event.currentTarget.contains(event.relatedTarget as Node))onLabelFocus?.(undefined);}}>
       <ModuleDependencyDetails key={node?.id ?? region?.id ?? edge?.id} node={node} region={region} edge={edge} view={view} store={store}
         showDirectoryChain={spatialDetails}
         onSelectNode={onSelectNode} onSelectRegion={onSelectRegion} onFocusConnection={onFocusConnection} onClose={onClose}/>
     </aside>;
   }
   return (
-    <aside className="analyzer-detail-panel" aria-label="Analyzer detail panel">
+    <aside className="analyzer-detail-panel" aria-label="Analyzer detail panel" onFocusCapture={event=>onLabelFocus?.((event.target as HTMLElement).closest<HTMLElement>('[data-analyzer-entity-id]')?.dataset.analyzerEntityId)} onBlurCapture={event=>{if(!event.currentTarget.contains(event.relatedTarget as Node))onLabelFocus?.(undefined);}}>
       {!node && !region && !edge ? (
         <div className="analyzer-detail-empty">
           <div className="analyzer-detail-heading-top">

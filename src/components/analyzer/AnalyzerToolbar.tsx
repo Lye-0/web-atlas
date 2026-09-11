@@ -1,3 +1,4 @@
+import { CommandEntryControl } from './CommandEntryControl';
 import { NavLink } from 'react-router-dom';
 import { analyzerRoutes } from '../../utils/routes';
 import { analyzerViewLabels, type AnalyzerFilter, type AnalyzerViewCounts, type AnalyzerViewId, type PackageScriptFact } from '../../analyzer';
@@ -86,15 +87,7 @@ export function AnalyzerToolbar({
             {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
         </label>
-        {view === 'command' && (
-          <label className="analyzer-filter-control analyzer-entry-control">
-            <span>開始コマンド</span>
-            <select value={entryScriptId ?? ''} onChange={(event) => onEntryChange(event.target.value)} aria-label="Command Flowのentry script">
-              {scripts.length === 0 && <option value="">scriptなし</option>}
-              {scripts.map((script) => <option key={script.id} value={script.id}>{script.packageName} · {script.scriptName}</option>)}
-            </select>
-          </label>
-        )}
+        {view === 'command' && <CommandEntryControl scripts={scripts} entryScriptId={entryScriptId} onChange={onEntryChange} />}
         {view === 'dependencies' && (
           <button type="button" className={`analyzer-quiet-button${externalExpanded ? ' is-active' : ''}`} onClick={onToggleExternal} aria-expanded={externalExpanded}
             disabled={!externalToggleAvailable} title={externalToggleAvailable ? undefined : '展開する外部パッケージのまとまりはありません'}>

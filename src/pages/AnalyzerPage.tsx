@@ -1,3 +1,4 @@
+import { CommandEntryControl } from '../components/analyzer/CommandEntryControl';
 import { Component, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { ANALYZER_DEFAULT_TRANSFORM, ANALYZER_EXTERNAL_SUMMARY_ID, analyzerViewCounts, analyzerViewLabels, isCompatibleSpatialCameraTransform, presentationOwnsNode, presentAnalyzerView, projectAnalyzerView, restoreAnalyzerViewSession, useAnalyzerSession } from '../analyzer';
@@ -290,8 +291,20 @@ function LegacyAnalyzerPage() {
     updateView(view, update);
   }, [expandedPresentationIds, externalPresentationIds, model, selectedEdgeId, selectedNodeId, updateView, view]);
 
+  const [detailLabelFocus,setDetailLabelFocus]=useState<string>();
+  useEffect(()=>setDetailLabelFocus(undefined),[view,store,selectedNodeId,selectedRegionId,selectedEdgeId,is3D]);
   const activeFocusRequest = focusRequest?.view === view && focusRequest.store === store ? focusRequest : undefined;
 
+  const changeEntry = (value: string) => {
+              if (!store) return;
+              if (is3D && (selectedNodeId || selectedRegionId || selectedEdgeId)) {
+                const nextModel = projectAnalyzerView(store, view, value || undefined);
+                const valid = selectedNodeId ? nextModel.nodes.some(node => node.id === selectedNodeId) : selectedEdgeId ? nextModel.edges.some(edge => edge.id === selectedEdgeId) : nextModel.regions?.some(region => region.id === selectedRegionId);
+                setSelectionNotice(valid ? undefined : '選択対象が新しい開始スクリプトの範囲外になったため、選択を解除しました。');
+              }
+              updateView(view, { entryScriptId: value || undefined });
+            };
+  const entryControl=fullscreen.isFullscreen&&view==='command'?<CommandEntryControl compact scripts={scripts} entryScriptId={effectiveEntryScriptId} onChange={changeEntry}/>:undefined;
   return (
     <div className="page-stack analyzer-page">
       <AnalyzerProjectHeader onScanned={handleScanned} />
@@ -324,14 +337,7 @@ function LegacyAnalyzerPage() {
             onToggleExternal={toggleExternal}
             scripts={scripts}
             entryScriptId={effectiveEntryScriptId}
-            onEntryChange={(value) => {
-              if (is3D && (selectedNodeId || selectedRegionId || selectedEdgeId)) {
-                const nextModel = projectAnalyzerView(store, view, value || undefined);
-                const valid = selectedNodeId ? nextModel.nodes.some(node => node.id === selectedNodeId) : selectedEdgeId ? nextModel.edges.some(edge => edge.id === selectedEdgeId) : nextModel.regions?.some(region => region.id === selectedRegionId);
-                setSelectionNotice(valid ? undefined : '選択対象が新しい開始スクリプトの範囲外になったため、選択を解除しました。');
-              }
-              updateView(view, { entryScriptId: value || undefined });
-            }}
+            onEntryChange={changeEntry}
             counts={nodeCounts}
           />
 
@@ -352,7 +358,7 @@ function LegacyAnalyzerPage() {
             {is3D ? (
               <AnalyzerRenderBoundary key={`3d-boundary:${view}:${session.scanVersion}`} onUnavailable={() => { setUnavailable3D(true); updateView(view, { graphMode: '2d' }); }}>
               <Suspense fallback={<div className="analyzer-graph-stage"><p role="status">3D表示を読み込み中…</p></div>}>
-                <AnalyzerGraph3DStage onMode={switchMode} key={`3d:${view}:${session.scanVersion}:${model.entryScriptId ?? ''}`} model={model} state={viewState} input={`${session.scanVersion}:${store.scannedAt}:${model.entryScriptId ?? ''}`}
+                <AnalyzerGraph3DStage labelFocusId={detailLabelFocus} controlsExtras={entryControl} onMode={switchMode} key={`3d:${view}:${session.scanVersion}:${model.entryScriptId ?? ''}`} model={model} state={viewState} input={`${session.scanVersion}:${store.scannedAt}:${model.entryScriptId ?? ''}`}
                   onCamera={graph3DCamera => updateView(view, { graph3DCamera })}
                   onUnavailable={() => { setUnavailable3D(true); updateView(view, { graphMode: '2d' }); }}
                   onSelectNode={selectNode} onSelectRegion={selectRegion} onSelectEdge={selectEdge} onClear={clearSelection}
@@ -396,7 +402,7 @@ function LegacyAnalyzerPage() {
               </Suspense>
               </AnalyzerRenderBoundary>
             ) : (
-              <AnalyzerGraphStage
+              <AnalyzerGraphStage controlsExtras={entryControl}
                 onMode={switchMode}
                 view={model}
                 isFullscreen={fullscreen.isFullscreen}
@@ -422,7 +428,7 @@ function LegacyAnalyzerPage() {
               />
             )}
             {detailOpen && (
-              <AnalyzerDetailPanel
+              <AnalyzerDetailPanel onLabelFocus={is3D ? setDetailLabelFocus : undefined}
                 spatialDetails={is3D}
                 store={store}
                 view={model}

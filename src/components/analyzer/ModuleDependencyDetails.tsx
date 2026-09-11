@@ -60,7 +60,7 @@ function Connections({ edges, incoming, view, onSelectNode, onFocusConnection }:
     const node = view.nodes.find(item => item.id === id);
     const relation = relations[0]!;
     return node && <li key={id} className="analyzer-module-connection-row">
-      <button type="button" className="analyzer-module-connection-name" onClick={() => onSelectNode(id, true)} title={String(node.metadata.modulePath ?? node.label)}>
+      <button type="button" className="analyzer-module-connection-name" data-analyzer-entity-id={id} onClick={() => onSelectNode(id, true)} title={String(node.metadata.modulePath ?? node.label)}>
         <strong>{node.label}</strong><small>{String(node.metadata.directoryPath ?? node.metadata.modulePath ?? '')}{relations.length > 1 ? ` · ${relations.length}件` : ''}</small>
       </button>
       {onFocusConnection && <button type="button" className="analyzer-module-connection-fit" onClick={() => onFocusConnection(relation.sourceId, relation.targetId)} aria-label={`${node.label}との両端を表示`} title="この依存の両端を表示">↔</button>}
