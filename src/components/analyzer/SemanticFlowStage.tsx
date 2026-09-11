@@ -3,8 +3,7 @@ import type { AnalyzerViewSession } from '../../analyzer/session';
 import type { SemanticEdge, SemanticGraph } from '../../analyzer/semantic/types';
 import { explorerRelations, type SemanticExplorerModel } from '../../analyzer/semantic/semanticExplorer';
 import { useSpatialFlowMotion, type SpatialParticleMode } from './useSpatialFlowMotion';
-import { SpatialParticleControl } from './SpatialParticleControl';
-import { AutoAggregationToggle } from './AutoAggregationPanel';
+import { AnalyzerGraphControls } from './AnalyzerGraphControls';
 import { SemanticFlow2D, type FlowCameraCommand, type SemanticFlowRenderProps } from './SemanticFlow2D';
 import { SemanticFlowLegend } from './SemanticFlowLegend';
 import { semanticFlowDirectionLanguage } from './semanticFlowLanguage';
@@ -96,23 +95,14 @@ export function SemanticFlowStage({ graph, explorer, nodeDisplays, navigation, m
   const cameraTitle = cameraApplicable ? undefined : 'この階層のブロックはスクロールで移動します';
   return <div ref={setElement} className="analyzer-graph-stage analyzer-spatial-graph-stage semantic-flow-stage" data-mode={mode} data-visit-id={navigation?.visitId}
     style={{ '--flow-controls-height': `${controlsHeight}px` } as CSSProperties}>
-    <div ref={controls} className="analyzer-stage-controls" aria-label="グラフ操作">
-      <div className="semantic-flow-mode" role="group" aria-label="表示モード"><button type="button" aria-pressed={mode === '2d'} onClick={() => onMode('2d')}>2D</button><button type="button" aria-pressed={mode === '3d'} onClick={() => onMode('3d')}>3D</button></div>
-      <button type="button" disabled={!cameraApplicable} onClick={() => run('fit')} title={cameraTitle ?? '現在の関係図全体を収める'}>Fit</button>
-      <button type="button" disabled={!cameraApplicable} onClick={() => run('reset')} title={cameraTitle ?? '現在の図のカメラを初期位置へ戻す'}>Reset</button>
-      <button type="button" disabled={!cameraApplicable} aria-label="Zoom in" title={cameraTitle} onClick={() => run('zoom-in')}>+</button><button type="button" disabled={!cameraApplicable} aria-label="Zoom out" title={cameraTitle} onClick={() => run('zoom-out')}>−</button>
-      <button type="button" disabled={!selectedIds.size && !selectedEdgeId} onClick={() => {
-        if (mode === '2d' && navigation && (!navigation.location.centerId || [...selectedIds].some(id => !localGraph.nodes.some(node => node.id === id))
-          || selectedEdgeId && !localGraph.edges.some(edge => edge.id === selectedEdgeId))) navigation.onRevealSelection();
+    <AnalyzerGraphControls elementRef={controls} mode={mode} onMode={onMode} cameraApplicable={cameraApplicable} cameraTitle={cameraTitle}
+      onFit={() => run('fit')} onReset={() => run('reset')} onZoomIn={() => run('zoom-in')} onZoomOut={() => run('zoom-out')}
+      canFocus={Boolean(selectedIds.size || selectedEdgeId)} onFocus={() => {
+        if (mode === '2d' && navigation && (!navigation.location.centerId || [...selectedIds].some(id => !localGraph.nodes.some(node => node.id === id)) || selectedEdgeId && !localGraph.edges.some(edge => edge.id === selectedEdgeId))) navigation.onRevealSelection();
         else run('focus', selectedEdgeId ? graph.edges.filter(edge => edge.id === selectedEdgeId).flatMap(edge => [edge.source, edge.target]) : [...selectedIds]);
-      }}>選択へ移動</button>
-      <SpatialParticleControl mode={flow.mode} onChange={flow.setMode} onOpen={() => setHelp(false)} />
-      {mode === '3d' && <button type="button" className="semantic-flow-bounds-toggle" aria-label="分類の囲い" aria-pressed={showGroupBounds} onClick={() => onGroupBounds?.(!showGroupBounds)}>分類の囲い：{showGroupBounds ? 'ON' : 'OFF'}</button>}
-      {mode === '3d' && <AutoAggregationToggle enabled={autoAggregation} onChange={enabled => onAutoAggregation?.(enabled)} />}
-      {architectureControls}
-      <button type="button" aria-label={isFullscreen ? '全画面を終了' : '全画面表示'} aria-pressed={isFullscreen} onClick={onFullscreen}>{isFullscreen ? '↙' : '⛶'}</button>
-      <button type="button" className="analyzer-help-button" aria-label="グラフ操作ヘルプ" aria-expanded={help} onClick={() => setHelp(!help)}>?</button>
-    </div>
+      }} particleMode={flow.mode} onParticleMode={flow.setMode} showGroupBounds={showGroupBounds} onGroupBounds={mode === '3d' ? onGroupBounds : undefined}
+      autoAggregation={autoAggregation} onAutoAggregation={mode === '3d' ? onAutoAggregation : undefined}
+      isFullscreen={isFullscreen} onFullscreen={onFullscreen} help={help} onHelp={setHelp}>{architectureControls}</AnalyzerGraphControls>
     {explorer && navigation && <div ref={navigationElement} className="semantic-explorer-navigation-position" style={{ top: controlsHeight + 24 }}>
       <SemanticExplorerNavigation explorer={explorer} navigation={navigation} mode={mode} graph={graph} localGraph={localGraph} selectedIds={selectedIds} selectedEdgeId={selectedEdgeId} hoverTarget={hoverTarget} onSelectEdge={selectEdge} relationHint={visibleRelation?.graph === graph ? visibleRelation.edge : undefined} />
     </div>}

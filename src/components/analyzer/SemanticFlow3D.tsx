@@ -1,3 +1,4 @@
+import { SpatialRelationLines } from './SpatialRelationLines';
 import { Component, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import { useDisposableFrame } from './useDisposableFrame';
@@ -26,6 +27,7 @@ import { semanticNodeDisplays } from './semanticFlowDisplay';
 import { registerCanvasDisposal, useCanvasDisposals } from './canvasDisposals';
 import './semantic-flow-disclosures.css';
 import './semantic-flow-3d-polish.css';
+import './spatial-label-direction.css';
 
 type CameraState = NonNullable<AnalyzerViewSession['semanticCamera']>;
 interface Props extends SemanticFlowRenderProps { explorer?: SemanticExplorerModel; direction?: 'both' | 'incoming' | 'outgoing'; camera?: CameraState; onCamera: (camera: CameraState) => void; onUnavailable: () => void; onFocusRegion?: (ids: string[]) => void }
@@ -106,28 +108,7 @@ function Scene({ graph: sourceGraph, renderGraph, explorer, nodeDisplays: displa
     return { object, geometry, material };
   }, [positions, selectedIds, selectedEdgeId, matchIds, connected, emphasis, gl, autoAggregation, explicitPathNodeIds, hoveredIds]);
   useEffect(() => () => { nodeAsset.geometry.dispose(); nodeAsset.material.dispose(); }, [nodeAsset]);
-  const edgeAsset = useMemo(() => {
-    const vertices: number[] = [], colors: number[] = [], arrowVertices: number[] = [], previous: number[] = [], corners: number[] = [], arrowColors: number[] = [];
-    for (const path of paths) {
-      const color = new THREE.Color(path.color).multiplyScalar(emphasis.edgeIds.size && !emphasis.edgeIds.has(path.edge.id) ? explicitPathEdgeIds?.has(path.edge.id) ? .7 : .18 : 1).toArray();
-      for (let index = 1; index < path.points.length; index++) {
-        const a = path.points[index - 1]!, b = path.points[index]!;
-        vertices.push(a.x, a.y, a.z, b.x, b.y, b.z); colors.push(...color, ...color);
-      }
-      const a = path.points.at(-2)!, b = path.points.at(-1)!;
-      for (const corner of [[0, 0], [-12, 5], [-12, -5]]) { arrowVertices.push(b.x, b.y, b.z); previous.push(a.x, a.y, a.z); corners.push(...corner); arrowColors.push(...color); }
-    }
-    const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3)); geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-    const material = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: .95, depthTest: false });
-    const object = new THREE.LineSegments(geometry, material); object.frustumCulled = false;
-    const arrowGeometry = new THREE.BufferGeometry(); arrowGeometry.setAttribute('position', new THREE.Float32BufferAttribute(arrowVertices, 3)); arrowGeometry.setAttribute('previous', new THREE.Float32BufferAttribute(previous, 3)); arrowGeometry.setAttribute('corner', new THREE.Float32BufferAttribute(corners, 2)); arrowGeometry.setAttribute('color', new THREE.Float32BufferAttribute(arrowColors, 3));
-    const arrowMaterial = new THREE.ShaderMaterial({ vertexColors: true, depthTest: false, side: THREE.DoubleSide, uniforms: { viewport: { value: new THREE.Vector2(1, 1) } },
-      vertexShader: 'attribute vec3 previous; attribute vec2 corner; uniform vec2 viewport; varying vec3 tint; void main(){tint=color; vec4 p=projectionMatrix*modelViewMatrix*vec4(position,1.); vec4 a=projectionMatrix*modelViewMatrix*vec4(previous,1.); vec2 d=(p.xy/p.w-a.xy/a.w)*viewport; d=length(d)>.0001?normalize(d):vec2(1.,0.); p.xy+=(d*corner.x+vec2(-d.y,d.x)*corner.y)*2./viewport*p.w; gl_Position=p;}',
-      fragmentShader: 'varying vec3 tint; void main(){gl_FragColor=vec4(tint,1.);\n#include <colorspace_fragment>\n}' });
-    const arrows = new THREE.Mesh(arrowGeometry, arrowMaterial); arrows.frustumCulled = false; arrows.renderOrder = 2;
-    return { object, geometry, material, arrows, arrowGeometry, arrowMaterial };
-  }, [paths, emphasis, explicitPathEdgeIds]);
-  useEffect(() => () => { edgeAsset.geometry.dispose(); edgeAsset.material.dispose(); edgeAsset.arrowGeometry.dispose(); edgeAsset.arrowMaterial.dispose(); }, [edgeAsset]);
+  const linePaths = useMemo(() => paths.map(path => ({ id: path.edge.id, points: path.points, color: path.color, intensity: emphasis.edgeIds.size && !emphasis.edgeIds.has(path.edge.id) ? explicitPathEdgeIds?.has(path.edge.id) ? .7 : .18 : 1 })), [paths, emphasis, explicitPathEdgeIds]);
   const boundaryAsset = useMemo(() => {
     const vertices = regions.flatMap(region => semanticFlowRegionWire(region).flatMap(point => [point.x, point.y, point.z]));
     const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
@@ -235,7 +216,6 @@ function Scene({ graph: sourceGraph, renderGraph, explorer, nodeDisplays: displa
   useDisposableFrame((_, delta) => {
     const zoom = (camera as THREE.OrthographicCamera).zoom;
     nodeAsset.material.uniforms.zoom!.value = zoom;
-    (edgeAsset.arrowMaterial.uniforms.viewport!.value as THREE.Vector2).set(size.width, size.height);
     cameraRef.current = { scale: zoom, viewportWidth: size.width, viewportHeight: size.height };
     if (labelDirty.current) {
       const labels = projectSemanticFlowLabels(camera, size, zoom, labelOrder, selectedIds, matchIds, { quietBackground: autoAggregation && Boolean(selectedIds.size || selectedEdgeId || explicitPathNodeIds?.size), regions, relatedIds: connected, priorityIds, hoveredIds, overlayTop, previous: previousLabels.current, obstacles: labelObstacles, roles, relationKinds, displays, view: sourceGraph.view, emphasisIds: emphasis.nodeIds, scopeActiveIds });
@@ -246,7 +226,7 @@ function Scene({ graph: sourceGraph, renderGraph, explorer, nodeDisplays: displa
     }
     if (stateRef.current.active) { stateRef.current.distance += Math.min(delta, SPATIAL_FLOW_MAX_FRAME_SECONDS) * SPATIAL_FLOW_SPEED; invalidate(); }
   });
-  return <><color attach="background" args={['#050c09']} />{showGroupBounds && <primitive object={boundaryAsset.object} />}<primitive object={edgeAsset.object} /><primitive object={edgeAsset.arrows} /><primitive object={nodeAsset.object} />
+  return <><color attach="background" args={['#050c09']} />{showGroupBounds && <primitive object={boundaryAsset.object} />}<SpatialRelationLines paths={linePaths} /><primitive object={nodeAsset.object} />
     <SpatialFlowParticles paths={flowPaths} stateRef={stateRef} cameraRef={cameraRef} active={motion.enabled && motion.visible} />
   </>;
 }

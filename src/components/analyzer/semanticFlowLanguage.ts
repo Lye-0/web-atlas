@@ -1,9 +1,25 @@
 import { confidenceLabels, type SemanticNode, type SemanticRelationSource, type SemanticViewId } from '../../analyzer/semantic/types';
 import { architectureRelationLabel } from '../../analyzer/semantic/architectureRelations';
 
-export type SemanticFlowLanguageView = SemanticViewId | 'module-dependency';
+export type SemanticFlowLanguageView = SemanticViewId | 'architecture' | 'workspace' | 'command' | 'dependencies' | 'module-dependency';
 
 export function semanticFlowDirectionLanguage(view: SemanticFlowLanguageView) {
+  if (view === 'architecture') return {
+    incoming: '所属元', outgoing: '包含先', caption: 'Scope包含と技術所属。技術選択時は所属Scopeの関係を強調',
+    help: 'Scopeまたは技術を選ぶと、その所属に対応する既存の包含関係を強調します。技術ごとの架空の線は追加しません。包含は実行順を示しません。',
+  };
+  if (view === 'workspace') return {
+    incoming: '設定・宣言元', outgoing: '宣言・一致先', caption: '矢印は設定、パターン宣言、package一致、包含の関係',
+    help: '青は選択対象からの宣言・一致先、橙は設定・宣言元です。種類と根拠は元の関係詳細で確認できます。',
+  };
+  if (view === 'command') return {
+    incoming: '呼び出し元', outgoing: '展開・呼び出し先', caption: '矢印・粒子はscript解決・コマンド展開の関係',
+    help: '青は選択対象からの展開・呼び出し先、橙は呼び出し元です。閉じた枝では元の関係をsummaryへまとめます。粒子は実際の実行を示しません。',
+  };
+  if (view === 'dependencies') return {
+    incoming: '利用元', outgoing: '依存先', caption: '矢印・粒子は直接依存の宣言元から依存先へ',
+    help: '青は選択対象の依存先、橙は選択対象を利用する元です。version指定と宣言種類は元Evidenceで確認できます。',
+  };
   if (view === 'architecture-map') return {
     incoming: '関係元', outgoing: '関係先', caption: '矢印は参照・要求・設定の向き。種類は線の詳細で確認',
     help: '青は選択対象から出る関係、橙は入る関係です。宣言依存、コード参照、呼び出し、通信要求、配置設定を区別します。粒子は方向の補助表示です。設定は稼働状況を示さず、集約された連続線は一連の実行を証明しません。',

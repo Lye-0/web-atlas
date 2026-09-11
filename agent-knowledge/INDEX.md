@@ -111,10 +111,26 @@
 ### 設定共有と粒子の描画仕様を別々に検証する
 - id: `rm-20260910-particle-renderer-contract`
 - type: `failure`
-- maturity: `candidate`
+- maturity: `reused`
 - tags: `particles`, `presentation`, `shared-state`, `animation`
 - files: `src/analyzer/flowParticleStyle.ts`, `src/analyzer/spatialFlow.ts`, `src/components/analyzer/SvgFlowParticles.tsx` …
 - memory: `agent-knowledge/entries/2026-09-10-particle-renderer-contract-d2916e.md`
+
+### ホバーの再配置ループは粒子の停止として現れる
+- id: `rm-20260911-hover-label-particle-rebuild`
+- type: `failure`
+- maturity: `candidate`
+- tags: `hover`, `label`, `particles`, `animation`
+- files: `src/components/analyzer/AnalyzerGraph3DStage.tsx`, `src/components/analyzer/SpatialFlowParticles.tsx`, `docs/technical/analyzer-particle-unification.md`
+- memory: `agent-knowledge/entries/2026-09-11-hover-label-particle-rebuild-502194.md`
+
+### R3Fのfallback mountをWebGL失敗判定に使わない
+- id: `rm-20260911-r3f-renderer-initialization-failure`
+- type: `failure`
+- maturity: `candidate`
+- tags: `r3f`, `webgl`, `initialization`, `fallback`
+- files: `src/components/analyzer/recoverableWebGLRenderer.ts`, `src/components/analyzer/recoverableWebGLRenderer.test.ts`, `src/components/analyzer/AnalyzerGraph3DStage.tsx` …
+- memory: `agent-knowledge/entries/2026-09-11-r3f-renderer-initialization-failure-38dfb1.md`
 
 ## analyzer-session
 

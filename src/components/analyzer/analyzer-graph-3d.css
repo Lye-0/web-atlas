@@ -1,0 +1,24 @@
+.analyzer-graph-3d { position: relative; min-width: 0; min-height: 660px; height: min(78vh, 980px); overflow: hidden; background: #050c09; }
+.analyzer-graph-3d > div:has(> canvas) { position: absolute !important; inset: 0; }
+.analyzer-3d-overlay, .analyzer-3d-labels { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: hidden; }
+.analyzer-3d-overlay { z-index: 1; }
+.analyzer-3d-overlay text { font-size: 10px; paint-order: stroke; stroke: #0c1915; stroke-width: 4px; }
+.analyzer-3d-edge-hit { pointer-events: stroke; cursor: pointer; }
+.analyzer-3d-labels { z-index: 2; }
+.analyzer-3d-panel, .analyzer-3d-label, .analyzer-3d-hit, .analyzer-3d-region { position: absolute; pointer-events: auto; cursor: pointer; }
+.analyzer-3d-panel { width: 166px; height: 54px; padding: 7px 10px; border: 1px solid #58796b; border-radius: 8px; color: #d3e9df; background: #142b24f5; text-align: left; box-shadow: 0 3px 9px #0004; }
+.analyzer-3d-panel strong, .analyzer-3d-panel small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.analyzer-3d-panel strong { font-size: 12px; font-weight: 600; }
+.analyzer-3d-panel small { font-size: 10px; color: #90b3a2; margin-top: 4px; }
+.analyzer-3d-label { width: 146px; height: 24px; padding: 2px 5px; text-align: left; color: #c7e0d4; background: #10231de8; border: 1px solid transparent; border-radius: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+.analyzer-3d-hit { width: 20px; height: 20px; border-radius: 50%; border: 1px solid transparent; background: transparent; }
+.analyzer-3d-hit:hover, .analyzer-3d-hit:focus-visible { border-color: #c2f3df; }
+.analyzer-3d-labels .is-selected { border-color: #bdf4db; box-shadow: 0 0 0 2px #9ee6c533; }
+.analyzer-3d-labels .is-match { color: #f4d28b; }
+.analyzer-3d-region { transform: translate(-50%, -100%); max-width: 180px; padding: 3px 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: #132921d9; color: #91b5a3; border: 1px solid #426658; border-radius: 4px; font-size: 10px; }
+.analyzer-3d-inspection { position: absolute; z-index: 6; left: 12px; bottom: calc(var(--analyzer-legend-height, 72px) + 24px); max-width: min(420px, calc(100% - 24px)); max-height: 48%; overflow: auto; background: #10221eef; color: #bcd2c6; border-radius: 6px; font-size: 11px; }
+.analyzer-3d-inspection > details { padding: 6px 9px; }
+.analyzer-3d-connection-notice { padding: 6px 9px; margin: 0; max-width: 350px; }
+.analyzer-3d-inspection ul { padding: 4px; list-style: none; }
+.analyzer-3d-inspection li { display: flex; gap: 5px; padding: 2px; }
+@media (max-width: 700px) { .analyzer-graph-3d { min-height: 620px; } }

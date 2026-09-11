@@ -18,7 +18,11 @@
 
 - タブ1〜4と6〜10の2D：共通の`SvgFlowParticles`。既存SVG経路をサンプルし、共通プロファイルから作る粒子画像を曲線に沿って移動する。経路のサンプルはキャッシュし、カメラやホバーだけで再計算しない。粒子を描くためのThree.jsや3Dレイアウトは読み込まない。
 - タブ5と6〜10の3D：共通の`SpatialFlowParticles`。同じプロファイルのシェーダーと固定間隔を使用する。タブ5も速度のズーム補正やモード別減速を行わず、同じ距離時計を使用する。
-- タブ1〜4は選択に関係する前景の線を粒子の対象とし、所属関係の`contains`も含める。Stack MapのProject→領域、WorkspaceのProject→Root Packageにも同じ粒子を表示する。
+- タブ1〜4は2D／3Dとも選択に関係する前景の線を粒子の対象とし、所属関係の`contains`も含める。Stack MapのProject→領域、WorkspaceのProject→Root Packageにも同じ粒子を表示する。
+
+2026-09-11追加：タブ1〜5の3D追加時に`contains`除外が再発していた。実WebGLでProject選択時のStack Mapが粒子経路0本になることを再現し、選択された前景線を関係種別によらず粒子へ渡すよう修正。`AnalyzerGraph3DStage.test.tsx`でProject／Scope／Root Package選択と選択解除を検証する。実ブラウザでは2入力×5タブで通常・控えめの距離uniformの増加、OFF／非表示でのフレーム停止、再表示と2D往復後の移動再開を確認した。[実測値](../../reports/unified-3d-20260911/particles-after.json)。
+
+同じ確認で、Moduleの粒子メニューを閉じた後にラベルがポインターの下で再配置を繰り返すケースを再現した。控えめで距離uniformが0のまま、OFFでも350msに22フレーム更新されていた。ホバーラベルの位置保持により、同じ操作・ポインター位置で控えめの移動とOFF時0フレームを確認した。描画フレーム数だけでは移動の証明にならないため、粒子materialの距離と画面も確認する。[再現確認](../../reports/unified-3d-20260911/particles-debug.json)。
 
 実ブラウザで全15表示モードを確認した初回検証では、Stack Mapの粒子存在チェックが除外され、Workspaceもuses-configのみを選択していたため、containsの除外漏れを検出できなかった。修正後は固定入力git-linesのStack Mapの3本とWorkspaceのProject→Root Packageについて、通常／控えめの粒子の存在・移動・粒数、オフでの消去を12ケースで確認した。SVGは通常`ceil(経路長/50)`、控えめ`ceil(経路長/100)`となる。記録と再現スクリプトは`.cache/particle-unify/`に保存する。
 

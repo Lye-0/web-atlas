@@ -8,6 +8,8 @@ Analyzerは、ブラウザでユーザーが選択したローカルProject Fold
 
 ## Pipeline
 
+タブ1〜5の任意切り替え3D、元データと表示の境界、モード別カメラ・手動開閉は[2D／3Dの技術仕様](analyzer-tabs-1-5-3d.md)を参照。既存2Dは初期表示として維持し、3Dは遅延読み込みする。
+
 ```text
 Project Folder
   -> fileDiscovery

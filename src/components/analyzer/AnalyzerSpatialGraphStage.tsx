@@ -1,5 +1,6 @@
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
+import { recoverableWebGLRenderer } from './recoverableWebGLRenderer';
 import * as THREE from 'three';
 import {
   ANALYZER_MODULE_NODE_WIDTH,
@@ -63,15 +64,16 @@ import { projectSpatialHeadings } from '../../analyzer/spatialHeadings';
 import { SPATIAL_FLOW_SPEED, type SpatialFlowState } from '../../analyzer/spatialFlow';
 import { useSpatialFlowMotion } from './useSpatialFlowMotion';
 import { useAnalyzerControlInset } from './useAnalyzerControlInset';
-import { SpatialParticleControl } from './SpatialParticleControl';
+import { AnalyzerGraphControls } from './AnalyzerGraphControls';
 import { SemanticFlowLegend } from './SemanticFlowLegend';
 import { semanticFlowDirectionLanguage } from './semanticFlowLanguage';
 import { prepareAutoAggregation, projectAutoAggregation, projectAggregationRelations, stableAggregationRepresentation, type AutoAggregationResult } from '../../analyzer/autoAggregation';
 import { moduleAggregateRegions, moduleAggregationInput, moduleAggregationProjection, moduleManualGroups, moduleRelationEvidenceCounts } from '../../analyzer/moduleAutoAggregation';
 import type { AnalyzerViewSession } from '../../analyzer/session';
-import { AutoAggregationPanel, AutoAggregationToggle, type AggregationInspection, type AggregationGroupMode } from './AutoAggregationPanel';
+import { AutoAggregationPanel, type AggregationInspection, type AggregationGroupMode } from './AutoAggregationPanel';
 
 interface AnalyzerSpatialGraphStageProps {
+  onMode?: (mode: '2d' | '3d') => void;
   view: AnalyzerViewModel;
   selectedNodeId?: string;
   selectedRegionId?: string;
@@ -229,6 +231,7 @@ function projectedEndpointBounds(
 }
 
 export function AnalyzerSpatialGraphStage({
+  onMode,
   view,
   selectedNodeId,
   selectedRegionId,
@@ -283,6 +286,7 @@ export function AnalyzerSpatialGraphStage({
     ANALYZER_SPATIAL_YAW_DEGREES,
   ));
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
+  const [webglUnavailable, setWebglUnavailable] = useState(false);
   const [stageElement, setStageElement] = useState<HTMLDivElement | null>(null);
   const flow = useSpatialFlowMotion(stageElement);
   useAnalyzerControlInset(stageElement);
@@ -914,13 +918,9 @@ export function AnalyzerSpatialGraphStage({
       aria-label="Module Dependency spatial graph. Drag to pan and use the wheel to zoom."
       data-display-point-count={aggregation.counts.representations} data-node-count={totalModuleCount}
     >
-      <div className="analyzer-stage-controls" aria-label="グラフ操作">
-        <button type="button" onClick={fitCamera} title="現在表示しているMap全体を表示">Fit</button>
-        <button type="button" onClick={resetTransform} title="現在の図のカメラを初期位置へ戻す">Reset</button>
-        <button type="button" onClick={() => changeZoom(1.14)} aria-label="Zoom in">+</button>
-        <button type="button" onClick={() => changeZoom(0.88)} aria-label="Zoom out">−</button>
-        <span ref={scaleLabelRef}>{Math.round(settledTransform.scale * 100)}%</span>
-        <button type="button" disabled={!selectedNodeId && !selectedRegionId && !selectedEdgeId} onClick={() => {
+      <AnalyzerGraphControls mode="2d" onMode={onMode} onFit={fitCamera} onReset={resetTransform}
+        onZoomIn={() => changeZoom(1.14)} onZoomOut={() => changeZoom(0.88)} zoomLabel={Math.round(settledTransform.scale * 100) + '%'} zoomLabelRef={scaleLabelRef}
+        canFocus={Boolean(selectedNodeId || selectedRegionId || selectedEdgeId)} onFocus={() => {
           const edge = view.edges.find(edge => edge.id === selectedEdgeId);
           const ids = edge ? [edge.sourceId, edge.targetId] : [selectedNodeId ?? selectedRegionId];
           const endpoints = ids.flatMap(id => { const endpoint = id ? positionedById.get(id) : undefined; return endpoint ? [endpoint] : []; });
@@ -929,13 +929,9 @@ export function AnalyzerSpatialGraphStage({
             commitCamera(fitSpatialProjectedBounds([...endpoints.flatMap(endpoint => regionRectCorners(endpointWorldRect(endpoint))), ...elevated], viewport.width, viewport.height, ANALYZER_SPATIAL_FIT_PADDING, ANALYZER_SPATIAL_TILT_DEGREES, worldBounds));
           }
           else if (endpoints[0]) { const endpoint = endpoints[0]; const anchor = isRegionEndpoint(endpoint) ? regionHeadingWorldAnchor(endpoint, endpointElevation(endpoint)) : moduleWorldAnchor(endpoint, endpointElevation(endpoint)); commitCamera(focusSpatialCamera(anchor, settledTransform, viewport.width, viewport.height, worldBounds)); }
-        }}>選択へ移動</button>
-        <SpatialParticleControl mode={flow.mode} onChange={flow.setMode} onOpen={() => setShowHelp(false)} />
-        <AutoAggregationToggle enabled={autoAggregation} onChange={enabled => onAutoAggregation?.(enabled)} />
-        <button type="button" aria-label="分類の囲い" aria-pressed={showGroupBounds} onClick={() => onGroupBounds?.(!showGroupBounds)}>分類の囲い：{showGroupBounds ? 'ON' : 'OFF'}</button>
-        {onToggleFullscreen && <button type="button" onClick={onToggleFullscreen} aria-pressed={isFullscreen} aria-label={isFullscreen ? '全画面を終了' : '全画面表示'} title={isFullscreen ? '全画面を終了（Esc）' : '全画面表示'}>{isFullscreen ? '↙' : '⛶'}</button>}
-        <button type="button" className="analyzer-help-button" onClick={() => setShowHelp((current) => !current)} aria-expanded={showHelp} aria-controls="analyzer-spatial-help" aria-label="グラフ操作ヘルプ">?</button>
-      </div>
+        }}
+        particleMode={flow.mode} onParticleMode={flow.setMode} showGroupBounds={showGroupBounds} onGroupBounds={onGroupBounds} autoAggregation={autoAggregation} onAutoAggregation={onAutoAggregation}
+        isFullscreen={isFullscreen} onFullscreen={onToggleFullscreen} help={showHelp} onHelp={setShowHelp} />
       {showHelp && (
         <div id="analyzer-spatial-help" className="analyzer-stage-help" role="dialog" aria-label="グラフ操作ヘルプ">
           <strong>Spatial Atlas</strong>
@@ -947,7 +943,9 @@ export function AnalyzerSpatialGraphStage({
       {view.nodes.length > 0 && view.edges.length === 0 && (
         <div className="analyzer-spatial-status" role="status">Modules found, but no local module dependencies were resolved.</div>
       )}
-      {view.nodes.length === 0 ? (
+      {webglUnavailable ? (
+        <div className="analyzer-graph-empty" role="alert"><p>WebGLを利用できないためModule地図を描画できません。検索と詳細から対象を確認できます。</p><button type="button" onClick={() => setWebglUnavailable(false)}>描画を再試行</button></div>
+      ) : view.nodes.length === 0 ? (
         <div className="analyzer-graph-empty">No supported source modules found.</div>
       ) : (
         <>
@@ -957,8 +955,8 @@ export function AnalyzerSpatialGraphStage({
             camera={{ position: [0, 0, 800], zoom: 1, near: -2000, far: 2000 }}
             dpr={[1, 1.5]}
             frameloop="demand"
-            gl={{ alpha: false, antialias: true, powerPreference: 'high-performance' }}
-            fallback={<div className="analyzer-graph-empty">Three.js spatial rendering is unavailable.</div>}
+            gl={defaults => recoverableWebGLRenderer({ ...defaults, alpha: false, antialias: true, powerPreference: 'high-performance' }, () => setWebglUnavailable(true))}
+            fallback={<p>WebGLを利用できません。</p>}
             style={{ pointerEvents: 'none' }}
           >
             <SpatialCameraBinder modelRef={liveCameraRef} invalidateOut={invalidateOutRef} />

@@ -6,12 +6,13 @@ import { stackPath } from '../../utils/routes';
 import { analyzerEntitySearchDocument, matchAnalyzerSearch } from '../../analyzer/search';
 import { analyzerDirectionColors, analyzerEdgeDirection } from '../../analyzer/edgeDirection';
 import { useSpatialFlowMotion } from './useSpatialFlowMotion';
-import { SpatialParticleControl } from './SpatialParticleControl';
+import { AnalyzerGraphControls } from './AnalyzerGraphControls';
 import { SvgFlowParticles } from './SvgFlowParticles';
 import { useAnalyzerControlInset } from './useAnalyzerControlInset';
 import { EvidencePreview } from './EvidenceCodeBlock';
 
 interface AnalyzerGraphStageProps {
+  onMode?: (mode: '2d' | '3d') => void;
   view: AnalyzerViewModel;
   selectedNodeId?: string;
   selectedRegionId?: string;
@@ -113,6 +114,7 @@ function evidenceHint(node: AnalyzerViewModel['nodes'][number], view: AnalyzerVi
 }
 
 export function AnalyzerGraphStage({
+  onMode,
   view,
   selectedNodeId,
   selectedRegionId,
@@ -668,17 +670,11 @@ export function AnalyzerGraphStage({
       tabIndex={0}
       aria-label={`${view.view} graph stage. Drag to pan and use the wheel to zoom. Semantic zoom: ${zoomLevel}.`}
     >
-      <div className="analyzer-stage-controls" aria-label="グラフ操作">
-        <button type="button" onClick={fit} title="現在表示している図全体を収める">Fit</button>
-        <button type="button" onClick={resetTransform} title="現在の図のカメラを初期位置へ戻す">Reset</button>
-        <button type="button" onClick={() => changeZoom(1.14)} aria-label="Zoom in" title="拡大">+</button>
-        <button type="button" onClick={() => changeZoom(0.88)} aria-label="Zoom out" title="縮小">−</button>
-        <span>{Math.round(transform.scale * 100)}%</span>
-        <button type="button" disabled={!selectedPosition} onClick={focusSelection}>選択へ移動</button>
-        <SpatialParticleControl mode={flow.mode} onChange={flow.setMode} onOpen={() => setShowHelp(false)} />
-        {onToggleFullscreen && <button type="button" onClick={onToggleFullscreen} aria-pressed={isFullscreen} aria-label={isFullscreen ? '全画面を終了' : '全画面表示'}>{isFullscreen ? '↙' : '⛶'}</button> }
-        <button type="button" className="analyzer-help-button" onClick={() => setShowHelp((current) => !current)} aria-expanded={showHelp} aria-controls="analyzer-graph-help" aria-label="グラフ操作ヘルプ">?</button>
-      </div>
+      <AnalyzerGraphControls mode="2d" onMode={onMode} onFit={fit} onReset={resetTransform}
+        onZoomIn={() => changeZoom(1.14)} onZoomOut={() => changeZoom(0.88)} zoomLabel={Math.round(transform.scale * 100) + '%'}
+        canFocus={Boolean(selectedPosition)} onFocus={focusSelection}
+        particleMode={flow.mode} onParticleMode={flow.setMode}
+        isFullscreen={isFullscreen} onFullscreen={onToggleFullscreen} help={showHelp} onHelp={setShowHelp} />
       {showHelp && (
         <div id="analyzer-graph-help" className="analyzer-stage-help" role="dialog" aria-label="グラフ操作ヘルプ">
           <strong>グラフ操作</strong>

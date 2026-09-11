@@ -3,9 +3,9 @@ id: rm-20260910-particle-renderer-contract
 topic: analyzer-rendering
 type: failure
 status: active
-maturity: candidate
+maturity: reused
 created: 2026-09-10
-last_verified: 2026-09-10
+last_verified: 2026-09-11
 source_commit: "bf7c4392d67d1b727967d8d43623b46db9a34e7e"
 related_files:
   - src/analyzer/flowParticleStyle.ts
@@ -13,6 +13,8 @@ related_files:
   - src/components/analyzer/SvgFlowParticles.tsx
   - src/components/analyzer/SpatialFlowParticles.tsx
   - src/components/analyzer/AnalyzerSpatialGraphStage.tsx
+  - src/components/analyzer/AnalyzerGraph3DStage.tsx
+  - src/components/analyzer/AnalyzerGraph3DStage.test.tsx
   - docs/technical/analyzer-particle-unification.md
 tags:
   - particles
@@ -44,6 +46,7 @@ promoted_to: null
 - Shared GPU spacingは常に50。SVGも同じ曲線長50単位ごとの配分と65単位/秒を使う。
 - Bの速度比較integration testは、reduced変更でloopを停止・再起動するeffectを検出した。lifecycleとreduced更新を分離して解消した。
 - 未コミット実装の全15表示をEdgeで確認。詳細と確認範囲は技術ドキュメントに記録した。
+- 2026-09-11、追加したタブ1〜5の3Dで同じcontains除外が再発。Project選択のStack MapがGPU粒子経路0本となる実測から確認した。関係線の直接選択だけを検証すると除外の例外に入って見逃すため、元Node／Scope選択で粒子へ渡る入力をcomponent testで検証する。修正後は2入力×5タブで通常／控えめの移動とOFF・非表示からの再開、2D往復後の移動を実WebGLで確認した。
 
 ## Verification
 

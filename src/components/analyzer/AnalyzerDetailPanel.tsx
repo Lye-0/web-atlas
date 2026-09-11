@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useState } from 'react';
 import { evidenceRangeLabel, analyzerRegionParentId, analyzerSummaryExpanded, analyzerSummarySubtitle, displayDictionaryStack, factDictionaryStackId, factForNode, moduleIdForPath, nodeTypeLabels, relationLabelForNode } from '../../analyzer';
 import type { AnalyzerProjectStore, AnalyzerSemanticRegion, AnalyzerViewEdge, AnalyzerViewModel, AnalyzerViewNode } from '../../analyzer';
 import { stackPath } from '../../utils/routes';
@@ -6,6 +7,7 @@ import { EvidenceCodeBlock } from './EvidenceCodeBlock';
 import { ModuleDependencyDetails } from './ModuleDependencyDetails';
 
 interface AnalyzerDetailPanelProps {
+  spatialDetails?: boolean;
   store: AnalyzerProjectStore;
   view: AnalyzerViewModel;
   selectedNodeId?: string;
@@ -559,13 +561,20 @@ function metadataStringFromEdge(edge: AnalyzerViewEdge, key: string): string | u
   return typeof value === 'string' ? value : undefined;
 }
 
-export function AnalyzerDetailPanel({ store, view, selectedNodeId, selectedRegionId, selectedEdgeId, expandedPresentationIds, onSelectNode, onSelectRegion, onTogglePresentation, onClose, onFocusConnection }: AnalyzerDetailPanelProps) {
+function CommandOriginal({ node, store }: { node: AnalyzerViewNode; store: AnalyzerProjectStore }) {
+  const fact = factForNode(store, node), [status, setStatus] = useState('');
+  const command = fact && (fact.kind === 'command' || fact.kind === 'package-script') ? fact.command : typeof node.metadata.command === 'string' ? node.metadata.command : node.label;
+  return <section className="analyzer-detail-section"><h3>Command 原文</h3><pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{command}</pre><button type="button" onClick={() => { navigator.clipboard.writeText(command).then(() => setStatus('コピーしました'), () => setStatus('コピーできませんでした。原文を選択してコピーできます。')); }}>コマンドをコピー</button><span role="status">{status}</span></section>;
+}
+
+export function AnalyzerDetailPanel({ store, view, selectedNodeId, selectedRegionId, selectedEdgeId, expandedPresentationIds, onSelectNode, onSelectRegion, onTogglePresentation, onClose, onFocusConnection, spatialDetails }: AnalyzerDetailPanelProps) {
   const node = selectedNodeId ? view.nodes.find((candidate) => candidate.id === selectedNodeId) : undefined;
   const region = selectedRegionId ? view.regions?.find((candidate) => candidate.id === selectedRegionId) : undefined;
   const edge = selectedEdgeId ? view.edges.find((candidate) => candidate.id === selectedEdgeId) : undefined;
   if (view.view === 'module-dependency' && (node || region || edge)) {
     return <aside key={node?.id ?? region?.id ?? edge?.id} className="analyzer-detail-panel is-module-detail" aria-label="Analyzer detail panel">
       <ModuleDependencyDetails key={node?.id ?? region?.id ?? edge?.id} node={node} region={region} edge={edge} view={view} store={store}
+        showDirectoryChain={spatialDetails}
         onSelectNode={onSelectNode} onSelectRegion={onSelectRegion} onFocusConnection={onFocusConnection} onClose={onClose}/>
     </aside>;
   }
@@ -586,6 +595,7 @@ export function AnalyzerDetailPanel({ store, view, selectedNodeId, selectedRegio
             <button type="button" className="analyzer-detail-close" onClick={onClose} aria-label="詳細を閉じる">閉じる</button>
           </div>
           <NodeDetails onFocusConnection={onFocusConnection} node={node} view={view} store={store} expandedPresentationIds={expandedPresentationIds} onSelectNode={onSelectNode} onSelectRegion={onSelectRegion} onTogglePresentation={onTogglePresentation} />
+          {spatialDetails && view.view === 'command' && node.presentation?.role !== 'summary' && (node.type === 'command' || node.type === 'package-script') && <CommandOriginal key={node.id} node={node} store={store} />}
         </>
       ) : region ? (
         <>

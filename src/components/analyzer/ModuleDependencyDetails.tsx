@@ -4,6 +4,7 @@ import type { AnalyzerProjectStore, AnalyzerSemanticRegion, AnalyzerViewEdge, An
 import { EvidenceCodeBlock } from './EvidenceCodeBlock';
 
 interface Props {
+  showDirectoryChain?: boolean;
   store: AnalyzerProjectStore;
   view: AnalyzerViewModel;
   node?: AnalyzerViewNode;
@@ -74,7 +75,11 @@ function Auxiliary({ metadata, ids, view, store }: { metadata: AnalyzerViewNode[
   </>;
 }
 
-export function ModuleDependencyDetails({ node, region, edge, view, store, onSelectNode, onSelectRegion, onFocusConnection, onClose }: Props) {
+export function ModuleDependencyDetails({ node, region, edge, view, store, onSelectNode, onSelectRegion, onFocusConnection, onClose, showDirectoryChain }: Props) {
+  const [directoryFactId, setDirectoryFactId] = useState<string>();
+  const chainPaths = region?.metadata.compressedPaths;
+  const chain = showDirectoryChain && Array.isArray(chainPaths) ? chainPaths.flatMap(path => store.facts.filter(fact => fact.kind === 'module-directory' && fact.path === path)) : [];
+  const directoryFact = chain.find(fact => fact.id === directoryFactId);
   const title = node?.label ?? region?.label ?? 'Module dependency';
   const path = node?.metadata.modulePath ?? region?.metadata.directoryPath ?? region?.subtitle;
   const focus = node ? () => onSelectNode(node.id, true) : region ? () => onSelectRegion?.(region.id, true) : undefined;
@@ -122,6 +127,7 @@ export function ModuleDependencyDetails({ node, region, edge, view, store, onSel
         <Connections edges={incoming} incoming view={view} onSelectNode={onSelectNode} onFocusConnection={node ? onFocusConnection : undefined}/>
       </Section>
       {region && <>
+        {chain.length > 1 && <Section title="圧縮されたDirectory階層" count={chain.length}><p>図では単一の囲いとして表示しています。各Directoryの元のパスとIDを確認できます。</p><ul>{chain.map(fact => <li key={fact.id}><button type="button" aria-pressed={directoryFactId === fact.id} onClick={() => setDirectoryFactId(fact.id)}>{fact.kind === 'module-directory' ? fact.path : fact.label}</button></li>)}</ul>{directoryFact?.kind === 'module-directory' && <Info entries={[["Directory ID", directoryFact.id], ['Path', directoryFact.path], ['Parent ID', directoryFact.parentDirectoryId], ['Direct files', directoryFact.moduleIds.length], ['Child directories', directoryFact.childDirectoryIds.length]]}/>}</Section>}
         <Section title="領域内の依存" count={internal.length}><p className="analyzer-muted-copy">この領域内のファイル同士に{internal.length}件の依存があります。</p></Section>
         <Section title="含まれるファイル" count={contained.length}><ExpandableList items={contained} render={item => <li key={item.id}><button type="button" className="analyzer-module-connection-name" onClick={() => onSelectNode(item.id,true)}><strong>{item.label}</strong><small>{String(item.metadata.modulePath ?? '')}</small></button></li>}/></Section>
         {directories.length > 0 && <Section title="子Directory" count={directories.length}><ExpandableList items={directories} render={item => <li key={item.id}><button type="button" className="analyzer-module-connection-name" onClick={() => onSelectRegion?.(item.id,true)}>{item.label}</button></li>}/></Section>}

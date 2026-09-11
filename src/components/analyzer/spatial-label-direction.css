@@ -1,0 +1,3 @@
+:is(.semantic-flow-3d-labels, .analyzer-3d-labels) button[data-flow-role='outgoing'] { border-left: 3px solid #82c6e2; }
+:is(.semantic-flow-3d-labels, .analyzer-3d-labels) button[data-flow-role='incoming'] { border-left: 3px solid #dfb785; }
+:is(.semantic-flow-3d-labels, .analyzer-3d-labels) button[data-flow-role='both'] { border-left: 3px solid #dfb785; border-right: 3px solid #82c6e2; }

@@ -1,0 +1,11 @@
+.analyzer-graph-stage .analyzer-stage-controls.analyzer-graph-controls { z-index:5; max-width:calc(100% - 24px); flex-wrap:wrap; justify-content:flex-end; }
+.analyzer-graph-controls button { min-height:32px; cursor:pointer; }
+.analyzer-graph-controls button:disabled { opacity:.4; cursor:default; }
+.semantic-flow-mode { display:flex; padding:2px; border:1px solid var(--line); border-radius:5px; gap:2px; }
+.semantic-flow-mode button { border-color:transparent; }
+.semantic-flow-mode button[aria-pressed=true] { border-color:var(--accent); color:var(--accent); background:#273e32; }
+@media(max-width:700px) {
+  .analyzer-graph-stage .analyzer-stage-controls.analyzer-graph-controls { top:8px; left:8px; right:8px; max-width:none; justify-content:flex-start; gap:4px; }
+  .analyzer-graph-stage .analyzer-graph-controls button { min-height:32px; font-size:11px; }
+  .semantic-flow-mode { padding:0; }
+}

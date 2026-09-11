@@ -4,6 +4,9 @@ import type { AnalyzerFilter, AnalyzerProjectStore, AnalyzerSemanticRegion, Anal
 import type { ExplorerSession } from './semantic/semanticExplorerState';
 
 export interface AnalyzerViewSession {
+  graphMode?: '2d' | '3d';
+  graph3DCamera?: import('./graph3D').Graph3DCamera;
+  graph3DAggregation?: { expandedGroupIds: string[]; collapsedGroupIds: string[] };
   selectedNodeId?: string;
   semanticFieldId?: string;
   modelOpenChoiceIds?: string[];
