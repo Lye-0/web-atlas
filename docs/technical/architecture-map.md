@@ -135,3 +135,11 @@ CloudFront、Fastly、Cloudflare cache ruleset、Google Cloud CDN、Akamai、bun
 2026-09-13の原因再現・操作結果・測定条件は[クリックと配置安定性の確認](tab10-click-stable-scope-review-20260913.md)を参照。
 
 タブ10の3D DOMラベルはpointer操作開始時の矩形を、操作中だけ同じ要素のmanual popoverで保持する。通常のlabel collision配置・点・cameraは維持し、leave/cancel/外側操作/scroll/wheel/key/resize/visit/unmountで解除する。他Viewは利用しない。これにより未選択からのdblclickでも、選択後のラベル拡大やcanvas clippingで2回目が別対象へ当たることを防ぐ。
+
+選択時の2D接続先は本体の固定境界を基準にする。選択リングのfillはnoneを明示し、選択本体のCSSで上書きさせない。矢印markerは先端座標(10,5)をrefX/refYに合わせ、強調時の線幅でも終点を動かさない。斜めの接続は終端のBezier制御点を接続面の外側に保ち、枠内へ先に入り込んだり枠と平行に進入したりすることを防ぐ。
+
+## 表示集合の選択と個別要求（2026-09-13）
+
+要求集合も共通の選択と右側詳細を使用する。個別要求は元IDで一時表示し、選択解除・別の選択で集合へ戻す。詳細を閉じても選択は残す。明示展開は「まとめる」まで維持し、全件個別表示中は0件の集合ノードを描かない。件数は元要求・集合内・個別表示を分け、画面内外に依存しない。通常選択と明示展開で既存の予約座標を再利用する。
+
+ラベルの現在地との関係、種類、環境は別の軸として扱う。Suiteはprovider/identity/configurationとEvidenceから説明し、接続設定という名称だけで実体を統合しない。詳細な根拠と検証結果は [表示集合の修正報告](tab10-aggregate-selection-review-20260913.md) を参照。

@@ -49,7 +49,6 @@ export default function FlowAnalyzerPage({ view }: { view: SemanticExplorerViewI
   traceContext.current = { store, view, folder: state.folderHandle };
   useEffect(() => { const traceToken = traceRequest, rescanToken = rescanRequest; setRescanning(false); return () => { traceToken.current++; rescanToken.current++; }; }, [store, view, state.folderHandle]);
   const [focus, setFocus] = useState<{ nonce: number; ids: string[]; mode?: '2d' | '3d' }>();
-  const [requestInspection, setRequestInspection] = useState<{ context: string; id: string }>();
   const requestFocus = useCallback((mode: '2d' | '3d', ids: string[]) => setFocus({ nonce: ++focusNonce.current, ids, mode }), []);
   const fullscreen = useWorkspaceFullscreen(Boolean(store));
   const analysis = loaded?.store === store ? loaded?.analysis : undefined;
@@ -95,29 +94,28 @@ export default function FlowAnalyzerPage({ view }: { view: SemanticExplorerViewI
   const explorer = useMemo(() => buildSemanticExplorer(graph, knownFiles), [graph, knownFiles]);
   const navigation = useSemanticExplorerNavigation({ view, scanVersion: state.scanVersion, session, explorer, edges: graph.edges, ready: Boolean(analysis), updateView, onFocus: requestFocus });
   const explorerLocation = useMemo(() => ({ ...navigation.location, direction: options.direction }), [navigation.location, options.direction]);
-  const selectedIds = useMemo(() => new Set(selected ? [selected.id] : []), [selected]);
-  const hoverContext = useMemo(() => ({ view, scanVersion: state.scanVersion, mode: flow.mode, visitId: navigation.visitId, selectedId: selected?.id, selectedEdgeId: selectedEdge?.id, graph: stageGraph, direction: options.direction }), [view, state.scanVersion, flow.mode, navigation.visitId, selected?.id, selectedEdge?.id, stageGraph, options.direction]);
+  const selectedIds = useMemo(() => new Set(session.selectedNodeId ? [session.selectedNodeId] : []), [session.selectedNodeId]);
+  const hoverContext = useMemo(() => ({ view, scanVersion: state.scanVersion, mode: flow.mode, visitId: navigation.visitId, selectedId: session.selectedNodeId, selectedEdgeId: selectedEdge?.id, graph: stageGraph, direction: options.direction }), [view, state.scanVersion, flow.mode, navigation.visitId, session.selectedNodeId, selectedEdge?.id, stageGraph, options.direction]);
   const { hoverTarget, onHoverTarget, clearHover } = useSemanticFlowHover(hoverContext);
   const currentChildren = useMemo(() => explorerChildren(explorer, explorerLocation, filteredIds), [explorer, explorerLocation, filteredIds]);
   const allowedIds = useMemo(() => architectureBase ? new Set(architectureBase.allowed.map(node => node.id)) : filteredIds, [architectureBase, filteredIds]);
   const hiddenSelection = Boolean(selected && !allowedIds.has(selected.id) || selectedEdge && (!allowedIds.has(selectedEdge.source) || !allowedIds.has(selectedEdge.target)));
   const inspectionContext = `${state.scanVersion}:${view}:${flow.mode}:${architectureLocation?.scopeId}:${options.environment}:${options.scope}:${options.kind}:${options.confidence}:${options.auxiliary}`;
-  const inspectedRequests = requestInspection?.context === inspectionContext ? architectureVisible.architectureView?.requestGroups.find(group => group.id === requestInspection.id) : undefined;
-  const clearSelection = useCallback(() => { setRequestInspection(undefined); updateView(view, current => recordExplorerSelection(current, { selectedNodeId: undefined, selectedEdgeId: undefined, detailOpen: false })); }, [updateView, view]);
+  const inspectedRequests = architectureVisible.architectureView?.requestGroups.find(group => group.id === session.selectedNodeId);
+  const clearSelection = useCallback(() => { updateView(view, current => recordExplorerSelection(current, { selectedNodeId: undefined, selectedEdgeId: undefined, detailOpen: false })); }, [updateView, view]);
   useEffect(() => {
     if (!analysis) return;
-    if (session.selectedNodeId && !byId.has(session.selectedNodeId) || session.selectedEdgeId && !selectedEdge) {
+    if (session.selectedNodeId && !byId.has(session.selectedNodeId) && !inspectedRequests || session.selectedEdgeId && !selectedEdge) {
       clearSelection(); setNotice('現在の表示データに存在しない選択を解除しました。');
     }
-  }, [analysis, byId, selectedEdge, session.selectedNodeId, session.selectedEdgeId, clearSelection]);
+  }, [analysis, byId, inspectedRequests, selectedEdge, session.selectedNodeId, session.selectedEdgeId, clearSelection]);
   const changeOptions = (patch: Partial<typeof options>) => updateView(view, { semantic: { ...options, page: 0, ...patch } });
   const changeMode = (mode: '2d' | '3d') => { if (mode === '3d') setUnavailable3D(false); navigation.changeMode(mode); };
   const saveCamera = useCallback((mode: '2d' | '3d', camera: NonNullable<AnalyzerViewSession['flowCameras']>['2d' | '3d']) => {
     if (camera) updateView(view, current => recordExplorerCamera(current, mode, camera));
   }, [updateView, view]);
   const selectNode = (id: string) => {
-    if (stageGraph.architectureView?.requestGroups.some(group => group.id === id)) { setRequestInspection({ context: inspectionContext, id }); return; }
-    setRequestInspection(undefined);
+    if (stageGraph.architectureView?.requestGroups.some(group => group.id === id)) { updateView(view, current => recordExplorerSelection(current, { selectedNodeId: id, selectedEdgeId: undefined, detailOpen: true })); return; }
     if (!byId.has(id)) {
       if (allNodes.has(id)) {
         updateView('function-call-flow', { selectedNodeId: id, selectedEdgeId: undefined, detailOpen: true, search: '', semantic: { ...semanticFlowDefaults, auxiliary: options.auxiliary } });
@@ -130,12 +128,12 @@ export default function FlowAnalyzerPage({ view }: { view: SemanticExplorerViewI
   const selectEdge = (id: string) => {
     const edge = stageGraph.edges.find(item => item.id === id) ?? stageGraph.architectureView?.internalRelations.find(item => item.id === id)
       ?? stageGraph.architectureView?.boundaryRelations.find(item => item.id === id) ?? graph.edges.find(item => item.id === id); if (!edge) return;
-    setRequestInspection(undefined);
     updateView(view, current => recordExplorerSelection(current, { selectedNodeId: undefined, selectedEdgeId: id, detailOpen: true }));
   };
   const revealSelection = () => {
-    const id = selected?.id ?? selectedEdge?.source; if (!id) return;
-    if (flow.mode === '2d') navigation.revealNode(id); else requestFocus('3d', selectedEdge ? [selectedEdge.source, selectedEdge.target] : [id]);
+    const id = selected?.id ?? inspectedRequests?.id ?? selectedEdge?.source; if (!id) return;
+    if (view === 'architecture-map') requestFocus(flow.mode, selectedEdge ? [selectedEdge.source, selectedEdge.target] : inspectedRequests && !stageGraph.nodes.some(node => node.id === id) ? inspectedRequests.memberIds : [id]);
+    else if (flow.mode === '2d') navigation.revealNode(id); else requestFocus('3d', selectedEdge ? [selectedEdge.source, selectedEdge.target] : [id]);
   };
   const architectureGesture = useArchitectureNodeGesture(`${inspectionContext}:${navigation.visitId}:${session.architecture?.surroundings}:${session.architecture?.expandedRequestGroupIds?.join(",")}`, view === 'architecture-map', navigation.canOpenScope, navigation.openScope, selectNode);
   const restoreSelection = () => {
@@ -228,12 +226,10 @@ export default function FlowAnalyzerPage({ view }: { view: SemanticExplorerViewI
         }
         navigation.jumpMode(flow.mode, id, fields.length === 1 ? fields[0]!.id : undefined);
       }} loading={Boolean(store && !analysis && !error)} />
-      <div {...architectureGesture.bindings} ref={fullscreen.root} className={`analyzer-workspace semantic-flow-workspace${session.detailOpen && (selected || selectedEdge) ? ' has-detail' : ''}${fullscreen.isFullscreen ? ' is-fullscreen' : ''}`}
+      <div {...architectureGesture.bindings} ref={fullscreen.root} className={`analyzer-workspace semantic-flow-workspace${session.detailOpen && (selected || selectedEdge || inspectedRequests) ? ' has-detail' : ''}${fullscreen.isFullscreen ? ' is-fullscreen' : ''}`}
         role={fullscreen.isFullscreen ? 'dialog' : undefined} aria-modal={fullscreen.isFullscreen || undefined} aria-label={fullscreen.isFullscreen ? `${view} 全画面表示` : undefined} onKeyDownCapture={event => { architectureGesture.bindings.onKeyDownCapture?.(); fullscreen.onKeyDownCapture(event); }}>
         {<SemanticFlowStage key={`${view}:${state.scanVersion}`} graph={stageGraph} explorer={explorer} nodeDisplays={stageDisplays} mode={flow.mode} direction={options.direction} selectedIds={selectedIds} selectedEdgeId={selectedEdge?.id} matchIds={matchIds} focus={focus}
           architectureControls={view === 'architecture-map' && flow.mode === '3d' && architectureBase?.scopeId ? <button type="button" aria-label="周辺構成" aria-pressed={session.architecture?.surroundings !== false} title="直接つながる外側の接続相手は残します" onClick={() => updateView(view, { architecture: { ...session.architecture, surroundings: session.architecture?.surroundings === false } })}>周辺構成：{session.architecture?.surroundings !== false ? '表示' : '非表示'}</button> : undefined}
-          architectureOverlay={inspectedRequests && <ArchitectureRequestInspection group={inspectedRequests} nodes={byId} onSelect={selectNode} onClose={() => setRequestInspection(undefined)} expanded={session.architecture?.expandedRequestGroupIds?.includes(inspectedRequests.id) ?? false}
-            onExpanded={expanded => updateView(view, { architecture: { ...session.architecture, expandedRequestGroupIds: [...session.architecture?.expandedRequestGroupIds?.filter(id => id !== inspectedRequests.id) ?? [], ...(expanded ? [inspectedRequests.id] : [])] } })} />}
           navigation={{ location: explorerLocation, activePath: navigation.activePath, visitId: navigation.visitId, scrollTop: navigation.scrollTop, canBack: navigation.canBack,
             projectLabel: state.folderHandle?.name ?? store.facts.find(fact => fact.kind === 'project')?.label, surroundings: session.architecture?.surroundings !== false, canOpenScope: navigation.canOpenScope,
             onBack: navigation.back, onParent: navigation.parent, onProject: navigation.project, onOpenScope: navigation.openScope, onOpenNode: navigation.openNode,
@@ -247,6 +243,8 @@ export default function FlowAnalyzerPage({ view }: { view: SemanticExplorerViewI
           hoverTarget={hoverTarget} onHoverTarget={onHoverTarget}
           onArchitectureNodeClick={architectureGesture.onNodeClick} onSelect={selectNode} onSelectEdge={selectEdge} onClear={clearSelection} isFullscreen={fullscreen.isFullscreen} onFullscreen={() => void fullscreen.toggle()}
           onUnavailable={() => { setUnavailable3D(true); navigation.changeMode('2d'); }} />}
+        {store && view === 'architecture-map' && session.detailOpen && inspectedRequests && <ArchitectureRequestInspection key={inspectedRequests.id} group={inspectedRequests} nodes={byId} visible={stageGraph} onSelect={selectNode} onClose={() => { clearHover(); updateView(view, current => recordExplorerSelection(current, { selectedNodeId: current.selectedNodeId, selectedEdgeId: current.selectedEdgeId, detailOpen: false })); }} expanded={session.architecture?.expandedRequestGroupIds?.includes(inspectedRequests.id) ?? false}
+          onExpanded={expanded => updateView(view, { architecture: { ...session.architecture, expandedRequestGroupIds: [...session.architecture?.expandedRequestGroupIds?.filter(id => id !== inspectedRequests.id) ?? [], ...(expanded ? [inspectedRequests.id] : [])] } })} />}
         {store && view === 'architecture-map' && session.detailOpen && (selected || selectedEdge) && <ArchitectureDetail key={selected?.id ?? selectedEdge?.id} node={stageGraph.nodes.find(n => n.id === selected?.id) ?? selected} edge={selectedEdge} graph={graph} visible={stageGraph} sources={store.semanticSources ?? store.sources} store={store} analysis={analysis!} canOpen={navigation.canOpenScope} onOpen={navigation.openScope} onReveal={id => navigation.jumpMode(flow.mode, id)} onSelect={selectNode} onSelectEdge={selectEdge} onJump={jump} onHoverTarget={onHoverTarget} onClose={() => { clearHover(); updateView(view, current => recordExplorerSelection(current, { selectedNodeId: current.selectedNodeId, selectedEdgeId: current.selectedEdgeId, detailOpen: false })); }} />}
         {store && view !== 'architecture-map' && session.detailOpen && (selected || selectedEdge) && <SemanticFlowDetail key={selected?.id ?? selectedEdge?.id} node={selected} edge={selectedEdge} nodes={allNodes} edges={graph.edges} sources={store.semanticSources ?? store.sources} view={view}
           openChoiceIds={session.modelOpenChoiceIds} onOpenChoiceIds={modelOpenChoiceIds => updateView(view, { modelOpenChoiceIds })}

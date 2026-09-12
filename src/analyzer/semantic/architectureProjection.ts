@@ -152,7 +152,7 @@ function buildArchitectureScope(base: PreparedArchitectureScope, options: Archit
     requestGroups.push({ id: groupId, memberIds: members.map(node => node.id), label });
     if (options.expandedRequestGroupIds?.includes(groupId)) continue;
     const remaining = members.filter(node => !protectedIds.has(node.id));
-    if (remaining.length < 2) continue;
+    if (!remaining.length) continue;
     const first = remaining[0]!, ids = new Set(remaining.map(node => node.id));
     for (const member of remaining) groupOwners.set(member.id, groupId);
     const points = members.map(node => base.positions.get(node.id)!).filter(Boolean);
@@ -188,7 +188,9 @@ export function projectArchitectureScope(base: PreparedArchitectureScope, option
   let cached = views.get(key);
   if (!cached) {
     const graph = buildArchitectureScope(base, { ...options, selectedNodeId: undefined, selectedEdgeId: undefined });
-    const positions = new Map(layoutSemanticFlow(graph, '2d').map(p => [p.node.id, { x: p.x, y: p.y, z: p.z }]));
+    // Explicit expansion uses the same reserved coordinates as temporary exposure.
+    const collapsed = options.expandedRequestGroupIds?.length ? projectArchitectureScope(base, { ...options, selectedNodeId: undefined, selectedEdgeId: undefined, expandedRequestGroupIds: [] }) : undefined;
+    const positions = new Map(collapsed?.architectureView?.positions2d ?? layoutSemanticFlow(graph, '2d').map(p => [p.node.id, { x: p.x, y: p.y, z: p.z }]));
     const bottom = Math.max(0, ...[...positions.values()].map(p => p.y));
     let row = 0;
     for (const group of graph.architectureView!.requestGroups) for (const member of group.memberIds) {

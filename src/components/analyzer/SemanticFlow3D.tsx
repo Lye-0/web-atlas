@@ -469,6 +469,6 @@ export function SemanticFlow3D(props: Props) {
       </details>}
     </div>
     {!props.explorer && <SemanticFlowLocation label={`${regionNodes.size}のまとまり · ${props.graph.nodes.length.toLocaleString()}対象`} description={description} selection={selected ? `${selectedRegion?.label} · ${selected.kind === 'external' ? '呼び出し箇所: ' : ''}${selected.path ?? selected.label}` : undefined} />}
-    <div className="semantic-flow-3d-selection-description" aria-live="polite">{[...props.selectedIds].map(id => props.graph.nodes.find(node => node.id === id)?.label).filter(Boolean).join('、')}</div>
+    <div className="semantic-flow-3d-selection-description" aria-live="polite">{[...props.selectedIds].map(id => props.nodeDisplays?.get(id)?.title ?? props.graph.nodes.find(node => node.id === id)?.label).filter(Boolean).join('、')}</div>
   </div>;
 }

@@ -1,3 +1,4 @@
+import { architectureRequestTitle } from './architectureRequestPresentation';
 import { useLayoutEffect, useRef } from 'react';
 import { explorerBreadcrumbs, type SemanticExplorerModel } from '../../analyzer/semantic/semanticExplorer';
 import type { SemanticEdge, SemanticGraph } from '../../analyzer/semantic/types';
@@ -7,6 +8,7 @@ import { AnalyzerBreadcrumb } from './AnalyzerBreadcrumb';
 
 export function ArchitectureNavigation({ explorer, navigation, graph, selectedId, selectedEdgeId, onSelectEdge, relationHint, mode }: { explorer: SemanticExplorerModel; navigation: SemanticExplorerNavigationActions; graph: SemanticGraph; selectedId?: string; selectedEdgeId?: string; onSelectEdge?: (id: string) => void; relationHint?: SemanticEdge; mode: '2d' | '3d' }) {
   const scopeId = navigation.location.scopeId, selected = graph.nodes.find(n => n.id === selectedId) ?? (selectedId ? explorer.nodes.get(selectedId) : undefined);
+  const selectedGroup = graph.architectureView?.requestGroups.find(group => group.id === selectedId);
   const outside = Boolean(selected && scopeId !== 'project' && !graph.architectureView?.detailIds.includes(selected.id));
   const hasChildren = selected && navigation.canOpenScope?.(selected.id);
   const projection = graph.architectureView, relation = graph.edges.find(edge => edge.id === selectedEdgeId) ?? relationHint;
@@ -25,6 +27,7 @@ export function ArchitectureNavigation({ explorer, navigation, graph, selectedId
     <div className="semantic-explorer-caption"><span>{projection?.scopeId ? `内部 ${projection.detailEntityCount} / 外側 ${projection.contextEntityCount}構成要素` : `${projection?.detailEntityCount ?? graph.nodes.length}構成要素`}{projection?.requestCount ? ` · 未特定要求 ${projection.requestCount}対象` : ''} · 表示線 {graph.edges.length}本{projection?.internalRecordCount ? ` · 内部で要約 ${projection.internalRecordCount}関係` : ''}</span><small>{relation ? <span role="status">{architectureRelationLabel(relation)} · ソース上の {architectureRelationCounts([relation]).sites}箇所</span> : '線はソース・設定上の関係'}</small></div>
     {projection?.requestGroups.length ? <small className="architecture-count-note">未特定の要求を含む対象数です。表示集合は実体数に加算しません。</small> : null}
     {projection?.boundaryRelations.length ? <details className="architecture-boundary-relations"><summary>構成全体の接続 · {projection.boundaryRelations.length}件（内部の対応箇所は未特定）</summary><div>{projection.boundaryRelations.map(edge => <button key={edge.id} onClick={() => onSelectEdge?.(edge.id)}>{explorer.nodes.get(edge.source)?.label} → {explorer.nodes.get(edge.target)?.label} · {architectureRelationLabel(edge)}{edge.details?.environment ? ` · ${edge.details.environment}` : ''}</button>)}</div></details> : null}
-    {selected && !selected.attributes.architectureRequestGroup && <div className="semantic-explorer-selection"><span>選択中：{selected.label}{outside ? '（現在の範囲の外側）' : ''}</span><div className="semantic-explorer-selection-actions">{hasChildren && <button type="button" onClick={() => navigation.onOpenScope(selected.id)}>{outside ? 'この構成を開く' : '内部を開く'}</button>}<button type="button" onClick={() => navigation.onJumpMode(mode === '2d' ? '3d' : '2d', selected.id)}>{mode === '2d' ? '3D上で位置を見る' : '2Dで詳しく見る'}</button></div></div>}
+    {selectedGroup && <div className="semantic-explorer-selection"><span>選択中：{selectedGroup.label} · 表示上の集合</span></div>}
+    {selected && !selectedGroup && <div className="semantic-explorer-selection"><span>選択中：{architectureRequestTitle(selected)}{outside ? '（現在の範囲の外側）' : ''}</span><div className="semantic-explorer-selection-actions">{hasChildren && <button type="button" onClick={() => navigation.onOpenScope(selected.id)}>{outside ? 'この構成を開く' : '内部を開く'}</button>}<button type="button" onClick={() => navigation.onJumpMode(mode === '2d' ? '3d' : '2d', selected.id)}>{mode === '2d' ? '3D上で位置を見る' : '2Dで詳しく見る'}</button></div></div>}
   </div>;
 }

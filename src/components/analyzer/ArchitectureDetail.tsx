@@ -17,6 +17,8 @@ import { architectureEvidencePaths } from './architectureEvidencePaths';
 import { semanticFlowHoverBindings } from './semanticFlowHoverBindings';
 import type { SemanticFlowHoverHandler } from '../../analyzer/semantic/flowRelationInteraction';
 import './architecture-detail.css';
+import { architectureProviderExplanation, architectureRequestPartition, architectureRequestTitle } from './architectureRequestPresentation';
+import { publicUrlText } from '../../analyzer/urlPrivacy';
 
 function Disclosure({ title, children }: { title: ReactNode; children: () => ReactNode }) {
   const [open, setOpen] = useState(false);
@@ -66,7 +68,10 @@ export function ArchitectureDetail({ node, edge, graph, visible, sources, store,
   const relations = useMemo(() => [...visible.edges.filter(e => e.source === node?.id || e.target === node?.id), ...boundary], [visible.edges, node?.id, boundary]);
   const partners = useMemo(() => architecturePartners(relations, node?.id ?? ''), [relations, node?.id]);
   const partnerDisplays = useMemo(() => semanticNodeDisplays(partners.flatMap(partner => { const other = byId.get(partner.otherId); return other ? [other] : []; }), byId), [partners, byId]);
-  const title = node?.label ?? (edge ? architectureRelationLabel(edge) : '構成の詳細');
+  const title = node ? architectureRequestTitle(node) : (edge ? architectureRelationLabel(edge) : '構成の詳細');
+  const requestGroup = visible.architectureView?.requestGroups.find(group => group.memberIds.includes(node?.id ?? ''));
+  const requestPartition = requestGroup && architectureRequestPartition(requestGroup.memberIds, visible);
+  const scopeRole = node?.attributes.architectureScopeRole;
   const otherButton = (otherId: string, key: string) => { const other = byId.get(otherId); return <button onClick={() => onSelect(otherId)} {...semanticFlowHoverBindings<HTMLButtonElement>(onHoverTarget, { kind: 'node', id: otherId }, `architecture-detail-node:${key}`)}>{other?.label ?? '元の対象'}{other?.architecture?.identity ? ` · ${architectureEnvironmentLabel(other.architecture.environments)}` : ''}</button>; };
   const relationButton = (edge: SemanticEdge) => { const summary = architectureRelationSummary([edge]); return <button onClick={() => onSelectEdge(edge.id)} {...semanticFlowHoverBindings<HTMLButtonElement>(onHoverTarget, { kind: 'edge', id: edge.id }, `architecture-detail-edge:${edge.id}`)}>{architectureRelationLabel(edge)} · {summary.status} · {summary.sites}箇所{edge.details?.environment ? ` · ${edge.details.environment}` : ''}</button>; };
   const partnerDetails = (partner: ReturnType<typeof architecturePartners>[number]) => <>
@@ -85,9 +90,16 @@ export function ArchitectureDetail({ node, edge, graph, visible, sources, store,
     <div className="analyzer-detail-heading"><h3>{title}</h3><button type="button" aria-label="詳細を閉じる" onClick={onClose}>×</button></div>
     {node && arch && <>
       <p className="architecture-detail-kind"><strong>選択中</strong> · {architectureKindLabels[arch.kind]}</p>
+      {arch.request && <section className="architecture-request-expression"><h4>記録された要求</h4><code>{publicUrlText(arch.request.expression ?? '式未記録')}</code><p>接続先未特定。式の実行・補完は行わず、記録されたコードを表示しています。</p>
+        {node.evidence[0] && <p>{node.evidence[0].path}:{node.evidence[0].line} · 範囲 {node.evidence[0].start}–{node.evidence[0].end}</p>}
+        {requestGroup && requestPartition && <><p>{visible.architectureView?.explicitNodeIds.includes(node.id) ? '明示展開による個別表示' : '選択中の一時表示。選択解除・別の選択で集合に戻ります。'}</p><p>元の要求 {requestPartition.originalIds.length}件 · 集合内 {requestPartition.groupedIds.length}件 · 個別表示 {requestPartition.individualIds.length}件</p><button onClick={() => onSelect(requestGroup.id)}>元の集合の内訳を見る</button></>}
+      </section>}
+      {architectureProviderExplanation(node) && <p className="architecture-context-note">{architectureProviderExplanation(node)}</p>}
       {outside && <p className="architecture-context-note">表示範囲外 · {visible.nodes.some(item => item.id === node.id) ? '周辺の構成として表示' : '現在の図には表示していません'}</p>}
       <dl className="analyzer-metadata-list architecture-summary">
-        <div><dt>役割</dt><dd>{arch.request ? `${({ http: 'HTTP要求のコードを確認。接続先は未特定', process: '起動要求のコードを確認。起動先は未特定', auth: '認証SDKの使用・設定コードを確認。プロジェクトは未特定' })[arch.request.kind]}` : arch.codeUsage?.reason ?? (arch.roles.length ? `${arch.roles.slice(0, 2).map(role => role.label).join(' / ')}${arch.roles.length > 2 ? ` ほか${arch.roles.length - 2}役割` : ''}（推定）` : '具体的な役割は未判定')}</dd></div>
+        <div><dt>現在地との関係</dt><dd>{scopeRole === 'inside' ? '現在地の内部' : scopeRole === 'direct' ? '外側の接続相手' : scopeRole === 'surrounding' ? '周辺' : visible.architectureView?.scopeId ? '現在の図の外側' : 'プロジェクト全体'}</dd></div>
+        <div><dt>種類</dt><dd>{arch.request ? '個別要求（接続先未特定）' : architectureKindLabels[arch.kind]}</dd></div>
+        <div><dt>役割</dt><dd>{arch.request ? `${({ http: 'HTTP要求のコードを確認。接続先は未特定', process: '起動要求のコードを確認。起動先は未特定', auth: '認証SDKの使用・設定コードを確認。プロジェクトは未特定' })[arch.request.kind]}` : arch.codeUsage?.reason ?? (arch.roles.length ? `${arch.roles.slice(0, 2).map(role => role.label).join(' / ')}${arch.roles.length > 2 ? ` ほか${arch.roles.length - 2}役割` : ''}（${arch.roles.every(role => role.confidence === 'source') ? 'ソース・設定で確認' : '推定を含む'}）` : '具体的な役割は未判定')}</dd></div>
         {requestOrigin ? <div><dt>要求元</dt><dd>{requestOrigin.label.replace(/^要求元：/, '')}<small className="architecture-count-note">要求を書いた側です。接続先の所属は未特定です。</small>{requestOrigin.sources.length > 1 && <Disclosure title="要求元の内訳">{() => <>{requestOrigin.sources.map(source => <p key={source.id}>{otherButton(source.id, `request-${source.id}`)}</p>)}{requestOrigin.unknown && <p>要求元未確認の要求も含みます。</p>}</>}</Disclosure>}</dd></div>
           : <div><dt>所属</dt><dd>{arch.parentId ? byId.get(arch.parentId)?.label : arch.ownerPath || (['application', 'component', 'shared-code', 'code-package'].includes(arch.kind) ? 'プロジェクト' : '外部・設定上の対象')}</dd></div>}
         <div><dt>環境・設定</dt><dd>{arch.context.join(' / ') || '実行先未判定'} · {architectureEnvironmentLabel(arch.environments)}</dd></div>

@@ -119,7 +119,7 @@ describe('Architecture summaries in the detail panel', () => {
     const a = node('a'), b = node('b'), requests = [request('r1', 'a'), request('r2', 'b'), request('r3', 'unknown')], nodes = new Map([a, b, ...requests].map(n => [n.id, n]));
     const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
     try {
-      await act(async () => root.render(<ArchitectureRequestInspection group={{ id: 'g', label: 'HTTP接続先・未特定', memberIds: requests.map(n => n.id) }} nodes={nodes} expanded={false} onExpanded={vi.fn()} onSelect={vi.fn()} onClose={vi.fn()} />));
+      await act(async () => root.render(<ArchitectureRequestInspection group={{ id: 'g', label: 'HTTP接続先・未特定', memberIds: requests.map(n => n.id) }} nodes={nodes} visible={{ view: 'architecture-map', nodes: [], edges: [] }} expanded={false} onExpanded={vi.fn()} onSelect={vi.fn()} onClose={vi.fn()} />));
       expect(host.querySelector('.architecture-request-origin')?.textContent).toBe('要求元：複数の要求元');
       expect(host.textContent).toContain('要求元未確認');
       await open(host.querySelector('details')!); expect(host.textContent).toContain('要求元を確認できない要求も含みます');

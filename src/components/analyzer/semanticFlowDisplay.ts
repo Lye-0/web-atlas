@@ -1,3 +1,4 @@
+import { architectureRequestTitle } from './architectureRequestPresentation';
 import { kindLabels, type SemanticNode } from '../../analyzer/semantic/types';
 import { architectureEnvironmentLabel, architectureKindLabels } from '../../analyzer/semantic/architectureMetadata';
 import { architectureRequestSources } from './architectureSummary';
@@ -106,12 +107,12 @@ export function semanticNodeDisplay(node: SemanticNode): SemanticNodeDisplay {
       binding ? `${binding}${identity?.identifier ? ` · ID:${identity.identifier.slice(0, 8)}` : ' · 同一性未確認'}` : arch.request || node.attributes.architectureRequestGroup ? '' : arch.parentId ? node.group : arch.ownerPath,
       Number(node.attributes.architectureInternalCount) > 0 ? `内部関係 ${node.attributes.architectureInternalCount}件` : '',
     ].filter(Boolean).join(' · ') || node.path || '構成要素';
-    const kind = node.attributes.architectureRequestGroup ? '表示上の集合' : arch.request ? '相手は未特定' : architectureKindLabels[arch.kind];
-    const dataRole = scope ? `${({ inside: '内部', direct: '外側の接続相手', surrounding: '周辺' })[scope]} · ${arch.kind === 'component' ? 'コンポーネント' : kind}` : node.attributes.architectureContext ? `表示範囲外 · ${kind}` : kind;
+    const kind = node.attributes.architectureRequestGroup ? '表示上の集合' : arch.request ? '接続先未特定' : architectureKindLabels[arch.kind];
+    const dataRole = scope ? `${({ inside: '内部', direct: '外側の接続相手', surrounding: '周辺' })[scope]} · 種類：${kind}` : node.attributes.architectureContext ? `表示範囲外 · ${kind}` : kind;
     const disambiguation = identity ? `${architectureEnvironmentLabel(arch.environments)}${binding ? ` · ${binding}` : ''}${identity.identifier ? ` · ID:${identity.identifier.length > 10 ? `${identity.identifier.slice(0, 4)}…${identity.identifier.slice(-4)}` : identity.identifier}` : ' · 同一性未確認'}`
-      : arch.request ? node.evidence[0] ? `${node.evidence[0].path}:${node.evidence[0].line}` : node.path ?? 'ソース箇所未確認'
+      : arch.request ? node.evidence[0] ? `${node.evidence[0].path.split(/[\\/]/).at(-1)}:${node.evidence[0].line} · 範囲 ${node.evidence[0].start}–${node.evidence[0].end}` : node.path ?? 'ソース箇所未確認'
         : Number(node.attributes.architectureInternalCount) > 0 ? `内部関係 ${node.attributes.architectureInternalCount}件` : undefined;
-    return { title: node.label, location, dataRole, disambiguation, scopeRole: scope, tooltip: `${node.label}\n${dataRole}\n${location}\n${identity?.identifier ? `識別子: ${identity.identifier}\n` : ''}${arch.request?.expression ?? node.evidence[0]?.description ?? ''}` };
+    return { title: architectureRequestTitle(node), location, dataRole, disambiguation, scopeRole: scope, tooltip: `${node.label}\n${dataRole}\n${location}\n${identity?.identifier ? `識別子: ${identity.identifier}\n` : ''}${arch.request?.expression ?? node.evidence[0]?.description ?? ''}` };
   }
   const initializer = node.kind === 'function' && node.attributes.initializer === true;
   const callee = (node.kind === 'external' || node.kind === 'operation') && typeof node.attributes.callee === 'string' ? node.attributes.callee : undefined;

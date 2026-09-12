@@ -36,7 +36,7 @@ export function spatialRelationCurve(a: FlowPoint, b: FlowPoint, bend: number | 
   const control = (t: number) => ({ x: start.x + (end.x - start.x) * t + normal.x * arc * 4 / 3,
     y: start.y + (end.y - start.y) * t + normal.y * arc * 4 / 3, z: start.z + (end.z - start.z) * t });
   const c1 = control(1 / 3), c2 = control(2 / 3);
-  if (mode === '2d') {
+  if (mode === '2d' && (Math.abs(dx) > 212 || Math.abs(dy) > 60)) {
     // The port is fixed by the card boundary. A bent control point can otherwise
     // enter the card before the tip, or approach along its top/bottom border.
     const approach = (center: FlowPoint, port: FlowPoint, handle: FlowPoint) => {
