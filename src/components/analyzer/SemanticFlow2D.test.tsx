@@ -17,6 +17,10 @@ describe('semantic 2D drawing and selection layers', () => {
     motion={motion} onCamera={onCamera} onSelect={onSelect} onSelectEdge={onSelectEdge} onClear={onClear} onHoverTarget={onHoverTarget} {...extras} />));
   beforeEach(async () => {
     screenSize = { width: 1000, height: 700 };
+    Object.defineProperty(SVGElement.prototype, 'getTotalLength', { configurable: true, value() { return this.getAttribute('data-particle-route') === 'a-b' ? 100 : 200; } });
+    Object.defineProperty(SVGElement.prototype, 'getPointAtLength', { configurable: true, value(x: number) { return { x, y: 0 }; } });
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({ createImageData: () => ({ data: new Uint8ClampedArray(76 * 48 * 4) }), putImageData: vi.fn() } as unknown as ReturnType<HTMLCanvasElement['getContext']>);
+    vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/png;base64,fixture');
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
     vi.stubGlobal('ResizeObserver', class {
       constructor(private callback: ResizeObserverCallback) {}
@@ -27,39 +31,39 @@ describe('semantic 2D drawing and selection layers', () => {
     host = document.createElement('div'); document.body.append(host); root = createRoot(host);
     await render();
   });
-  afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.clearAllMocks(); vi.unstubAllGlobals(); });
+  afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.clearAllMocks(); vi.restoreAllMocks(); vi.unstubAllGlobals(); Reflect.deleteProperty(SVGElement.prototype, 'getTotalLength'); Reflect.deleteProperty(SVGElement.prototype, 'getPointAtLength'); });
 
   it('paints lines and particles above cards while leaving edge hit targets below cards', () => {
     expect([...host.querySelectorAll('[data-flow-layer]')].map(item => item.getAttribute('data-flow-layer'))).toEqual(['edge-targets', 'nodes', 'edges', 'particles']);
     const visual = host.querySelector('[data-flow-layer="edges"]')!, particles = host.querySelector('[data-flow-layer="particles"]')!;
     expect(visual.getAttribute('pointer-events')).toBe('none'); expect(particles.getAttribute('pointer-events')).toBe('none');
     expect([...visual.querySelectorAll('[data-edge-id]')].map(item => [item.getAttribute('data-edge-id'), item.getAttribute('data-source'), item.getAttribute('data-target')])).toEqual([['a-b', 'a', 'b'], ['b-c', 'b', 'c'], ['a-c', 'a', 'c']]);
-    expect(particles.querySelectorAll('[data-flow-particle]')).toHaveLength(2);
+    expect(particles.querySelectorAll('[data-particle-route]')).toHaveLength(2);
+    expect(particles.querySelectorAll('image[data-flow-particle]')).toHaveLength(6);
     expect(visual.querySelectorAll('[marker-end]')).toHaveLength(3);
     expect(host.querySelectorAll('[data-node-id]')).toHaveLength(3);
   });
 
   it('uses the same smooth curve for the visible line, hit target and constant-spacing particles', () => {
     for (const id of ['a-b', 'a-c']) {
-      const line = host.querySelector(`[data-edge-id="${id}"] > path`)!, particle = host.querySelector(`[data-particle-edge-id="${id}"]`)!;
+      const line = host.querySelector(`[data-edge-id="${id}"] > path`)!, particle = host.querySelector(`[data-particle-route="${id}"]`)!;
       expect(line.getAttribute('d')).toContain(' C');
       expect(particle.getAttribute('d')).toBe(line.getAttribute('d'));
       expect(host.querySelector(`[data-edge-hit-id="${id}"]`)?.getAttribute('d')).toBe(line.getAttribute('d'));
-      expect(particle.getAttribute('stroke-dasharray')).toBe('0 50');
-      expect(particle.getAttribute('stroke-linecap')).toBe('round');
+      expect(host.querySelector(`[data-particle-edge-id="${id}"]`)?.getAttribute('width')).toBe('19');
     }
-    expect(host.querySelector('[data-particle-edge-id="a-b"]')?.getAttribute('d')).not.toBe(host.querySelector('[data-particle-edge-id="a-c"]')?.getAttribute('d'));
+    expect(host.querySelector('[data-particle-route="a-b"]')?.getAttribute('d')).not.toBe(host.querySelector('[data-particle-route="a-c"]')?.getAttribute('d'));
   });
 
   it('advances short and long connections by the same distance and supports reduced/off/hidden motion', async () => {
     const particles = [...host.querySelectorAll('[data-flow-particle]')];
-    const offsets = () => particles.map(path => Number(path.getAttribute('stroke-dashoffset')));
-    const before = offsets();
+    const offsets = () => particles.map(path => Number(path.getAttribute('transform')?.match(/translate\(([^ ]+)/)?.[1]));
     await act(async () => vi.mocked(requestAnimationFrame).mock.calls.at(-1)![0](1000));
+    const before = offsets();
     await act(async () => vi.mocked(requestAnimationFrame).mock.calls.at(-1)![0](1100));
-    offsets().forEach((offset, index) => expect(offset - before[index]!).toBeCloseTo(-6.5));
+    offsets().forEach((offset, index) => expect((offset - before[index]! + 50) % 50).toBeCloseTo(6.5));
     await render({ enabled: true, reduced: true, visible: true });
-    expect([...host.querySelectorAll('[data-flow-particle]')].every(path => path.getAttribute('stroke-dasharray') === '0 100')).toBe(true);
+    expect(host.querySelectorAll('[data-flow-particle]')).toHaveLength(3);
     await render({ enabled: false, reduced: false, visible: true });
     expect(host.querySelector('[data-flow-particle]')).toBeNull(); expect(cancelAnimationFrame).toHaveBeenCalled();
     await render({ enabled: true, reduced: false, visible: false });

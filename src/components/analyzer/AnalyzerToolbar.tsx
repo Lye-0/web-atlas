@@ -1,3 +1,4 @@
+import { CommandEntryControl } from './CommandEntryControl';
 import { NavLink } from 'react-router-dom';
 import { analyzerRoutes } from '../../utils/routes';
 import { analyzerViewLabels, type AnalyzerFilter, type AnalyzerViewCounts, type AnalyzerViewId, type PackageScriptFact } from '../../analyzer';
@@ -12,6 +13,7 @@ interface AnalyzerToolbarProps {
   filter: AnalyzerFilter;
   onFilterChange: (value: AnalyzerFilter) => void;
   externalExpanded: boolean;
+  externalToggleAvailable: boolean;
   onToggleExternal: () => void;
   scripts: PackageScriptFact[];
   entryScriptId?: string;
@@ -65,6 +67,7 @@ export function AnalyzerToolbar({
   filter,
   onFilterChange,
   externalExpanded,
+  externalToggleAvailable,
   onToggleExternal,
   scripts,
   entryScriptId,
@@ -79,23 +82,16 @@ export function AnalyzerToolbar({
       <div className="analyzer-control-row">
         <AnalyzerSearchControl value={search} onChange={onSearchChange} />
         <label className="analyzer-filter-control">
-          <span>Filter</span>
+          <span>対象</span>
           <select value={filter} onChange={(event) => onFilterChange(event.target.value as AnalyzerFilter)} aria-label="Analyzer Nodeを絞り込む">
             {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
         </label>
-        {view === 'command' && (
-          <label className="analyzer-filter-control analyzer-entry-control">
-            <span>Entry</span>
-            <select value={entryScriptId ?? ''} onChange={(event) => onEntryChange(event.target.value)} aria-label="Command Flowのentry script">
-              {scripts.length === 0 && <option value="">scriptなし</option>}
-              {scripts.map((script) => <option key={script.id} value={script.id}>{script.packageName} · {script.scriptName}</option>)}
-            </select>
-          </label>
-        )}
+        {view === 'command' && <CommandEntryControl scripts={scripts} entryScriptId={entryScriptId} onChange={onEntryChange} />}
         {view === 'dependencies' && (
-          <button type="button" className={`analyzer-quiet-button${externalExpanded ? ' is-active' : ''}`} onClick={onToggleExternal} aria-expanded={externalExpanded}>
-            {externalExpanded ? 'Externalを折りたたむ' : 'Externalを展開'}
+          <button type="button" className={`analyzer-quiet-button${externalExpanded ? ' is-active' : ''}`} onClick={onToggleExternal} aria-expanded={externalExpanded}
+            disabled={!externalToggleAvailable} title={externalToggleAvailable ? undefined : '展開する外部パッケージのまとまりはありません'}>
+            {externalExpanded ? '外部パッケージを折りたたむ' : '外部パッケージを展開'}
           </button>
         )}
         <span className="analyzer-node-count" aria-label={`${counts.visibleNodes} visible nodes, ${counts.totalNodes} total nodes`}>

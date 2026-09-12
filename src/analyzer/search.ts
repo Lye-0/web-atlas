@@ -1,4 +1,4 @@
-import type { AnalyzerViewNode } from './types';
+import type { AnalyzerSemanticRegion, AnalyzerViewNode } from './types';
 
 export interface AnalyzerSearchDocument {
   names: string[];
@@ -36,6 +36,24 @@ export function matchAnalyzerSearch(document: AnalyzerSearchDocument, query: str
 export function moduleSearchDocument(node: AnalyzerViewNode): AnalyzerSearchDocument {
   const strings = (keys: string[]) => keys.flatMap(key => typeof node.metadata[key] === 'string' ? [node.metadata[key] as string] : []);
   return { names: [node.label], paths: strings(['modulePath', 'directoryPath']), groups: strings(['packageName', 'packagePath']) };
+}
+
+/** Search only user-facing names, declared commands and paths, never opaque metadata. */
+export function analyzerEntitySearchDocument(node: AnalyzerViewNode | AnalyzerSemanticRegion): AnalyzerSearchDocument {
+  if ('type' in node && node.type === 'module') return moduleSearchDocument(node);
+  const strings = (keys: string[]) => keys.flatMap(key => {
+    const value = node.metadata[key];
+    return typeof value === 'string' ? [value] : Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+  });
+  return {
+    names: [node.label, ...strings(['aliases', 'alias', 'packageName', 'stackName'])],
+    paths: strings(['filePath', 'scopePath', 'packagePath', 'directoryPath', 'modulePath', 'configPath']),
+    groups: strings(['scopeLabel', 'workspaceName']),
+    fields: [
+      ...('type' in node && node.type === 'workspace-pattern' ? [] : [node.subtitle ?? '']),
+      ...strings(['command', 'rawCommand', 'scriptName', 'pattern', 'specifier', 'versionRange', 'versionRanges', 'toolName', 'packageSelector']),
+    ],
+  };
 }
 
 export function compareAnalyzerSearchResults(

@@ -4,6 +4,7 @@ import type { AnalyzerProjectStore, AnalyzerSemanticRegion, AnalyzerViewEdge, An
 import { EvidenceCodeBlock } from './EvidenceCodeBlock';
 
 interface Props {
+  showDirectoryChain?: boolean;
   store: AnalyzerProjectStore;
   view: AnalyzerViewModel;
   node?: AnalyzerViewNode;
@@ -59,7 +60,7 @@ function Connections({ edges, incoming, view, onSelectNode, onFocusConnection }:
     const node = view.nodes.find(item => item.id === id);
     const relation = relations[0]!;
     return node && <li key={id} className="analyzer-module-connection-row">
-      <button type="button" className="analyzer-module-connection-name" onClick={() => onSelectNode(id, true)} title={String(node.metadata.modulePath ?? node.label)}>
+      <button type="button" className="analyzer-module-connection-name" data-analyzer-entity-id={id} onClick={() => onSelectNode(id, true)} title={String(node.metadata.modulePath ?? node.label)}>
         <strong>{node.label}</strong><small>{String(node.metadata.directoryPath ?? node.metadata.modulePath ?? '')}{relations.length > 1 ? ` · ${relations.length}件` : ''}</small>
       </button>
       {onFocusConnection && <button type="button" className="analyzer-module-connection-fit" onClick={() => onFocusConnection(relation.sourceId, relation.targetId)} aria-label={`${node.label}との両端を表示`} title="この依存の両端を表示">↔</button>}
@@ -74,7 +75,11 @@ function Auxiliary({ metadata, ids, view, store }: { metadata: AnalyzerViewNode[
   </>;
 }
 
-export function ModuleDependencyDetails({ node, region, edge, view, store, onSelectNode, onSelectRegion, onFocusConnection, onClose }: Props) {
+export function ModuleDependencyDetails({ node, region, edge, view, store, onSelectNode, onSelectRegion, onFocusConnection, onClose, showDirectoryChain }: Props) {
+  const [directoryFactId, setDirectoryFactId] = useState<string>();
+  const chainPaths = region?.metadata.compressedPaths;
+  const chain = showDirectoryChain && Array.isArray(chainPaths) ? chainPaths.flatMap(path => store.facts.filter(fact => fact.kind === 'module-directory' && fact.path === path)) : [];
+  const directoryFact = chain.find(fact => fact.id === directoryFactId);
   const title = node?.label ?? region?.label ?? 'Module dependency';
   const path = node?.metadata.modulePath ?? region?.metadata.directoryPath ?? region?.subtitle;
   const focus = node ? () => onSelectNode(node.id, true) : region ? () => onSelectRegion?.(region.id, true) : undefined;
@@ -103,23 +108,26 @@ export function ModuleDependencyDetails({ node, region, edge, view, store, onSel
   return <>
     <header className="analyzer-module-detail-header">
       <div className="analyzer-detail-heading-top"><span className="analyzer-node-type">{node ? 'FILE / MODULE' : region ? region.regionKind === 'directory' ? 'DIRECTORY' : 'PACKAGE' : 'DEPENDENCY'}</span>
-        <button type="button" className="analyzer-detail-close" onClick={onClose} aria-label="Close detail panel">閉じる</button></div>
+        <button type="button" className="analyzer-detail-close" onClick={onClose} aria-label="詳細を閉じる">閉じる</button></div>
       <h2>{title}</h2>
       {path && <p className="analyzer-module-detail-path">{String(path)}</p>}
       <div className="analyzer-module-detail-meta">
         {node && <span>{String(node.metadata.language ?? node.subtitle ?? 'Module')}</span>}
         {region && <span>{contained.length} files · {directories.length} directories</span>}
-        {focus && <button type="button" className="analyzer-focus-selected" onClick={focus}>選択位置を表示</button>}
+        {focus && <button type="button" className="analyzer-focus-selected" onClick={focus}>選択へ移動</button>}
       </div>
     </header>
     {(node || region) && <>
       <Section title="import先" direction="imports" count={outgoing.length} initiallyOpen={outgoing.length > 0}>
+        <p className="analyzer-muted-copy">{new Set(outgoing.map(edge => edge.targetId)).size}対象 · {outgoing.length}関係</p>
         <Connections edges={outgoing} incoming={false} view={view} onSelectNode={onSelectNode} onFocusConnection={node ? onFocusConnection : undefined}/>
       </Section>
       <Section title="import元" direction="imported-by" count={incoming.length} initiallyOpen={incoming.length > 0 && (outgoing.length === 0 || incoming.length <= 4)}>
+        <p className="analyzer-muted-copy">{new Set(incoming.map(edge => edge.sourceId)).size}対象 · {incoming.length}関係</p>
         <Connections edges={incoming} incoming view={view} onSelectNode={onSelectNode} onFocusConnection={node ? onFocusConnection : undefined}/>
       </Section>
       {region && <>
+        {chain.length > 1 && <Section title="圧縮されたDirectory階層" count={chain.length}><p>図では単一の囲いとして表示しています。各Directoryの元のパスとIDを確認できます。</p><ul>{chain.map(fact => <li key={fact.id}><button type="button" aria-pressed={directoryFactId === fact.id} onClick={() => setDirectoryFactId(fact.id)}>{fact.kind === 'module-directory' ? fact.path : fact.label}</button></li>)}</ul>{directoryFact?.kind === 'module-directory' && <Info entries={[["Directory ID", directoryFact.id], ['Path', directoryFact.path], ['Parent ID', directoryFact.parentDirectoryId], ['Direct files', directoryFact.moduleIds.length], ['Child directories', directoryFact.childDirectoryIds.length]]}/>}</Section>}
         <Section title="領域内の依存" count={internal.length}><p className="analyzer-muted-copy">この領域内のファイル同士に{internal.length}件の依存があります。</p></Section>
         <Section title="含まれるファイル" count={contained.length}><ExpandableList items={contained} render={item => <li key={item.id}><button type="button" className="analyzer-module-connection-name" onClick={() => onSelectNode(item.id,true)}><strong>{item.label}</strong><small>{String(item.metadata.modulePath ?? '')}</small></button></li>}/></Section>
         {directories.length > 0 && <Section title="子Directory" count={directories.length}><ExpandableList items={directories} render={item => <li key={item.id}><button type="button" className="analyzer-module-connection-name" onClick={() => onSelectRegion?.(item.id,true)}>{item.label}</button></li>}/></Section>}
@@ -128,6 +136,7 @@ export function ModuleDependencyDetails({ node, region, edge, view, store, onSel
         ['Path',path],['Language',node.metadata.language],['Package',node.metadata.packageName ?? node.metadata.packagePath],['Directory',node.metadata.directoryPath],
       ] : [['Path',path],['Files',contained.length],['Directories',directories.length],['Internal dependencies',internal.length]]}/></Section>
       {node && imports.length > 0 && <Section title="Import宣言" count={imports.length}>
+        {imports.some(reference => !reference.resolvedPath) && <p className="analyzer-muted-copy">読み込み宣言は確認できています。解析範囲内で参照先を特定できないものは、宣言の文字列と判定理由を表示します。</p>}
         <ExpandableList items={imports} render={reference => {
           const resolved = reference.resolvedPath ? view.nodes.find(item => item.id === moduleIdForPath(reference.resolvedPath!)) : undefined;
           const evidence = fact?.kind === 'module' ? view.evidence.find(item => item.id === `evidence:module-import:${fact.path}:${reference.start}:${reference.end}`) : undefined;

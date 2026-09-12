@@ -18,7 +18,4 @@
 .auto-aggregation-body details > summary { cursor:pointer; padding:8px 0; }
 @media(max-width:600px) { .auto-aggregation-panel { font-size:11px; }.auto-aggregation-body li button { min-height:44px; } }
 .analyzer-spatial-aggregation-panel { position:absolute; z-index:5; bottom:64px; left:12px; max-width:calc(100% - 24px); }
-.analyzer-spatial-aggregate-label { position:absolute; transform:translate(-50%,-50%); width:34px; height:34px; padding:0; border:0; border-radius:50%; background:transparent; color:#edcc94; pointer-events:auto; }
-.analyzer-spatial-aggregate-label > span { display:none; position:absolute; left:34px; top:50%; transform:translateY(-50%); width:170px; padding:6px 8px; font-size:11px; line-height:1.35; text-align:left; border:1px dashed #d3b77c; border-radius:5px; background:#19291ef0; }
-.analyzer-spatial-aggregate-label[data-label-visible] > span, .analyzer-spatial-aggregate-label:hover > span, .analyzer-spatial-aggregate-label:focus-visible > span { display:block; }
 .analyzer-auto-aggregation-toggle { width:112px; flex-shrink:0; white-space:nowrap; }

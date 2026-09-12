@@ -11,6 +11,7 @@ import { semanticTraceCache } from '../analyzer/semantic/traceCache';
 vi.mock('../analyzer', async importOriginal => ({ ...await importOriginal<typeof import('../analyzer')>(), filesFromDirectoryHandle: vi.fn(), scanProjectFiles: vi.fn() }));
 vi.mock('../analyzer/semantic/client', () => ({ getSemanticAnalysis: vi.fn(), cancelSemanticAnalysis: vi.fn() }));
 vi.mock('../components/analyzer/SemanticFlow3D', () => ({ SemanticFlow3D: () => <div>3D test surface</div> }));
+vi.mock('../components/analyzer/AnalyzerEmptyOrbit', () => ({ AnalyzerEmptyOrbit: () => null }));
 const source = 'interface Payload { id: string } function handle(payload: Payload) { return payload.id; }';
 const evidence = [{ path: 'src/app.ts', start: 0, end: source.length, line: 1, endLine: 1, description: 'fixture source' }];
 const analysis: SemanticAnalysis = { nodes: [

@@ -1,8 +1,22 @@
 import { buildAggregationGroups, type AggregationGroup, type AggregationProjection } from './autoAggregation';
-import type { PositionedNode } from './layout';
+import type { PositionedNode, PositionedSemanticRegion } from './layout';
 import { moduleWorldAnchor, projectSpatialPoint, type SpatialCameraModel } from './spatialCoordinates';
 import { spatialModuleElevation } from './spatialPresentation';
 import type { AnalyzerEvidence, AnalyzerViewEdge } from './types';
+import type { DisplayAggregation } from './autoAggregation';
+
+/** Resolve a display group to an existing shared ancestor, never to an arbitrary member file. */
+export function moduleAggregateRegions(groups: readonly DisplayAggregation[], modules: readonly PositionedNode[], regions: readonly PositionedSemanticRegion[]) {
+  const paths = new Map(modules.map(({ node }) => [node.id, Array.isArray(node.metadata.regionPath) ? node.metadata.regionPath as string[] : []]));
+  const visible = new Map(regions.map(region => [region.region.id, region]));
+  const result = new Map<string, PositionedSemanticRegion>();
+  for (const group of groups) {
+    const members = group.memberIds.map(id => paths.get(id) ?? []);
+    const common = [...members[0] ?? []].reverse().find(id => visible.has(id) && members.every(path => path.includes(id)));
+    if (common) result.set(group.id, visible.get(common)!);
+  }
+  return result;
+}
 
 export function moduleRelationEvidenceCounts(edge: Pick<AnalyzerViewEdge, 'evidenceIds'>, evidenceById: ReadonlyMap<string, AnalyzerEvidence>): { evidenceCount: number; siteCount?: number } {
   const ids = [...new Set(edge.evidenceIds)], sites = new Set<string>();

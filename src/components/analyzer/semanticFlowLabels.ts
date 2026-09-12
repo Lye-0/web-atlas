@@ -13,7 +13,7 @@ export interface FlowConnectionNotice { id: string; status: 'offscreen' | 'unlab
 export interface FlowLabelObstacle { left: number; top: number; width: number; height: number }
 interface LabelContext { quietBackground?: boolean; regions?: readonly SemanticFlowRegion[]; relatedIds?: ReadonlySet<string>; hoveredIds?: ReadonlySet<string>; priorityIds?: ReadonlySet<string>; overlayTop?: number; previous?: readonly FlowLabelPlacement[]; obstacles?: readonly FlowLabelObstacle[]; roles?: ReadonlyMap<string, SemanticFlowNodeRole>; displays?: ReadonlyMap<string, SemanticNodeDisplay>; view?: SemanticViewId; emphasisIds?: ReadonlySet<string>; relationKinds?: ReadonlyMap<string, ReadonlySet<string>>; scopeActiveIds?: ReadonlySet<string> }
 const coversPoint = (obstacle: FlowLabelObstacle, x: number, y: number) => x >= obstacle.left && x <= obstacle.left + obstacle.width && y >= obstacle.top && y <= obstacle.top + obstacle.height;
-const labelInset = (label: FlowLabelContent) => label.selected || label.aggregate ? 17 : 9;
+import { createSpatialLabelPlacer, labelInset } from './spatialLabelPlacement';
 const nodeIndexes = new WeakMap<readonly SemanticPosition[], Map<string, SemanticPosition['node']>>();
 
 export function semanticFlowConnectionNotices(camera: Camera, size: { width: number; height: number }, positions: readonly SemanticPosition[], ids: ReadonlySet<string>, labels: readonly FlowLabelPlacement[], overlayTop = 148, obstacles: readonly FlowLabelObstacle[] = []): FlowConnectionNotice[] {
@@ -65,7 +65,7 @@ export function hitSemanticFlowEdge(camera: Camera, size: { width: number; heigh
 export function projectSemanticFlowLabels(camera: Camera, size: { width: number; height: number }, zoom: number, ordered: readonly SemanticPosition[], selectedIds: ReadonlySet<string>, matchIds: ReadonlySet<string>, context: LabelContext = {}): FlowLabelPlacement[] {
   camera.updateMatrixWorld();
   if (size.width <= 0 || size.height <= 0) return [];
-  const labels: FlowLabelPlacement[] = [], point = new Vector3();
+  const point = new Vector3();
   const projection = new Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
   const { top, bottom } = semanticFlowPlot(size.width, size.height, context.overlayTop ?? (size.width < 700 ? 198 : 148));
   const previous = new Map(context.previous?.map(label => [label.id, label]));
@@ -76,69 +76,8 @@ export function projectSemanticFlowLabels(camera: Camera, size: { width: number;
     const x = (point.x + 1) * size.width / 2, y = (1 - point.y) * size.height / 2;
     if (y >= top && y <= bottom && !context.obstacles?.some(obstacle => coversPoint(obstacle, x, y))) projected.push({ item, x, y });
   }
-  const occupied: FlowLabelObstacle[] = [...context.obstacles ?? []];
-  // A forced label may cover ordinary background dots, but never an active
-  // endpoint (including the enlarged point and the arrow's connection area).
-  const criticalCells = new Map<string, typeof projected>();
-  for (const p of projected) if (selectedIds.has(p.item.node.id) || context.priorityIds?.has(p.item.node.id) || context.hoveredIds?.has(p.item.node.id)) {
-    const key = `${Math.floor(p.x / 40)}:${Math.floor(p.y / 40)}`, cell = criticalCells.get(key) ?? [];
-    cell.push(p); criticalCells.set(key, cell);
-  }
-  const coversCritical = (id: string, rect: FlowLabelObstacle) => {
-    for (let x = Math.floor((rect.left - 17) / 40); x <= Math.floor((rect.left + rect.width + 17) / 40); x++) for (let y = Math.floor((rect.top - 17) / 40); y <= Math.floor((rect.top + rect.height + 17) / 40); y++) {
-      for (const p of criticalCells.get(`${x}:${y}`) ?? []) if (p.item.node.id !== id && p.x > rect.left - 17 && p.x < rect.left + rect.width + 17 && p.y > rect.top - 17 && p.y < rect.top + rect.height + 17) return true;
-    }
-    return false;
-  };
-  const cells = new Map<string, typeof projected>();
-  for (const p of projected) {
-    const key = `${Math.floor(p.x / 40)}:${Math.floor(p.y / 40)}`, cell = cells.get(key) ?? [];
-    cell.push(p); cells.set(key, cell);
-  }
-  const pointOverlap = (id: string, rect: { left: number; top: number; width: number; height: number }) => {
-    let count = 0;
-    for (let x = Math.floor((rect.left - 6) / 40); x <= Math.floor((rect.left + rect.width + 6) / 40); x++) for (let y = Math.floor((rect.top - 6) / 40); y <= Math.floor((rect.top + rect.height + 6) / 40); y++) {
-      for (const p of cells.get(`${x}:${y}`) ?? []) if (p.item.node.id !== id && p.x > rect.left - 6 && p.x < rect.left + rect.width + 6 && p.y > rect.top - 6 && p.y < rect.top + rect.height + 6) {
-        if (++count === 16) return count * 300;
-      }
-    }
-    return count * 300;
-  };
   const budget = Math.max(6, Math.min(24, Math.floor(size.width * size.height / 28000)));
-  const placedIds = new Set<string>();
-  const place = (label: FlowLabelContent, px: number, py: number, force: boolean) => {
-    if (placedIds.has(label.id) || !Number.isFinite(px) || !Number.isFinite(py)) return false;
-    const measureText = (text: string) => [...text].reduce((sum, char) => sum + (char.charCodeAt(0) > 255 ? 12 : 6.7), 16);
-    // Hover must not grow a mounted hit box: a left-side label would then cover
-    // its own dot and be relocated out from under the stationary pointer.
-    const width = Math.min(size.width < 700 ? 175 : 225, label.selected ? 225 : Math.min(220, Math.max(90, measureText(label.label), measureText(label.disambiguation ?? ''), measureText(label.roleLabel ?? ''))));
-    // Each supplemental row has a fixed 16px line box in the mounted label.
-    const height = (label.region || label.selected || label.aggregate ? 46 : 28) + (label.disambiguation ? 16 : 0) + (label.roleLabel ? 16 : 0);
-    const inset = labelInset(label);
-    const prior = previous.get(label.id);
-    const choices = [...(prior?.selected === label.selected && prior.pointX !== undefined && prior.pointY !== undefined ? [[prior.x - prior.pointX, prior.y - prior.pointY]] : []),
-      [0, 0], [-width - inset * 2, 0], [0, -height - 8], [0, height + 8], [-width - inset * 2, -height - 8], [-width - inset * 2, height + 8],
-      ...(force || label.related ? [2, 3, 4].flatMap(step => [[0, -(height + 8) * step], [0, (height + 8) * step], [-width - inset * 2, -(height + 8) * step], [-width - inset * 2, (height + 8) * step]]) : [])];
-    let fallback: { x: number; y: number; left: number; top: number; overlap: number } | undefined;
-    for (const [dx, dy] of choices) {
-      const x = Math.max(3, Math.min(size.width - width - inset - 3, px + dx!)), y = Math.max(top + height / 2, Math.min(bottom - height / 2, py + dy!));
-      const rect = { left: x + inset, top: y - height / 2, width, height };
-      const clearance = prior ? 3 : 9;
-      const ownDotOverlap = !label.region && px + inset > rect.left + .001 && px - inset < rect.left + width - .001
-        && py + inset > rect.top + .001 && py - inset < rect.top + height - .001;
-      const labelOverlap = occupied.reduce((sum, previous) => sum + Math.max(0, Math.min(rect.left + width + clearance, previous.left + previous.width) - Math.max(rect.left - clearance, previous.left))
-        * Math.max(0, Math.min(rect.top + height + clearance, previous.top + previous.height) - Math.max(rect.top - clearance, previous.top)), 0);
-      if (ownDotOverlap || labelOverlap || coversCritical(label.id, rect)) continue;
-      const overlap = pointOverlap(label.id, rect);
-      if (!fallback || overlap < fallback.overlap) fallback = { x, y, left: rect.left, top: rect.top, overlap };
-      if (overlap === 0) break;
-    }
-    if (!fallback || !force && fallback.overlap > 0) return false;
-    occupied.push({ left: fallback.left, top: fallback.top, width, height });
-    placedIds.add(label.id);
-    labels.push({ ...label, x: fallback.x, y: fallback.y, pointX: px, pointY: py, width, height });
-    return true;
-  };
+  const {labels,place} = createSpatialLabelPlacer(projected.map(p=>({id:p.item.node.id,x:p.x,y:p.y})),size,top,bottom,context,selectedIds,previous);
   const nodeLabel = (item: SemanticPosition): FlowLabelContent => {
     const display = context.displays?.get(item.node.id), role = context.roles?.get(item.node.id);
     return { id: item.node.id, label: typeof item.node.attributes.shortLabel === 'string' ? item.node.attributes.shortLabel : context.view === 'data-flow' ? display?.title ?? item.node.label : item.node.label, path: item.node.attributes.displayAggregate === true ? `${Number(item.node.attributes.targetCount).toLocaleString()}対象${Number(item.node.attributes.matchingCount) > 0 ? ` · ${Number(item.node.attributes.matchingCount)}件一致` : ''}` : `${item.node.kind === 'external' && !item.node.architecture ? '定義先未特定 · 呼び出し箇所 ' : ''}${display?.location ?? `${item.node.path ?? item.node.group}${item.node.line ? `:${item.node.line}` : ''}`}`,

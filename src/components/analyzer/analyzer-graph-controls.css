@@ -1,0 +1,14 @@
+.analyzer-graph-stage .analyzer-stage-controls.analyzer-graph-controls { z-index:5; max-width:calc(100% - 24px); flex-wrap:wrap; justify-content:flex-end; }
+.analyzer-graph-controls button { min-height:32px; cursor:pointer; }
+.analyzer-graph-controls button:disabled { opacity:.4; cursor:default; }
+.analyzer-graph-controls .analyzer-fullscreen-entry { display:flex; flex:0 0 auto; align-items:center; gap:10px; width:clamp(240px,28vw,340px); max-width:100%; padding:0 4px; box-sizing:border-box; }
+.analyzer-graph-controls .analyzer-fullscreen-entry > span { flex:none; min-width:0; padding:0; color:var(--muted); font-family:inherit; font-size:12px; white-space:nowrap; }
+.analyzer-graph-controls .analyzer-fullscreen-entry select { flex:1; width:0; min-width:0; height:36px; padding:0 34px 0 12px; font-size:13px; line-height:1.5; appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='m1 1 5 5 5-5' fill='none' stroke='%23c7e0d4' stroke-width='1.5'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 12px center; text-overflow:ellipsis; cursor:pointer; }
+.semantic-flow-mode { display:flex; padding:2px; border:1px solid var(--line); border-radius:5px; gap:2px; }
+.semantic-flow-mode button { border-color:transparent; }
+.semantic-flow-mode button[aria-pressed=true] { border-color:var(--accent); color:var(--accent); background:#273e32; }
+@media(max-width:700px) {
+  .analyzer-graph-stage .analyzer-stage-controls.analyzer-graph-controls { top:8px; left:8px; right:8px; max-width:none; justify-content:flex-start; gap:4px; }
+  .analyzer-graph-stage .analyzer-graph-controls button { min-height:32px; font-size:11px; }
+  .semantic-flow-mode { padding:0; }
+}

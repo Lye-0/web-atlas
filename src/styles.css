@@ -2867,6 +2867,7 @@ summary:focus-visible {
 }
 
 .analyzer-workspace {
+  --analyzer-stage-height: clamp(540px, 67vh, 760px);
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   align-items: stretch;
@@ -2881,18 +2882,11 @@ summary:focus-visible {
 .analyzer-graph-stage {
   position: relative;
   min-width: 0;
-  height: clamp(540px, 67vh, 760px);
+  height: var(--analyzer-stage-height, clamp(540px, 67vh, 760px));
   overflow: hidden;
   overscroll-behavior: contain;
   border: 1px solid var(--line);
-  background-color: #0c1111;
-  background-image:
-    linear-gradient(rgba(135, 164, 155, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(135, 164, 155, 0.035) 1px, transparent 1px),
-    linear-gradient(rgba(135, 164, 155, 0.022) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(135, 164, 155, 0.022) 1px, transparent 1px),
-    radial-gradient(circle at 50% 40%, rgba(118, 167, 151, 0.075), transparent 55%);
-  background-size: 28px 28px, 28px 28px, 140px 140px, 140px 140px, auto;
+  background: #050c09;
   cursor: grab;
   touch-action: none;
   user-select: none;
@@ -2910,16 +2904,15 @@ summary:focus-visible {
 
 .analyzer-spatial-graph-stage {
   isolation: isolate;
-  background-color: #020407;
-  background-image: radial-gradient(circle at 50% 42%, rgba(54, 91, 84, 0.08), transparent 62%);
-  background-size: auto;
+  background-color: #050c09;
+  background-image: none;
 }
 
 .analyzer-spatial-workspace {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  height: clamp(540px, 67vh, 760px);
+  height: var(--analyzer-stage-height, clamp(540px, 67vh, 760px));
 }
 .analyzer-spatial-workspace > .analyzer-spatial-graph-stage {
   flex: 1;
@@ -3075,14 +3068,14 @@ summary:focus-visible {
 .analyzer-spatial-selected-indicator {
   position: absolute;
   z-index: 6;
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%) scale(var(--spatial-annotation-scale, 1));
   padding: 2px 8px;
   border: 1px solid rgba(103, 232, 249, 0.55);
   border-radius: 999px;
   background: rgba(10, 17, 16, 0.92);
   color: rgba(186, 244, 252, 0.92);
   font-family: var(--font-mono);
-  font-size: calc(0.56rem * var(--spatial-label-scale));
+  font-size: 0.56rem;
   letter-spacing: 0.04em;
   pointer-events: none;
   white-space: nowrap;
@@ -4185,6 +4178,9 @@ summary:focus-visible {
 }
 
 .analyzer-stage-controls {
+  max-width: calc(100% - 24px);
+  flex-wrap: wrap;
+  justify-content: flex-end;
   position: absolute;
   top: 12px;
   right: 12px;
@@ -4350,7 +4346,7 @@ summary:focus-visible {
   position: relative;
   z-index: 5;
   min-width: 0;
-  max-height: clamp(540px, 67vh, 760px);
+  max-height: var(--analyzer-stage-height, clamp(540px, 67vh, 760px));
   overflow: auto;
   border: 1px solid var(--line);
   background: rgba(16, 21, 22, 0.82);
@@ -4607,7 +4603,9 @@ summary:focus-visible {
 }
 
 .analyzer-evidence-file span {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
   color: var(--subtle);
   font-family: var(--font-mono);
   font-size: 0.61rem;
@@ -5027,9 +5025,12 @@ summary:focus-visible {
   grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
 }
 .analyzer-workspace:fullscreen .analyzer-spatial-workspace,
-.analyzer-workspace.is-fullscreen .analyzer-spatial-workspace {
+.analyzer-workspace.is-fullscreen .analyzer-spatial-workspace,
+.analyzer-workspace:fullscreen .analyzer-graph-stage,
+.analyzer-workspace.is-fullscreen .analyzer-graph-stage {
   height: 100%;
   min-height: 0;
+  max-height: none;
 }
 .analyzer-workspace:fullscreen .analyzer-detail-panel,
 .analyzer-workspace.is-fullscreen .analyzer-detail-panel {
@@ -5044,3 +5045,14 @@ summary:focus-visible {
     grid-template-rows: minmax(0, 2fr) minmax(0, 1fr);
   }
 }
+.analyzer-evidence-path { margin: 0; padding: 5px 9px; overflow-wrap: anywhere; font-size: .65rem; }
+.analyzer-graph-stage:not(.semantic-flow-stage) .analyzer-stage-help,
+.analyzer-graph-3d .analyzer-stage-help { top: var(--analyzer-controls-bottom, 92px); }
+.analyzer-static-direction-legend {
+  position: absolute; bottom: 10px; left: 12px; z-index: 7; display: flex; flex-wrap: wrap;
+  gap: 8px; max-width: calc(100% - 24px); padding: 5px 8px; border-radius: 5px;
+  background: rgba(10, 13, 14, .9); color: var(--subtle); font-size: .65rem; pointer-events: none;
+}
+.analyzer-static-direction-legend span::before { content: '→'; margin-right: 4px; }
+
+.analyzer-graph-3d > .analyzer-graph-empty { position:absolute; inset:0; z-index:3; display:grid; place-content:center; pointer-events:none; }

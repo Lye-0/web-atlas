@@ -27,6 +27,19 @@ function withProject(): AnalyzerSessionState {
   });
 }
 
+it('retains the shared particle preference across tab changes and project replacement', () => {
+  let state = analyzerSessionReducer(withProject(), { type: 'setParticleMode', mode: 'off' });
+  for (const view of ['workspace', 'module-dependency', 'runtime-flow', 'architecture-map'] as const) {
+    state = analyzerSessionReducer(state, { type: 'setActiveView', view });
+    expect(state.particleMode).toBe('off');
+  }
+  state = analyzerSessionReducer(state, { type: 'replaceProject', store: projectStore('second') });
+  expect(state.particleMode).toBe('off');
+  expect(state.views.workspace.selectedNodeId).toBeUndefined();
+  state = analyzerSessionReducer(state, { type: 'setParticleMode', mode: 'reduced' });
+  expect(state.particleMode).toBe('reduced');
+});
+
 function viewModel(): AnalyzerViewModel {
   return {
     view: 'command',

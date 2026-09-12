@@ -12,9 +12,8 @@ export interface SpatialFlowState {
 }
 
 export const SPATIAL_FLOW_SPEED = 65;
+export const SPATIAL_FLOW_MAX_FRAME_SECONDS = .1;
 export const SPATIAL_FLOW_PARTICLE_SPACING = 50;
-const SPATIAL_FLOW_DENSITY = 3;
-export const SPATIAL_FLOW_MAX_PARTICLES_PER_PATH = 8 * SPATIAL_FLOW_DENSITY;
 export const SPATIAL_FLOW_PATHS_PER_BATCH = 512;
 
 export function spatialFlowPhase(id: string): number {
@@ -23,9 +22,8 @@ export function spatialFlowPhase(id: string): number {
   return (hash >>> 0) / 4294967296;
 }
 
-/** Store arc distances once. Fixed spacing uses a shared phase plus a distance slot;
- * callers without spacing retain the bounded particle layout used by Module Dependency. */
-export function buildSpatialFlowData(paths: readonly SpatialFlowPath[], spacing?: number) {
+/** Shared fixed arc spacing and phase for every renderer. */
+export function buildSpatialFlowData(paths: readonly SpatialFlowPath[]) {
   const width = Math.max(2, ...paths.map(path => path.points.length));
   const height = Math.max(1, paths.length);
   const samples = new Float32Array(width * height * 4);
@@ -38,12 +36,11 @@ export function buildSpatialFlowData(paths: readonly SpatialFlowPath[], spacing?
       samples.set([point.x, point.y, point.z, length], (row * width + i) * 4);
     });
     if (path.points.length < 2 || length < 0.001) return;
-    const fixedSpacing = spacing !== undefined && Number.isFinite(spacing) && spacing > 0;
-    const count = fixedSpacing ? Math.ceil(length / spacing) : Math.max(2, Math.min(8, Math.ceil(length / 150))) * SPATIAL_FLOW_DENSITY;
+    const count = Math.ceil(length / SPATIAL_FLOW_PARTICLE_SPACING);
     const phase = spatialFlowPhase(path.id);
     for (let index = 0; index < count; index++) particles.push({
       row: (row + 0.5) / height, length, sampleCount: path.points.length,
-      offset: fixedSpacing ? phase : (index / count + phase) % 1, index, color: path.color,
+      offset: phase, index, color: path.color,
     });
   });
   return { width, height, samples, particles };
