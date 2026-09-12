@@ -20,7 +20,7 @@ export const dictionaryVisualGroups: DictionaryVisualGroup[] = [
     description: 'コードを書く・動かす・依存を揃える',
     side: 'right',
     order: 1,
-    rootCategoryIds: ['markup-language', 'stylesheet-language', 'programming-language', 'runtime', 'package-manager'],
+    rootCategoryIds: ['markup-language', 'stylesheet-language', 'programming-language', 'query-schema-language', 'runtime', 'package-manager'],
   },
   {
     id: 'application',

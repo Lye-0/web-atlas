@@ -119,3 +119,15 @@ A（タブ1–4）の全面更新は今回の対象外。B（5）とC（6–9）
 F1–F7の仕上げと内部詳細＋周辺概要の検証は[追加検証記録](architecture-focus-review.md)を参照。
 
 ラベル優先度・要求元・相手要約・件数説明の仕上げは[視認性と関係要約の検証](architecture-readability-review.md)を参照。
+
+## 2026-09-12 配置・配信の明示構成
+
+stackArchitectureは追加adapterのresourceを同じArchitecture Modelへ投影する。declaredConnectionsはtarget ID、関係種別、元ファイル・範囲を保持する軽量データ契約であり、workerからscan adapterやDictionary本文を逆importしない。関係ラベルはarchitectureRelationsにも登録し、未知の関係として表示しない。
+
+Kubernetes Service selectorは同じmanifest所有・namespace内のworkload labelsにだけ対応する。Ingressは明示backend名から同namespaceのServiceへつながる。未知・曖昧なbackendやselector無しを任意のappに結び付けない。image名だけでローカルappへ昇格しない。
+
+NGINXはserver / location / proxy_pass / upstream /静的接続先を保持し、includeは既に選択されたローカルファイル内だけを有限深さで処理する。Apacheは明示VirtualHost / ServerName / DocumentRoot / ProxyPassを扱う。可変接続先、未読include、DNS解決は実行しない。
+
+CloudFront、Fastly、Cloudflare cache ruleset、Google Cloud CDN、Akamai、bunny CDNは採用した明示cache/behavior/rule/originの値を保持する。bunnyのcustom hostnameはbunnynet_pullzone_hostnameからPull Zoneへ対応し、providerの読み取り専用cdn_domainを設定形式として捏造しない。GitHub Pagesは同じjob内のupload artifact pathとdeployを接続する。cross-job artifact追跡や全provider versionの解釈は対象外。
+
+設定詳細は「構成と接続先」で環境、Origin、namespace、selector、ports、artifact、配信設定等を表示する。設定を発見したことと稼働・通信観測は区別する。

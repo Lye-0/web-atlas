@@ -796,7 +796,7 @@ export function AnalyzerSpatialGraphStage({
       const sourceName = endpointDisplayName(source, uniqueRegionLabels, 'near');
       const targetName = endpointDisplayName(target, uniqueRegionLabels, 'near');
       const direction = edgeDirection(edge);
-      const description = edge.aggregated ? `${sourceName} → ${targetName} · この範囲内の ${edge.count}関係 · ${edge.edge.label}` : `${sourceName} が ${targetName} を import`;
+      const description = edge.aggregated ? `${sourceName} → ${targetName} · この範囲内の ${edge.count}関係 · ${edge.edge.label}` : edge.edge.metadata.dependencyKind === 'build-entry' ? `${sourceName} が ${targetName} をビルド入力に指定` : `${sourceName} が ${targetName} を import`;
       const start = sourceWorldPort ?? spatialScreenPointToWorldAtElevation(routePorts.start, endpointElevation(source), routeCamera);
       const end = targetWorldPort ?? spatialScreenPointToWorldAtElevation(routePorts.end, endpointElevation(target), routeCamera);
       return {

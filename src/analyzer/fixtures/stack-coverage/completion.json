@@ -1,0 +1,21 @@
+{
+  "wpf-explicit-main": {
+    "apps/desktop/app.csproj": "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><UseWPF>true</UseWPF><OutputType>WinExe</OutputType><TargetFramework>net10.0-windows</TargetFramework></PropertyGroup></Project>",
+    "apps/desktop/MainWindow.xaml": "<Window x:Class=\"App.MainWindow\" xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\" xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\"><Button Click=\"Save\" Content=\"{Binding Title}\" /></Window>",
+    "apps/desktop/MainWindow.xaml.cs": "using System.Windows;namespace App {public partial class MainWindow:Window {public MainWindow(){InitializeComponent();}public new string Title {get;set;}public void Save(object sender,RoutedEventArgs e){Persist(Title);}public string Persist(string value){return value;}}}",
+    "apps/desktop/Program.cs": "using System;using System.Windows;namespace App{class Program{[STAThread]public static void Main(){var app=new Application();app.Run(new MainWindow());}}}",
+    "package.json": "{\"name\":\"orchestrator\",\"scripts\":{\"start\":\"dotnet run --project apps/desktop/app.csproj\"}}"
+  },
+  "boot-ci": {
+    "pom.xml": "<project><modelVersion>4.0.0</modelVersion><groupId>demo</groupId><artifactId>app</artifactId><version>1</version><dependencies><dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-web</artifactId><version>4</version></dependency></dependencies></project>",
+    "Api.java": "package demo;\nimport org.springframework.web.bind.annotation.GetMapping;\nimport org.springframework.context.annotation.Bean;\nimport org.springframework.beans.factory.annotation.Autowired;\nimport org.springframework.web.bind.annotation.RequestMapping;\nimport org.springframework.web.bind.annotation.RestController;\n@RestController @RequestMapping(\"/api\") class Api { @Autowired private Store store; @GetMapping(\"/users\") public User users(){return load();} User load(){return new User();} } class User {public String name;} class Store{} class Config{ @Bean public Store store(){return new Store();} }",
+    "Application.java": "package demo;\nimport org.springframework.boot.SpringApplication;\nimport org.springframework.boot.autoconfigure.SpringBootApplication;\n@SpringBootApplication class Application {public static void main(String[] args){SpringApplication.run(Application.class,args);}}",
+    ".gitlab-ci.yml": "launch:\n  script: java --class-path \"lib/*\" Application.java\n"
+  },
+  "clerk-middleware-handler": {
+    "app.ts": "import express from 'express';import{clerkMiddleware,getAuth}from'@clerk/express';const app=express();app.use(clerkMiddleware());app.get('/me',profile);function profile(req,res){const user=getAuth(req);return res.json(user);}"
+  },
+  "auth0-domain-handler": {
+    "middleware.ts": "import{Auth0Client}from'@auth0/nextjs-auth0/server';const auth0=new Auth0Client({domain:'tenant.example.test'});export async function middleware(request:Request){return auth0.middleware(request);}export async function profile(){const session=await auth0.getSession();return session;}"
+  }
+}

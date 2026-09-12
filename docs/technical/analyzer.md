@@ -203,3 +203,15 @@ Module Dependencyの集約内訳は主選択と別の参照状態であり、内
 `pnpm test`、`pnpm typecheck`、`pnpm lint`、`pnpm build`で検証します。Tab 1–5のFact・import解決・routing・spatial layout・操作・Sessionの回帰は、`src/analyzer/*.test.ts`と既存のAnalyzerコンポーネントテストで維持します。View 6–10の実WASM解析・投影・Trace・UI回帰は`src/analyzer/semantic/*.test.ts`と`src/pages/SemanticAnalyzerPage.test.tsx`で検証します。
 
 `WEB_ATLAS_VALIDATION_REPOS`を指定すると、任意の実Repositoryを読み取り専用で検証します。指定がない通常のテストでは、この外部入力検証のみskipします。`vehicle-management`と`git-lines`は許可された検証入力であり、解析側からコードを変更・実行しません。実際のWebGL描画・ファイル選択・View間の移動は別途ブラウザで確認します。
+
+## 2026-09-12 Dictionary連携拡張
+
+新94 Stackの正規ID・ecosystem別識別子・対応形式・必要View・非該当理由・限界は src/analyzer/stackRegistry.ts に集約する。Dictionaryは142 Stack /52 Categoryになり、Viewの辞書リンクも同じIDを利用する。
+
+追加scanはmanifestAdapters / lockAdapters / expandedCommands / providerAdapters / providerSourceAdapters / buildAdapters / deploymentDetailsへ分割する。npmのほかPyPI、Maven、NuGet、Cargo、Composer、Go、Gem、Dart、Swift等の明示宣言と所属を扱う。lock情報はmanifestの所有に従い、推測したtransitive依存を直接依存に変えない。C/C++ヘッダはcompile databaseや明示言語指定を利用し、曖昧な.hは未解決にする。
+
+CI script配列を合成したコマンドにはyamlCommandOffsetsの元文字位置対応を保持する。Command Flow・起動対象・Evidenceは同じ原範囲を参照する。webpack/esbuildの静的input/outputはビルド宣言であり、実行観測ではない。
+
+Firebase SuiteとAuth/Firestore/Storage等の製品を分け、明示されたlocal接続、project、binding、API受信先に基づいて結び付ける。CDN、Service、Ingress、proxy、Pages artifactの設定接続は明示対象IDと元範囲を保持し、Runtime/Architectureにも渡す。取得していないDNS、クラウド状態、稼働状態は推定しない。
+
+AppのAnalyzerページとscanを遅延読み込みし、semantic workerはES module形式。SQL/GraphQL parserも必要入力で読み込む。workerへ辞書本文全体をimportせず、軽量metadataで識別する。検証範囲は[受入台帳](../plans/2026-09-12-dictionary-analyzer-acceptance.md)と[最終結果](../plans/2026-09-12-dictionary-analyzer-final-review.md)を参照。

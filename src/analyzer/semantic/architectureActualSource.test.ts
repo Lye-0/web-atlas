@@ -62,8 +62,13 @@ for (const name of ['git-lines', 'vehicle-management', 'web-atlas']) it.skipIf(!
   if (name === 'vehicle-management') {
     expect(root.nodes.some(n => n.label === 'vehicle-management-api')).toBe(true);
     expect(root.nodes.some(n => n.label === 'VehicleManagement.Companion' && n.architecture?.context.includes('.NET / WPF'))).toBe(true);
-    expect(model.environments).toEqual(['development', 'production']);
-    expect(root.nodes.some(n => n.label === 'Firebase authエミュレーター :9099')).toBe(true);
+    expect(model.environments).toEqual(expect.arrayContaining(['development', 'production', 'local', 'cloud']));
+    const suite=model.nodes.find(node=>node.attributes.dictionaryStackId==='firebase-emulator-suite')!;
+    const localAuth=model.nodes.find(node=>node.attributes.dictionaryStackId==='firebase-authentication'&&node.architecture?.environments.includes('local'))!;
+    expect(root.nodes.some(node=>node.id===suite.id)).toBe(true);
+    expect(localAuth.architecture?.parentId).toBe(suite.id);
+    expect(String(localAuth.attributes.endpoint)).toMatch(/127\.0\.0\.1:9099\/?$/);
+    expect(model.edges.some(edge=>edge.source===suite.id&&edge.target===localAuth.id&&edge.kind==='contains')).toBe(true);
     const production = architectureScopeGraph(model, undefined, 'production');
     const development = architectureScopeGraph(model, undefined, 'development');
     expect(production.nodes.filter(n => n.architecture?.kind === 'resource').every(n => n.architecture!.environments.includes('production'))).toBe(true);

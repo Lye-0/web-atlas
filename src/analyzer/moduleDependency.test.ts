@@ -16,6 +16,15 @@ function file(relativePath: string, source: string): AnalyzerSourceFile {
 }
 
 describe('Module Dependency view', () => {
+  it('owns Python root modules exactly once and keeps nested directories below their project',async()=>{
+    const store=await scanProjectFiles([file('services/api/pyproject.toml','[project]\nname="api"'),file('services/api/main.py','from .repository import load\n'),file('services/api/repository.py','def load(): return 1\n'),file('services/api/sub/helper.py','def helper(): return 1\n')]);
+    const view=projectModuleDependency(store);const layout=layoutAnalyzerView(view);
+    for(const fact of store.facts.filter(fact=>fact.kind==='module')){
+      expect(view.regions?.filter(region=>region.childIds.includes(fact.id))).toHaveLength(1);
+      expect(layout.nodes.filter(node=>node.node.id===fact.id)).toHaveLength(1);
+    }
+    expect(view.regions?.some(region=>region.regionKind==='directory'&&region.subtitle==='services/api')).toBe(false);
+  });
   it('creates source modules, typed dependency facts, and nested directory Regions', async () => {
     const store = await scanProjectFiles([
       file('package.json', '{"name":"fixture"}'),

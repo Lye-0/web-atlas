@@ -522,7 +522,7 @@ describe('Analyzer scan and projectors', () => {
     expect(fact('technology:react')).toMatchObject({ kind: 'technology', dictionaryStackId: 'react' });
     expect(fact('technology:vite')).toMatchObject({ kind: 'technology', dictionaryStackId: 'vite' });
     expect(fact('technology:firebase')).toMatchObject({ kind: 'technology', label: 'Firebase' });
-    expect(fact('technology:firebase-authentication')).toBeUndefined();
+    expect(fact('technology:firebase-authentication')).toMatchObject({ dictionaryStackId: 'firebase-authentication', explicit: true });
     expect(fact('runtime:cloudflare-workers:wrangler.jsonc')).toMatchObject({ kind: 'runtime', runtimeType: 'cloudflare-workers' });
     expect(fact('resource:wrangler.jsonc:d1:DB')).toMatchObject({ kind: 'resource', resourceType: 'database', binding: 'DB' });
     expect(fact('resource:wrangler.jsonc:b2')).toMatchObject({ kind: 'resource', resourceType: 'storage', dictionaryStackId: 'backblaze-b2' });
@@ -747,8 +747,10 @@ describe('Analyzer scan and projectors', () => {
     expect(usage('services', 'firebase-authentication')).toBeDefined();
 
     const sharedScope = stackMap.regions?.find((region) => region.id === 'region:scope:packages/shared');
-    expect(sharedScope).toBeUndefined();
-    expect(stackMap.regions?.some((region) => region.metadata.scopeLabel === 'DESKTOP')).toBe(false);
+    expect(sharedScope?.childIds).toEqual(['stack-usage:package:packages/shared:pnpm']);
+    expect(usage('package:packages/shared','pnpm')?.evidenceIds.some(id=>store.evidence.find(item=>item.id===id)?.filePath==='packages/shared/package.json')).toBe(true);
+    expect(stackMap.regions?.some((region) => region.metadata.scopeLabel === 'DESKTOP')).toBe(true);
+    expect(store.facts.some(fact=>fact.kind==='runtime'&&['pnpm','wpf','dotnet'].includes(fact.runtimeType))).toBe(false);
     expect(stackMap.edges.every((edge) => stackMap.nodes.some((node) => node.id === edge.sourceId) || stackMap.regions?.some((region) => region.id === edge.sourceId))).toBe(true);
     expect(stackMap.edges.every((edge) => stackMap.nodes.some((node) => node.id === edge.targetId) || stackMap.regions?.some((region) => region.id === edge.targetId))).toBe(true);
     expect(stackMap.edges.every((edge) => edge.kind === 'contains' && edge.metadata.toEndpointKind === 'region')).toBe(true);
@@ -802,14 +804,14 @@ describe('Analyzer scan and projectors', () => {
     expect(stackMap.regions?.some((region) => region.metadata.scopePath === 'packages/shared')).toBe(false);
 
     const companionScope = stackMap.regions?.find((region) => region.metadata.scopePath === 'apps/companion');
-    expect(companionScope).toMatchObject({ entityKind: 'region', subtitle: 'apps/companion', metadata: { scopeKind: 'physical', scopeType: 'desktop' } });
+    expect(companionScope).toMatchObject({ entityKind: 'region', subtitle: 'apps/companion', metadata: { scopeKind: 'physical', scopeType: 'workspace' } });
     const companionTypescript = stackMap.nodes.find((node) => node.type === 'stack-usage' && node.metadata.scopePath === 'apps/companion' && node.metadata.stackId === 'typescript');
     expect(companionTypescript?.evidenceIds).toHaveLength(2);
     const companionEvidencePaths = stackMap.evidence.filter((evidence) => companionTypescript?.evidenceIds.includes(evidence.id)).map((evidence) => evidence.filePath);
     expect(companionEvidencePaths).toEqual(expect.arrayContaining(['apps/companion/src/ProjectA/tsconfig.json', 'apps/companion/src/ProjectB/tsconfig.json']));
 
     const standaloneScope = stackMap.regions?.find((region) => region.metadata.scopePath === 'Standalone');
-    expect(standaloneScope).toMatchObject({ entityKind: 'region', subtitle: 'Standalone', metadata: { scopeKind: 'physical', scopeType: 'desktop' } });
+    expect(standaloneScope).toMatchObject({ entityKind: 'region', subtitle: 'Standalone', metadata: { scopeKind: 'physical', scopeType: 'package' } });
     expect(stackMap.nodes.some((node) => node.label === '@types/node')).toBe(false);
 
     const stackOnly = presentAnalyzerView(stackMap, { expandedPresentationIds: new Set(), filter: 'stack-usage', search: '' });

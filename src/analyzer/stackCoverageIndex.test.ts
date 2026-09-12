@@ -1,0 +1,4 @@
+import{describe,expect,it}from'vitest';import{stackCoverageFixtures}from'./fixtures/stack-coverage';import{stackRegistry}from'./stackRegistry';
+describe('the 94 canonical expansion IDs have executable fixture bindings',()=>{
+ it('binds every registry fixture exactly once without granting blanket profile completion',()=>{expect(stackCoverageFixtures).toHaveLength(94);expect(new Set(stackCoverageFixtures.map(fixture=>fixture.stackId)).size).toBe(94);expect(stackCoverageFixtures.map(fixture=>fixture.stackId).sort()).toEqual(stackRegistry.map(entry=>entry.stackId).sort());for(const support of stackRegistry){const fixture=stackCoverageFixtures.find(fixture=>fixture.stackId===support.stackId)!;expect(fixture.fixtureId).toBe(support.fixtureId);expect(Object.keys(fixture.sources).length).toBeGreaterThan(0);expect(fixture.testFile).toMatch(/\.test\.ts$/);}});
+});

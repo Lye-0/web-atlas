@@ -1,7 +1,7 @@
 import { getCategory, getStack } from '../data';
-import { makeEvidence, type OffsetRange } from './evidence';
-import { parseCommandExpression, type CommandFragment } from './commandParser';
-import { commandTerminalTarget } from './commandTargets';
+import { makeEvidence } from './evidence';
+import { commandSourceRange, parseCommandExpression, type CommandFragment } from './commandParser';
+import { commandTerminalTargets } from './commandTargets';
 import {
   analyzerViewLabels,
   nodeTypeLabels,
@@ -34,14 +34,14 @@ export const ANALYZER_COMMAND_COMMON_LANE_ID = 'command-lane:common';
 
 function nodeSubtitle(fact: AnalyzerFact): string | undefined {
   if (fact.kind === 'project') return 'Selected local project folder';
-  if (fact.kind === 'workspace-package') return fact.packagePath === '.' ? 'root package · workspace root' : fact.packagePath;
+  if (fact.kind === 'workspace-package') return fact.packagePath === '.' ? 'root package · project root' : fact.packagePath;
   if (fact.kind === 'workspace-config') return fact.filePath;
   if (fact.kind === 'workspace-pattern') return fact.configId;
   if (fact.kind === 'package-script') return `${fact.packageName} · ${fact.packagePath} · ${fact.command}`;
   if (fact.kind === 'technology') return fact.packageNames.length > 0 ? fact.packageNames.join(' · ') : 'explicit configuration';
   if (fact.kind === 'external-package') return fact.versionRanges.join(' · ');
   if (fact.kind === 'runtime') return typeof fact.metadata.main === 'string' ? fact.metadata.main : fact.runtimeType;
-  if (fact.kind === 'resource') return fact.binding ?? fact.resourceType;
+  if (fact.kind === 'resource') return fact.metadata.buildOutput ? `ビルド成果物の宣言 · ${fact.metadata.outputKind === 'directory' ? 'directory' : 'file'}` : fact.binding ?? fact.resourceType;
   if (fact.kind === 'dotnet-project') return fact.projectPath;
   return undefined;
 }
@@ -68,6 +68,7 @@ function nodeForFact(fact: AnalyzerFact, clusterId: string | undefined, typeOver
       factKind: fact.kind,
       nodeType: nodeTypeLabels[type],
       ...(fact.kind === 'project' ? { displayRole: 'PROJECT' } : {}),
+      ...(fact.metadata.buildOutput ? { displayRole: 'BUILD OUTPUT' } : {}),
       ...(fact.kind === 'workspace-package' && fact.isRoot ? { displayRole: 'ROOT PACKAGE' } : {}),
     },
   };
@@ -135,8 +136,8 @@ function edgesForRelations(
     });
 }
 
-type StackMapScopeKind = 'root' | 'services' | 'application' | 'workspace' | 'package' | 'desktop';
-type StackMapScopeSource = 'root' | 'services' | 'package' | 'workspace' | 'runtime' | 'config' | 'solution' | 'standalone';
+type StackMapScopeKind = 'root' | 'services' | 'deployment' | 'application' | 'workspace' | 'package' | 'desktop';
+type StackMapScopeSource = 'root' | 'services' | 'deployment' | 'package' | 'workspace' | 'runtime' | 'config' | 'solution' | 'standalone';
 
 interface StackMapScopeCandidate {
   id: string;
@@ -289,7 +290,7 @@ function workspacePatternRootForPath(directory: string, patterns: readonly strin
 
 function scopeCandidateId(path: string, source: StackMapScopeSource, kind: StackMapScopeKind): string {
   const normalizedPath = normalizeScopePath(path);
-  if (normalizedPath === '.') return source === 'services' ? 'services' : 'root';
+  if (normalizedPath === '.') return source === 'services' ? 'services' : source==='deployment'?'deployment':'root';
   if (source === 'package') return packageScopeId(normalizedPath);
   return kind === 'desktop' ? `desktop:${normalizedPath}` : `application:${normalizedPath}`;
 }
@@ -307,7 +308,7 @@ function makeScopeCandidate(
     id: scopeCandidateId(normalizedPath, source, kind),
     path: normalizedPath,
     kind,
-    label: kind === 'desktop' ? 'DESKTOP' : normalizedPath === '.' ? source === 'services' ? 'PROJECT / SERVICES' : 'PROJECT / TOOLING' : packageScopeLabel(normalizedPath),
+    label: kind === 'desktop' ? 'DESKTOP' : normalizedPath === '.' ? source === 'services' ? 'PROJECT / SERVICES' : source==='deployment'?'PROJECT / DEPLOYMENT':'PROJECT / TOOLING' : packageScopeLabel(normalizedPath),
     source,
     promotionStrength,
     ...(factId ? { factId } : {}),
@@ -318,6 +319,7 @@ function makeScopeCandidate(
 const stackMapScopeSourceRank: Record<StackMapScopeSource, number> = {
   root: 6,
   services: 6,
+  deployment: 6,
   package: 5,
   solution: 4,
   config: 3,
@@ -395,13 +397,24 @@ function inferredEvidenceRole(fact: AnalyzerFact, evidence: AnalyzerEvidence): A
 }
 
 function stackUsageRole(fact: AnalyzerFact): string | undefined {
-  if (fact.kind === 'technology') return fact.explicit ? 'explicit configuration' : 'package dependency';
+  if (fact.kind === 'technology') return typeof fact.metadata.source === 'string' ? fact.metadata.source : fact.explicit ? 'explicit configuration' : 'package dependency';
   if (fact.kind === 'runtime') return 'runtime';
   if (fact.kind === 'resource') return fact.resourceType;
   return undefined;
 }
 
+function stackRoleOrder(stackId:string):number{
+  const categories=new Set<string>();let category=getCategory(getStack(stackId)?.categoryId??'');while(category&&!categories.has(category.id)){categories.add(category.id);category=category.parentCategoryId?getCategory(category.parentCategoryId):undefined;}
+  if(['package-manager','build-tool','testing','code-quality','ci-cd','local-emulator'].some(id=>categories.has(id)))return 3;
+  if(['programming-language','markup-language','stylesheet-language','query-schema-language','runtime'].some(id=>categories.has(id)))return 0;
+  if(['database','storage','orm','validation-library'].some(id=>categories.has(id)))return 2;
+  if(['deployment-platform','container','version-control','development-platform'].some(id=>categories.has(id)))return 4;
+  return 1;
+}
+
 function buildStackMap(store: AnalyzerProjectStore): AnalyzerViewModel {
+  const solutionPaths=store.facts.flatMap(fact=>fact.kind==='dotnet-project'&&/\.slnx?$/.test(fact.projectPath)?[scopeDirectory(fact.projectPath)]:[]);
+  const solutionLibraryPaths=new Set(store.facts.filter((fact):fact is WorkspacePackageFact=>fact.kind==='workspace-package'&&fact.metadata.ecosystem==='nuget'&&fact.manifestPath.endsWith('.csproj')&&!/^(?:Exe|WinExe)$/i.test(String(fact.metadata.outputType??''))&&!fact.metadata.webSdk&&solutionPaths.some(path=>path!==fact.packagePath&&pathBelongsToPackage(fact.packagePath,path))).map(fact=>fact.packagePath));
   const projectFact = store.facts.find((fact): fact is Extract<AnalyzerFact, { kind: 'project' }> => fact.kind === 'project');
   const rootWorkspacePackage = store.facts.find((fact): fact is WorkspacePackageFact => fact.kind === 'workspace-package' && fact.isRoot);
   const rootManifest = store.facts.find((fact): fact is PackageManifestFact => fact.kind === 'package-manifest' && fact.packagePath === '.');
@@ -451,23 +464,26 @@ function buildStackMap(store: AnalyzerProjectStore): AnalyzerViewModel {
     knownPackagePaths.add(normalizedPath);
   };
   store.facts
-    .filter((fact): fact is WorkspacePackageFact => fact.kind === 'workspace-package')
+    .filter((fact): fact is WorkspacePackageFact => fact.kind === 'workspace-package' && !(solutionLibraryPaths.has(fact.packagePath)&&fact.manifestPath.endsWith('.csproj')))
     .forEach((fact) => addPackageRecord(fact.packagePath, fact.id, fact.evidenceIds, true));
   store.facts
     .filter((fact): fact is PackageManifestFact => fact.kind === 'package-manifest')
     .forEach((fact) => {
+      if(solutionLibraryPaths.has(fact.packagePath)&&fact.filePath?.endsWith('.csproj'))return;
       const normalizedPath = normalizeScopePath(fact.packagePath);
       if (normalizedPath === '.' || patternRootPaths.has(normalizedPath) || knownPackagePaths.has(normalizedPath)) {
         addPackageRecord(normalizedPath, fact.id, fact.evidenceIds, false);
       }
     });
   const packages = [...packageRecords.values()];
-  const desktopFacts = store.facts.filter((fact): fact is Extract<AnalyzerFact, { kind: 'dotnet-project' }> => fact.kind === 'dotnet-project');
+  const declaredScopeKind=(path:string):StackMapScopeKind|undefined=>{const declaration=store.facts.find((fact):fact is WorkspacePackageFact=>fact.kind==='workspace-package'&&fact.packagePath===path&&fact.metadata.ecosystem==='nuget');if(!declaration)return;if(declaration.metadata.useWpf)return'desktop';if(declaration.metadata.solution)return'workspace';return declaration.metadata.webSdk||/^(?:Exe|WinExe)$/i.test(String(declaration.metadata.outputType??''))?'application':'package';};
+  const dotnetFacts=store.facts.filter((fact):fact is Extract<AnalyzerFact,{kind:'dotnet-project'}>=>fact.kind==='dotnet-project');
+  const desktopFacts=dotnetFacts.filter(fact=>fact.useWpf||/\.(?:sln|slnx)$/i.test(fact.projectPath)&&dotnetFacts.some(project=>project.useWpf&&pathBelongsToPackage(project.projectPath,scopeDirectory(fact.projectPath))));
   const scopeCandidates = new Map<string, StackMapScopeCandidate>();
   packages.filter((fact) => !fact.isRoot).forEach((fact) => {
     addScopeCandidate(scopeCandidates, makeScopeCandidate(
       fact.packagePath,
-      packageScopeKind(fact.packagePath),
+      declaredScopeKind(fact.packagePath)??packageScopeKind(fact.packagePath),
       'package',
       fact.factId,
       fact.evidenceIds,
@@ -482,13 +498,13 @@ function buildStackMap(store: AnalyzerProjectStore): AnalyzerViewModel {
   store.evidence
     .filter((evidence) => evidence.role === 'scope'
       && evidence.scopeStrength !== 'usage-only'
-      && typeof evidence.scopePath === 'string')
+      && typeof evidence.scopePath === 'string' && !solutionLibraryPaths.has(evidence.scopePath))
     .forEach((evidence) => {
       const scopePath = normalizeScopePath(evidence.scopePath ?? '.');
       if (scopePath !== '.') {
         addScopeCandidate(scopeCandidates, makeScopeCandidate(
           scopePath,
-          'application',
+          declaredScopeKind(scopePath)??'application',
           'config',
           undefined,
           [evidence.id],
@@ -546,6 +562,8 @@ function buildStackMap(store: AnalyzerProjectStore): AnalyzerViewModel {
   const servicesCandidate = rootCandidate
     ? makeScopeCandidate('.', 'services', 'services', projectFact?.id, projectFact?.evidenceIds ?? [])
     : undefined;
+  const deploymentCandidate=rootCandidate?makeScopeCandidate('.','deployment','deployment',projectFact?.id,projectFact?.evidenceIds??[]):undefined;
+  const deliveryStacks=new Set(store.facts.flatMap(fact=>fact.kind==='resource'&&['delivery','deployment'].includes(String(fact.metadata.resourceRole))&&fact.dictionaryStackId?[fact.dictionaryStackId]:[]));
 
   const evidenceById = new Map(store.evidence.map((evidence) => [evidence.id, evidence]));
   const usageById = new Map<string, StackMapUsageRecord>();
@@ -560,10 +578,10 @@ function buildStackMap(store: AnalyzerProjectStore): AnalyzerViewModel {
     return rootScope();
   };
 
-  const groupEvidenceByScope = (items: AnalyzerEvidence[]): Map<string, { scope: StackMapScopeRecord; evidenceIds: Set<string> }> => {
+  const groupEvidenceByScope = (items: AnalyzerEvidence[],stackId?:string): Map<string, { scope: StackMapScopeRecord; evidenceIds: Set<string> }> => {
     const grouped = new Map<string, { scope: StackMapScopeRecord; evidenceIds: Set<string> }>();
     items.forEach((item) => {
-      const scope = scopeForEvidence(item);
+      let scope = scopeForEvidence(item);if(scope?.path==='.'&&stackId&&deliveryStacks.has(stackId)&&deploymentCandidate)scope=ensureScope(deploymentCandidate);
       if (!scope) return;
       const entry = grouped.get(scope.id) ?? { scope, evidenceIds: new Set<string>() };
       entry.evidenceIds.add(item.id);
@@ -583,10 +601,10 @@ function buildStackMap(store: AnalyzerProjectStore): AnalyzerViewModel {
     const usageEvidence = classifiedEvidence.filter((candidate) => candidate.role === 'usage').map((candidate) => candidate.item);
     const declarationEvidence = classifiedEvidence.filter((candidate) => candidate.role === 'declaration').map((candidate) => candidate.item);
     const scopeEvidence = classifiedEvidence.filter((candidate) => candidate.role === 'scope').map((candidate) => candidate.item);
-    const evidenceByScope = groupEvidenceByScope(usageEvidence);
+    const evidenceByScope = groupEvidenceByScope(usageEvidence,stack.id);
     const hasUsageEvidence = evidenceByScope.size > 0;
     if (!hasUsageEvidence) {
-      groupEvidenceByScope(declarationEvidence).forEach((entry, scopeId) => {
+      groupEvidenceByScope(declarationEvidence,stack.id).forEach((entry, scopeId) => {
         evidenceByScope.set(scopeId, entry);
       });
     }
@@ -638,14 +656,14 @@ function buildStackMap(store: AnalyzerProjectStore): AnalyzerViewModel {
   });
 
   const orderedScopes = [...scopes.values()].filter((scope) => scope.usageIds.size > 0).sort((first, second) => {
-    const rank: Record<StackMapScopeKind, number> = { root: 0, application: 1, workspace: 2, package: 3, desktop: 4, services: 5 };
+    const rank: Record<StackMapScopeKind, number> = { root: 0, application: 1, workspace: 2, package: 3, desktop: 4, services: 5, deployment:6 };
     return rank[first.kind] - rank[second.kind] || first.path.localeCompare(second.path) || first.id.localeCompare(second.id);
   });
   const projectNode = projectFact ? nodeForFact(projectFact, 'stack-map:project') : undefined;
   const usageRecords = orderedScopes.flatMap((scope) => [...scope.usageIds]
     .map((usageId) => usageById.get(usageId))
     .filter((usage): usage is StackMapUsageRecord => Boolean(usage))
-    .sort((first, second) => first.stackName.localeCompare(second.stackName)));
+    .sort((first, second) => stackRoleOrder(first.stackId)-stackRoleOrder(second.stackId)||first.stackName.localeCompare(second.stackName)));
   const usageNodes = usageRecords.map((usage): AnalyzerViewNode => ({
     id: usage.id,
     factId: usage.sourceFactIds[0],
@@ -658,6 +676,9 @@ function buildStackMap(store: AnalyzerProjectStore): AnalyzerViewModel {
       stackUsage: true,
       stackId: usage.stackId,
       dictionaryStackId: usage.stackId,
+      roleOrder:stackRoleOrder(usage.stackId),
+      roleGroup:['language-runtime','application','data','tooling','delivery'][stackRoleOrder(usage.stackId)]!,
+      aliases:getStack(usage.stackId)?.aliases??[],
       categoryId: getStack(usage.stackId)?.categoryId ?? '',
       categoryLabel: usage.categoryLabel,
       scopeId: usage.scopeId,
@@ -707,7 +728,7 @@ function buildStackMap(store: AnalyzerProjectStore): AnalyzerViewModel {
     const childRegionIds = (childScopeIdsByParentId.get(scope.id) ?? [])
       .map((childScopeId) => regionIdByScopeId.get(childScopeId))
       .filter((regionId): regionId is string => Boolean(regionId));
-    const scopeKind = scope.kind === 'root' || scope.kind === 'services' ? 'logical' : 'physical';
+    const scopeKind = scope.kind === 'root' || scope.kind === 'services' ||scope.kind==='deployment'? 'logical' : 'physical';
     return {
       id,
       entityKind: 'region',
@@ -715,8 +736,9 @@ function buildStackMap(store: AnalyzerProjectStore): AnalyzerViewModel {
       label: scope.label,
       ...(scope.path !== '.' ? { subtitle: scope.path } : {}),
       childIds: [...scope.usageIds]
-        .map((usageId) => usageById.get(usageId)?.id)
-        .filter((usageId): usageId is string => Boolean(usageId)),
+        .map((usageId) => usageById.get(usageId))
+        .filter((usage):usage is StackMapUsageRecord=>Boolean(usage))
+        .sort((a,b)=>stackRoleOrder(a.stackId)-stackRoleOrder(b.stackId)||a.stackName.localeCompare(b.stackName)).map(usage=>usage.id),
       ports: (['top', 'right', 'bottom', 'left'] as const).map((side) => ({ id: `${id}:${side}`, side })),
       selectable: true,
       evidenceIds: [...scope.evidenceIds],
@@ -823,7 +845,7 @@ export function projectWorkspace(store: AnalyzerProjectStore): AnalyzerViewModel
     ['workspace:project', 'Project', 'neutral'],
     ['workspace:config', 'Workspace Config', 'cool'],
     ['workspace:patterns', 'Patterns', 'warm'],
-    ['workspace:packages', 'Workspace Packages', 'accent'],
+    ['workspace:packages', 'Projects / Members', 'accent'],
   ] as const;
   return {
     view: 'workspace',
@@ -866,10 +888,7 @@ function resolveScriptFact(
 function evidenceForCommandFragment(store: AnalyzerProjectStore, script: PackageScriptFact, fragment: CommandFragment): string[] {
   const source = store.sources[script.sourcePath];
   if (!source) return script.evidenceIds;
-  const range: OffsetRange = {
-    start: script.commandStartOffset + fragment.start,
-    end: script.commandStartOffset + fragment.end,
-  };
+  const range=commandSourceRange(store.semanticSources?.[script.sourcePath]??source,script,fragment);
   if (range.start < 0 || range.end > source.length) return script.evidenceIds;
   return [makeEvidence(script.sourcePath, source, range, 'script', 'command-fragment', `Command fragment ${fragment.text}`)].map((evidence) => evidence.id);
 }
@@ -1019,7 +1038,7 @@ export function projectCommand(store: AnalyzerProjectStore, requestedEntryScript
     const evidenceIds = evidenceForCommandFragment(store, script, fragment);
     evidenceIds.forEach((evidenceId) => {
       if (!generatedEvidence.has(evidenceId) && store.sources[script.sourcePath]) {
-        const range: OffsetRange = { start: script.commandStartOffset + fragment.start, end: script.commandStartOffset + fragment.end };
+        const range=commandSourceRange(store.semanticSources?.[script.sourcePath]??store.sources[script.sourcePath],script,fragment);
         generatedEvidence.set(evidenceId, makeEvidence(script.sourcePath, store.sources[script.sourcePath], range, 'script', 'command-fragment', `Command fragment ${fragment.text}`));
       }
     });
@@ -1046,7 +1065,7 @@ export function projectCommand(store: AnalyzerProjectStore, requestedEntryScript
         kind: 'starts',
         label: relationLabels.starts,
         evidenceIds,
-        metadata: { parallel: true, executionRank: context.executionRank, branchPath: context.branchPath },
+        metadata: { parallel: nodes.get(parentCommandId)?.metadata.commandType === 'concurrently', executionRank: context.executionRank, branchPath: context.branchPath },
       });
     }
 
@@ -1062,10 +1081,10 @@ export function projectCommand(store: AnalyzerProjectStore, requestedEntryScript
       }));
       return;
     }
-    if (fragment.kind === 'pnpm-script') {
+    if (fragment.kind === 'pnpm-script' || fragment.kind === 'project-script') {
       const targetScript = resolveScriptFact(fragment, script, scripts, packages);
       if (!targetScript) {
-        addCommandWarning(warnings, `Could not resolve pnpm script: ${fragment.text}`, script);
+        addCommandWarning(warnings, `Could not resolve project script: ${fragment.text}`, script);
         return;
       }
       addViewEdge(edges, {
@@ -1092,8 +1111,7 @@ export function projectCommand(store: AnalyzerProjectStore, requestedEntryScript
       addCommandWarning(warnings, `Unknown command fragment retained: ${fragment.text}`, script);
       return;
     }
-    const terminal = commandTerminalTarget(fragment, store, script);
-    if (terminal) {
+    for (const terminal of commandTerminalTargets(fragment, store, script)) {
       const terminalFact = store.facts.find((fact) => fact.id === terminal.factId);
       if (terminalFact) {
         addFactNode(terminalFact, 'command:commands', undefined, {
@@ -1113,6 +1131,7 @@ export function projectCommand(store: AnalyzerProjectStore, requestedEntryScript
         metadata: { terminal: true, executionRank: context.executionRank + 1, branchPath: context.branchPath },
       });
     }
+    if(fragment.children.length)fragment.children.forEach((child,index)=>addFragment(script,child,commandId,{...context,executionRank:context.executionRank+2+index,executionDepth:context.executionDepth+1,branchPath:context.branchPath}));
   };
 
   const buildScript = (script: PackageScriptFact, context: CommandExecutionContext): void => {
@@ -1124,6 +1143,11 @@ export function projectCommand(store: AnalyzerProjectStore, requestedEntryScript
     visited.add(script.id);
     active.add(script.id);
     addFactNode(script, 'command:scripts', undefined, context);
+    for(const relation of store.relations.filter(relation=>relation.targetId===script.id&&relation.metadata.relationClass==='pipeline-dependency')){
+      const prerequisite=scripts.get(relation.sourceId);if(!prerequisite)continue;
+      buildScript(prerequisite,{...context,executionRank:Math.max(0,context.executionRank-1),executionDepth:context.executionDepth+1});
+      addViewEdge(edges,{id:`view-edge:ci:${relation.id}`,sourceId:prerequisite.id,targetId:script.id,kind:'executes',label:'needs',evidenceIds:relation.evidenceIds,metadata:{relationClass:'pipeline-dependency',parallel:false}});
+    }
     parseCommandExpression(script.command).forEach((fragment, index) => addFragment(script, fragment, undefined, {
       executionRank: context.executionRank + 1 + index,
       executionDepth: context.executionDepth + 1,
@@ -1134,10 +1158,11 @@ export function projectCommand(store: AnalyzerProjectStore, requestedEntryScript
   };
 
   if (entry) {
+    const manager=/(?:^|\/)deno\.jsonc?$/.test(entry.sourcePath)?'deno task':/(?:^|\/)composer\.json$/.test(entry.sourcePath)?'composer run':/\.gradle(?:\.kts)?$/.test(entry.sourcePath)?'gradle':/\.ya?ml$/.test(entry.sourcePath)?'Job':/pyproject\.toml$/.test(entry.sourcePath)?'':`${(store.sources['package.json']??'').match(/"packageManager"\s*:\s*"(pnpm|yarn|bun|npm)@/)?.[1]??'npm'} run`;
     const entryNode: AnalyzerViewNode = {
       id: `user-command:${entry.id}`,
       type: 'command',
-      label: `pnpm run ${entry.scriptName}`,
+      label: `${manager} ${entry.scriptName}`.trim(),
       subtitle: entry.packageName,
       clusterId: 'command:user',
       evidenceIds: entry.evidenceIds,
@@ -1366,7 +1391,7 @@ export function projectDependencies(store: AnalyzerProjectStore): AnalyzerViewMo
     : dependencyEdges;
   const warnings = baseWarnings(store, 'dependencies');
   const clusterDefinitions = [
-    ['dependencies:packages', 'Workspace Packages', 'neutral'],
+    ['dependencies:packages', 'Projects / Packages', 'neutral'],
     ['dependencies:technology', 'Recognized Technology', 'accent'],
     ['dependencies:external', `External Packages · ${externalNodes.length}`, 'cool'],
   ] as const;
@@ -1416,7 +1441,7 @@ export function projectModuleDependency(store: AnalyzerProjectStore): AnalyzerVi
     .sort((first, second) => first.path.localeCompare(second.path) || first.id.localeCompare(second.id));
   const moduleIds = new Set(moduleFacts.map((fact) => fact.id));
   const importRelations = store.relations
-    .filter((relation) => relation.kind === 'imports' && moduleIds.has(relation.sourceId) && moduleIds.has(relation.targetId))
+    .filter((relation) => (relation.kind === 'imports'||relation.metadata.dependencyKind==='build-entry') && moduleIds.has(relation.sourceId) && moduleIds.has(relation.targetId))
     .sort((first, second) => first.id.localeCompare(second.id));
 
   const packageById = new Map<string, { id: string; path: string; label: string; factId?: string; moduleIds: string[] }>();
@@ -1617,7 +1642,8 @@ export function projectModuleDependency(store: AnalyzerProjectStore): AnalyzerVi
       },
     };
   });
-  const edges = importRelations.map((relation) => relationEdge(relation, 'imports', relationLabels.imports));
+  const edges = importRelations.map((relation) => relation.metadata.dependencyKind === 'build-entry'
+    ? relationEdge(relation, 'uses-config', 'ビルド入力') : relationEdge(relation, 'imports', relationLabels.imports));
   const cluster = {
     id: 'module-dependency:modules',
     label: 'Modules',

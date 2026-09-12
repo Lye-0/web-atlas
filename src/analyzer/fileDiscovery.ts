@@ -90,7 +90,10 @@ async function collectDirectoryFiles(directory: DirectoryHandleLike, parentPath 
   for await (const entry of directory.values()) {
     const relativePath = normalizeRelativePath(parentPath ? `${parentPath}/${entry.name}` : entry.name);
     if (entry.kind === 'directory') {
-      if (isExcludedDirectory(entry.name)) continue;
+      if (isExcludedDirectory(entry.name)) {
+        if(entry.name.toLowerCase()==='build'&&entry.values)for await(const config of entry.values())if(config.kind==='file'&&config.name==='compile_commands.json'&&config.getFile)files.push(sourceFileFromFile(await config.getFile(),`${relativePath}/${config.name}`));
+        continue;
+      }
       if (!entry.values) continue;
       files.push(...await collectDirectoryFiles(entry as DirectoryHandleLike, relativePath));
       continue;
@@ -112,12 +115,14 @@ export function isExcludedDirectory(directoryName: string): boolean {
 
 export function isExcludedPath(path: string): boolean {
   const parts = normalizeRelativePath(path).split('/');
+  if(parts.at(-1)==='compile_commands.json'&&parts.slice(0,-1).filter(isExcludedDirectory).every(part=>part.toLowerCase()==='build'))return false;
   return parts.slice(0, -1).some(isExcludedDirectory);
 }
 
 export function isSensitivePath(path: string): boolean {
   const name = fileNameForPath(path).toLowerCase();
-  return name.startsWith('.env') || sensitiveExtensions.has(extensionForPath(path));
+  return name.startsWith('.env') || sensitiveExtensions.has(extensionForPath(path))
+    || /(?:^|[-_.])(?:credentials?|secrets?|kubeconfig)(?:$|[-_.])/.test(name) || /\.tfstate(?:\.|$)/.test(name);
 }
 
 export function isAnalyzerSourcePath(path: string): boolean {
@@ -136,7 +141,11 @@ export function isAnalyzerSourcePath(path: string): boolean {
     || (name.startsWith('tsconfig') && name.endsWith('.json'))
     || name.endsWith('.slnx')
     || name.endsWith('.sln')
-    || name.endsWith('.csproj');
+    || name.endsWith('.csproj')
+    || ['gemfile.lock','pubspec.lock','package.resolved'].includes(name)
+    || /^(?:pyproject\.toml|requirements[^/]*\.txt|setup\.cfg|uv\.lock|pip\.(?:conf|ini)|pytest\.ini|pom\.xml|(?:build|settings)\.gradle(?:\.kts)?|build\.sbt|libs\.versions\.toml|directory\.(?:build|packages)\.props|global\.json|nuget\.config|go\.(?:mod|work)|cargo\.(?:toml|lock)|composer\.(?:json|lock)|gemfile|pubspec\.yaml|package\.swift|deno\.(?:jsonc?|lock)|bun\.(?:lock|lockb)|bunfig\.toml|yarn\.lock|\.yarnrc\.yml|netlify\.toml|nginx\.conf|httpd\.conf|apache2\.conf|\.gitlab-ci\.yml)$/.test(name)
+    || /\.(?:gemspec|tf|json|jsonc|ya?ml|xaml|html|astro|vue|svelte|css)$/.test(name)
+    || /^(?:webpack|jest|cypress|nuxt|astro|svelte)\.config\./.test(name);
 }
 
 /**
@@ -146,5 +155,5 @@ export function isAnalyzerSourcePath(path: string): boolean {
  */
 export function isAnalyzerUsageSourcePath(path: string): boolean {
   if (isExcludedPath(path) || isSensitivePath(path)) return false;
-  return usageSourceExtensions.has(extensionForPath(path));
+  return usageSourceExtensions.has(extensionForPath(path)) || /\.(?:vue|svelte|astro|html|xaml)$/.test(path);
 }

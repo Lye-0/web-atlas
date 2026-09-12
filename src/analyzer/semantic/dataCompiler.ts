@@ -1,7 +1,8 @@
 import ts from 'typescript';
 import type { SemanticEvidence, SemanticInput } from './types';
+import { scriptSource } from '../sourceSyntax';
 
-export const dataScriptPath = (path: string) => /\.[cm]?[jt]sx?$/.test(path);
+export const dataScriptPath = (path: string) => /\.(?:[cm]?[jt]sx?|vue|svelte|astro|html)$/.test(path);
 const normalize = (path: string) => {
   const parts: string[] = [];
   for (const part of path.replaceAll('\\', '/').split('/')) { if (part === '..') parts.pop(); else if (part && part !== '.') parts.push(part); }
@@ -11,8 +12,8 @@ const normalize = (path: string) => {
 /** A closed, in-memory compiler host. Never reads disk, executes configuration, or loads target packages. */
 export function createDataCompiler(input: SemanticInput) {
   const files = new Map(Object.entries(input.sources).filter(([path]) => dataScriptPath(path)).map(([path, source]) =>
-    [path, ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, /x$/.test(path) ? ts.ScriptKind.TSX : /\.([cm]?js)$/.test(path) ? ts.ScriptKind.JS : ts.ScriptKind.TS)]));
-  const options: ts.CompilerOptions = { noLib: true, allowJs: true, checkJs: false, noEmit: true, target: ts.ScriptTarget.Latest, module: ts.ModuleKind.ESNext, strictNullChecks: true };
+    [path, ts.createSourceFile(path, scriptSource(path,source), ts.ScriptTarget.Latest, true, /x$/.test(path) ? ts.ScriptKind.TSX : /\.([cm]?js)$/.test(path) ? ts.ScriptKind.JS : ts.ScriptKind.TS)]));
+  const options: ts.CompilerOptions = { noLib: true, allowJs: true, allowNonTsExtensions: true, checkJs: false, noEmit: true, target: ts.ScriptTarget.Latest, module: ts.ModuleKind.ESNext, strictNullChecks: true };
   const resolve = (specifier: string, from: string) => {
     const supplied = input.imports.find(item => item.from === from && item.specifier === specifier)?.to;
     if (supplied && files.has(supplied)) return supplied;

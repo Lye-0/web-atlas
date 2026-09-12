@@ -34,6 +34,8 @@ export function SemanticFlowStage({ graph, explorer, nodeDisplays, navigation, m
   const controls = useRef<HTMLDivElement>(null), navigationElement = useRef<HTMLDivElement>(null);
   const [controlsHeight, setControlsHeight] = useState(40), [navigationHeight, setNavigationHeight] = useState(80);
   const [extraLabelObstacles, setExtraLabelObstacles] = useState<FlowLabelObstacle[]>([]);
+  const [compact,setCompact]=useState(false),[navigationExpanded,setNavigationExpanded]=useState(false);
+  useLayoutEffect(()=>{if(!element)return;const measure=()=>setCompact(element.getBoundingClientRect().width<=620);measure();if(typeof ResizeObserver==='undefined')return;const observer=new ResizeObserver(measure);observer.observe(element);return()=>observer.disconnect();},[element]);
   const [visibleRelation, setVisibleRelation] = useState<{ graph: SemanticGraph; edge: SemanticEdge }>();
   const onVisibleRelation = useCallback((edge: SemanticEdge | undefined) => setVisibleRelation(previous => edge ? previous?.graph === graph && previous.edge === edge ? previous : { graph, edge } : previous?.graph === graph ? undefined : previous), [graph]);
   const hasArchitectureOverlay = Boolean(architectureOverlay);
@@ -95,7 +97,7 @@ export function SemanticFlowStage({ graph, explorer, nodeDisplays, navigation, m
   const cameraTitle = cameraApplicable ? undefined : 'この階層のブロックはスクロールで移動します';
   return <div ref={setElement} className="analyzer-graph-stage analyzer-spatial-graph-stage semantic-flow-stage" data-mode={mode} data-visit-id={navigation?.visitId}
     style={{ '--flow-controls-height': `${controlsHeight}px` } as CSSProperties}>
-    <AnalyzerGraphControls elementRef={controls} mode={mode} onMode={onMode} cameraApplicable={cameraApplicable} cameraTitle={cameraTitle}
+    <AnalyzerGraphControls elementRef={controls} compact={compact} mode={mode} onMode={onMode} cameraApplicable={cameraApplicable} cameraTitle={cameraTitle}
       onFit={() => run('fit')} onReset={() => run('reset')} onZoomIn={() => run('zoom-in')} onZoomOut={() => run('zoom-out')}
       canFocus={Boolean(selectedIds.size || selectedEdgeId)} onFocus={() => {
         if (mode === '2d' && navigation && (!navigation.location.centerId || [...selectedIds].some(id => !localGraph.nodes.some(node => node.id === id)) || selectedEdgeId && !localGraph.edges.some(edge => edge.id === selectedEdgeId))) navigation.onRevealSelection();
@@ -104,7 +106,10 @@ export function SemanticFlowStage({ graph, explorer, nodeDisplays, navigation, m
       autoAggregation={autoAggregation} onAutoAggregation={mode === '3d' ? onAutoAggregation : undefined}
       isFullscreen={isFullscreen} onFullscreen={onFullscreen} help={help} onHelp={setHelp}>{architectureControls}</AnalyzerGraphControls>
     {explorer && navigation && <div ref={navigationElement} className="semantic-explorer-navigation-position" style={{ top: controlsHeight + 24 }}>
+      {compact&&<button type="button" className="semantic-navigation-disclosure" aria-expanded={navigationExpanded} onClick={()=>setNavigationExpanded(!navigationExpanded)}>現在地・階層移動</button>}
+      <div hidden={compact&&!navigationExpanded}>
       <SemanticExplorerNavigation explorer={explorer} navigation={navigation} mode={mode} graph={graph} localGraph={localGraph} selectedIds={selectedIds} selectedEdgeId={selectedEdgeId} hoverTarget={hoverTarget} onSelectEdge={selectEdge} relationHint={visibleRelation?.graph === graph ? visibleRelation.edge : undefined} />
+      </div>
     </div>}
     {help && <div className="analyzer-stage-help" role="dialog" aria-label="グラフ操作ヘルプ"><strong>{graph.view === 'architecture-map' ? '構成図の操作' : mode === '2d' ? '2Dエクスプローラー' : '3D全体図'}</strong>
       <p>{graph.view === 'architecture-map' ? 'クリック・Enterで構成要素を選択し、内部を開くボタンで下位の構成へ移動します。パンくず・親へ・戻るで階層と訪問先を移動できます。2Dはドラッグで移動、3Dはドラッグで回転します。ホイールと＋ / −で拡大縮小できます。' : mode === '2d' ? 'ブロックをクリック・Enterで開き、パンくずや「親へ」で所属階層を移動します。「戻る」とブラウザの戻る・進むは訪問した場所を復元します。関係図の対象はクリックで選択し、「この要素を中心に見る」で中心を切り替えます。関係図はドラッグと矢印キーで移動、ホイールと＋ / −で拡大縮小できます。' : 'ドラッグで回転、右ドラッグで移動。点やラベルから対象を選択できます。ホイールと＋ / −で拡大縮小できます。'}</p>

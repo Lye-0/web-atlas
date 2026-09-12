@@ -1,12 +1,16 @@
 import type { AnalyzerProjectStore } from '../types';
 import type { SemanticAnalysis, SemanticInput } from './types';
+import{stacks}from'../../data';
+const stackMetadata=Object.fromEntries(stacks.map(stack=>[stack.id,{name:stack.name,aliases:stack.aliases??[]}]));
 
 export function semanticInput(store: AnalyzerProjectStore): SemanticInput {
-  return { sources: store.semanticSources ?? store.sources,
-    imports: store.facts.flatMap(fact => fact.kind === 'module-dependency' ? [{ from: fact.sourcePath, to: fact.targetPath, specifier: fact.specifier }] : []),
+  return { sources: store.semanticSources ?? store.sources,stackMetadata,
+    projectScopes:store.facts.flatMap(fact=>fact.kind==='workspace-package'?[{id:fact.id,path:fact.manifestPath,directory:fact.packagePath}]:[]),
+    imports: store.facts.flatMap(fact => fact.kind === 'module-dependency'&&fact.dependencyKind!=='build-entry' ? [{ from: fact.sourcePath, to: fact.targetPath, specifier: fact.specifier }] : []),
     resources: store.facts.flatMap(fact => fact.kind === 'runtime' || fact.kind === 'resource' ? [{ id: fact.id, label: fact.label, type: fact.kind === 'runtime' ? 'runtime' : fact.resourceType, path: fact.filePath, binding: fact.kind === 'resource' ? fact.binding : undefined,
-      entryPath: typeof fact.metadata.main === 'string' ? `${fact.filePath?.split('/').slice(0, -1).join('/')}/${fact.metadata.main}`.replace(/^\//, '').replaceAll('/./', '/') : undefined,
-      evidence: store.evidence.filter(item => fact.evidenceIds.includes(item.id)).map(item => { const line = item.highlightRanges[0]?.start.line ?? item.contextStartLine; const source = store.sources[item.filePath] ?? ''; const start = source.split('\n').slice(0, line - 1).reduce((offset, value) => offset + value.length + 1, 0); return { path: item.filePath, start, end: start + (source.split('\n')[line - 1]?.length ?? 0), line, endLine: line, description: item.description ?? 'Runtime / resource configuration' }; }),
+      attributes: Object.fromEntries(Object.entries(fact.metadata).filter((entry): entry is [string, string | number | boolean | string[]] => entry[1] !== undefined)),
+      entryPath: typeof fact.metadata.entryPath === 'string' ? fact.metadata.entryPath : typeof fact.metadata.main === 'string' ? `${fact.filePath?.split('/').slice(0, -1).join('/')}/${fact.metadata.main}`.replace(/^\//, '').replaceAll('/./', '/') : undefined,
+      evidence: store.evidence.filter(item => fact.evidenceIds.includes(item.id)).map(item => { const range = item.highlightRanges[0]; const line = range?.start.line ?? item.contextStartLine; const endLine = range?.end.line ?? line; const source = store.sources[item.filePath] ?? ''; const lines = source.split('\n'); const start = lines.slice(0, line - 1).reduce((offset, value) => offset + value.length + 1, 0) + (range?.start.column ?? 1) - 1; const end = lines.slice(0, endLine - 1).reduce((offset, value) => offset + value.length + 1, 0) + (range?.end.column ?? (lines[endLine - 1]?.length ?? 0) + 1) - 1; return { path: item.filePath, start, end, line, endLine, description: item.description ?? 'Runtime / resource configuration' }; }),
     }] : []),
   };
 }

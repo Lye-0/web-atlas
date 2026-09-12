@@ -7,6 +7,7 @@ import type { ArchitectureCodeUsage, ArchitectureIdentity, ArchitectureRequest, 
 import { populateArchitectureUsage } from './architectureUsage';
 import { architectureResourceIdentity } from './architectureIdentity';
 import { architectureFirstArgument } from './architectureArguments';
+import { parseManifest,type ManifestProject } from '../manifestAdapters';
 import { responsibility, semanticLanguage } from './languages';
 import type { SemanticAnalysis, SemanticConfidence, SemanticEdge, SemanticEvidence, SemanticGraph, SemanticInput, SemanticNode } from './types';
 
@@ -107,6 +108,12 @@ export function buildArchitectureModel(input: SemanticInput, analysis: Pick<Sema
     }
   }
   const bindings: { owner: SemanticNode; node: SemanticNode; binding: string; environment: string; dir: string }[] = [];
+  const commonProjects:ManifestProject[]=[];const sourceMap=new Map(configs);
+  for(const[path,source]of configs)try{const project=parseManifest(path,source,sourceMap);if(project&&(project.ecosystem!=='npm'||/deno\.jsonc?$/.test(project.path))&&project.ecosystem!=='nuget'&&!project.attributes.solution)commonProjects.push(project,...(project.children??[]));}catch{/* invalid manifests are reported by the scan */}
+  for(const project of commonProjects){const dir=project.directory==='.'?'':project.directory;if(units.some(unit=>unit.dir===dir))continue;
+    const entries=analysis.nodes.filter(node=>node.path&&within(node.path,dir)&&!commonProjects.some(other=>other!==project&&other.directory!=='.'&&other.directory.length>project.directory.length&&within(node.path!,other.directory))&&node.kind==='entry'&&(node.attributes.endpoint||node.attributes.runtimeEntry)&&!node.attributes.test);
+    const node=add(['manifest',project.path,project.directory],project.name,entries.length?'application':'code-package',ev(project.path,project.name,`${project.ecosystem} manifestの宣言`),{ownerPath:dir,entryPaths:unique(entries.map(entry=>entry.path!)),context:[project.ecosystem],auxiliary:auxiliary(project.path)});units.push({dir,node});
+  }
   const assetRoutes: { owner: SemanticNode; directory: string; routes: string[]; environment: string; evidence: SemanticEvidence[] }[] = [];
   for (const [path, source] of configs.filter(([p]) => /(?:^|\/)wrangler\.(?:jsonc?|toml)$/.test(p))) {
     const toml = path.endsWith('.toml') ? architectureToml(source) : undefined;
@@ -202,6 +209,7 @@ export function buildArchitectureModel(input: SemanticInput, analysis: Pick<Sema
     const config = parse(path, source), emulators = object(config.emulators), owner = ownerAt(path);
     for (const service of ['auth', 'firestore', 'storage', 'database']) {
       const setting = object(emulators[service]); if (!Object.keys(setting).length) continue;
+      if(input.resources.some(resource=>resource.path===path&&resource.attributes?.emulatorService===service&&resource.attributes.configurationOccurrence))continue;
       const host = string(setting.host), port = typeof setting.port === 'number' ? setting.port : undefined;
       const evidence = ev(path, JSON.stringify(service), `Firebase ${service}エミュレーターの設定。起動状態は未確認`);
       const node = add(['firebase-emulator-config', path, service], `Firebase ${service}エミュレーター${port ? ` :${port}` : ''}`, 'external-service', evidence,
@@ -305,7 +313,7 @@ export function buildArchitectureModel(input: SemanticInput, analysis: Pick<Sema
     }
     const parsed = syntax.get(path);
     if (parsed?.imports.has('firebase/auth')) {
-      const auth = parsed.calls.filter(c => /(?:^|\.)(?:getAuth|connectAuthEmulator|signInWith\w*)$/.test(c.callee));
+      const auth = parsed.calls.filter(c => /(?:^|\.)(?:getAuth|connectAuthEmulator|signInWith\w*)$/.test(c.callee)).filter(call=>!input.resources.some(resource=>resource.attributes?.dictionaryStackId==='firebase-authentication'&&resource.attributes.factoryPath===path&&(resource.attributes.projectIdentity||resource.attributes.endpoint)&&(resource.attributes.factoryStart===call.start||resource.attributes.connectionStart===call.start)));
       if (auth.length) {
         const emulator = auth.filter(c => c.callee.endsWith('connectAuthEmulator'));
         const evidence = auth.map(c => c.evidence);

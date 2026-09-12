@@ -1,7 +1,16 @@
 import { findCanonicalStackByPackageName, getStack } from '../data';
-import { isAnalyzerSourcePath, isAnalyzerUsageSourcePath, isAnalyzerSemanticSourcePath, normalizeRelativePath } from './fileDiscovery';
-import { makeEvidence, makeFileEvidence, maskSensitiveSource, type OffsetRange } from './evidence';
-import { moduleDirectoryId, moduleIdForPath, resolveModuleGraph } from './moduleResolver';
+import { isAnalyzerSourcePath, isAnalyzerUsageSourcePath, isAnalyzerSemanticSourcePath, normalizeRelativePath,isExcludedPath,isSensitivePath } from './fileDiscovery';
+import{parseManifest,parseStructuredConfig,objectValue,arrayValue,textValue}from'./manifestAdapters';
+import{localPath,directoryFor}from'./projectPaths';
+import { makeEvidence, makeFileEvidence, type OffsetRange } from './evidence';
+import { moduleDirectoryId, moduleIdForPath, parseModuleImports, resolveModuleGraph } from './moduleResolver';
+import { buildExpansionContext, scanManifestProjects, scanSourceTechnologies, scanToolConfiguration } from './expandedScan';
+import { scanProviderConfigurations } from './providerAdapters';
+import { scanDeploymentDetails } from './deploymentDetails';
+import { scanCdnReferences, scanFirebaseApi } from './providerSourceAdapters';
+import { scanCommandEvidence } from './expandedCommands';
+import { scanLockedVersions } from './lockAdapters';
+import{scanBuildConfiguration}from'./buildAdapters';
 import {
   parseDotnetProject,
   parseFirebaseConfig,
@@ -15,8 +24,6 @@ import {
 } from './parsers';
 import type {
   AnalyzerDependencyType,
-  AnalyzerFact,
-  AnalyzerEvidence,
   AnalyzerEvidenceRole,
   AnalyzerScopeEvidenceStrength,
   AnalyzerMetadata,
@@ -43,110 +50,8 @@ import type {
 import { packageIdForPath, scriptIdFor } from './types';
 import { maskSemanticSource } from './semantic/sourceMask';
 
-export const ANALYZER_MAX_CONFIG_SIZE = 1024 * 1024;
-
-export class AnalyzerStoreBuilder {
-  private readonly factMap = new Map<string, AnalyzerFact>();
-  private readonly relationMap = new Map<string, AnalyzerRelation>();
-  private readonly evidenceMap = new Map<string, AnalyzerEvidence>();
-  private readonly sourceMap: Record<string, string> = {};
-  private readonly warningMap = new Map<string, AnalyzerWarning>();
-
-  addSource(filePath: string, source: string): void {
-    this.sourceMap[filePath] = maskSensitiveSource(source);
-  }
-
-  addEvidence(evidence: AnalyzerEvidence): string {
-    this.evidenceMap.set(evidence.id, evidence);
-    return evidence.id;
-  }
-
-  addFact(fact: AnalyzerFact): string {
-    const existing = this.factMap.get(fact.id);
-    if (!existing) {
-      this.factMap.set(fact.id, { ...fact, evidenceIds: [...new Set(fact.evidenceIds)] });
-      return fact.id;
-    }
-
-    const mergedEvidenceIds = [...new Set([...existing.evidenceIds, ...fact.evidenceIds])];
-    const mergedMetadata = { ...existing.metadata, ...fact.metadata };
-    if (existing.kind === 'technology' && fact.kind === 'technology') {
-      this.factMap.set(fact.id, {
-        ...existing,
-        ...fact,
-        evidenceIds: mergedEvidenceIds,
-        metadata: mergedMetadata,
-        packageNames: [...new Set([...existing.packageNames, ...fact.packageNames])],
-        explicit: existing.explicit || fact.explicit,
-      });
-    } else if (existing.kind === 'external-package' && fact.kind === 'external-package') {
-      this.factMap.set(fact.id, {
-        ...existing,
-        ...fact,
-        evidenceIds: mergedEvidenceIds,
-        metadata: mergedMetadata,
-        versionRanges: [...new Set([...existing.versionRanges, ...fact.versionRanges])],
-        dependencyTypes: [...new Set([...existing.dependencyTypes, ...fact.dependencyTypes])],
-      });
-    } else if (existing.kind === 'workspace-package' && fact.kind === 'workspace-package') {
-      this.factMap.set(fact.id, {
-        ...existing,
-        ...fact,
-        evidenceIds: mergedEvidenceIds,
-        metadata: mergedMetadata,
-        scripts: { ...existing.scripts, ...fact.scripts },
-        dependencies: [...existing.dependencies, ...fact.dependencies],
-      });
-    } else {
-      this.factMap.set(fact.id, { ...existing, evidenceIds: mergedEvidenceIds, metadata: mergedMetadata });
-    }
-    return fact.id;
-  }
-
-  addRelation(relation: AnalyzerRelation): string {
-    const existing = this.relationMap.get(relation.id);
-    if (!existing) {
-      this.relationMap.set(relation.id, { ...relation, evidenceIds: [...new Set(relation.evidenceIds)] });
-      return relation.id;
-    }
-    this.relationMap.set(relation.id, {
-      ...existing,
-      evidenceIds: [...new Set([...existing.evidenceIds, ...relation.evidenceIds])],
-      metadata: { ...existing.metadata, ...relation.metadata },
-    });
-    return relation.id;
-  }
-
-  addWarning(warning: AnalyzerWarning): string {
-    this.warningMap.set(warning.id, warning);
-    return warning.id;
-  }
-
-  getSource(filePath: string): string | undefined {
-    return this.sourceMap[filePath];
-  }
-
-  getFact(id: string): AnalyzerFact | undefined {
-    return this.factMap.get(id);
-  }
-
-  forEachFact(callback: (fact: AnalyzerFact) => void): void {
-    this.factMap.forEach(callback);
-  }
-
-  build(files: AnalyzerSourceFile[]): AnalyzerProjectStore {
-    return {
-      files,
-      facts: [...this.factMap.values()],
-      relations: [...this.relationMap.values()],
-      evidence: [...this.evidenceMap.values()],
-      sources: { ...this.sourceMap },
-      warnings: [...this.warningMap.values()],
-      scannedAt: new Date().toISOString(),
-    };
-  }
-}
-
+import{AnalyzerStoreBuilder,ANALYZER_MAX_CONFIG_SIZE}from'./storeBuilder';
+export{AnalyzerStoreBuilder,ANALYZER_MAX_CONFIG_SIZE}from'./storeBuilder';
 interface LoadedSource {
   file: AnalyzerSourceFile;
   source: string;
@@ -206,21 +111,32 @@ function isUsageSourceFile(file: AnalyzerSourceFile): boolean {
 
 async function loadSources(files: AnalyzerSourceFile[], builder: AnalyzerStoreBuilder): Promise<LoadedSource[]> {
   const candidates = files.filter((file) => isConfigFile(file) || isUsageSourceFile(file) || isAnalyzerSemanticSourcePath(file.relativePath)).sort((a, b) => a.relativePath.localeCompare(b.relativePath));
-  const loaded = await Promise.all(candidates.map(async (file): Promise<LoadedSource | undefined> => {
+  const read=async (file:AnalyzerSourceFile): Promise<LoadedSource | undefined> => {
     if (file.size > ANALYZER_MAX_CONFIG_SIZE) {
       addWarning(builder, `Skipped oversized analyzer input (${Math.round(file.size / 1024)} KB)`, file.relativePath, 'file-size-guard');
       return undefined;
     }
     try {
       const source = await file.readText();
+      if (/\.(?:ya?ml|json)$/i.test(file.relativePath) && /(?:^|\n)\s*kind\s*:\s*["']?Secret\b|"kind"\s*:\s*"Secret"/.test(source)) {
+        addWarning(builder, 'Kubernetes Secretの内容は収集対象外です', file.relativePath, 'sensitive-content-guard');
+        return undefined;
+      }
       builder.addSource(file.relativePath, source);
       return { file, source };
     } catch {
       addWarning(builder, `Could not read ${file.relativePath}`, file.relativePath, 'file-discovery', 'error');
       return undefined;
     }
-  }));
-  return loaded.filter((entry): entry is LoadedSource => Boolean(entry));
+  };
+  const loaded=(await Promise.all(candidates.map(read))).filter((entry):entry is LoadedSource=>Boolean(entry));
+  for(let pass=0;pass<8;pass++){const sources=new Map(loaded.map(entry=>[entry.file.relativePath,entry.source]));const references=new Set<string>();
+    for(const entry of loaded){const path=entry.file.relativePath;try{if(/(?:deno\.jsonc?|\.csproj)$/.test(path)){const project=parseManifest(path,entry.source,sources);if(project&&typeof project.attributes.lockPath==='string'&&!project.attributes.lockDisabled){const target=localPath(project.directory,project.attributes.lockPath);if(target)references.add(target);}}
+      if(/\.(?:csproj|props|targets)$/.test(path)){const project=objectValue(parseStructuredConfig(path,entry.source).Project);for(const imported of arrayValue(project.Import).map(objectValue)){const value=textValue(imported['@_Project']);const target=!imported['@_Condition']&&!value.includes('$(')?localPath(directoryFor(path),value):undefined;if(target&&/\.(?:props|targets)$/.test(target))references.add(target);}}
+    }catch{/* the ordinary parser records malformed input diagnostics */}}
+    const extra=files.filter(file=>references.has(file.relativePath)&&!sources.has(file.relativePath)&&!isExcludedPath(file.relativePath)&&!isSensitivePath(file.relativePath));if(!extra.length)break;const additions=(await Promise.all(extra.map(read))).filter((entry):entry is LoadedSource=>Boolean(entry));if(!additions.length)break;loaded.push(...additions);
+  }
+  return loaded;
 }
 
 function isNamedFile(filePath: string, name: string): boolean {
@@ -407,16 +323,7 @@ function makeWorkspacePackageFact(parsed: ParsedPackageJson, source: string, bui
   return fact;
 }
 
-const PRIMARY_PACKAGE_TECHNOLOGY: Record<string, string> = {
-  // `firebase` is the product package; Firebase Authentication remains the
-  // capability/resource dictionary match for firebase.json Auth evidence.
-  firebase: 'firebase',
-};
-
 function technologyForPackageName(packageName: string): { id: string } | undefined {
-  const normalized = packageName.toLowerCase();
-  const primaryTechnologyId = PRIMARY_PACKAGE_TECHNOLOGY[normalized];
-  if (primaryTechnologyId) return { id: primaryTechnologyId };
   const stack = findCanonicalStackByPackageName(packageName);
   return stack ? { id: stack.id } : undefined;
 }
@@ -663,14 +570,13 @@ function packageRootForImport(specifier: string): string | undefined {
  * not attempt AST, call-flow, or transitive dependency analysis.
  */
 function processSourceImports(builder: AnalyzerStoreBuilder, loaded: LoadedSource): void {
-  const importPattern = /\b(?:import\s+(?:type\s+)?(?:[^'"\n]*?\s+from\s+)?|export\s+(?:[^'"\n]*?\s+from\s+)?|require\s*\(\s*|import\s*\(\s*)['"]([^'"]+)['"]/g;
-  let match = importPattern.exec(loaded.source);
-  while (match) {
-    const specifier = match[1] ?? '';
+  for (const reference of parseModuleImports(loaded.source)) {
+    const specifier = reference.specifier;
     const packageName = packageRootForImport(specifier);
-    const stack = packageName ? technologyForPackageName(packageName) : undefined;
+    const firebaseProduct = ({ 'firebase/auth': 'firebase-authentication', 'firebase-admin/auth': 'firebase-authentication', 'firebase/firestore': 'cloud-firestore', 'firebase-admin/firestore': 'cloud-firestore', 'firebase/storage': 'firebase-storage', 'firebase-admin/storage': 'firebase-storage' } as Record<string, string>)[specifier];
+    const stack = firebaseProduct ? { id: firebaseProduct } : packageName ? technologyForPackageName(packageName) : undefined;
     if (packageName && stack) {
-      const specifierStart = match.index + match[0].lastIndexOf(specifier);
+      const specifierStart = reference.start;
       const evidenceId = createEvidence(
         builder,
         loaded.file.relativePath,
@@ -683,7 +589,6 @@ function processSourceImports(builder: AnalyzerStoreBuilder, loaded: LoadedSourc
       );
       addTechnologyFact(builder, stack.id, packageName, evidenceId, false, stack.id === 'firebase' ? 'Firebase' : undefined, 'source import');
     }
-    match = importPattern.exec(loaded.source);
   }
 }
 
@@ -1168,5 +1073,16 @@ export async function scanProjectFiles(files: AnalyzerSourceFile[]): Promise<Ana
     });
   }
 
+  const expansion = buildExpansionContext(builder, new Map(loadedSources.map(({ file, source }) => [file.relativePath, source])));
+  scanManifestProjects(expansion);
+  scanLockedVersions(expansion);
+  await scanSourceTechnologies(expansion);
+  scanToolConfiguration(expansion);
+  await scanBuildConfiguration(expansion);
+  await scanProviderConfigurations(expansion);
+  scanDeploymentDetails(expansion);
+  scanCdnReferences(expansion);
+  await scanFirebaseApi(expansion);
+  scanCommandEvidence(expansion);
   return { ...builder.build(files), semanticSources: Object.fromEntries(loadedSources.map(({ file, source }) => [file.relativePath, maskSemanticSource(source)])) };
 }

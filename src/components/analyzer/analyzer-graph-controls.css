@@ -12,3 +12,6 @@
   .analyzer-graph-stage .analyzer-graph-controls button { min-height:32px; font-size:11px; }
   .semantic-flow-mode { padding:0; }
 }
+.analyzer-controls-secondary { display: contents; }
+.analyzer-controls-secondary[hidden] { display: none; }
+.semantic-navigation-disclosure { min-height: 36px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 5px; color: var(--text); background: var(--surface); font: inherit; font-size: .75rem; }

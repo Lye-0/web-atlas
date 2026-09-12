@@ -1,5 +1,6 @@
 import { Parser, type Language, type Node } from 'web-tree-sitter';
-import { semanticLanguage, responsibility } from './languages';
+import { semanticLanguage, responsibility, grammarLanguage } from './languages';
+import { scriptSource } from '../sourceSyntax';
 import type { SemanticAnalysis, SemanticConfidence, SemanticEdge, SemanticEvidence, SemanticField, SemanticInput, SemanticKind, SemanticNode, SemanticViewId } from './types';
 import { createDataCompiler } from './dataCompiler';
 import { refineDataModels } from './dataModels';
@@ -7,9 +8,11 @@ import { refineDataSchemas } from './dataSchemas';
 import { refineDataFlow } from './dataFlow';
 import { refineSchemaFiles } from './dataSchemaFiles';
 import { buildArchitectureModel } from './architecture';
+import { refineStackSemantics } from './stackSemantics';
+import { addStackArchitecture } from './stackArchitecture';
 
 const functionTypes = new Set(['function_declaration', 'function_definition', 'function_expression', 'arrow_function', 'method_definition', 'method_declaration', 'constructor_declaration', 'function_item', 'method', 'singleton_method', 'local_function_statement', 'lambda_expression', 'function_literal', 'function_signature']);
-const modelTypes = new Set(['interface_declaration', 'type_alias_declaration', 'type_item', 'class_declaration', 'class_definition', 'class', 'struct_item', 'struct_specifier', 'type_spec', 'record_declaration', 'enum_declaration', 'enum_item', 'object_declaration', 'trait_item']);
+const modelTypes = new Set(['interface_declaration', 'type_alias_declaration', 'type_item', 'class_declaration', 'class_definition', 'class_specifier', 'class', 'struct_item', 'struct_specifier', 'type_spec', 'record_declaration', 'enum_declaration', 'enum_item', 'object_declaration', 'trait_item']);
 const callTypes = new Set(['call_expression', 'invocation_expression', 'method_invocation', 'function_call_expression', 'member_call_expression', 'scoped_call_expression', 'call', 'object_creation_expression', 'new_expression', 'macro_invocation', 'selector']);
 const assignmentTypes = new Set(['variable_declarator', 'assignment', 'assignment_expression', 'short_var_declaration', 'let_declaration', 'init_declarator', 'property_declaration']);
 const ignoredCalls = new Set(['if', 'for', 'while', 'switch', 'catch', 'return', 'typeof', 'sizeof', 'require', 'import', 'super']);
@@ -62,7 +65,7 @@ function identifiers(node: Node): string[] {
   }
   return [...names].filter(value => /^[\w$]+$/.test(value));
 }
-function modelFields(node: Node, orm = false): SemanticField[] {
+function modelFields(node: Node, path:string, orm = false): SemanticField[] {
   const body = field(node, 'body', 'value', 'type') ?? node;
   const fields: SemanticField[] = [];
   const members = orm ? descendants(body, new Set(['pair'])).filter(item => item.parent?.id === body.id) : [...descendants(body, fieldTypes), ...(node.type === 'record_declaration' ? (field(node, 'parameters') ?? node.namedChildren.find(item => item.type === 'parameter_list'))?.namedChildren ?? [] : [])];
@@ -79,7 +82,7 @@ function modelFields(node: Node, orm = false): SemanticField[] {
     const typeNode = field(member, 'type', 'value', 'right') ?? field(declarator?.parent ?? member, 'type') ?? member.namedChildren.find(item => /type_annotation|user_type|type_identifier|predefined_type/.test(item.type));
     const type = (typeNode?.text ?? member.text.slice(nameNode.endIndex - member.startIndex)).replace(/^\s*[:=]\s*/, '').split('\n')[0]!.replace(/[,;]\s*$/, '').slice(0, 220);
     const text = member.text;
-    fields.push({ name, type: type || 'unknown', optional: /\?|\.optional\(|\bOptional\b|\bnullable\b/.test(text),
+    fields.push({ name, type: type || 'unknown', optional: /\?|\.optional\(|\bOptional\b|\bnullable\b/.test(text), evidence:[evidence(path,member,`${name}のfield宣言`)],
       ...(/primaryKey\(|@id\b|PRIMARY KEY/i.test(text) ? { key: 'primary' as const } : {}),
       ...(/references\s*\(/.test(text) ? { key: 'foreign' as const, target: text.match(/references\s*\(\s*\(\)\s*=>\s*(\w+)/)?.[1] } : {}),
     });
@@ -117,31 +120,28 @@ export async function analyzeSemanticSources(input: SemanticInput, loadLanguage:
   const functions: FunctionRecord[] = []; const calls: CallRecord[] = []; const assignments: AssignmentRecord[] = [];
   const bindings = new Map<string, ImportBinding[]>();
   const coverage: SemanticAnalysis['coverage'] = []; const warnings: string[] = [];
-  const resources = input.resources.map(resource => { const node = builder.node('resource', resource.label, resource.path, -1, resource.evidence ?? [], 'source', { resourceType: resource.type, binding: resource.binding ?? '', entryPath: resource.entryPath ?? '' }); node.group = resource.type === 'auth' ? 'Authentication' : resource.type === 'database' || resource.type === 'storage' ? 'Persistence' : 'Infrastructure'; return node; });
+  const resources = input.resources.map(resource => { const node = builder.node('resource', resource.label, resource.path, resource.id, resource.evidence ?? [], 'source', { ...resource.attributes, resourceId: resource.id, resourceType: resource.type, binding: resource.binding ?? '', entryPath: resource.entryPath ?? '' }); node.group = resource.attributes?.environment === 'local' ? 'Local development' : resource.type === 'auth' ? 'Authentication' : resource.type === 'database' || resource.type === 'storage' ? 'Persistence' : 'Infrastructure'; return node; });
   const sources = Object.entries(input.sources).filter(([path]) => semanticLanguage(path));
+  const headerLanguages=compileHeaderLanguages(new Map(Object.entries(input.sources)));
   for (const [fileIndex, [path, originalSource]] of sources.entries()) {
-    const language = semanticLanguage(path)!;
+    const language = path.endsWith('.h')?headerLanguages.get(path)??'header':semanticLanguage(path)!;
+    if(language==='header'){coverage.push({path,language,status:'skipped',message:'headerのC/C++ compilation contextが未解決または曖昧'});continue;}
+    if (language === 'xaml') { coverage.push({ path, language, status: 'partial', message: 'XAMLの静的templateとcode-behind対応。動的Bindingは未評価' }); progress?.(fileIndex + 1, sources.length); continue; }
     if (['sql', 'prisma', 'graphql'].includes(language)) { parseSchemaFile(builder, path, originalSource, language); coverage.push({ path, language, status: 'parsed' }); progress?.(fileIndex + 1, sources.length); continue; }
     let parser: Parser | undefined;
     let tree: ReturnType<Parser['parse']> = null;
     try {
-      const grammar = await loadLanguage(language);
-      parser = createParser(language); parser.setLanguage(grammar);
+      const grammarId = grammarLanguage(language, originalSource);
+      const grammar = await loadLanguage(grammarId);
+      parser = createParser(grammarId); parser.setLanguage(grammar);
       let source = originalSource;
-      if (/\.(vue|svelte)$/.test(path)) {
-        const characters: string[] = source.split('').map(char => char === '\n' || char === '\r' ? char : ' ');
-        for (const match of source.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) {
-          const offset = match.index! + match[0].indexOf('>') + 1;
-          for (let i = 0; i < match[1]!.length; i++) characters[offset + i] = match[1]![i]!;
-        }
-        source = characters.join('');
-      }
+      source = scriptSource(path, source);
       tree = parser.parse(source);
       if (!tree) throw new Error('構文解析を完了できませんでした');
       const root = tree.rootNode;
       const errors = descendants(root, new Set(['ERROR'])).length;
-      coverage.push({ path, language, status: errors || /\.(vue|svelte)$/.test(path) ? 'partial' : 'parsed',
-        ...(errors ? { message: `${errors}箇所の構文エラー。解析可能な範囲を表示` } : /\.(vue|svelte)$/.test(path) ? { message: 'script内を解析。テンプレートは対象外' } : {}) });
+      coverage.push({ path, language, status: errors || /\.(vue|svelte|astro|html)$/.test(path) ? 'partial' : 'parsed',
+        ...(errors ? { message: `${errors}箇所の構文エラー。解析可能な範囲を表示` } : /\.(vue|svelte|astro|html)$/.test(path) ? { message: 'scriptと静的templateを解析。動的式・実行時のcomponent解決は未評価' } : {}) });
       const initializer = builder.node('function', '<module>', path, 0, [], 'source', { initializer: true, exported: true });
       const localFunctions: FunctionRecord[] = [{ node: initializer, start: 0, end: source.length, parameters: [] }];
       walk(root, ast => {
@@ -178,8 +178,9 @@ export async function analyzeSemanticSources(input: SemanticInput, loadLanguage:
         if (parent && !parent.node.attributes.initializer) fn.node.attributes.ownerName = parent.node.label;
       }
       functions.push(...localFunctions);
-      for (const fn of localFunctions.filter(fn => fn.node.attributes.entry)) {
-        for (const runtime of resources.filter(node => node.attributes.entryPath === path)) builder.edge(runtime.id, fn.node.id, 'runtime-entry', 'entry point', ['runtime-flow'], [...runtime.evidence, ...fn.node.evidence]);
+      for(const runtime of resources.filter(node=>node.attributes.entryPath===path&&node.attributes.entryMode==='top-level')){initializer.attributes.entry=true;initializer.evidence=[evidence(path,root,'実行対象ファイルのtop-level処理')];builder.edge(runtime.id,initializer.id,'runtime-entry','top-level entry',['runtime-flow'],[...runtime.evidence,...initializer.evidence]);}
+      for (const fn of localFunctions.filter(fn => fn.node.attributes.entry||resources.some(node=>node.attributes.entryPath===path&&node.attributes.entryFunction===fn.node.attributes.name))) {
+        for (const runtime of resources.filter(node => node.attributes.entryPath === path&&(!node.attributes.entryFunction||node.attributes.entryFunction===fn.node.attributes.name))){fn.node.attributes.entry=true;builder.edge(runtime.id, fn.node.id, 'runtime-entry', 'entry point', ['runtime-flow'], [...runtime.evidence, ...fn.node.evidence]);}
       }
       const ownerAt = (ast: Node) => localFunctions.filter(fn => fn.start <= ast.startIndex && fn.end >= ast.endIndex).sort((a, b) => a.end - a.start - (b.end - b.start) || Number(Boolean(a.node.attributes.initializer)) - Number(Boolean(b.node.attributes.initializer)))[0] ?? localFunctions[0]!;
       const assignmentScope = (ast: Node, owner: FunctionRecord) => {
@@ -200,7 +201,7 @@ export async function analyzeSemanticSources(input: SemanticInput, loadLanguage:
       const objectFields = (object: Node, seen = new Set<number>()): { fields: SemanticField[]; unresolved: string[] } => {
         if (seen.has(object.id)) return { fields: [], unresolved: ['循環したobject spread'] };
         const nextSeen = new Set([...seen, object.id]); const resolved = new Map<string, SemanticField>(); const unresolved: string[] = [];
-        const direct = modelFields(object, true);
+        const direct = modelFields(object,path,true);
         for (const child of object.namedChildren) {
           if (child.type === 'spread_element') {
             const value = child.namedChildren[0];
@@ -213,12 +214,13 @@ export async function analyzeSemanticSources(input: SemanticInput, loadLanguage:
         return { fields: [...resolved.values()], unresolved };
       };
       walk(root, ast => {
-        if (['decorator', 'annotation', 'attribute'].includes(ast.type)) {
+        if (['decorator', 'annotation', 'attribute'].includes(ast.type)&&!(language==='python'&&ast.type==='attribute')) {
           const name = ast.text.match(/^@?(?:\w+\.)?(\w+)/)?.[1] ?? '';
           const methods: Record<string, string> = { get: 'GET', Get: 'GET', GetMapping: 'GET', HttpGet: 'GET', post: 'POST', Post: 'POST', PostMapping: 'POST', HttpPost: 'POST', put: 'PUT', Put: 'PUT', PutMapping: 'PUT', HttpPut: 'PUT', patch: 'PATCH', Patch: 'PATCH', PatchMapping: 'PATCH', HttpPatch: 'PATCH', delete: 'DELETE', Delete: 'DELETE', DeleteMapping: 'DELETE', HttpDelete: 'DELETE', route: 'ANY', Route: 'ANY', RequestMapping: 'ANY', Controller: 'ANY' };
           const method = methods[name];
           if (method) {
             let ancestor = ast.parent; let declaration: Node | null = null;
+            if(language==='rust'&&ancestor?.type==='attribute_item'){let sibling=ancestor.nextNamedSibling;while(sibling?.type==='attribute_item')sibling=sibling.nextNamedSibling;if(sibling&&functionTypes.has(sibling.type))declaration=sibling;}
             if (ancestor?.type === 'class_body') { let sibling = ast.nextNamedSibling; while (sibling?.type === 'decorator') sibling = sibling.nextNamedSibling; if (sibling && functionTypes.has(sibling.type)) declaration = sibling; }
             while (ancestor && !declaration) {
               const decorated = ancestor.type === 'decorated_definition' ? field(ancestor, 'definition') : null;
@@ -260,12 +262,13 @@ export async function analyzeSemanticSources(input: SemanticInput, loadLanguage:
           const name = declarationName(ast); if (!name) return;
           const item = builder.node('model', name, path, ast.startIndex, [evidence(path, ast, `${name}の構造定義`)], 'source', { modelKind: ast.type });
           if (/\b(?:BaseModel|models\.Model|ApplicationRecord|ActiveRecord|DbContext|Base|Model)\b/.test(ast.text.slice(0, (field(ast, 'body')?.startIndex ?? ast.endIndex) - ast.startIndex)) || /@Entity\b/.test(ast.text.slice(0, 100))) item.attributes.orm = true;
-          item.fields = modelFields(ast); item.signature = ast.text.split('\n')[0]?.slice(0, 220);
+          item.fields = modelFields(ast,path); item.signature = ast.text.split('\n')[0]?.slice(0, 220);
           const types = descendants(ast, new Set(['type_identifier'])).map(node => node.text).filter(type => type !== name);
           item.attributes.typeReferences = [...new Set(types)];
           if (language === 'ruby') for (const association of descendants(ast, new Set(['call'])).filter(call => /^(?:belongs_to|has_one|has_many)\b/.test(call.text))) {
             const fieldName = association.text.match(/:([\w]+)/)?.[1]; if (fieldName) item.fields.push({ name: fieldName, type: association.text.split(/\s+/)[0]!, optional: /optional:\s*true/.test(association.text), target: fieldName.replace(/s$/, '').replace(/(^|_)(\w)/g, (_, _sep, char: string) => char.toUpperCase()) });
           }
+          if(language==='ruby')for(const accessor of descendants(ast,new Set(['call'])).filter(call=>/^(?:attr_accessor|attr_reader|attr_writer)\b/.test(call.text))){let parent=accessor.parent;let nested=false;while(parent&&parent.id!==ast.id){if(functionTypes.has(parent.type)){nested=true;break;}parent=parent.parent;}if(!nested)for(const match of accessor.text.matchAll(/:(\w+)/g))item.fields.push({name:match[1]!,type:'unknown',optional:false,evidence:[evidence(path,accessor,'Rubyの明示attribute宣言')]});}
         }
         if (assignmentTypes.has(ast.type)) {
           const left = field(ast, 'name', 'left', 'pattern', 'declarator'); const right = field(ast, 'value', 'right');
@@ -307,6 +310,7 @@ export async function analyzeSemanticSources(input: SemanticInput, loadLanguage:
           const receiver = field(ast, 'object');
           const callee = (receiver && receiver.id !== calleeNode.id ? `${receiver.text}.${calleeNode.text}` : calleeNode.text).slice(0, 240); if (ignoredCalls.has(callee)) return;
           const owner = ownerAt(ast); const ev = evidence(path, ast, `${callee}の呼び出し`);
+          if(ast.type==='selector'&&calleeNode.startIndex<ev.start){ev.start=calleeNode.startIndex;ev.line=calleeNode.startPosition.row+1;}
           const argsNode = field(ast, 'arguments', 'argument_list') ?? descendants(ast, new Set(['arguments', 'value_arguments', 'argument_list']))[0];
           const argumentsList = argsNode?.namedChildren ?? [];
           const op = builder.node('operation', `${leaf(callee)}()`, path, `${ast.startIndex}-${ast.endIndex}`, [ev], 'source', { owner: owner.node.id, callee });
@@ -386,14 +390,14 @@ export async function analyzeSemanticSources(input: SemanticInput, loadLanguage:
           if (handler) { builder.edge(entry.id, handler.node.id, 'handles', 'UI event', ['runtime-flow'], [ev]); handler.node.attributes.entry = true; }
           else entry.attributes.handler = ast.namedChildren.at(-1)?.text.replace(/^[{]|[}]$/g, '') ?? '';
         }
-        if (/^(?:return_statement|return_expression)$/.test(ast.type) || /^(?:jump_expression|control_transfer_statement)$/.test(ast.type) && /^return\b/.test(ast.text)) {
+        if (/^(?:return_statement|return_expression)$/.test(ast.type) || language==='ruby'&&ast.type==='return' || /^(?:jump_expression|control_transfer_statement)$/.test(ast.type) && /^return\b/.test(ast.text)) {
           const owner = ownerAt(ast); const ev = evidence(path, ast, '戻り値');
           const value = builder.node('value', 'return', path, ast.startIndex, [ev], 'source', { owner: owner.node.id, returnValue: true });
           assignments.push({ id: value.id, owner: owner.node.id, path, name: 'return', inputs: identifiers(ast), calls: immediateCalls(ast), evidence: ev, ...assignmentScope(ast, owner) });
         }
         if (functionTypes.has(ast.type)) {
           const body = field(ast, 'body');
-          const expression = body && !/block|statement|function_body/.test(body.type) ? body : language === 'rust' && body?.type === 'block' && body.lastNamedChild?.type !== 'return_expression' ? body.lastNamedChild : undefined;
+          const expression = body && !/block|statement|function_body/.test(body.type) ? body : language === 'rust' && body?.type === 'block' && body.lastNamedChild?.type !== 'return_expression' ? body.lastNamedChild : language==='ruby'&&body?.lastNamedChild?.type!=='return'?body?.namedChildren.filter(child=>child.type!=='comment').at(-1):undefined;
           if (expression) {
             const owner = localFunctions.find(fn => fn.start === ast.startIndex && !fn.node.attributes.initializer);
             if (owner) { const ev = evidence(path, expression, '暗黙の戻り値'); const value = builder.node('value', 'return', path, expression.startIndex, [ev], 'source', { owner: owner.node.id, returnValue: true, implicit: true });
@@ -439,13 +443,17 @@ export async function analyzeSemanticSources(input: SemanticInput, loadLanguage:
   const models = refineDataModels(analysis, compiler, schemas);
   refineSchemaFiles(analysis, input);
   refineDataFlow(analysis, compiler, models);
+  refineStackSemantics(analysis, input, compiler);
+  if(Object.keys(input.sources).some(path=>/\.(?:sql|graphql|gql)$/.test(path))||[...compiler.files.values()].some(file=>file.text.includes('graphql')))await(await import('./querySemantics')).refineQuerySemantics(analysis,input,compiler);
   analysis.architecture = buildArchitectureModel(input, analysis);
+  addStackArchitecture(analysis.architecture, input, analysis);
   analysis.stats.models = analysis.nodes.filter(node => node.kind === 'model' && !node.attributes.dataModelExcluded).length;
   analysis.stats.elapsedMs = Math.round(performance.now() - started);
   return analysis;
 }
 
 function resolveRelationships(builder: SemanticBuilder, input: SemanticInput, functions: FunctionRecord[], calls: CallRecord[], assignments: AssignmentRecord[], bindings: Map<string, ImportBinding[]>) {
+  const projectScope=(path:string|undefined)=>path?input.projectScopes?.filter(scope=>scope.directory==='.'||path.startsWith(scope.directory+'/')).sort((a,b)=>b.directory.length-a.directory.length)[0]?.id:undefined;
   const byId = new Map(functions.map(fn => [fn.node.id, fn]));
   const byName = new Map<string, FunctionRecord[]>();
   for (const fn of functions) { const name = String(fn.node.attributes.name ?? ''); byName.set(name, [...(byName.get(name) ?? []), fn]); }
@@ -538,7 +546,7 @@ function resolveRelationships(builder: SemanticBuilder, input: SemanticInput, fu
       if (candidates.some(fn => !input.imports.some(ref => ref.from === path && ref.to === fn.node.path))) confidence = 'inferred';
     } else if (memberCall) {
       const directMember = /^(?:[\w$]+)(?:\.|::|->)[\w$]+$/.test(callee);
-      const currentClass = directMember && /^(?:this|self)(?:\.|::|->)/.test(callee) ? owner.className : undefined;
+      const currentClass = directMember && (/^(?:this|self)(?:\.|::|->)/.test(callee)||owner.node.language==='php'&&/^\$this(?:->|\.)/.test(callee)) ? owner.className : undefined;
       const namedClass = directMember && namedClasses.has(`${path}\0${receiver}`) ? receiver : undefined;
       candidates = currentClass || namedClass ? candidates.filter(fn => fn.node.path === path && fn.className === (currentClass ?? namedClass)) : [];
       if (namedClass) confidence = 'inferred';
@@ -633,7 +641,7 @@ function resolveRelationships(builder: SemanticBuilder, input: SemanticInput, fu
     const binding = bindings.get(entry.path ?? '')?.find(item => item.local === handler || handler.startsWith(`${item.local}.`));
     const paths = binding ? reachable(entry.path!, binding.specifier) : undefined;
     const name = binding && binding.original !== '*' && !handler.includes('.') ? binding.original : leaf(handler);
-    const candidates = functions.filter(fn => fn.node.attributes.name === name && (entry.attributes.handlerClass ? fn.className === entry.attributes.handlerClass : paths ? paths.has(fn.node.path!) : fn.node.path === entry.path));
+    const candidates = functions.filter(fn => fn.node.attributes.name === name && (entry.attributes.handlerClass ? fn.className === entry.attributes.handlerClass&&projectScope(fn.node.path)===projectScope(entry.path) : paths ? paths.has(fn.node.path!) : fn.node.path === entry.path));
     if (candidates.length === 1) { builder.edge(entry.id, candidates[0]!.node.id, 'handles', 'handler', ['runtime-flow'], entry.evidence, entry.attributes.handlerClass || binding ? 'inferred' : 'source'); candidates[0]!.node.attributes.entry = true; }
   }
 }
@@ -658,3 +666,4 @@ function parseSchemaFile(builder: SemanticBuilder, path: string, source: string,
     }
   }
 }
+import { compileHeaderLanguages } from '../compileHeaders';

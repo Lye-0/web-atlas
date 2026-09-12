@@ -2,9 +2,9 @@
 
 ## 目的と境界
 
-Web Atlas Phase 1 は、Web 開発の分類と具体的な技術をたどる静的な Dictionary Web アプリである。画面は Stack Map、Categories、Stacks の3領域で構成する。
+Dictionary は、開発技術の分類と具体的な技術をたどるブラウザ内の辞書である。画面は Stack Map、Categories、Stacks の3領域で構成する。
 
-Phase 1 の責務は Dictionary の表示・検索・相互リンク・データ検証までであり、Project Analyzer、local file access、backend、database、authentication、3D Map は対象外とする。
+Dictionary の責務は表示・検索・相互リンク・データ検証である。別機能のAnalyzerが同じStack IDを使い、ローカル解析の根拠から辞書詳細へ接続する。DictionaryのMap自体はDOM/CSSの2Dツリーである。
 
 ## 現在の構成
 
@@ -58,7 +58,7 @@ Category・Stackの一覧、Mapノード、詳細ページ内の関連リンク�
 
 ## A/B/C の生成
 
-- Mapは `stackMap` の階層を再帰描画し、`dictionaryVisualGroups` で大分類を整理する。Category / Stack のIDから正規データを解決し、親子関係はDOMのborderとconnectorで表現する。Three.jsやReact Three Fiberは実装依存に含めない。
+- Mapは `stackMap` の階層を再帰描画し、`dictionaryVisualGroups` で大分類を整理する。Category / Stack のIDから正規データを解決し、親子関係はDOMのborderとconnectorで表現する。DictionaryのMap描画ではThree.jsやReact Three Fiberを使用しない。
 - CategoriesはMapと同じ `dictionaryVisualGroups` で索引を整理し、選択したCategoryの `stacksForCategory`、下位Category、差分説明、関連Categoryを表示する。
 - Stacksは `stacks` を一覧表示し、Category lookup、features、use cases、relationships、related stacks、公式URL、Analyzer用識別子を表示する。Stacks filterも同じ大分類を利用する。
 
@@ -82,7 +82,7 @@ Categoriesの一覧は、5大visual groupをmarkerlessで強いGroup Headingと�
 
 MapのDesktop表示は5列均等配置を使わず、`Web開発`を起点に中央の縦幹と左右2レーンで5大visual groupを表示する。左レーンは「UIとアプリケーション」「品質と検証」、右レーンは「言語と実行基盤」「データとストレージ」「開発と配信」とし、各groupは`dictionaryVisualGroups`の`side` / `order`を使って配置する。Mapのコネクタは通常のdividerより明確にし、Category / Stackの内部Treeは既存のmarkerと字下げを維持する。
 
-Mapは`max-width: 1100px`以下で左右レーンを圧縮せず、1列の縦Treeへ切り替える。Rootから5大groupへの縦接続は狭幅でも残し、長いCategory / Stack名を文字サイズの縮小で解決せず、通常の単語境界で折り返す。Mapの通常ノードではsummaryを表示しない。
+Mapはコンテナ幅`max-width: 1100px`以下で左右レーンを圧縮せず、1列の縦Treeへ切り替える。Rootから5大groupへの縦接続は狭幅でも残し、長いCategory / Stack名を文字サイズの縮小で解決せず、通常の単語境界で折り返す。Mapの通常ノードではsummaryを表示しない。
 
 Stacksの「すべて」は同じ5大visual groupごとに区切って表示し、個別filter選択時はgroup見出しを重複させない。Stack一覧はStack名の近くにCategory labelを置き、row全体をStack Detailへの単一リンクとして`↗`を表示する。`active` statusは隠し、例外statusだけを共通日本語ラベルで表示する。通常の内部Dictionaryリンクの矢印は`→`、Categories一覧のCategory Detail rowとStacks一覧のStack Detail rowは`↗`、公式サイトなど外部リンクも`↗`とする。Categoriesの階層とDetailのDocument構造は維持する。
 
@@ -90,11 +90,11 @@ Stacksの「すべて」は同じ5大visual groupごとに区切って表示し�
 
 Phase 1.3.1では、中央幹型のDesktop Mapを維持したまま、左レーンを右レーンの視覚的mirrorとして扱う。右レーンは「中央幹 → group → Category → Stack」、左レーンは「Stack ← Category ← group ← 中央幹」の方向で、左右のgroup heading、marker、Tree connectorがそれぞれ中央幹側を向く。5大visual groupのheadingはMap専用のmarkerlessな構造見出しとし、group descriptionはMap上に表示しない。
 
-左レーンのTreeは、`min-width: 1101px`で`padding-right`、`right`側のpseudo connector、`row-reverse`のmarker配置を使って明示的に反転する。各Tree `li` の縦線とbranch線は別のpseudo elementで描画し、`li:last-child`では縦線を自身のbranch位置で止める。`transform: scaleX(-1)`、Canvas、SVG座標のJavaScript計算は使わない。group branchはmarkerlessなheading行へ接続し、中央幹を装飾線ではなく5大groupの親構造線として見せる。
+左レーンのTreeは、コンテナ幅`width > 1100px`で`padding-right`、`right`側のpseudo connector、`row-reverse`のmarker配置を使って明示的に反転する。各Tree `li` の縦線とbranch線は別のpseudo elementで描画し、`li:last-child`では縦線を自身のbranch位置で止める。`transform: scaleX(-1)`、Canvas、SVG座標のJavaScript計算は使わない。group branchはmarkerlessなheading行へ接続し、中央幹を装飾線ではなく5大groupの親構造線として見せる。
 
 Mapのセクション見出しは`構造`とし、`Web開発`はTree Rootに1回だけ表示する。Rootには装飾用accent barを置かず、Root文字の直下から実際のconnectorを開始する。Root connector、中央幹、NarrowのGroup幹は共通の2pxで連続させる。Wideでは中央幹のレイアウト列を`84px`、Group headingから子Tree縦線までを`10px`として、中央幹から子Tree縦線までの間隔を確保する。Root descriptionはMapに表示せず、Categoryは四角marker、Stackは円形markerを維持しつつ、Categoryをやや強く、Stackをやや控えめに表示する。Mapの階層indentはgroup、Category、child branchごとに確保し、desktopの目安は`30px / 26px / 20px`、Groupからchild treeまでのgapは`24px`とする。長い名称は通常の単語境界で折り返す。
 
-`max-width: 1100px`では中央幹を隠し、左レーンの反転を解除して、Rootから5大groupへ続く通常方向の1列Vertical Treeへ戻す。狭幅のRootは`padding-left: 0`とし、Root文字とconnectorをコンテンツ外側へ寄せ、`--map-mobile-root-offset: 8px`でRoot幹を文字のW中央付近へ寄せる。`--map-mobile-group-offset: 28px`でRoot / Group幹を外側の一本に接続し、Group headingから子Tree縦線まで`10px`を確保して、その縦線を先頭文字の中央付近へ置く。狭幅では`map-mobile-group-list`の`ul > li`としてgroupを`dictionaryVisualGroups`のpresentation metadata（`order`）順に描画し、Rootの縦線と各groupのbranchを静的CSSで接続する。canonical taxonomyやCategory / Stack ID、Analyzer metadataは変更しない。
+コンテナ幅`max-width: 1100px`では中央幹を隠し、左レーンの反転を解除して、Rootから5大groupへ続く通常方向の1列Vertical Treeへ戻す。狭幅のRootは`padding-left: 0`とし、Root文字とconnectorをコンテンツ外側へ寄せ、`--map-mobile-root-offset: 8px`でRoot幹を文字のW中央付近へ寄せる。`--map-mobile-group-offset: 28px`でRoot / Group幹を外側の一本に接続し、Group headingから子Tree縦線まで`10px`を確保して、その縦線を先頭文字の中央付近へ置く。狭幅では`map-mobile-group-list`の`ul > li`としてgroupを`dictionaryVisualGroups`のpresentation metadata（`order`）順に描画し、Rootの縦線と各groupのbranchを静的CSSで接続する。canonical taxonomyやCategory / Stack ID、Analyzer metadataは変更しない。
 
 ## Phase 1.3.2 Presentation Contract
 
@@ -128,7 +128,17 @@ Stable ID、`categoryId`、package名、alias、関連ID、relationship metadata
 
 ## Verification anchors
 
-- `src/data/validateDictionary.test.ts`: 43 Category / 48 Stack、参照整合性、重複検出、5大visual groupのroot割り当て検証
+- `src/data/validateDictionary.test.ts`: 52 Category / 142 Stack、参照整合性、重複検出、5大visual groupのroot割り当て検証
 - `src/utils/search.test.ts`: 名称・alias・package名検索と検索順位
 - `src/utils/routes.test.ts`: stable ID lookupとURL生成
 - `package.json`: `build`、`lint`、`typecheck`、`test` の品質ゲート
+
+## 2026-09-12 拡張の現行契約
+
+142 Stack /52 Category（新規94 /9）。従来48 StackのID・URLを維持する。TSX、JSX、Firebase Local Emulator Suiteは独立IDで、CDN8製品もそれぞれ詳細を持つ。
+
+正規データはcategories/stacksを入口にexpandedCategories、applicationStacks、platformStacks、deliveryStacks等を合成し、expansionLinksで既存項目との関係を補う。非npmの識別子はecosystemを区別し、同じ文字列でも別ecosystemを同一packageと推定しない。説明、比較、関連分類、関連技術、関係の方向を検証する。
+
+MapはResizeObserverでコンテナの実幅を把握し、CSS container queryと同じ1100px境界で2レーン/1レーンを選ぶ。620/820/1200pxにも密度調整があり、1100px超の小数幅に空白区間を作らない。Categoryの開閉はIDで共有し、レーン切替時のfocusを移し、ユーザーの開閉状態を保持する。5グループの移動、全開閉、技術件数、44px以上の開閉操作領域を備える。大量データは縮小せず開閉と縦方向の探索で扱う。
+
+採用形式とテストの対応は[94件受入台帳](../plans/2026-09-12-dictionary-analyzer-acceptance.md)を参照。

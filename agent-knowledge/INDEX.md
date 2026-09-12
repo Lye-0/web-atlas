@@ -28,6 +28,16 @@
 - files: `src/components/analyzer/useArchitectureNodeGesture.ts`, `src/components/analyzer/SemanticFlow2D.tsx`, `src/components/analyzer/SemanticFlow3D.tsx` …
 - memory: `agent-knowledge/entries/2026-09-10-architecture-selection-gesture-04c7e2.md`
 
+## analyzer-command-evidence
+
+### CIコマンドを合成すると元範囲の座標系が変わる
+- id: `rm-20260912-ci-command-source-offsets`
+- type: `failure`
+- maturity: `candidate`
+- tags: `analyzer`, `ci`, `source-range`
+- files: `src/analyzer/providerAdapters.ts`, `src/analyzer/yamlCommandOffsets.ts`, `src/analyzer/commandParser.ts` …
+- memory: `agent-knowledge/entries/2026-09-12-ci-command-source-offsets-b84d19.md`
+
 ## analyzer-flow
 
 ### Flowの共有ホバーは入力元と表示寿命を区別する

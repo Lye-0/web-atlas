@@ -364,27 +364,28 @@ function detectionReason(node: AnalyzerViewNode, fact: ReturnType<typeof factFor
     case 'project':
       return source ? `${source}のproject metadataからProjectを検出しました。` : '選択したローカルFolderをProjectとして検出しました。';
     case 'workspace-config':
-      return `${source ?? fact.filePath ?? 'workspace設定'}のpackages設定からpnpm workspaceを検出しました。`;
+      return `${source ?? fact.filePath ?? 'workspace設定'}の明示member設定から${fact.manager}のworkspace構成を検出しました。`;
     case 'workspace-pattern':
-      return `${source ?? fact.filePath ?? 'workspace設定'}のpackages pattern「${fact.pattern}」を検出しました。`;
+      return `${source ?? fact.filePath ?? 'workspace設定'}のmember宣言「${fact.pattern}」を検出しました。`;
     case 'workspace-package':
-      return `${fact.manifestPath}のpackage manifestを${fact.isRoot ? 'root package' : 'workspace package'}として検出しました。`;
+      return `${fact.manifestPath}のmanifestを${fact.isRoot ? 'root project' : fact.metadata.workspaceMembership==='standalone' ? '独立project（workspaceへの所属宣言なし）' : '明示workspace member'}として検出しました。`;
     case 'package-manifest':
-      return `${fact.filePath ?? fact.packagePath}のpackage.json manifestとして検出しました。`;
+      return `${fact.filePath ?? fact.packagePath}のproject manifestとして検出しました。`;
     case 'package-script':
-      return `${fact.sourcePath}のscripts.${fact.scriptName}からpackage scriptを検出しました。`;
+      return `${fact.sourcePath}に宣言された「${fact.scriptName}」のcommandを検出しました。`;
     case 'external-package':
       return `${fact.packageName}が直接dependency declarationに含まれているためExternal Packageとして検出しました。`;
     case 'technology':
       return fact.explicit
         ? `${source ?? '設定ファイル'}の明示的な設定から${fact.label}を検出しました。`
-        : `package.jsonのdependency declaration（${fact.packageNames.join('、') || fact.label}）から${fact.label}を検出しました。`;
+        : `${source ?? 'manifest'}の直接依存または明示参照（${fact.packageNames.join('、') || fact.label}）から${fact.label}を検出しました。`;
     case 'runtime':
-      return `${fact.configPath ?? source ?? 'runtime設定'}のname / mainから${fact.label} runtimeを検出しました。`;
+      return `${fact.configPath ?? source ?? 'runtime設定'}の実行設定・入口宣言から${fact.label}を検出しました。稼働状況の観測ではありません。`;
     case 'resource':
+      if (fact.metadata.buildOutput) return `${fact.filePath ?? 'ビルド設定'}に宣言された出力先です。ビルドの実施や生成ファイルの存在を観測したものではありません。`;
       return `${source ?? fact.filePath ?? '設定ファイル'}の${fact.binding ? `binding「${fact.binding}」` : fact.resourceType}からResourceを検出しました。`;
     case 'dotnet-project':
-      return `${fact.projectPath}の.csproj propertyから${fact.useWpf ? '.NET / WPF Application' : '.NET Application'}を検出しました。`;
+      return `${fact.projectPath}のproject宣言から${fact.useWpf ? '.NET / WPF' : '.NET'}の構成を検出しました。実行可能なアプリかどうかは出力・入口設定で区別します。`;
     case 'command':
       return `package scriptのcommand fragment「${fact.command}」として展開しました。`;
     case 'module':
@@ -441,6 +442,14 @@ function NodeDetails({ node, view, store, expandedPresentationIds, onSelectNode,
         <h3>Overview</h3>
         <p>{detectionReason(node, fact, view)}</p>
       </section>
+      {node.metadata.buildOutput && <section className="analyzer-detail-section"><h3>ビルド入出力の宣言</h3>
+        <dl className="analyzer-metadata-list">
+          <div><dt>宣言元</dt><dd>{fact?.filePath}</dd></div>
+          <div><dt>入力</dt><dd>{metadataStrings(node, 'inputPaths').join('、') || '静的に確定していません'}</dd></div>
+          <div><dt>出力先</dt><dd>{metadataString(node, 'outputPath')}</dd></div>
+          <div><dt>種類</dt><dd>{node.metadata.outputKind === 'directory' ? 'ディレクトリ' : 'ファイル'}</dd></div>
+        </dl>
+      </section>}
       {stackUsage && (
         <section className="analyzer-detail-section">
           <h3>Stack Usage</h3>

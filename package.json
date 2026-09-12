@@ -16,13 +16,19 @@
   "dependencies": {
     "@react-three/fiber": "^9.7.0",
     "@repomix/tree-sitter-wasms": "0.1.17",
+    "fast-xml-parser": "^5.11.1",
+    "graphql": "^17.0.2",
+    "parse5": "^8.0.1",
+    "pgsql-ast-parser": "^12.0.2",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-router-dom": "^7.8.2",
+    "smol-toml": "^1.8.0",
     "three": "^0.182.0",
     "tree-sitter-wasms": "0.1.13",
     "web-tree-sitter": "0.27.0",
-    "web-tree-sitter-legacy": "npm:web-tree-sitter@0.20.8"
+    "web-tree-sitter-legacy": "npm:web-tree-sitter@0.20.8",
+    "yaml": "^2.9.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.35.0",

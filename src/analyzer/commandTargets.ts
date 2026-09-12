@@ -1,5 +1,9 @@
 import { getStack } from '../data';
-import { commandInvocation, type CommandFragment } from './commandParser';
+import { commandArgv, commandInvocation, type CommandFragment } from './commandParser';
+import { commandPurpose, commandStackId } from './expandedCommands';
+import { localPath } from './projectPaths';
+import{commandProjectPath}from'./commandProject';
+import{runtimeEntryArgument,workingDirectoryArgument}from'./runtimeArgv';
 import type {
   AnalyzerProjectStore,
   AnalyzerRelationKind,
@@ -103,11 +107,11 @@ export function commandTerminalTarget(
   }
 
   if (invocation.executable === 'firebase') {
-    const firebase = technologyFactForStack(store, 'firebase');
-    return firebase ? { factId: firebase.id, kind: 'starts' } : undefined;
+    const id=commandStackId(commandArgv(fragment));const target=id?technologyFactForStack(store,id):undefined;
+    return target?{factId:target.id,kind:id==='firebase-emulator-suite'?'starts':'uses'}:undefined;
   }
 
-  const stackId = COMMAND_EXECUTABLE_STACK_IDS[invocation.executable];
+  const stackId = COMMAND_EXECUTABLE_STACK_IDS[invocation.executable]??commandStackId(commandArgv(fragment));
   if (!stackId || !getStack(stackId)) return undefined;
   const technology = technologyFactForStack(store, stackId);
   if (!technology) return undefined;
@@ -115,4 +119,23 @@ export function commandTerminalTarget(
     ? 'uses'
     : 'starts';
   return { factId: technology.id, kind };
+}
+
+export function commandTerminalTargets(fragment:CommandFragment,store:AnalyzerProjectStore,script:PackageScriptFact):CommandTerminalTarget[]{
+  const argv=commandArgv(fragment);const stackId=commandStackId(argv);const targets:CommandTerminalTarget[]=[];
+  for(const runtime of store.facts.filter(fact=>fact.kind==='runtime'&&fact.metadata.entryScriptId===script.id))targets.push({factId:runtime.id,kind:'starts'});
+  const cwd=fragment.workingDirectory??workingDirectoryArgument(argv);const directory=cwd?localPath(script.packagePath,cwd):script.packagePath;const selected=commandProjectPath(argv,directory??script.packagePath);const selectedProject=selected.explicit?store.facts.find(fact=>fact.kind==='workspace-package'&&(fact.manifestPath===selected.path||fact.packagePath===selected.path))?.id:cwd&&directory?store.facts.filter(fact=>fact.kind==='workspace-package'&&(fact.packagePath===directory||directory.startsWith(fact.packagePath+'/'))).sort((a,b)=>(b.kind==='workspace-package'?b.packagePath.length:0)-(a.kind==='workspace-package'?a.packagePath.length:0))[0]?.id:script.packageId;
+  if(stackId==='firebase-emulator-suite'){
+    const onlyIndex=argv.indexOf('--only');const only=(onlyIndex>=0?argv[onlyIndex+1]:argv.find(value=>value.startsWith('--only='))?.slice(7))?.split(',');
+    const local=store.facts.filter((fact):fact is ResourceFact=>fact.kind==='resource'&&fact.metadata.environment==='local'&&(!fact.packageId||fact.packageId===script.packageId));
+    for(const fact of local)if(fact.dictionaryStackId==='firebase-emulator-suite'||only?.includes(String(fact.metadata.emulatorService??fact.metadata.service)))targets.push({factId:fact.id,kind:'starts'});
+  }
+  const entryArgument=runtimeEntryArgument(argv);const entryPath=entryArgument&&directory?localPath(directory,entryArgument):undefined;
+  const runtime=store.facts.find(fact=>fact.kind==='runtime'&&fact.packageId===selectedProject&&fact.metadata.dictionaryStackId===stackId&&entryPath&&(fact.metadata.entryPath===entryPath||fact.metadata.invocationTargetPath===entryPath));
+  if(runtime)targets.push({factId:runtime.id,kind:'starts'});
+  const configIndex=argv.indexOf('--config');const configArgument=configIndex>=0?argv[configIndex+1]:argv.find(value=>value.startsWith('--config='))?.slice(9);const configPath=configArgument&&directory?localPath(directory,configArgument):undefined;
+  const artifacts=store.facts.filter(fact=>fact.kind==='resource'&&fact.metadata.buildOutput&&fact.packageId===selectedProject&&(fact.metadata.buildInvocationScriptId===script.id||fact.dictionaryStackId==='webpack'&&stackId==='webpack'&&commandPurpose(argv)==='build'&&(configArgument?fact.filePath===configPath:directory&&fact.filePath?.startsWith(directory==='.'?'':directory+'/')&&fact.filePath?.slice(directory==='.'?0:directory.length+1).match(/^webpack\.config\.[cm]?[jt]s$/))||runtime?.metadata.entryPath===fact.filePath));for(const artifact of artifacts)targets.push({factId:artifact.id,kind:'uses'});
+  if(!targets.length||artifacts.length&&!runtime){const terminal=commandTerminalTarget(fragment,store,script);if(terminal)targets.push(terminal);}
+  if(['mvn','mvnw','gradle','gradlew','cargo','composer','dotnet','deno','bun','uv','webpack','esbuild','jest','pytest','cypress','netlify'].includes(argv[0]??'')&&['build','test','deploy','start','install'].includes(commandPurpose(argv))&&selectedProject&&store.facts.some(fact=>fact.id===selectedProject))targets.push({factId:selectedProject,kind:'uses'});
+  return targets;
 }

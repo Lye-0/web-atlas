@@ -5,7 +5,7 @@ type: decision
 status: active
 maturity: reused
 created: 2026-08-30
-last_verified: 2026-08-30
+last_verified: 2026-09-12
 source_commit: "33cbdb5"
 related_files:
   - src/components/map/StackMap.tsx
@@ -56,7 +56,7 @@ Do not apply:
 - `src/styles.css`のRootに装飾barを持たせず、文字直下のpseudo connectorと`30px / 26px / 20px`のdesktop階層indentを使う定義
 - `src/styles.css`の`--map-trunk-width: 2px`、`--map-group-to-children-gap: 24px`、Group / Categoryの階層別typographyと、Group直下リストへのgap適用
 - `src/styles.css`の`--map-trunk-gap: 84px`、`--map-mobile-group-offset: 28px`、`--map-mobile-root-offset: 8px`、`--map-group-child-offset: 10px`、狭幅Rootの`padding-left: 0` / connector `left: 8px`
-- `src/styles.css`の`@media (max-width: 1100px)`にある中央幹非表示、Group単位の通常方向connector、最終Groupでの停止、Root接続、左側right offset解除
+- `src/styles.css`の`@container dictionary-map (max-width: 1100px)`にある中央幹非表示、Group単位の通常方向connector、最終Groupでの停止、Root接続、左側right offset解除
 - `src/components/map/StackMap.tsx`のsemanticなRoot / group / Category / Stack構造と、presentation `order`順のmobile group list
 - `src/data/dictionaryGroups.ts`の`side` / `order` presentation metadata
 - 1600 / 1440 / 1280 / 1100 / 1024 / 900 / 820 / 768 / 390pxでのブラウザ確認。1600 / 1440 / 1280pxは2レーンで中央幹から子Tree縦線まで52px、1100px以下は1列でRoot / Group幹から子Tree縦線まで30px、Root connectorは文字開始位置から8px、全幅でhorizontal overflowなし。1440 / 1280 / 390pxではconnector、Root位置、Group先頭文字との相対位置を目視確認
@@ -69,3 +69,7 @@ Do not apply:
 2. `/dictionary/map`を1600 / 1440 / 1280 / 1200pxで開き、Root直下から中央幹が始まり、左Treeが中央幹方向へ反転し、右Treeの方向、markerless group heading、connector contrast、非末尾/末尾branch形状が維持されていることを確認する。
 3. 1100 / 1024 / 900 / 820 / 768 / 390pxで中央幹が隠れ、通常方向の1列Tree、Root接続、5大group順、最後のGroupでの幹停止、horizontal overflowなしを確認する。
 4. `/dictionary/categories`、`/dictionary/stacks`、各Detail、Search、404、Deep Link、Browser historyにMap CSSの波及がないことを確認する。
+
+## 2026-09-12 再確認
+
+左右mirrorと1列化の契約は維持。現在はviewport media queryではなく、Mapコンテナの実幅1100pxで切り替える。JSのResizeObserverとCSSのwidth > 1100pxを揃え、小数幅で両方非表示になる隙間を作らない。Category IDごとの開閉・focusをレーン切替後も保持する。142 Stack /52 Category、最新確認では約308〜1908 CSS pxで文書の横overflow無し。初期HEAD 34551afからの未commit変更で確認。現行の寸法・開閉仕様はdocs/technical/dictionary.mdを優先する。

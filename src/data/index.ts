@@ -25,14 +25,9 @@ export const stacksForCategory = (categoryId: string) => stacks.filter((stack) =
 
 const normalizeStackLookupValue = (value: string): string => value.trim().toLowerCase();
 
-// `firebase` is intentionally kept as an Analyzer primary product token. It
-// is also listed by the Firebase Authentication entry for search purposes,
-// so a bare package name cannot safely identify one Dictionary Stack.
-const ambiguousAnalyzerStackTokens = new Set(['firebase']);
-
 function uniqueStackMatch(value: string, valuesForStack: (stack: StackEntry) => string[] | undefined): StackEntry | undefined {
   const normalizedValue = normalizeStackLookupValue(value);
-  if (!normalizedValue || ambiguousAnalyzerStackTokens.has(normalizedValue)) return undefined;
+  if (!normalizedValue) return undefined;
   const matches = stacks.filter((stack) => valuesForStack(stack)?.some((candidate) => normalizeStackLookupValue(candidate) === normalizedValue));
   return matches.length === 1 ? matches[0] : undefined;
 }

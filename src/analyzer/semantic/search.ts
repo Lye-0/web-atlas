@@ -8,7 +8,7 @@ export function semanticSearchDocument(node: SemanticNode): AnalyzerSearchDocume
     const value = node.attributes[key]; return typeof value === 'string' ? [value] : Array.isArray(value) ? value : [];
   });
   return {
-    names: [node.label, ...(node.data ? [node.data.expression] : []), ...values(['name', 'qualifiedName', 'className', 'callee', 'event', 'command', 'serviceName', 'binding', 'aliases']),
+    names: [node.label, ...(node.data ? [node.data.expression] : []), ...values(['name', 'qualifiedName', 'className', 'callee', 'event', 'command', 'serviceName', 'binding', 'aliases','technologyName','dictionaryStackId']),
       ...(node.architecture ? [architectureKindLabels[node.architecture.kind], node.architecture.request?.expression ?? '', node.architecture.identity?.identifier ?? '', ...node.architecture.identity?.configurations.map(setting => setting.binding ?? '') ?? []] : [])],
     paths: [node.path ?? '', ...values(['entryPath']), ...(node.architecture?.files ?? []), ...(node.architecture?.identity?.configurations.map(setting => setting.path) ?? [])],
     groups: [node.group, ...values(['ownerName', 'runtimeName']), ...(node.architecture?.environments ?? [])],

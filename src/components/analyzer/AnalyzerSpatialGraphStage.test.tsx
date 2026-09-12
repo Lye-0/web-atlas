@@ -55,7 +55,7 @@ describe('Spatial Atlas gesture integration', () => {
     vi.unstubAllGlobals();
   });
   const zoomIn = () => document.querySelector<HTMLButtonElement>('button[aria-label="Zoom in"]')!;
-  const scale = () => document.querySelector('.analyzer-stage-controls > span')!.textContent;
+  const scale = () => document.querySelector('[aria-label="ズーム倍率"]')!.textContent;
 
   const particleButton = () => host.querySelector<HTMLButtonElement>('.analyzer-particle-trigger')!;
   const chooseParticleMode = async (label: string) => {

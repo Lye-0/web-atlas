@@ -1,8 +1,9 @@
 import type { CategoryEntry } from '../types';
+import { categoryAdditions, expandedCategories } from './expandedCategories';
 
 const difference = (against: string, explanation: string) => ({ against, explanation });
 
-export const categories: CategoryEntry[] = [
+const existingCategories: CategoryEntry[] = [
   {
     id: 'markup-language',
     name: 'マークアップ言語',
@@ -271,9 +272,9 @@ export const categories: CategoryEntry[] = [
   {
     id: 'orm',
     name: 'ORM',
-    aliases: ['Object Relational Mapper', 'Database Toolkit'],
+    aliases: ['Object Relational Mapper', 'Database Toolkit', 'ODM', 'Object Document Mapper'],
     parentCategoryId: 'library',
-    summary: 'アプリケーションコードと主にリレーショナルデータベースの間を橋渡しする仕組み。',
+    summary: 'アプリケーションのモデルと、DBの表やdocumentの操作を橋渡しする仕組み。',
     description:
       'テーブルやクエリを、型やオブジェクト/モデルを通じてアプリから扱いやすくします。SQLを完全に隠すものから、SQLに近い操作感を重視するものまで設計はさまざまです。',
     role: 'アプリのデータモデルとDB操作を接続する',
@@ -334,10 +335,10 @@ export const categories: CategoryEntry[] = [
     id: 'database',
     name: 'データベース',
     aliases: ['Database', 'DB'],
-    summary: '構造化されたデータを永続化し、検索・更新するための仕組み。',
+    summary: 'データを管理し、用途に応じた検索・取得・更新を提供する仕組み。',
     description:
       'データを保存するだけでなく、検索、更新、整合性、同時実行などを扱います。データモデルやアクセス方法によってRDB、ドキュメントデータベース、オブジェクトデータベースなどに分かれます。',
-    role: 'アプリケーションデータを検索・更新可能な形で永続化する',
+    role: 'アプリケーションデータを取得・更新可能な形で管理する',
     useCases: ['ユーザーや注文などの業務データを保存する', '条件検索や集計を行う', '制約でデータ整合性を保つ'],
     differences: [
       difference('オブジェクトストレージ', 'データベースは検索・更新する構造化データ、オブジェクトストレージは画像や動画などのファイル保存が中心です。'),
@@ -673,3 +674,8 @@ export const categories: CategoryEntry[] = [
     relatedCategoryIds: ['deployment-platform', 'application-platform', 'serverless-runtime'],
   },
 ];
+
+export const categories: CategoryEntry[] = [...existingCategories.map((category) => {
+  const addition = categoryAdditions[category.id];
+  return { ...category, ...addition, relatedCategoryIds: [...new Set([...(category.relatedCategoryIds ?? []), ...(addition?.relatedCategoryIds ?? [])])] };
+}), ...expandedCategories];

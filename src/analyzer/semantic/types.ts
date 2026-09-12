@@ -52,9 +52,11 @@ export interface SemanticAnalysis {
   stats: { files: number; functions: number; models: number; unresolved: number; elapsedMs: number };
 }
 export interface SemanticInput {
+  stackMetadata?:Record<string,{name:string;aliases:string[]}>;
+  projectScopes?:{id:string;path:string;directory:string}[];
   sources: Record<string, string>;
   imports: { from: string; to: string; specifier: string }[];
-  resources: { id: string; label: string; type: string; path?: string; binding?: string; entryPath?: string; evidence?: SemanticEvidence[] }[];
+  resources: { id: string; label: string; type: string; path?: string; binding?: string; entryPath?: string; evidence?: SemanticEvidence[]; attributes?: SemanticNode['attributes'] }[];
 }
 export interface SemanticGraph { view: SemanticViewId; nodes: SemanticNode[]; edges: SemanticEdge[]; architectureView?: import('./architectureProjection').ArchitectureProjection; }
 
