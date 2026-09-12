@@ -72,4 +72,4 @@ Do not apply:
 
 ## 2026-09-12 再確認
 
-左右mirrorと1列化の契約は維持。現在はviewport media queryではなく、Mapコンテナの実幅1100pxで切り替える。JSのResizeObserverとCSSのwidth > 1100pxを揃え、小数幅で両方非表示になる隙間を作らない。Category IDごとの開閉・focusをレーン切替後も保持する。142 Stack /52 Category、最新確認では約308〜1908 CSS pxで文書の横overflow無し。初期HEAD 34551afからの未commit変更で確認。現行の寸法・開閉仕様はdocs/technical/dictionary.mdを優先する。
+左右mirrorと1列化の契約は維持。現在はviewport media queryではなく、Mapコンテナの実幅1100pxで切り替える。JSのResizeObserverとCSSのwidth > 1100pxを揃え、小数幅で両方非表示になる隙間を作らない。後続のユーザー修正により全項目を常時表示する。レーン切替時のfocus保持は継続する。5グループの移動ボタンは見出し領域へ置き、狭幅では説明文と水平線の間に配置する。142 Stack /52 Category、最新確認では約308〜1908 CSS pxで文書の横overflow無し。初期HEAD 34551afからの未commit変更で確認。現行の寸法・開閉仕様はdocs/technical/dictionary.mdを優先する。

@@ -139,6 +139,6 @@ Stable ID、`categoryId`、package名、alias、関連ID、relationship metadata
 
 正規データはcategories/stacksを入口にexpandedCategories、applicationStacks、platformStacks、deliveryStacks等を合成し、expansionLinksで既存項目との関係を補う。非npmの識別子はecosystemを区別し、同じ文字列でも別ecosystemを同一packageと推定しない。説明、比較、関連分類、関連技術、関係の方向を検証する。
 
-MapはResizeObserverでコンテナの実幅を把握し、CSS container queryと同じ1100px境界で2レーン/1レーンを選ぶ。620/820/1200pxにも密度調整があり、1100px超の小数幅に空白区間を作らない。Categoryの開閉はIDで共有し、レーン切替時のfocusを移し、ユーザーの開閉状態を保持する。5グループの移動、全開閉、技術件数、44px以上の開閉操作領域を備える。大量データは縮小せず開閉と縦方向の探索で扱う。
+MapはResizeObserverでコンテナの実幅を把握し、CSS container queryと同じ1100px境界で2レーン/1レーンを選ぶ。620/820/1200pxにも密度調整があり、1100px超の小数幅に空白区間を作らない。全技術を常時表示し、レーン切替時のfocusを対応するリンクへ移す。5グループへの移動ボタンは「構造」の見出し領域内に配置する。Map領域の実幅が820pxを超える場合は見出しを左下、説明文とボタンを右側に置き、見出しとボタンの下端を揃える。820px以下では見出し・説明文・ボタンを左揃えで縦に並べ、ボタンは説明文と水平線の間で折り返す。操作領域は44px以上を確保し、大量データは縦方向の探索で扱う。
 
 採用形式とテストの対応は[94件受入台帳](../plans/2026-09-12-dictionary-analyzer-acceptance.md)を参照。

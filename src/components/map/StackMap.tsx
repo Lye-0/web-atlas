@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { dictionaryVisualGroups, getCategory, getStack, stackMap } from '../../data';
 import type { DictionaryVisualGroup } from '../../data/dictionaryGroups';
@@ -26,7 +26,7 @@ const groupsBySide = (side: DictionaryVisualGroup['side']) => dictionaryVisualGr
 
 const groupsByOrder = [...dictionaryVisualGroups].sort((a, b) => a.order - b.order);
 
-interface MapState { collapsed: ReadonlySet<string>; toggle: (id: string) => void; idPrefix: string; categoryNodes: Map<string, Extract<MapNode, {kind:'category'}>>; stackLookup: (id: string) => StackEntry | undefined }
+interface MapState { idPrefix: string; categoryNodes: Map<string, Extract<MapNode, {kind:'category'}>>; stackLookup: (id: string) => StackEntry | undefined }
 function MapNodeView({ node, state }: { node: MapNode; state: MapState }) {
   if (node.kind === 'group') {
     return (
@@ -45,9 +45,6 @@ function MapNodeView({ node, state }: { node: MapNode; state: MapState }) {
   if (node.kind === 'category') {
     const category = getCategory(node.categoryId);
     if (!category) return null;
-    const count = node.children.filter(child => child.kind === 'stack').length;
-    const collapsed = state.collapsed.has(node.categoryId);
-    const childrenId = `map-children-${state.idPrefix}-${category.id}`;
 
     return (
       <li className="map-tree-item map-tree-category-item">
@@ -63,15 +60,10 @@ function MapNodeView({ node, state }: { node: MapNode; state: MapState }) {
             <span className="map-node-name">{category.name}</span>
           </span>
           </Link>
-          {count > 0 && <button type="button" className="map-disclosure" onClick={() => state.toggle(category.id)}
-            aria-expanded={!collapsed} aria-controls={childrenId} data-map-focus={`toggle:${category.id}`}
-            aria-label={`${category.name}の技術一覧を${collapsed ? '展開' : '折りたたむ'}（${count}件）`}>
-            <span aria-hidden="true">{collapsed ? '+' : '−'}</span><span>{count}</span>
-          </button>}
         </div>
         {node.children.length > 0 && (
-          <ul id={childrenId} className="map-tree-list map-tree-list-nested" hidden={collapsed && node.children.every(child => child.kind === 'stack')}>
-            {node.children.filter(child => !collapsed || child.kind !== 'stack').map((child) => <MapNodeView key={getNodeKey(child)} node={child} state={state} />)}
+          <ul className="map-tree-list map-tree-list-nested">
+            {node.children.map((child) => <MapNodeView key={getNodeKey(child)} node={child} state={state} />)}
           </ul>
         )}
       </li>
@@ -131,13 +123,10 @@ function MapVerticalTree({ groups, state }: { groups: DictionaryVisualGroup[]; s
 
 export function StackMap({ map = stackMap, stackLookup = getStack }: { map?: MapNode; stackLookup?: (id: string) => StackEntry | undefined } = {}) {
   const categoryNodeById = useMemo(() => { const nodes = new Map<string, Extract<MapNode, {kind:'category'}>>(); collectCategoryNodes(map, nodes); return nodes; }, [map]);
-  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set());
   const rootRef = useRef<HTMLDivElement>(null);
   const lastFocus = useRef<string | undefined>(undefined);
-  const toggle = (id: string) => setCollapsed(previous => { const next = new Set(previous); if (next.has(id)) next.delete(id); else next.add(id); return next; });
-  const desktop: MapState = { collapsed, toggle, idPrefix: 'desktop', categoryNodes: categoryNodeById, stackLookup };
-  const mobile: MapState = { collapsed, toggle, idPrefix: 'mobile', categoryNodes: categoryNodeById, stackLookup };
-  const visibleTarget = (key: string) => [...(rootRef.current?.querySelectorAll<HTMLElement>('[data-map-focus]') ?? [])].find(element => element.dataset.mapFocus === key && element.getClientRects().length > 0);
+  const desktop: MapState = { idPrefix: 'desktop', categoryNodes: categoryNodeById, stackLookup };
+  const mobile: MapState = { idPrefix: 'mobile', categoryNodes: categoryNodeById, stackLookup };
   useEffect(() => {
     const root = rootRef.current; if (!root || typeof ResizeObserver === 'undefined') return;
     let previousWidth = root.getBoundingClientRect().width;
@@ -165,15 +154,6 @@ export function StackMap({ map = stackMap, stackLookup = getStack }: { map?: Map
     <div className="map-container">
     <div ref={rootRef} className="stack-map" role="region" aria-label="Web開発技術の分類マップ"
       onFocusCapture={event => { lastFocus.current = (event.target as HTMLElement).dataset.mapFocus; }}>
-      <div className="map-controls">
-        <div className="map-expand-controls" role="group" aria-label="技術一覧の表示">
-          <button type="button" onClick={() => setCollapsed(new Set())}>すべて展開</button>
-          <button type="button" onClick={() => setCollapsed(new Set(categoryNodeById.keys()))}>すべて折りたたむ</button>
-        </div>
-        <nav className="map-group-jumps" aria-label="マップのグループへ移動">
-          {groupsByOrder.map(group => <button key={group.id} type="button" onClick={() => { const target = visibleTarget(`group:${group.id}`); target?.focus({ preventScroll: true }); target?.scrollIntoView({ block: 'start', behavior: 'instant' }); }}>{group.label}</button>)}
-        </nav>
-      </div>
       <div className="map-root-node">
         <strong>Web開発</strong>
       </div>
