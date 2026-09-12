@@ -10,7 +10,6 @@ import type { AnalyzerViewModel, AnalyzerViewSession, AnalyzerViewCounts } from 
 import { SpatialFlowParticles } from './SpatialFlowParticles';
 import { AnalyzerGraphControls } from './AnalyzerGraphControls';
 import { SpatialRelationLines, type SpatialRelationPath } from './SpatialRelationLines';
-import { spatialRelationCurve } from '../../analyzer/spatialRelationPath';
 import { graph3DSelectionContext, graph3DRelationColor } from '../../analyzer/graph3DSelection';
 import './spatial-label-direction.css';
 import { SemanticFlowLegend } from './SemanticFlowLegend';
@@ -23,6 +22,7 @@ import { recoverableWebGLRenderer } from './recoverableWebGLRenderer';
 import { registerCanvasDisposal, useCanvasDisposals } from './canvasDisposals';
 import { AutoAggregationPanel, type AggregationInspection, type AggregationGroupMode } from './AutoAggregationPanel';
 import './analyzer-graph-3d.css';
+import { Graph3DPathCache } from './graph3DPaths';
 import { graph3DHoverEmphasis } from './graph3DHover';
 import { FlowLabelLayer, type FlowLabelContent, type FlowLabelPlacement, type FlowLabelObstacle } from './semanticFlowLabels';
 import { prepareGraph3DLabels, projectGraph3DLabels, type Graph3DLabelDescriptor, type Graph3DLabelCandidate } from './graph3DLabels';
@@ -50,15 +50,6 @@ interface Projection { points: ScreenPoint[]; edges: ScreenEdge[]; regions: Scre
 interface CameraCommand { nonce: number; ids?: string[]; action?: 'fit' | 'reset' | 'in' | 'out' }
 const emptyProjection: Projection = { points: [], edges: [], regions: [] };
 
-/** All endpoint clipping is camera dependent; canonical XYZ positions never move. */
-function panelPort(a: ScreenPoint, b: ScreenPoint): [number, number] {
-  if (!a.panel) return [a.x, a.y];
-  const dx = b.x - a.x, dy = b.y - a.y;
-  if (Math.hypot(dx, dy) < .001) return [a.x, a.y];
-  const factor = Math.min((a.width / 2 + 2) / Math.max(.001, Math.abs(dx)), (a.height / 2 + 2) / Math.max(.001, Math.abs(dy)), .48);
-  return [a.x + dx * factor, a.y + dy * factor];
-}
-
 function Scene({ labelHovered, labelMatches, labelLayer, labelDescriptors, labelEndpoints, labelRelated, labelRoles, focusedId, labelObstacles, graph, points, edges, selected, priority, hovered, showGroupBounds, selectedRegionId, command, savedCamera, input, motion, onCamera, onProjection, onDensity, onUnavailable, onBlank, onPoint, onHover, disposals, overlayTop }: {
   labelHovered?: string; labelMatches: ReadonlySet<string>; labelLayer: FlowLabelLayer; labelDescriptors: ReadonlyMap<string, Graph3DLabelDescriptor>; labelEndpoints: ReadonlySet<string>; labelRelated: ReadonlySet<string>;
   labelRoles: ReadonlyMap<string, NonNullable<FlowLabelContent['role']>>; focusedId?: string; labelObstacles: readonly FlowLabelObstacle[];
@@ -72,6 +63,7 @@ function Scene({ labelHovered, labelMatches, labelLayer, labelDescriptors, label
   const callbacks = useRef({ labelLayer, labelDescriptors, onCamera, onProjection, onDensity, onUnavailable, onBlank, onPoint, onHover });
   useLayoutEffect(() => { callbacks.current = { labelLayer, labelDescriptors, onCamera, onProjection, onDensity, onUnavailable, onBlank, onPoint, onHover }; });
   const hitPoints = useRef<ScreenPoint[]>([]);
+  const [pathCache] = useState(() => new Graph3DPathCache());
   const previousLabels = useRef<FlowLabelPlacement[]>([]);
   const emphasis = useMemo(() => graph3DHoverEmphasis(edges, hovered), [edges, hovered]);
   const anchors = useMemo(() => graph3DRegionAnchors(graph), [graph]);
@@ -251,23 +243,20 @@ function Scene({ labelHovered, labelMatches, labelLayer, labelDescriptors, label
       previousLabels.current=labels; labelLayer.update(labels);
       const named=new Set(labels.map(label=>labelDescriptors.get(label.id)?.entityId));for(const p of projected)p.labelled=named.has(p.id);
       const paths: (SpatialRelationPath & { animate: boolean })[] = [], screenEdges: ScreenEdge[] = [];
-      const pairs = new Map<string, DisplayEdge[]>();
-      for (const edge of edges) { const key = JSON.stringify([edge.source, edge.target].sort()), pair = pairs.get(key) ?? []; pair.push(edge); pairs.set(key, pair); }
+      const worldPoints = new Map(points.map(point => [point.id, {x:point.x,y:point.y,z:point.z}]));
+      for(const [id,xyz] of anchors) worldPoints.set(id,{x:xyz[0],y:xyz[1],z:xyz[2]});
+      const worldPaths = pathCache.project(edges,worldPoints);
       for (const edge of edges) {
         const source = byId.get(edge.source), target = byId.get(edge.target); if (!source || !target || source.depth < -1 || source.depth > 1 || target.depth < -1 || target.depth > 1) continue;
-        const a = panelPort(source, target), b = panelPort(target, source);
-        const world = (p: [number, number], z: number) => new THREE.Vector3(p[0] / size.width * 2 - 1, 1 - p[1] / size.height * 2, z).unproject(camera);
-        const pair = pairs.get(JSON.stringify([edge.source, edge.target].sort()))!, index = pair.indexOf(edge);
-        const spacing = Math.min(32, 80 / Math.max(1, pair.length - 1));
-        const bend = pair.length > 1 ? (index - (pair.length - 1) / 2 + (pair.length % 2 ? .25 : 0)) * spacing * (edge.source.localeCompare(edge.target) > 0 ? -1 : 1) : undefined;
-        const curve = spatialRelationCurve(world(a, source.depth), world(b, target.depth), bend, '3d');
+        const a: [number,number]=[source.x,source.y], b: [number,number]=[target.x,target.y];
+        const curve = worldPaths.get(edge.id)!;
         const screenPoints = curve.points.map(point => screen(point.x, point.y, point.z));
         screenEdges.push({ id: edge.id, source: edge.source, target: edge.target, a, b, path: screenPoints.map((point, i) => (i ? 'L' : 'M') + point.x + ',' + point.y).join(' '), color: edge.color, label: edge.label, active: edge.active, aggregated: edge.aggregated });
-        paths.push({ id: edge.id, color: edge.color, points: curve.points, intensity: edge.intensity, animate: edge.animate });
+        paths.push(curve);
       }
       const regionLabels = (graph.source.view === 'architecture' ? graph.regions.filter(region=>connectedRegions.has(region.original.id)).map(region=>{const p=byId.get(region.original.id)!;return {id:region.original.id,x:p.x,y:p.y,label:region.original.label,depth:p.depth,port:true};})
         : shownBoundaries.map(region => { const p = screen(region.center[0], region.center[1] + region.size[1] / 2, region.center[2]); return { id: region.id, x: p.x, y: p.y, label: region.label, depth: p.depth, group: region.group }; })).filter(p => p.depth >= -1 && p.depth <= 1 && p.x >= 0 && p.x <= size.width && p.y > overlayTop && p.y < size.height - 25);
-      callbacks.current.onProjection({ points: projected, edges: screenEdges, regions: regionLabels }); setRenderPaths(paths);
+      callbacks.current.onProjection({ points: projected, edges: screenEdges, regions: regionLabels }); setRenderPaths(previous=>previous.length===paths.length&&previous.every((path,index)=>path===paths[index])?previous:paths);
     }
     if (stateRef.current.active) { stateRef.current.distance += Math.min(delta, SPATIAL_FLOW_MAX_FRAME_SECONDS) * SPATIAL_FLOW_SPEED; invalidate(); }
   });
@@ -314,7 +303,6 @@ export function AnalyzerGraph3DStage(props: Props) {
   }, [model, filter, commandPresentation]);
   const points = useMemo(() => graph.points.filter(point => shownIds.has(point.id)), [graph, shownIds]);
   const matchIds = useMemo(() => new Set(points.filter(point => state.search.trim() && matchAnalyzerSearch(analyzerEntitySearchDocument(point.original), state.search)).map(point => point.id)), [points, state.search]);
-  const regionMembers = useMemo(() => new Set(graph.regions.find(region => region.original.id === state.selectedRegionId)?.memberIds ?? []), [graph.regions, state.selectedRegionId]);
   const selectionContext = useMemo(() => graph3DSelectionContext(graph, { selectedNodeId, selectedRegionId, selectedEdgeId }), [graph, selectedNodeId, selectedRegionId, selectedEdgeId]);
   const relevantEdges = selectionContext.edges;
   const protectedIds = useMemo(() => new Set([...selected, ...relevantEdges.flatMap(edge => [edge.sourceId, edge.targetId]), ...hovered ? [hovered] : []]), [selected, relevantEdges, hovered]);
@@ -343,11 +331,11 @@ export function AnalyzerGraph3DStage(props: Props) {
     const roles = new Map<string, Set<'incoming' | 'outgoing'>>();
     const add = (id: string, direction: 'incoming' | 'outgoing') => { const value = roles.get(id) ?? new Set(); value.add(direction); roles.set(id, value); };
     for (const edge of relevantEdges) {
-      if (selected.has(edge.sourceId) || regionMembers.has(edge.sourceId)) add(edge.targetId, 'outgoing');
-      if (selected.has(edge.targetId) || regionMembers.has(edge.targetId)) add(edge.sourceId, 'incoming');
+      if (selectionContext.ids.has(edge.sourceId)) add(edge.targetId, 'outgoing');
+      if (selectionContext.ids.has(edge.targetId)) add(edge.sourceId, 'incoming');
     }
     return roles;
-  }, [relevantEdges, selected, regionMembers]);
+  }, [relevantEdges, selectionContext.ids]);
   const displayEdges = useMemo<DisplayEdge[]>(() => {
     const visible = relations.filter(edge => !edge.internal && (model.view !== 'module-dependency' || edge.originals.some(original => relevantIds.has(original.id))));
     const emphasized = graph3DHoverEmphasis(visible.map(edge => ({ ...edge, active: edge.originals.some(original => relevantIds.has(original.id)) })), hovered).edgeIds;
@@ -390,7 +378,7 @@ export function AnalyzerGraph3DStage(props: Props) {
   const chooseEdge = (id: string) => { setInspection(undefined); props.onSelectEdge(id); };
   const displayed = new Map(displayPoints.map(point => [point.id, point]));
   const labelledIds = new Set(labelContents.map(label => labelDescriptors.get(label.id)?.entityId));
-  const unlabelledConnections = [...new Set(relevantEdges.flatMap(edge => [edge.sourceId, edge.targetId]))].filter(id => graph.points.some(point => point.id === id) && !labelledIds.has(id)).length;
+  const unlabelledConnections = [...new Set(relevantEdges.flatMap(edge => [edge.sourceId, edge.targetId]))].map(id=>owners.get(id)??id).filter((id,index,ids)=>ids.indexOf(id)===index && displayed.has(id) && !labelledIds.has(id)).length;
   return <div ref={setStage} className="analyzer-graph-stage analyzer-spatial-graph-stage semantic-flow-stage analyzer-graph-3d" data-view={model.view} data-render-mode="3d">
     <AnalyzerGraphControls mode="3d" onMode={props.onMode}
       onFit={() => setCommand(current => ({ nonce: current.nonce + 1, action: 'fit' }))} onReset={() => setCommand(current => ({ nonce: current.nonce + 1, action: 'reset' }))}
@@ -400,6 +388,7 @@ export function AnalyzerGraph3DStage(props: Props) {
       autoAggregation={props.autoAggregation} onAutoAggregation={groups.length ? props.onAutoAggregation : undefined}
       isFullscreen={props.isFullscreen} onFullscreen={props.onFullscreen} help={help} onHelp={setHelp}>{props.controlsExtras}</AnalyzerGraphControls>
     {help && <div className="analyzer-stage-help" role="dialog" aria-label="グラフ操作ヘルプ"><strong>3D全体図</strong><p>ドラッグで回転、右ドラッグで移動。点やラベルから対象を選択できます。ホイールと＋ / −で拡大縮小できます。</p><p>検索結果と「選択へ移動」で対象へ移動します。青は選択対象から出る関係、橙は入る関係です。所属の線は実在する包含関係を示します。</p><button type="button" onClick={() => setHelp(false)}>ヘルプを閉じる</button></div>}
+    {displayPoints.length===0 && !graph.regions.some(region=>props.showGroupBounds || region.original.id===state.selectedRegionId || displayEdges.some(edge=>edge.source===region.original.id||edge.target===region.original.id)) && <div className="analyzer-graph-empty" role="status">現在のFilterに一致するNodeまたはRegionはありません。</div>}
     <CanvasBoundary onUnavailable={props.onUnavailable}><Canvas orthographic frameloop="demand" dpr={[1, 2]} onCreated={initializeSemanticCanvas} gl={defaults => recoverableWebGLRenderer({ ...defaults, antialias: true, alpha: true }, props.onUnavailable)} fallback={<p>3D表示を利用できません。</p>}>
       <Scene labelHovered={labelHovered} labelMatches={matchIds} labelLayer={labelLayer} labelDescriptors={labelDescriptors} labelEndpoints={labelEndpoints} labelRelated={labelRelated} labelRoles={labelRoles} focusedId={focusedOwner} labelObstacles={labelObstacles} graph={graph} points={displayPoints} edges={displayEdges} selected={selected} priority={protectedIds} hovered={hovered} showGroupBounds={props.showGroupBounds} selectedRegionId={state.selectedRegionId}
         command={command} savedCamera={state.graph3DCamera} input={props.input} motion={motion} onCamera={props.onCamera} onProjection={setProjection} onDensity={setDensity} onUnavailable={props.onUnavailable} onBlank={props.onClear}
@@ -409,7 +398,7 @@ export function AnalyzerGraph3DStage(props: Props) {
       {projection.edges.map(edge => <path key={edge.id} className="analyzer-3d-edge-hit" d={edge.path} fill="none" stroke="transparent" strokeWidth="12" tabIndex={0} role="button" aria-label={edge.label}
         data-edge-id={edge.id} data-source-id={edge.source} data-target-id={edge.target} data-direction-color={edge.color} data-active={edge.active}
         onPointerMove={event => { if(event.buttons)return; const rect=event.currentTarget.ownerSVGElement!.getBoundingClientRect(),x=event.clientX-rect.left,y=event.clientY-rect.top; const point=projection.points.filter(p=>p.visible&&Math.hypot(p.x-x,p.y-y)<13).sort((a,b)=>Math.hypot(a.x-x,a.y-y)-Math.hypot(b.x-x,b.y-y))[0]; setHovered(point?.id??edge.id); }} onPointerLeave={() => setHovered(undefined)}
-        onClick={() => edge.aggregated ? setInspection({ kind: 'relation', id: edge.id }) : chooseEdge(edge.id)} onKeyDown={event => { if (event.key === 'Enter') { if (edge.aggregated) setInspection({ kind: 'relation', id: edge.id }); else chooseEdge(edge.id); } }}><title>{edge.label}</title></path>)}
+        onClick={() => edge.aggregated ? setInspection({ kind: 'relation', id: edge.id }) : chooseEdge(edge.id)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); if (edge.aggregated) setInspection({ kind: 'relation', id: edge.id }); else chooseEdge(edge.id); } }}><title>{edge.label}</title></path>)}
     </svg>
     <svg className="analyzer-3d-label-leaders" aria-hidden="true">{labelContents.map(label=><line key={label.id} ref={element=>labelLayer.attachLeader(label.id,element)} />)}</svg>
     <div className="analyzer-3d-labels">

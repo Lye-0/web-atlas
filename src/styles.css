@@ -5046,10 +5046,13 @@ summary:focus-visible {
   }
 }
 .analyzer-evidence-path { margin: 0; padding: 5px 9px; overflow-wrap: anywhere; font-size: .65rem; }
-.analyzer-graph-stage:not(.semantic-flow-stage) .analyzer-stage-help { top: var(--analyzer-controls-bottom, 92px); }
+.analyzer-graph-stage:not(.semantic-flow-stage) .analyzer-stage-help,
+.analyzer-graph-3d .analyzer-stage-help { top: var(--analyzer-controls-bottom, 92px); }
 .analyzer-static-direction-legend {
   position: absolute; bottom: 10px; left: 12px; z-index: 7; display: flex; flex-wrap: wrap;
   gap: 8px; max-width: calc(100% - 24px); padding: 5px 8px; border-radius: 5px;
   background: rgba(10, 13, 14, .9); color: var(--subtle); font-size: .65rem; pointer-events: none;
 }
 .analyzer-static-direction-legend span::before { content: '→'; margin-right: 4px; }
+
+.analyzer-graph-3d > .analyzer-graph-empty { position:absolute; inset:0; z-index:3; display:grid; place-content:center; pointer-events:none; }

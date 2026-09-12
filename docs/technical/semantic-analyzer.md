@@ -166,3 +166,5 @@ The four-fix source/presentation comparison is separately enabled by `WEB_ATLAS_
 The five-item point/edge/label/group comparison uses `WEB_ATLAS_POLISH_REVIEW=1` with `WEB_ATLAS_VALIDATION_REPOS` and the fixed masked snapshots. `WEB_ATLAS_POLISH_REPORT=baseline` records source and snapshot hashes, canonical graphs, ownership, 3D vectors and actual-source 2D paths; `final` compares the same inputs. Ordinary tests independently cover endpoint projection, direction roles, counterpart versus individual-edge hover, duplicate identities, input ownership and bounds preference retention. Actual GPU/camera/physical pointer and focus checks are recorded separately from these mathematical and React tests.
 
 Browser verification must separately cover Worker/WASM loading, all five projections, detail navigation, 2D/3D interactions, fullscreen, responsive layout and the execution-data file chooser. Node parser tests alone do not establish browser compatibility.
+
+`SemanticFlow3D`も`recoverableWebGLRenderer`を使用し、R3Fの非同期renderer初期化失敗を`onUnavailable`へ伝えて2Dへ復旧する。

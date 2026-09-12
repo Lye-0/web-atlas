@@ -5,7 +5,7 @@ import { AnalyzerGraph3DStage } from './AnalyzerGraph3DStage';
 import { createInitialAnalyzerViewSession } from '../../analyzer/session';
 import type { AnalyzerViewModel } from '../../analyzer/types';
 
-const scene = vi.hoisted(() => ({ current: undefined as undefined | { edges: { source: string; target: string; animate: boolean }[] } }));
+const scene = vi.hoisted(() => ({ current: undefined as undefined | { labelRoles: Map<string,string>; edges: { source: string; target: string; animate: boolean }[] } }));
 // Inspect the actual renderer input; temporal GPU movement is verified in-browser.
 vi.mock('@react-three/fiber', () => ({ Canvas: ({ children }: { children: ReactElement<typeof scene.current> }) => { scene.current = children.props; return null; }, useThree: vi.fn(), useFrame: vi.fn() }));
 afterEach(() => vi.unstubAllGlobals());
@@ -27,6 +27,7 @@ it.each(['architecture', 'workspace'] as const)('animates selected contains in %
     await render({}); expect(scene.current!.edges.some(edge => edge.animate)).toBe(false);
     await render({ selectedNodeId: 'project' }); expect(scene.current!.edges).toEqual([expect.objectContaining({ source: 'project', target: 'scope', animate: true })]);
     await render(view === 'architecture' ? { selectedRegionId: 'scope' } : { selectedNodeId: 'scope' }); expect(scene.current!.edges[0]!.animate).toBe(true);
+    expect(scene.current!.labelRoles.get('project')).toBe('incoming');
     await render({}); expect(scene.current!.edges.some(edge => edge.animate)).toBe(false);
   } finally { await act(async () => root.unmount()); host.remove(); }
 });

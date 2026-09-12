@@ -42,7 +42,7 @@ Dependencyの入力から2D用のexternal summary／bundleを除き、折りた�
 
 ## 描画・操作・資産の寿命
 
-`AnalyzerGraph3DStage`はlazy importされ、2Dだけの利用では3D配置、OrbitControls、密度判定を開始しない。Three.jsのbatched points／wireと、点に隣接するHTMLラベルを使う。実体の関係線は元の点の3D座標へ接続する。Stack MapのScopeは`graph3DRegionAnchors`で境界の上・手前側に専用の接続点を置き、親子では左右を分ける。接続点は元Scope IDに対応し、技術の座標・解析対象数・関係IDを変えない。囲いOFFでも必要なScope名と選択可能な接続点を残す。端点をunprojectした後、既存Cと共通の`spatialRelationCurve`で49点の曲線を生成し、`SpatialRelationLines`と`SpatialFlowParticles`が同一経路を描く。SVGは透明な関係選択のhit領域とラベルの短い引き出し線に使用する。引き出し線は依存関係として数えない。
+`AnalyzerGraph3DStage`はlazy importされ、2Dだけの利用では3D配置、OrbitControls、密度判定を開始しない。Three.jsのbatched points／wireと、点に隣接するHTMLラベルを使う。実体の関係線は元の点の3D座標へ接続する。Stack MapのScopeは`graph3DRegionAnchors`で境界の上・手前側に専用の接続点を置き、親子では左右を分ける。接続点は元Scope IDに対応し、技術の座標・解析対象数・関係IDを変えない。囲いOFFでも必要なScope名と選択可能な接続点を残す。点とScope接続点のworld座標から既存Cと共通の`spatialRelationCurve`で49点の曲線を生成し、`SpatialRelationLines`と`SpatialFlowParticles`が同一経路を描く。SVGは透明な関係選択のhit領域とラベルの短い引き出し線に使用する。引き出し線は依存関係として数えない。
 
 方向色は共通の`analyzerDirectionColors`を使用する。`graph3DSelectionContext`はNodeに加えScope／Region、Stack Usageの所属Scope、閉じたCommand branchの子を既存edgeの端点へ解決する。ModuleのRegion選択では内部importを除き、境界を跨ぐ関係を強調する。明示した関係も強調対象になる。
 
@@ -79,3 +79,6 @@ R3F 9.7のCanvas `fallback`はHTML canvasの子として通常時もmountされ�
 実施内容・画像・実測値は[初回実装検証レポート](analyzer-tabs-1-5-3d-review.md)と[描画・操作欄の修正検証](analyzer-3d-unification-review.md)を参照。独立fixtureは`graph3D.test.ts`、`graph3D.integration.test.ts`、方向色とScope選択は`graph3DSelection.test.ts`、失敗経路は`recoverableWebGLRenderer.test.ts`で確認する。実WebGL、狭幅、資産解放は別途実ブラウザで確認する。
 `graph3DHoverEmphasis`は表示中かつ選択に関連するactiveな関係とホバー対象から、強調する関係IDと両端IDを返す。同じ集合をラベル・点・線・粒子に適用する。対象外ラベルのopacityは0.42、点の色強度は0.38、対象外線の強度は0.18で、対象外線の粒子は停止する。ホバー解除時は通常表示へ戻す。関係を持たない対象では全体を暗くせず、キーボードフォーカス中のラベルはopacityを1に保つ。
 点とラベルのpointer hoverは同じ元IDで判定する。選択に関連するactiveな関係の端点であれば、点自体が未選択でも、その関係と両端を強調する。無関係な点・ラベル・線では強調しない。Canvas上のラベル周辺のhover corridorは関係強調に使わず、SVG線と点が重なる場合は13px以内の点を優先する。build:webview選択中はpnpm build:webviewの点／ラベルで強調し、pnpm build:extensionの点／ラベルでは強調しない。
+
+PR #5レビュー対応：`Graph3DPathCache`は端点のworld座標・平行線の曲がり方・表示属性が同じ経路を再利用する。カメラだけの変更ではSVGとラベルを再投影し、可視経路が同じならGPUへの経路配列も維持する。端点・表示属性・経路の可視集合が変わった場合は更新し、削除された経路はcacheから除く。
+Scopeの入出方向は`selectionContext.ids`で判定する。ラベル省略件数はoriginal endpointを表示ownerへ解決し、表示対象のownerだけを重複なく数える。フィルターで点・描画対象領域がなくなった場合は該当なしの案内を表示する。接続線のキーボード選択はEnterとSpaceに対応する。
