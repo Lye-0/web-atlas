@@ -107,7 +107,7 @@ export function semanticNodeDisplay(node: SemanticNode): SemanticNodeDisplay {
       Number(node.attributes.architectureInternalCount) > 0 ? `内部関係 ${node.attributes.architectureInternalCount}件` : '',
     ].filter(Boolean).join(' · ') || node.path || '構成要素';
     const kind = node.attributes.architectureRequestGroup ? '表示上の集合' : arch.request ? '相手は未特定' : architectureKindLabels[arch.kind];
-    const dataRole = scope ? `${({ inside: '内部', direct: '接続先', surrounding: '周辺' })[scope]} · ${arch.kind === 'component' ? 'コンポーネント' : kind}` : node.attributes.architectureContext ? `表示範囲外 · ${kind}` : kind;
+    const dataRole = scope ? `${({ inside: '内部', direct: '外側の接続相手', surrounding: '周辺' })[scope]} · ${arch.kind === 'component' ? 'コンポーネント' : kind}` : node.attributes.architectureContext ? `表示範囲外 · ${kind}` : kind;
     const disambiguation = identity ? `${architectureEnvironmentLabel(arch.environments)}${binding ? ` · ${binding}` : ''}${identity.identifier ? ` · ID:${identity.identifier.length > 10 ? `${identity.identifier.slice(0, 4)}…${identity.identifier.slice(-4)}` : identity.identifier}` : ' · 同一性未確認'}`
       : arch.request ? node.evidence[0] ? `${node.evidence[0].path}:${node.evidence[0].line}` : node.path ?? 'ソース箇所未確認'
         : Number(node.attributes.architectureInternalCount) > 0 ? `内部関係 ${node.attributes.architectureInternalCount}件` : undefined;

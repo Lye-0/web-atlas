@@ -251,7 +251,8 @@ describe('semantic Analyzer exploration', () => {
     await chooseArchitecture(ids.B!); expect(current()).toBe('A');
     expect(host.querySelector('.semantic-detail')?.textContent).toContain('表示範囲外');
     await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="周辺構成"]')!.click());
-    expect([...host.querySelectorAll<HTMLElement>('[data-node-id]')].map(element => element.dataset.nodeId)).toContain(ids.B);
+    expect([...host.querySelectorAll<HTMLElement>('[data-node-id]')].map(element => element.dataset.nodeId)).not.toContain(ids.B);
+    expect(host.querySelector('.semantic-detail h3')?.textContent).toBe('B');
     expect([...host.querySelectorAll<HTMLElement>('[data-node-id]')].map(element => element.dataset.nodeId)).not.toContain(ids.C);
     expect(host.querySelector('[data-orbit]')?.getAttribute('data-camera-zoom')).toBe('0.72');
     await act(async () => button('この構成を開く').click());

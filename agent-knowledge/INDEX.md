@@ -28,6 +28,14 @@
 - files: `src/components/analyzer/useArchitectureNodeGesture.ts`, `src/components/analyzer/SemanticFlow2D.tsx`, `src/components/analyzer/SemanticFlow3D.tsx` …
 - memory: `agent-knowledge/entries/2026-09-10-architecture-selection-gesture-04c7e2.md`
 
+### 外側の選択を基本投影と配置の入力へ戻さない
+- id: `rm-20260913-architecture-selection-scope`
+- type: `constraint`
+- maturity: `candidate`
+- tags: `selection`, `projection`, `cache`, `layout`
+- files: `src/analyzer/semantic/architectureProjection.ts`, `src/analyzer/semantic/flowPresentation.ts`, `src/analyzer/semantic/flow3DInput.ts` …
+- memory: `agent-knowledge/entries/2026-09-13-architecture-selection-scope-318c64.md`
+
 ## analyzer-command-evidence
 
 ### CIコマンドを合成すると元範囲の座標系が変わる

@@ -77,7 +77,7 @@
 .semantic-flow-node rect { fill:#13251f; stroke:#4e7566; stroke-width:1.3; }
 .semantic-flow-node.is-connected rect { fill:#1a302a; stroke:#83aaa3; }.semantic-flow-node.is-match rect { stroke:#edc78a; stroke-width:2.2; }
 .semantic-flow-node.is-selected rect { fill:#24443a; stroke:#bfe7d8; stroke-width:2.8; }
-.semantic-flow-node .semantic-flow-selection-ring { fill:none; stroke:#c1e9dc; stroke-width:1.2; }
+.semantic-flow-node rect.semantic-flow-selection-ring { fill:none; stroke:#c1e9dc; stroke-width:1.2; }
 .semantic-flow-node:focus-visible rect { stroke:#fff; stroke-width:3; }.semantic-flow-node:focus-visible .semantic-flow-selection-ring { stroke-dasharray:4 3; }
 .semantic-flow-node-name { fill:#e7f0ea; font:600 12px var(--font-sans,system-ui); pointer-events:none; }
 .semantic-flow-node-path { fill:#a9bdb2; font:10px var(--font-mono,monospace); pointer-events:none; }.semantic-flow-node-dot { fill:#9bc0af; }

@@ -23,7 +23,7 @@ function Harness() {
   const gesture = useArchitectureNodeGesture(navigation.visitId, true, navigation.canOpenScope, navigation.openScope, select);
   return <div {...gesture.bindings}><output>{JSON.stringify(session)}</output>
     <ArchitectureNavigation explorer={explorer} graph={graph} mode="2d" selectedId={session.selectedNodeId} navigation={{ location: navigation.location, visitId: navigation.visitId, scrollTop: 0, projectLabel: 'fixture', canBack: navigation.canBack, canOpenScope: navigation.canOpenScope, onBack: navigation.back, onParent: navigation.parent, onProject: navigation.project, onOpenScope: navigation.openScope, onOpenNode: navigation.openNode, onJumpMode: navigation.jumpMode, onScroll: navigation.saveScroll, onCenter: navigation.openNode, onDefinition: navigation.openDefinition, onDepth: () => {}, onRevealSelection: () => {} }} />
-    {graph.nodes.map(n => <button key={n.id} data-node={n.id} onClick={event => gesture.onNodeClick?.(n.id, event)}>{n.id}</button>)}
+    {graph.nodes.map(n => <button key={n.id} data-node={n.id} data-architecture-node-id={n.id} onClick={event => gesture.onNodeClick?.(n.id, event)}>{n.id}</button>)}
     <button data-duplicate onClick={() => { navigation.openScope('API'); navigation.openScope('API'); }}>open twice</button>
     <button data-same onClick={() => navigation.openScope(navigation.location.scopeId)}>same</button>
     <button data-camera onClick={() => setSession(current => recordExplorerCamera(current, '2d', { x: 91, y: 32, scale: .75 }))}>camera</button>
@@ -58,9 +58,9 @@ describe('Architecture scope gestures, ancestors and browser visits', () => {
     await click(button('戻る')); expect(scope()).toBe('API'); expect(session().selectedNodeId).toBe('web'); expect(session().flowCameras?.['2d']).toEqual({ x: 91, y: 32, scale: .75 });
     await dbl('web'); await click(button('親へ')); expect(scope()).toBe('project'); expect(session().search).toBe('keep');
   });
-  it('binds the second click to the original node when detail layout puts another target under the pointer', async () => {
+  it('does not hijack an unrelated control after selecting a node', async () => {
     await click(host.querySelector('[data-node="API"]')!, 1); await click(host.querySelector('[data-other]')!, 2);
-    expect(scope()).toBe('API'); expect(count()).toBe(2);
+    expect(scope()).toBe('project'); expect(count()).toBe(1); expect(session().selectedNodeId).toBe('web');
   });
   it('does not open leaves, display aggregates, unrelated controls or separate-position clicks', async () => {
     await dbl('leaf'); await dbl('aggregate'); expect(scope()).toBe('project'); expect(count()).toBe(1);
@@ -68,9 +68,9 @@ describe('Architecture scope gestures, ancestors and browser visits', () => {
     await click(host.querySelector('[data-node="API"]')!, 1); await click(host.querySelector('[data-node="web"]')!, 2, 30, 30); expect(scope()).toBe('project');
     expect(canOpenArchitectureScope(explorer, 'leaf')).toBe(false); expect(canOpenArchitectureScope(explorer, 'aggregate')).toBe(false);
   });
-  it('keeps a leaf selection when the second click lands on a different element after layout', async () => {
+  it('allows an unrelated control action without opening the earlier leaf', async () => {
     await click(host.querySelector('[data-node="leaf"]')!, 1); await click(host.querySelector('[data-other]')!, 2);
-    expect(session().selectedNodeId).toBe('leaf'); expect(scope()).toBe('project'); expect(count()).toBe(1);
+    expect(session().selectedNodeId).toBe('web'); expect(scope()).toBe('project'); expect(count()).toBe(1);
   });
   it('cancels a double gesture after drag out and back or a keyboard action', async () => {
     const target = host.querySelector('[data-node="API"]')!;
@@ -78,6 +78,19 @@ describe('Architecture scope gestures, ancestors and browser visits', () => {
     await act(async () => { target.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 10, clientY: 10, buttons: 1 })); target.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 40, clientY: 10, buttons: 1 })); target.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 10, clientY: 10, buttons: 1 })); });
     await click(target, 2); expect(scope()).toBe('project');
     await click(target, 1); await act(async () => { target.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Tab' })); }); await click(target, 2); expect(scope()).toBe('project');
+  });
+  it('keeps two separate single clicks as selection and rejects different targets at the same screen position', async () => {
+    await click(host.querySelector('[data-node="API"]')!, 1);
+    await click(host.querySelector('[data-node="API"]')!, 1);
+    expect(scope()).toBe('project'); expect(count()).toBe(1); expect(session().selectedNodeId).toBe('API');
+    await click(host.querySelector('[data-node="web"]')!, 2);
+    expect(scope()).toBe('project'); expect(count()).toBe(1); expect(session().selectedNodeId).toBe('web');
+  });
+  it('rejects a stale double click after pointer cancellation', async () => {
+    const target = host.querySelector('[data-node="API"]')!;
+    await click(target, 1);
+    await act(async () => target.dispatchEvent(new MouseEvent('pointercancel', { bubbles: true })));
+    await click(target, 2); expect(scope()).toBe('project'); expect(count()).toBe(1);
   });
   it('renders real deep ancestors, an inert current item and focus after navigation', async () => {
     await dbl('API'); await dbl('service'); await dbl('module'); await dbl('unit');

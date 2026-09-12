@@ -151,8 +151,33 @@ export class FlowLabelLayer {
   private placements = new Map<string, FlowLabelPlacement>();
   private content: FlowLabelContent[] = [];
   private active = true;
+  private pointerLabel?: { id: string; element: HTMLElement; rect: DOMRect };
 
   constructor(private publish: (content: FlowLabelContent[]) => void) {}
+
+  /** Keep the actual clicked label (not a substitute target) under the pointer.
+   * A manual top-layer box survives the detail panel clipping the canvas. */
+  pinPointerLabel(id: string) {
+    if (this.pointerLabel?.id === id) return;
+    this.releasePointerLabel();
+    const element = this.elements.get(id);
+    if (!element || typeof element.showPopover !== 'function') return;
+    const rect = element.getBoundingClientRect();
+    this.pointerLabel = { id, element, rect };
+    element.setAttribute('popover', 'manual');
+    this.place(id, element);
+    element.showPopover();
+  }
+
+  releasePointerLabel(id?: string) {
+    const pinned = this.pointerLabel; if (!pinned) return;
+    if (id !== undefined && pinned.id !== id) return;
+    this.pointerLabel = undefined;
+    if (pinned.element.isConnected) pinned.element.hidePopover();
+    pinned.element.removeAttribute('popover');
+    for (const key of ['position', 'left', 'top', 'margin']) pinned.element.style.removeProperty(key);
+    this.place(pinned.id, pinned.element);
+  }
 
   private place(id: string, element: HTMLElement) {
     const position = this.active ? this.placements.get(id) : undefined;
@@ -161,9 +186,14 @@ export class FlowLabelLayer {
     element.tabIndex = position ? 0 : -1;
     element.setAttribute('aria-hidden', String(!position));
     if (position) {
-      element.style.transform = `translate3d(${position.x}px, ${position.y}px, 0) translate(${labelInset(position)}px, -50%)`;
-      if (position.width !== undefined) element.style.width = `${position.width}px`;
-      if (position.height !== undefined) element.style.height = `${position.height}px`;
+      const pinned = this.pointerLabel?.id === id ? this.pointerLabel : undefined;
+      if (pinned) {
+        Object.assign(element.style, { position: 'fixed', left: `${pinned.rect.left}px`, top: `${pinned.rect.top}px`, margin: '0', transform: 'none', width: `${pinned.rect.width}px`, height: `${pinned.rect.height}px` });
+      } else {
+        element.style.transform = `translate3d(${position.x}px, ${position.y}px, 0) translate(${labelInset(position)}px, -50%)`;
+        if (position.width !== undefined) element.style.width = `${position.width}px`;
+        if (position.height !== undefined) element.style.height = `${position.height}px`;
+      }
     }
     const leader = this.leaders.get(id);
     if (leader) {
@@ -207,6 +237,7 @@ export class FlowLabelLayer {
       if (ids.has(label.id) || !Number.isFinite(label.x) || !Number.isFinite(label.y)) return false;
       ids.add(label.id); return true;
     });
+    if (this.pointerLabel && !ids.has(this.pointerLabel.id)) this.releasePointerLabel();
     this.placements = new Map(next.map(label => [label.id, label]));
     for (const [id, element] of this.elements) this.place(id, element);
     if (next.length === this.content.length && next.every((label, index) => {
@@ -220,6 +251,7 @@ export class FlowLabelLayer {
   resume() { this.active = true; }
 
   suspend() {
+    this.releasePointerLabel();
     this.active = false;
     this.placements.clear(); this.content = [];
     for (const [id, element] of this.elements) this.place(id, element);

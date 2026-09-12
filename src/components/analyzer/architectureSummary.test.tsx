@@ -30,11 +30,11 @@ describe('Architecture readability preserves identity and relation meaning', () 
     const off = architectureScopeGraph(model, 'A', '', false, { mode: '3d', selectedNodeId: 'C', surroundings: false });
     const roles = (graph: SemanticGraph) => Object.fromEntries(graph.nodes.map(n => [n.id, n.attributes.architectureScopeRole]));
     expect(roles(normal)).toEqual({ inside: 'inside', B: 'direct', C: 'surrounding', D: 'surrounding' });
-    expect(roles(selected)).toEqual(roles(normal)); expect(roles(off)).toEqual(roles(normal));
+    expect(roles(selected)).toEqual(roles(normal)); expect(roles(off)).toEqual({ inside: 'inside', B: 'direct' });
     expect([...normal.architectureView!.positions]).toEqual([...selected.architectureView!.positions]);
     expect(JSON.stringify(model)).toBe(before);
     const display = semanticNodeDisplays(selected.nodes);
-    expect(display.get('inside')?.dataRole).toContain('内部'); expect(display.get('B')?.dataRole).toContain('接続先'); expect(display.get('C')?.dataRole).toContain('周辺');
+    expect(display.get('inside')?.dataRole).toContain('内部'); expect(display.get('B')?.dataRole).toContain('外側の接続相手'); expect(display.get('C')?.dataRole).toContain('周辺');
   });
   it('publishes temporary label promotion and demotion without changing the stable scope role or hit position', () => {
     const publish = vi.fn(), layer = new FlowLabelLayer(publish);

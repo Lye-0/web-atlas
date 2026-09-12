@@ -28,6 +28,7 @@ export function semanticMemberIds(node: SemanticNode): string[] {
 /** SCC depth follows source→target; grouping never invents or reverses a relationship. */
 export function layoutSemanticFlow(graph: SemanticGraph, mode: '2d' | '3d', explorer?: SemanticExplorerModel): SemanticPosition[] {
   if (mode === '3d') return layoutSemanticCloud(graph, explorer);
+  if (graph.view === 'architecture-map' && graph.architectureView?.positions2d) return graph.nodes.map(node => ({ node, ...graph.architectureView!.positions2d!.get(node.id)! }));
   const depths = semanticDepths(graph);
   if (graph.view === 'architecture-map') {
     const levels = new Map<number, SemanticNode[]>();

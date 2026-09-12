@@ -203,6 +203,7 @@ function Scene({ graph: sourceGraph, renderGraph, explorer, nodeDisplays: displa
       element.style.cursor = id || edgeId ? 'pointer' : '';
       callbacks.current.onHover(id, edgeId);
     };
+    const cancel = () => { down.moved = true; };
     const leave = () => { element.style.cursor = ''; callbacks.current.onHover(); };
     const end = (event: MouseEvent) => {
       if (event.button !== 0 || down.moved || Math.hypot(event.clientX - down.x, event.clientY - down.y) > 5) return;
@@ -210,8 +211,8 @@ function Scene({ graph: sourceGraph, renderGraph, explorer, nodeDisplays: displa
       const edgeId = id ? undefined : hitSemanticFlowEdge(camera, p, paths, p.x, p.y);
       if (id) { if (architecture && callbacks.current.onArchitectureNodeClick) callbacks.current.onArchitectureNodeClick(id, event); else callbacks.current.onSelect(id); } else if (edgeId) callbacks.current.onSelectEdge(edgeId); else callbacks.current.onClear();
     };
-    element.addEventListener('pointerdown', start); element.addEventListener(architecture ? 'click' : 'pointerup', end); element.addEventListener('pointermove', move); element.addEventListener('pointerleave', leave);
-    return () => { element.removeEventListener('pointerdown', start); element.removeEventListener(architecture ? 'click' : 'pointerup', end); element.removeEventListener('pointermove', move); element.removeEventListener('pointerleave', leave); element.style.cursor = ''; };
+    element.addEventListener('pointercancel', cancel); element.addEventListener('pointerdown', start); element.addEventListener(architecture ? 'click' : 'pointerup', end); element.addEventListener('pointermove', move); element.addEventListener('pointerleave', leave);
+    return () => { element.removeEventListener('pointercancel', cancel); element.removeEventListener('pointerdown', start); element.removeEventListener(architecture ? 'click' : 'pointerup', end); element.removeEventListener('pointermove', move); element.removeEventListener('pointerleave', leave); element.style.cursor = ''; };
   }, [camera, gl, positions, paths, sourceGraph.view]);
   const labelOrder = useMemo(() => [...positions].sort((a, b) => Number(selectedIds.has(b.node.id)) - Number(selectedIds.has(a.node.id)) || Number(matchIds.has(b.node.id)) - Number(matchIds.has(a.node.id)) || Number(connected.has(b.node.id)) - Number(connected.has(a.node.id)) || Number(b.node.kind === 'entry') - Number(a.node.kind === 'entry')), [positions, selectedIds, matchIds, connected]);
   useDisposableFrame((_, delta) => {
@@ -247,6 +248,17 @@ export function SemanticFlow3D(props: Props) {
   const canvasDisposals = useCanvasDisposals();
   const [labels, setLabels] = useState<FlowLabelContent[]>([]);
   const [labelLayer] = useState(() => new FlowLabelLayer(setLabels));
+  useEffect(() => {
+    if (props.graph.view !== 'architecture-map') return;
+    const release = () => labelLayer.releasePointerLabel();
+    const outside = (event: Event) => { if (!(event.target instanceof Element) || !event.target.closest('[data-architecture-node-id]')) release(); };
+    document.addEventListener('pointerdown', outside, true);
+    document.addEventListener('wheel', release, true);
+    document.addEventListener('scroll', release, true);
+    document.addEventListener('keydown', release, true);
+    window.addEventListener('resize', release);
+    return () => { release(); document.removeEventListener('pointerdown', outside, true); document.removeEventListener('wheel', release, true); document.removeEventListener('scroll', release, true); document.removeEventListener('keydown', release, true); window.removeEventListener('resize', release); };
+  }, [labelLayer, props.graph.view]);
   const updateLabels = useCallback((labels: FlowLabelPlacement[]) => { if (currentVisit.current === sceneVisit) labelLayer.update(labels); }, [labelLayer, sceneVisit]);
   const [hoveredId, setHoveredId] = useState<string>(), [focusedId, setFocusedId] = useState<string>();
   const [aggregateOpen, setAggregateOpen] = useState(false), [connectionsOpen, setConnectionsOpen] = useState(false), [memberPage, setMemberPage] = useState(0);
@@ -361,7 +373,7 @@ export function SemanticFlow3D(props: Props) {
     for (const group of aggregation.aggregates) {
       const roles = new Set(group.memberIds.map(id => base.get(id)?.scopeRole));
       const scopeRole = roles.has('inside') ? 'inside' : roles.has('direct') ? 'direct' : 'surrounding';
-      const roleLabel = scopeRole === 'inside' ? '内部' : scopeRole === 'direct' ? roles.has('surrounding') ? '接続先を含む周辺' : '接続先' : '周辺';
+      const roleLabel = scopeRole === 'inside' ? '内部' : scopeRole === 'direct' ? roles.has('surrounding') ? '外側の接続相手を含む周辺' : '外側の接続相手' : '周辺';
       next.set(group.id, { title: group.label, location: `${group.memberIds.length}対象・表示上の集合`, dataRole: `${roleLabel} · 表示上の集合`, scopeRole, tooltip: `${group.label}\n${roleLabel}\n${group.memberIds.length}対象を表示上でまとめています。` });
     }
     return next;
@@ -422,10 +434,12 @@ export function SemanticFlow3D(props: Props) {
     <FlowGraphBoundary onUnavailable={props.onUnavailable}><Canvas onCreated={initializeSemanticCanvas} orthographic frameloop="demand" dpr={[1, 1.7]} camera={{ position: [600, 450, 2200], zoom: 1, near: .1, far: 1000000 }} gl={defaults => recoverableWebGLRenderer({ ...defaults, antialias: true, alpha: true }, props.onUnavailable)}><Scene key={sceneVisit} {...props} canvasDisposals={canvasDisposals} nodeDisplays={displays} selectedIds={props.selectedIds} hoverTarget={hoverTarget} positions={positions} renderGraph={displayed.graph} allPositions={allPositions} onProjection={onProjection} onCamera={saveVisitCamera} labelObstacles={combinedObstacles} onArchitectureNodeClick={props.onArchitectureNodeClick ? (id, event) => { props.onArchitectureNodeClick?.(id, event, () => selectPoint(id)); } : undefined} onSelect={selectPoint} onSelectEdge={selectRelation} onConnections={onConnections} onLabels={updateLabels} hoveredIds={hoveredIds} onHover={onHover} hoverAt={labelLayer.hoverAt} /></Canvas></FlowGraphBoundary>
     <svg className="semantic-flow-label-leaders" aria-hidden="true">{labels.filter(label => !label.region && (aggregation.individualIds.has(label.id) || aggregation.aggregates.some(group => group.id === label.id))).map(label => <line key={label.id} ref={element => labelLayer.attachLeader(label.id, element)} />)}</svg>
     <div className="semantic-flow-3d-labels">{labels.filter(label => label.region ? regionNodes.has(label.id) : aggregation.individualIds.has(label.id) || aggregation.aggregates.some(group => group.id === label.id)).map(label => <button key={label.id} ref={element => labelLayer.attach(label.id, element)} type="button"
-      data-flow-label-id={label.id} data-flow-inspected={label.id === inspectedId || undefined} data-flow-role={label.role} data-flow-emphasized={label.emphasized || undefined} className={`${label.selected ? 'is-selected' : ''}${label.match ? ' is-match' : ''}${label.hovered ? ' is-hovered' : ''}${label.related ? ' is-related' : ''}${label.region ? ' is-region' : ''}${label.aggregate ? ' is-aggregate' : ''}${label.emphasized ? ' is-emphasized' : ''}${label.dimmed ? ' is-dimmed' : ''}`} aria-pressed={label.region ? undefined : label.selected} title={`${label.tooltip ?? `${label.label}\n${label.path}`}${label.roleLabel ? `\n${label.roleLabel}` : ''}`}
+      data-architecture-node-id={props.graph.view === 'architecture-map' && !label.region ? label.id : undefined} data-flow-label-id={label.id} data-flow-inspected={label.id === inspectedId || undefined} data-flow-role={label.role} data-flow-emphasized={label.emphasized || undefined} className={`${label.selected ? 'is-selected' : ''}${label.match ? ' is-match' : ''}${label.hovered ? ' is-hovered' : ''}${label.related ? ' is-related' : ''}${label.region ? ' is-region' : ''}${label.aggregate ? ' is-aggregate' : ''}${label.emphasized ? ' is-emphasized' : ''}${label.dimmed ? ' is-dimmed' : ''}`} aria-pressed={label.region ? undefined : label.selected} title={`${label.tooltip ?? `${label.label}\n${label.path}`}${label.roleLabel ? `\n${label.roleLabel}` : ''}`}
       data-architecture-scope-role={label.scopeRole} data-architecture-active={label.scopeActive || undefined}
       aria-label={label.region ? `${label.label}の領域へ移動 · ${label.path}` : undefined}
-      onPointerMove={event => { if (!label.region && event.buttons === 0) onHover(label.id, undefined, label.id); }} onPointerLeave={() => onHover()} onFocus={() => { if (!label.region) { focusedIdRef.current = label.id; focusOwner.current = { id: label.id, handler: props.onHoverTarget }; setFocusedId(label.id); props.onHoverTarget?.({ kind: 'node', id: label.id }, { source: `3d-focus:${label.id}`, modality: 'focus' }); } }} onBlur={() => releaseFocus(label.id)}
+      onPointerDown={event => { if (props.graph.view === 'architecture-map' && !label.region && event.button === 0 && event.pointerType !== 'touch') labelLayer.pinPointerLabel(label.id); }}
+      onPointerCancel={() => labelLayer.releasePointerLabel(label.id)}
+      onPointerMove={event => { if (!label.region && event.buttons === 0) onHover(label.id, undefined, label.id); }} onPointerLeave={() => { labelLayer.releasePointerLabel(label.id); onHover(); }} onFocus={() => { if (!label.region) { focusedIdRef.current = label.id; focusOwner.current = { id: label.id, handler: props.onHoverTarget }; setFocusedId(label.id); props.onHoverTarget?.({ kind: 'node', id: label.id }, { source: `3d-focus:${label.id}`, modality: 'focus' }); } }} onBlur={() => { labelLayer.releasePointerLabel(label.id); releaseFocus(label.id); }}
       onClick={event => { if (label.region) props.onFocusRegion?.(regionNodes.get(label.id) ?? []); else if (props.onArchitectureNodeClick) props.onArchitectureNodeClick(label.id, event, () => selectPoint(label.id)); else selectPoint(label.id); }}><strong>{label.label}</strong>{label.roleLabel && <span className="semantic-flow-3d-role">{label.roleLabel}</span>}{label.disambiguation && <small className="semantic-flow-3d-disambiguation">{label.disambiguation}</small>}{(label.region || label.selected || label.aggregate) && <small>{label.id === inspectedId ? `内訳を表示中 · ${label.path}` : label.region ? `所属 · ${label.path}` : label.path}</small>}</button>)}</div>
     <div className="semantic-flow-disclosures" ref={disclosures}>
       <AutoAggregationPanel enabled={props.autoAggregation !== false} totalCount={props.totalNodeCount} counts={aggregation.counts} groups={manualUnresolved ? [...aggregationInput.groups, manualUnresolved] : aggregationInput.groups} aggregates={aggregation.aggregates}

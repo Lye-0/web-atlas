@@ -130,17 +130,17 @@ describe('Architecture focus/context independent contracts', () => {
     expect(graph.nodes.map(n => n.id).sort()).toEqual(['B', 'C', 'a', 'a2', 'service']);
     expect(originalIds(graph.edges)).toEqual(['ab']);
     const selected = architectureScopeGraph(source, 'A', '', false, { mode: '3d', selectedNodeId: 'B' });
-    expect(originalIds(selected.edges)).toEqual(['ab', 'bc']);
+    expect(originalIds(selected.edges)).toEqual(['ab']);
     expect(source.edges.map(e => e.id)).toEqual(['ab', 'bc']);
   });
-  it('T12 retains selected outside objects and direct neighbors when surroundings are hidden, with stable coordinates', () => {
+  it('T12 keeps the chosen surrounding scope independent of an out-of-range selection', () => {
     const source = model([edge('ab', 'a', 'b'), edge('bc', 'b2', 'c')]);
     const on = architectureScopeGraph(source, 'A', '', false, { mode: '3d' });
     const off = architectureScopeGraph(source, 'A', '', false, { mode: '3d', surroundings: false });
     expect(off.nodes.map(n => n.id).sort()).toEqual(['B', 'a', 'a2']);
     for (const node of off.nodes) expect(off.architectureView!.positions.get(node.id)).toEqual(on.architectureView!.positions.get(node.id));
     const protectedGraph = architectureScopeGraph(source, 'A', '', false, { mode: '3d', surroundings: false, selectedNodeId: 'C' });
-    expect(protectedGraph.nodes.some(n => n.id === 'C')).toBe(true);
+    expect(protectedGraph.nodes.some(n => n.id === 'C')).toBe(false);
     expect(prepareArchitectureScope(source, 'A')).toBe(prepareArchitectureScope(source, 'A'));
   });
   it('T13 honors environmental, auxiliary and kind filters in the surrounding projection', () => {
@@ -149,18 +149,16 @@ describe('Architecture focus/context independent contracts', () => {
     const graph = architectureScopeGraph(source, 'A', 'development', false, { mode: '3d', allowedIds: new Set(['A', 'a', 'a2', 'B', 'b', 'service']) });
     expect(graph.nodes.map(n => n.id).sort()).toEqual(['a', 'a2']);
   });
-  it('T12b keeps a selected outer request-group relation after clearing its source selection and hiding surroundings', () => {
+  it('T12b leaves outside request relations in details without adding their targets to the current scope', () => {
     const source = model();
     for (const id of ['r1', 'r2']) {
       const request = node(id, undefined, 'unresolved'); request.architecture!.request = { kind: 'http', ownerId: 'B', expression: id, sourceId: id };
       source.nodes.push(request); source.edges.push(edge(id, 'b', id, 'http-request'));
     }
-    const selectedNode = architectureScopeGraph(source, 'A', '', false, { mode: '3d', selectedNodeId: 'B' });
-    const relation = selectedNode.edges.find(edge => edge.source === 'B')!;
-    const selectedEdge = architectureScopeGraph(source, 'A', '', false, { mode: '3d', surroundings: false, selectedEdgeId: relation.id });
-    expect(selectedEdge.edges.find(edge => edge.id === relation.id)?.provenance?.edges.map(edge => edge.id)).toEqual(['r1', 'r2']);
-    expect(selectedEdge.nodes.some(node => node.id === relation.target)).toBe(true);
-    expect(selectedEdge.nodes.some(node => node.id === 'B')).toBe(true);
+    const selected = architectureScopeGraph(source, 'A', '', false, { mode: '3d', surroundings: false, selectedEdgeId: 'r1' });
+    expect(selected.nodes.some(node => node.id === 'r1')).toBe(false);
+    expect(selected.edges).toEqual([]);
+    expect(source.edges.map(edge => edge.id)).toEqual(['r1', 'r2']);
   });
   it('T15 keeps shared-package declarations separate from each execution context source usage', () => {
     const graph = build({ 'package.json': JSON.stringify({ name: 'extension', engines: { vscode: '*' }, main: 'extension.ts', dependencies: { react: '*', 'react-dom': '*' }, devDependencies: { typescript: '*' } }),

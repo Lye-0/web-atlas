@@ -35,6 +35,18 @@ export function spatialRelationCurve(a: FlowPoint, b: FlowPoint, bend: number | 
   const arc = bend ?? Math.min(mode === '2d' ? 56 : 38, Math.max(6, length * (1 - 2 * trim) * .18));
   const control = (t: number) => ({ x: start.x + (end.x - start.x) * t + normal.x * arc * 4 / 3,
     y: start.y + (end.y - start.y) * t + normal.y * arc * 4 / 3, z: start.z + (end.z - start.z) * t });
-  return cubicCurve(start, control(1 / 3), control(2 / 3), end);
+  const c1 = control(1 / 3), c2 = control(2 / 3);
+  if (mode === '2d') {
+    // The port is fixed by the card boundary. A bent control point can otherwise
+    // enter the card before the tip, or approach along its top/bottom border.
+    const approach = (center: FlowPoint, port: FlowPoint, handle: FlowPoint) => {
+      const axis = Math.abs(port.x - center.x) / 106 >= Math.abs(port.y - center.y) / 30 ? 'x' : 'y';
+      const side = Math.sign(port[axis] - center[axis]);
+      const clearance = Math.min(32, length / 4);
+      handle[axis] = side > 0 ? Math.max(handle[axis], port[axis] + clearance) : Math.min(handle[axis], port[axis] - clearance);
+    };
+    approach(a, start, c1); approach(b, end, c2);
+  }
+  return cubicCurve(start, c1, c2, end);
 }
 

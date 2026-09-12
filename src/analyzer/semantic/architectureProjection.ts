@@ -1,5 +1,6 @@
 import type { SemanticEdge, SemanticEvidence, SemanticGraph, SemanticNode, SemanticRelationSource } from './types';
 import { layoutSemanticCloud } from './flowCloud';
+import { layoutSemanticFlow } from './flowPresentation';
 import { architectureRelationClass, architectureRelationCounts } from './architectureRelations';
 import { uniqueArchitectureEvidence } from './architectureEvidence';
 
@@ -9,6 +10,7 @@ export interface ArchitectureProjection {
   scopeId?: string; detailIds: string[]; contextIds: string[]; peripheralIds: string[];
   internalRelations: SemanticEdge[]; boundaryRelations: SemanticEdge[];
   positions: ReadonlyMap<string, Point>;
+  positions2d?: ReadonlyMap<string, Point>;
   requestGroups: { id: string; memberIds: string[]; label: string }[];
   representedNodeIds: string[]; detailCount: number; contextCount: number;
   detailEntityCount: number; contextEntityCount: number; requestCount: number; internalRecordCount: number; explicitNodeIds: string[];
@@ -106,7 +108,7 @@ function requestGroupId(node: SemanticNode) {
   return `architecture-display:${JSON.stringify(['requests', request.ownerId, request.kind, [...arch.environments].sort(), arch.auxiliary])}`;
 }
 
-export function projectArchitectureScope(base: PreparedArchitectureScope, options: ArchitectureProjectionOptions = {}): SemanticGraph {
+function buildArchitectureScope(base: PreparedArchitectureScope, options: ArchitectureProjectionOptions = {}): SemanticGraph {
   const { scopeId, direct, ancestors, projected, allowed } = base;
   const roots = new Set(allowed.filter(node => !node.architecture?.parentId && !ancestors.has(node.id)).map(node => node.id));
   const requestOwners = new Map(allowed.filter(node => node.architecture?.request).map(node => [node.id, requestGroupId(node)]));
@@ -116,18 +118,14 @@ export function projectArchitectureScope(base: PreparedArchitectureScope, option
     return options.selectedEdgeId === id('summary-edge', requestOwners.get(edge.source) ?? edge.source, requestOwners.get(edge.target) ?? edge.target,
       edge.kind, edge.confidence, edge.details?.environment ?? '', edge.details?.architectureRelation ?? 'connection');
   };
-  const selected = options.selectedNodeId ? base.owners.get(options.selectedNodeId) ?? options.selectedNodeId : undefined;
   const boundary = scopeId ? projected.filter(edge => edge.details?.architectureRelation !== 'internal'
     && (ancestors.has(edge.source) && (direct.has(edge.target) || roots.has(edge.target)) || ancestors.has(edge.target) && (direct.has(edge.source) || roots.has(edge.source)))) : [];
   const connections = projected.filter(edge => edge.details?.architectureRelation !== 'internal'
     && !ancestors.has(edge.source) && !ancestors.has(edge.target)
-    && (!scopeId || direct.has(edge.source) || direct.has(edge.target) || edge.source === selected || edge.target === selected || isSelectedRelation(edge)));
+    && (!scopeId || direct.has(edge.source) || direct.has(edge.target)));
   const shown = new Set([...direct, ...connections.flatMap(edge => [edge.source, edge.target])]);
   for (const edge of boundary) for (const endpoint of [edge.source, edge.target]) if (roots.has(endpoint)) shown.add(endpoint);
   if (options.mode === '3d' && options.surroundings !== false || !scopeId) for (const root of roots) shown.add(root);
-  if (selected && !ancestors.has(selected) && allowed.some(node => node.id === selected)) shown.add(selected);
-  const selectedRelation = projected.find(isSelectedRelation);
-  if (selectedRelation) for (const endpoint of [selectedRelation.source, selectedRelation.target]) if (!ancestors.has(endpoint)) shown.add(endpoint);
   const internalRelations = projected.filter(edge => edge.details?.architectureRelation === 'internal' && (shown.has(edge.source) || ancestors.has(edge.source)));
   const internalByOwner = new Map<string, SemanticEdge[]>();
   for (const edge of internalRelations) { const edges = internalByOwner.get(edge.source) ?? []; edges.push(edge); internalByOwner.set(edge.source, edges); }
@@ -146,7 +144,7 @@ export function projectArchitectureScope(base: PreparedArchitectureScope, option
   const requestGroups: ArchitectureProjection['requestGroups'] = [], groupOwners = new Map(nodes.map(node => [node.id, node.id]));
   const positions = new Map(base.positions);
   const protectedIds = new Set(options.selectedNodeId ? [options.selectedNodeId] : []);
-  for (const edge of boundary) if (edge.id === options.selectedEdgeId) { protectedIds.add(edge.source); protectedIds.add(edge.target); }
+  for (const edge of boundary) if (isSelectedRelation(edge)) { protectedIds.add(edge.source); protectedIds.add(edge.target); }
   for (const edge of connections) if (edge.id === options.selectedEdgeId) { protectedIds.add(edge.source); protectedIds.add(edge.target); }
   for (const [groupId, members] of groups) {
     if (members.length < 2) continue;
@@ -179,6 +177,40 @@ export function projectArchitectureScope(base: PreparedArchitectureScope, option
     internalRecordCount: architectureRelationCounts(internalRelations.filter(edge => direct.has(edge.source))).records,
     explicitNodeIds: requestGroups.filter(group => options.expandedRequestGroupIds?.includes(group.id)).flatMap(group => group.memberIds),
   } };
+}
+
+// Keep scope projection/layout owned by structural inputs. Selection only peels
+// existing unresolved members out of their display group; it cannot add neighbours.
+const scopeViews = new WeakMap<PreparedArchitectureScope, Map<string, { graph: SemanticGraph; selectionKey?: string; selection?: SemanticGraph }>>();
+export function projectArchitectureScope(base: PreparedArchitectureScope, options: ArchitectureProjectionOptions = {}): SemanticGraph {
+  let views = scopeViews.get(base); if (!views) { views = new Map(); scopeViews.set(base, views); }
+  const key = JSON.stringify([options.mode ?? '2d', options.surroundings !== false, [...options.expandedRequestGroupIds ?? []].sort()]);
+  let cached = views.get(key);
+  if (!cached) {
+    const graph = buildArchitectureScope(base, { ...options, selectedNodeId: undefined, selectedEdgeId: undefined });
+    const positions = new Map(layoutSemanticFlow(graph, '2d').map(p => [p.node.id, { x: p.x, y: p.y, z: p.z }]));
+    const bottom = Math.max(0, ...[...positions.values()].map(p => p.y));
+    let row = 0;
+    for (const group of graph.architectureView!.requestGroups) for (const member of group.memberIds) {
+      if (!positions.has(member)) positions.set(member, { x: positions.get(group.id)?.x ?? 0, y: bottom + 156 * ++row, z: 0 });
+    }
+    graph.architectureView!.positions2d = positions;
+    cached = { graph }; if (views.size >= 8) views.delete(views.keys().next().value!); views.set(key, cached);
+  }
+  const groups = cached.graph.architectureView!.requestGroups;
+  const requestIds = new Set(groups.flatMap(group => group.memberIds));
+  const selectedNodeId = options.selectedNodeId && requestIds.has(options.selectedNodeId) ? options.selectedNodeId : undefined;
+  const selectedEdgeId = options.selectedEdgeId && base.projected.some(edge =>
+    (edge.id === options.selectedEdgeId || edge.provenance?.edges.some(original => original.id === options.selectedEdgeId))
+    && (requestIds.has(edge.source) || requestIds.has(edge.target))) ? options.selectedEdgeId : undefined;
+  if (!selectedNodeId && !selectedEdgeId) return cached.graph;
+  const selectionKey = JSON.stringify([selectedNodeId, selectedEdgeId]);
+  if (cached.selectionKey !== selectionKey) {
+    cached.selection = buildArchitectureScope(base, { ...options, selectedNodeId, selectedEdgeId });
+    cached.selection.architectureView!.positions2d = cached.graph.architectureView!.positions2d;
+    cached.selectionKey = selectionKey;
+  }
+  return cached.selection!;
 }
 
 export function architectureScopeGraph(model: SemanticGraph, scopeId?: string, environment = '', includeAuxiliary = false, options: ArchitectureProjectionOptions = {}): SemanticGraph {
