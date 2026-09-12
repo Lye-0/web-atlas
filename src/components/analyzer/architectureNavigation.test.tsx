@@ -81,9 +81,9 @@ describe('Architecture scope gestures, ancestors and browser visits', () => {
   });
   it('renders real deep ancestors, an inert current item and focus after navigation', async () => {
     await dbl('API'); await dbl('service'); await dbl('module'); await dbl('unit');
-    expect(scope()).toBe('unit'); expect(host.querySelector('.architecture-location.is-deep')).not.toBeNull();
+    expect(scope()).toBe('unit'); expect(host.querySelector('.analyzer-breadcrumb')).not.toBeNull();
     expect(host.querySelector('[aria-current="page"]')?.tagName).toBe('SPAN'); expect(document.activeElement).toBe(host.querySelector('[aria-current="page"]'));
-    expect([...host.querySelectorAll('.architecture-ancestor-collapsed button')].map(b => b.textContent)).toEqual(['API', 'service', 'module']);
+    expect([...host.querySelectorAll('.analyzer-breadcrumb-track button')].map(b => b.textContent)).toEqual(['プロジェクト（fixture）', 'API', 'service', 'module']);
     await click(button('親へ')); expect(scope()).toBe('module');
     await click(button('プロジェクトへ')); expect(scope()).toBe('project'); expect(button('親へ').disabled).toBe(true); expect(button('プロジェクトへ').disabled).toBe(true); expect(button('戻る').disabled).toBe(false);
   });

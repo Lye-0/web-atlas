@@ -1,3 +1,4 @@
+import { AnalyzerBreadcrumb } from './AnalyzerBreadcrumb';
 import { useLayoutEffect, useMemo, useRef } from 'react';
 import { explorerBreadcrumbs, explorerChildren, explorerEdgeVisible, explorerRegionIdentity, type ExplorerLocation, type SemanticExplorerModel } from '../../analyzer/semantic/semanticExplorer';
 import type { SemanticEdge, SemanticGraph } from '../../analyzer/semantic/types';
@@ -32,7 +33,6 @@ function FlowNavigation({ explorer, navigation, mode, graph, localGraph, selecte
   const centerDisplay = center ? semanticNodeDisplay(center) : undefined;
   const breadcrumbs = explorerBreadcrumbs(explorer, location).map(item => ({ id: item.id, label: item.label, tooltip: undefined as string | undefined }));
   if (center) breadcrumbs.push({ id: center.id, label: centerDisplay?.title ?? center.label, tooltip: centerDisplay?.tooltip });
-  const middle = breadcrumbs.slice(1, -1), current = breadcrumbs.at(-1);
   const currentElement = useRef<HTMLSpanElement>(null);
   const locationKey = `${location.scopeId}:${location.centerId ?? ''}`;
   const previousLocation = useRef(locationKey);
@@ -57,12 +57,7 @@ function FlowNavigation({ explorer, navigation, mode, graph, localGraph, selecte
         <button type="button" onClick={navigation.onBack} disabled={!navigation.canBack}>戻る</button>
         <button type="button" onClick={navigation.onParent} disabled={!center && location.scopeId === 'project'}>親へ</button>
         <button type="button" onClick={navigation.onProject} disabled={!center && location.scopeId === 'project'}>プロジェクトへ</button>
-      </div><nav className={`semantic-explorer-breadcrumb architecture-location${breadcrumbs.length > 4 ? ' is-deep' : ''}`} aria-label="2Dの現在地"><span className="architecture-location-caption">現在地：</span><ol>
-        {breadcrumbs.length > 1 && <li><button type="button" onClick={() => navigation.onOpenScope(breadcrumbs[0]!.id)}>{breadcrumbs[0]!.label}</button></li>}
-        {middle.map(item => <li className="architecture-ancestor-expanded" key={item.id}><span className="architecture-breadcrumb-separator" aria-hidden="true">›</span><button type="button" onClick={() => navigation.onOpenScope(item.id)}>{item.label}</button></li>)}
-        {middle.length > 0 && <li className="architecture-ancestor-collapsed"><span className="architecture-breadcrumb-separator" aria-hidden="true">›</span><details><summary aria-label="中間の祖先を選ぶ">…</summary><ul>{middle.map(item => <li key={item.id}><button type="button" onClick={event => { event.currentTarget.closest('details')?.removeAttribute('open'); navigation.onOpenScope(item.id); }}>{item.label}</button></li>)}</ul></details></li>}
-        <li>{breadcrumbs.length > 1 && <span className="architecture-breadcrumb-separator" aria-hidden="true">›</span>}<span ref={currentElement} className="architecture-current-location" aria-current="page" tabIndex={-1} title={current?.tooltip}>{current?.label ?? 'プロジェクト'}</span></li>
-      </ol></nav>
+      </div><AnalyzerBreadcrumb items={breadcrumbs} label="2Dの現在地" currentRef={currentElement} onOpen={navigation.onOpenScope} />
         {center && <span className="semantic-explorer-local-count" title="現在の局所図の関係総数。線の方向は選択対象を基準に適用し、対象と配置は維持します。">{localGraph.nodes.length.toLocaleString()}対象 / 関係総数 {localGraph.edges.length.toLocaleString()}{location.direction !== 'both' && selectedIds.size > 0 ? ` · 表示${visibleEdges.toLocaleString()}本` : ''}</span>}
       </div>
       {!center && <div className="semantic-explorer-caption"><span>{scope?.label ?? 'プロジェクト'}の直下 · {children.length.toLocaleString()}件</span><small>クリック・Enterで開く · スクロールで同じ階層を移動</small></div>}
