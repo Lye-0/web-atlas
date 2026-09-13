@@ -13,6 +13,14 @@ const build = (sources: Record<string, string>, nodes: SemanticNode[] = [], edge
 const web = { 'apps/web/package.json': json({ name: 'Web', scripts: { dev: 'vite' } }), 'apps/web/src/main.ts': 'createRoot(root).render(App);' };
 
 describe('Architecture independent contracts', () => {
+  it('preserves every member of a bundled file beyond the JavaScript argument limit', () => {
+    const path = 'dist-public/assets/bundle.js';
+    const members = Array.from({ length: 150_000 }, (_, index) => fact(`bundled-${index}`, path, { evidence: [] }));
+    const model = build({ 'package.json': json({ name: 'bundle-fixture' }), [path]: 'function bundled() {}' }, members);
+    const component = model.nodes.find(node => node.architecture?.kind === 'component' && node.architecture.files.includes(path));
+    expect(component?.architecture?.memberIds).toEqual(members.map(member => member.id));
+    expect(component?.architecture?.files).toEqual([path]);
+  });
   it('T01 distinguishes app and a package with declared use but no confirmed library role', () => {
     const model = build({ ...web, 'apps/web/package.json': json({ name: 'Web', scripts: { dev: 'vite' }, dependencies: { shared: 'workspace:*' } }), 'packages/shared/package.json': json({ name: 'shared' }) });
     expect(model.nodes.find(n => n.label === 'Web')?.architecture?.kind).toBe('application');

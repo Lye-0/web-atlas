@@ -232,7 +232,9 @@ export function buildArchitectureModel(input: SemanticInput, analysis: Pick<Sema
     const label = auxiliary(path) ? 'テスト・補助コード' : primary === 'Data models' && !modelOnly ? 'モデルを扱うコード' : primary === 'Shared logic' ? '役割未判定' : primary;
     const child = add(['component', owner.id, label], label, 'component', [], { parentId: owner.id, ownerPath: owner.architecture!.ownerPath, context: [...owner.architecture!.context], auxiliary: auxiliary(path),
       roles: [{ label, confidence: 'inferred', reason: detectedRole?.reason ?? (primary === 'Shared logic' ? 'ソースの所属は確認済み。構文・配置規約から具体的な役割は未判定' : `所属パスの分類規則: ${path}。機能の実装完了を保証しません`), evidence: ev(path, '', `役割推定の対象ファイル: ${path}`) }] });
-    child.architecture!.memberIds.push(...members.map(n => n.id)); child.architecture!.files.push(path);
+    // Bundled sources can contribute more members than the engine's argument limit.
+    for (const member of members) child.architecture!.memberIds.push(member.id);
+    child.architecture!.files.push(path);
     for (const member of members) for (const item of member.evidence) child.evidence.push(item);
     if (!members.length) child.evidence.push(...ev(path, '', '所属ソースファイル'));
     fileOwners.set(path, child.id);
