@@ -254,7 +254,7 @@ summary:focus-visible {
 .search-input {
   width: 100%;
   height: 39px;
-  padding: 0 76px 0 38px;
+  padding: 0 7rem 0 38px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   outline: 0;
@@ -266,6 +266,14 @@ summary:focus-visible {
 
 .search-input::placeholder {
   color: var(--subtle);
+}
+
+.search-input:not(:placeholder-shown) {
+  padding-right: 12px;
+}
+
+.search-input:not(:placeholder-shown) ~ .search-shortcut {
+  display: none;
 }
 
 .search-input:hover,
