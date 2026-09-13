@@ -64,6 +64,10 @@ export function resolveSemanticFlowHover(graph: SemanticGraph, selectedIds: Read
     const source = edge.provenance?.edges[0]?.source ?? edge.source;
     const target = edge.provenance?.edges.at(-1)?.target ?? edge.target;
     const selectedEdge = edge.id === selectedEdgeId || Boolean(edge.provenance?.edges.some(original => original.id === selectedEdgeId));
+    // Views can keep background connections visible, but hovering them must
+    // not replace the selected flow's emphasis or activate background particles.
+    if (hoverTarget.kind === 'edge' && !selectedEdge
+      && !selectedIds.has(source) && !selectedIds.has(target) && !selectedIds.has(edge.source) && !selectedIds.has(edge.target)) continue;
     const matches = hoverTarget.kind === 'edge'
       ? edge.id === hoverTarget.id || Boolean(edge.provenance?.edges.some(original => original.id === hoverTarget.id))
       : selectedEdgeId ? selectedEdge && (edge.source === hoverTarget.id || edge.target === hoverTarget.id)

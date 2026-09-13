@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { resolveSemanticFlowHover, semanticFlowNodeRelationKinds, semanticFlowNodeRoles, semanticFlowRoleLabel } from './flowRelationInteraction';
-import type { SemanticGraph, SemanticNode } from './types';
+import { semanticViewIds, type SemanticGraph, type SemanticNode } from './types';
 
 const nodes: SemanticNode[] = ['selected', 'peer', 'incoming', 'same-name', 'unrelated'].map(id => ({ id, label: id === 'same-name' ? 'peer' : id, kind: 'function', group: 'Source', confidence: 'source', evidence: [], attributes: {} }));
 const graph: SemanticGraph = { view: 'function-call-flow', nodes, edges: [
@@ -9,6 +9,17 @@ const graph: SemanticGraph = { view: 'function-call-flow', nodes, edges: [
 const selected = new Set(['selected']);
 
 describe('canonical relation interaction', () => {
+  it.each(semanticViewIds)('%s ignores background-edge hover while retaining selected flows', view => {
+    const architecture: SemanticGraph = { ...graph, view };
+    const background = { kind: 'edge' as const, id: 'elsewhere' };
+    for (const selection of [selected, new Set<string>()]) {
+      const focus = resolveSemanticFlowHover(architecture, selection, undefined, background);
+      expect(focus.edgeIds.size).toBe(0); expect(focus.nodeIds.size).toBe(0);
+    }
+    expect([...resolveSemanticFlowHover(architecture, selected, undefined, { kind: 'edge', id: 'out' }).edgeIds]).toEqual(['out']);
+    expect([...resolveSemanticFlowHover(architecture, new Set(), 'elsewhere', background).edgeIds]).toEqual(['elsewhere']);
+    expect(resolveSemanticFlowHover(architecture, new Set(), 'out', background).edgeIds.size).toBe(0);
+  });
   it('retains direct roles, kind and counterpart hover between representatives without changing provenance', () => {
     const display: SemanticGraph = { view: 'function-call-flow', nodes: ['displayA', 'displayB'].map(id => ({ id, label: 'Display collection', kind: 'subsystem', group: 'Display', confidence: 'source', evidence: [], attributes: { displayAggregate: true } })), edges: [{
       id: 'display-edge', source: 'displayA', target: 'displayB', kind: 'calls', label: '2 relations', views: ['function-call-flow'], confidence: 'source', evidence: [],
