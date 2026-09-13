@@ -1,3 +1,4 @@
+import { localDevelopmentCoverageFixtures } from './localDevelopment';
 import{languageCoverageFixtures}from'./languages';
 import{frameworkCoverageFixtures}from'./frameworks';
 import{uiCoverageFixtures}from'./ui';
@@ -8,6 +9,7 @@ import{providerCoverageFixtures}from'./providers';
 
 /** Fixture presence is separate from full primitive/View acceptance. */
 export const stackCoverageFixtures=[
+ ...localDevelopmentCoverageFixtures.map(fixture=>({...fixture,family:'local-development',testFile:'localDevelopmentCli.test.ts'})),
  ...languageCoverageFixtures.map(fixture=>({...fixture,family:'language',testFile:'semantic/stackCoverage.test.ts'})),
  ...frameworkCoverageFixtures.map(fixture=>({...fixture,family:'framework',testFile:'semantic/frameworkCoverage.test.ts'})),
  ...uiCoverageFixtures.map(fixture=>({...fixture,family:'ui',testFile:'semantic/uiCoverage.test.ts'})),

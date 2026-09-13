@@ -678,4 +678,4 @@ const existingCategories: CategoryEntry[] = [
 export const categories: CategoryEntry[] = [...existingCategories.map((category) => {
   const addition = categoryAdditions[category.id];
   return { ...category, ...addition, relatedCategoryIds: [...new Set([...(category.relatedCategoryIds ?? []), ...(addition?.relatedCategoryIds ?? [])])] };
-}), ...expandedCategories];
+}), ...expandedCategories].map(category => ({ ...category, relatedCategoryIds: [...new Set([...(category.relatedCategoryIds ?? []), ...(['local-emulator', 'runtime', 'build-tool', 'deployment-platform', 'backend-platform'].includes(category.id) ? ['local-development-cli'] : [])])] }));

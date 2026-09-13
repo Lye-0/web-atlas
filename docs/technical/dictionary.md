@@ -128,17 +128,19 @@ Stable ID、`categoryId`、package名、alias、関連ID、relationship metadata
 
 ## Verification anchors
 
-- `src/data/validateDictionary.test.ts`: 52 Category / 142 Stack、参照整合性、重複検出、5大visual groupのroot割り当て検証
+- `src/data/validateDictionary.test.ts`: 53 Category / 147 Stack、参照整合性、重複検出、5大visual groupのroot割り当て検証
 - `src/utils/search.test.ts`: 名称・alias・package名検索と検索順位
 - `src/utils/routes.test.ts`: stable ID lookupとURL生成
 - `package.json`: `build`、`lint`、`typecheck`、`test` の品質ゲート
 
 ## 2026-09-12 拡張の現行契約
 
-142 Stack /52 Category（新規94 /9）。従来48 StackのID・URLを維持する。TSX、JSX、Firebase Local Emulator Suiteは独立IDで、CDN8製品もそれぞれ詳細を持つ。
+2026-09-12時点は142 Stack /52 Category（新規94 /9）。2026-09-14のCLI追加後は147 Stack /53 Category。従来48 StackのID・URLを維持する。TSX、JSX、Firebase Local Emulator Suiteは独立IDで、CDN8製品もそれぞれ詳細を持つ。
 
 正規データはcategories/stacksを入口にexpandedCategories、applicationStacks、platformStacks、deliveryStacks等を合成し、expansionLinksで既存項目との関係を補う。非npmの識別子はecosystemを区別し、同じ文字列でも別ecosystemを同一packageと推定しない。説明、比較、関連分類、関連技術、関係の方向を検証する。
 
 MapはResizeObserverでコンテナの実幅を把握し、CSS container queryと同じ1100px境界で2レーン/1レーンを選ぶ。620/820/1200pxにも密度調整があり、1100px超の小数幅に空白区間を作らない。全技術を常時表示し、レーン切替時のfocusを対応するリンクへ移す。5グループへの移動ボタンは「構造」の見出し領域内に配置する。Map領域の実幅が820pxを超える場合は見出しを左下、説明文とボタンを右側に置き、見出しとボタンの下端を揃える。820px以下では見出し・説明文・ボタンを左揃えで縦に並べ、ボタンは説明文と水平線の間で折り返す。操作領域は44px以上を確保し、大量データは縦方向の探索で扱う。
 
 採用形式とテストの対応は[94件受入台帳](../plans/2026-09-12-dictionary-analyzer-acceptance.md)を参照。
+
+2026-09-14追加の5 CLIはlocalDevelopmentStacksで定義し、「開発と配信」のルートカテゴリlocal-development-cliへ配置する。npm識別子はCLIへ対応し、サービス・SDK・runtime・Emulator Suiteと区別する。説明と相互リンク、検証結果は[CLI実装記録](../plans/2026-09-14-local-development-cli-review.md)を参照。

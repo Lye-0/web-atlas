@@ -1,3 +1,4 @@
+import { localDevelopmentStacks } from '../data/localDevelopmentStacks';
 import { describe, expect, it } from 'vitest';
 import { parseManifest, localPath, parseStructuredConfig, staticBlocks } from './manifestAdapters';
 import { scanProjectFiles } from './scan';
@@ -16,10 +17,10 @@ describe('ecosystem manifest contracts', () => {
     const sources=new Map(Object.entries({'Directory.Build.props':'<Project><PropertyGroup><TargetFramework>net10.0-windows</TargetFramework><UseWPF>true</UseWPF></PropertyGroup><PropertyGroup Condition="unknown"><OutputType>WinExe</OutputType></PropertyGroup></Project>','global.json':'{"sdk":{"version":"10.0.100","rollForward":"latestPatch"}}','apps/api/api.csproj':'<Project Sdk="Microsoft.NET.Sdk.Web"><PropertyGroup><UseWPF>false</UseWPF><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>','apps/desktop/app.csproj':'<Project Sdk="Microsoft.NET.Sdk"/>'}));
     const api=parseManifest('apps/api/api.csproj',sources.get('apps/api/api.csproj')!,sources)!;expect(api.attributes).toMatchObject({targetFramework:'net10.0',useWpf:false,webSdk:true,sdkVersion:'10.0.100',sdkConfigPath:'global.json',outputType:''});expect(api.tools).not.toContain('wpf');expect(api.unresolved.some(reason=>reason.includes('条件'))).toBe(true);const desktop=parseManifest('apps/desktop/app.csproj',sources.get('apps/desktop/app.csproj')!,sources)!;expect(desktop.attributes.useWpf).toBe(true);expect(desktop.tools).toContain('wpf');
   });
-  it('registers all 94 planned products with an explicit view contract and limitations', () => {
-    const ids = [...expandedStacks, ...applicationStacks, ...platformStacks, ...deliveryStacks].map(stack => stack.id).sort();
+  it('registers all 99 planned products with an explicit view contract and limitations', () => {
+    const ids = [...expandedStacks, ...applicationStacks, ...platformStacks, ...deliveryStacks, ...localDevelopmentStacks].map(stack => stack.id).sort();
     expect(stackRegistry.map(entry => entry.stackId).sort()).toEqual(ids);
-    expect(new Set(ids).size).toBe(94);
+    expect(new Set(ids).size).toBe(99);
     for (const entry of stackRegistry) { expect(Object.keys(entry.views)).toHaveLength(10); expect(entry.views.stack.requirement).toBe('required'); expect(entry.requiredPrimitives.length).toBeGreaterThan(0); expect(entry.limitations.length).toBeGreaterThan(0); }
   });
   it('normalizes identities only according to their own ecosystem', () => {

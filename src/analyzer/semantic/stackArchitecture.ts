@@ -2,6 +2,7 @@ import { directoryFor, parseManifest, type ManifestProject } from '../manifestAd
 import type { ArchitectureModel, ArchitectureEntity } from './architecture';
 import type { SemanticAnalysis, SemanticEvidence, SemanticInput, SemanticNode } from './types';
 import{stackRegistry}from'../stackRegistry';
+import { uniqueArchitectureEvidence } from './architectureEvidence';
 import { declaredConnections } from '../declarationConnections';
 
 /** Augment the existing semantic ownership model using explicit project/config identities. */
@@ -93,4 +94,13 @@ export function addStackArchitecture(model:ArchitectureModel,input:SemanticInput
   for(const node of model.nodes){const arch=node.architecture;if(!arch)continue;arch.technologyNames=[...new Set(arch.technologyNames)].filter(Boolean);node.attributes.members=arch.memberIds;node.attributes.files=arch.files;node.attributes.auxiliary=arch.auxiliary;
     for(const name of arch.technologyNames)if(getStack(name)&&!arch.technologies?.some(item=>item.name===name)){(arch.technologies??=[]).push({name,usage:node.attributes.configurationOccurrence||name==='docker-compose'?'configuration':'source',reason:'専用adapterで確認した宣言・参照',declarations:[],evidence:node.evidence});}
     if(typeof node.attributes.dictionaryStackId==='string')node.attributes.technologyName=getStack(node.attributes.dictionaryStackId)?.name??node.attributes.dictionaryStackId;}
+  for (const tool of input.developmentTools ?? []) {
+    const unit = owner(tool.path), arch = unit?.architecture; if (!arch) continue;
+    const packages = stackRegistry.find(entry => entry.stackId === tool.stackId)?.identifiers.npm ?? [];
+    const prior = arch.technologies?.filter(item => packages.includes(item.name) || item.name === tool.stackId) ?? [];
+    arch.technologies = (arch.technologies ?? []).filter(item => !prior.includes(item));
+    const active = !tool.declaration || prior.some(item => item.name === tool.stackId && item.usage === 'support');
+    arch.technologies.push({ name: tool.stackId, usage: active ? 'support' : 'declared', reason: active ? '開発CLIの静的コマンドを確認。アプリ本体の実行技術・起動成功は未確認' : '開発用CLIの依存宣言。コマンドの使用・起動は未確認', declarations: prior.flatMap(item => item.declarations), evidence: uniqueArchitectureEvidence([...prior.flatMap(item => item.evidence), tool.evidence]) });
+    arch.technologyNames = [...new Set([...arch.technologyNames.filter(name => !packages.includes(name)), tool.stackId])];
+  }
 }

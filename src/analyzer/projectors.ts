@@ -1,3 +1,5 @@
+import { localDevelopmentCliId, localDevelopmentOperation } from './localDevelopmentCli';
+import { commandArgv } from './commandParser';
 import { getCategory, getStack } from '../data';
 import { makeEvidence } from './evidence';
 import { commandSourceRange, parseCommandExpression, type CommandFragment } from './commandParser';
@@ -405,7 +407,7 @@ function stackUsageRole(fact: AnalyzerFact): string | undefined {
 
 function stackRoleOrder(stackId:string):number{
   const categories=new Set<string>();let category=getCategory(getStack(stackId)?.categoryId??'');while(category&&!categories.has(category.id)){categories.add(category.id);category=category.parentCategoryId?getCategory(category.parentCategoryId):undefined;}
-  if(['package-manager','build-tool','testing','code-quality','ci-cd','local-emulator'].some(id=>categories.has(id)))return 3;
+  if(['package-manager','build-tool','testing','code-quality','ci-cd','local-emulator','local-development-cli'].some(id=>categories.has(id)))return 3;
   if(['programming-language','markup-language','stylesheet-language','query-schema-language','runtime'].some(id=>categories.has(id)))return 0;
   if(['database','storage','orm','validation-library'].some(id=>categories.has(id)))return 2;
   if(['deployment-platform','container','version-control','development-platform'].some(id=>categories.has(id)))return 4;
@@ -1044,6 +1046,11 @@ export function projectCommand(store: AnalyzerProjectStore, requestedEntryScript
     });
     const commandId = `command:${script.id}:${fragment.start}:${fragment.kind}${parentCommandId ? `:child:${parentCommandId}` : ''}`;
     nodes.set(commandId, commandNode(commandId, fragment, evidenceIds, script.packageId, context.executionRank, context.executionDepth, context.branchPath, context.laneId, context.laneLabel));
+    const cliId = localDevelopmentCliId(commandArgv(fragment));
+    if (cliId) {
+      const node = nodes.get(commandId)!;
+      node.metadata = { ...node.metadata, dictionaryStackId: cliId, commandPurpose: localDevelopmentOperation(commandArgv(fragment)), observed: false };
+    }
     addViewEdge(edges, {
       id: `view-edge:${script.id}:${commandId}`,
       sourceId: script.id,

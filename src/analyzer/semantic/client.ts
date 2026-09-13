@@ -1,3 +1,4 @@
+import { localDevelopmentCliIds } from '../localDevelopmentCli';
 import type { AnalyzerProjectStore } from '../types';
 import type { SemanticAnalysis, SemanticInput } from './types';
 import{stacks}from'../../data';
@@ -5,6 +6,12 @@ const stackMetadata=Object.fromEntries(stacks.map(stack=>[stack.id,{name:stack.n
 
 export function semanticInput(store: AnalyzerProjectStore): SemanticInput {
   return { sources: store.semanticSources ?? store.sources,stackMetadata,
+    developmentTools: store.facts.flatMap(fact => fact.kind === 'technology' && localDevelopmentCliIds.some(id => id === fact.dictionaryStackId) ? store.evidence.filter(item => fact.evidenceIds.includes(item.id)).map(item => {
+      const range = item.highlightRanges[0], line = range?.start.line ?? item.contextStartLine, endLine = range?.end.line ?? line;
+      const lines = (store.sources[item.filePath] ?? '').split('\n');
+      const offset = (row: number, column: number) => lines.slice(0, row - 1).reduce((n, value) => n + value.length + 1, 0) + column - 1;
+      return { stackId: fact.dictionaryStackId!, path: item.filePath, declaration: item.role === 'declaration', evidence: { path: item.filePath, line, endLine, start: offset(line, range?.start.column ?? 1), end: offset(endLine, range?.end.column ?? (lines[endLine - 1]?.length ?? 0) + 1), description: item.description ?? '開発CLIの宣言・使用' } };
+    }) : []),
     projectScopes:store.facts.flatMap(fact=>fact.kind==='workspace-package'?[{id:fact.id,path:fact.manifestPath,directory:fact.packagePath}]:[]),
     imports: store.facts.flatMap(fact => fact.kind === 'module-dependency'&&fact.dependencyKind!=='build-entry' ? [{ from: fact.sourcePath, to: fact.targetPath, specifier: fact.specifier }] : []),
     resources: store.facts.flatMap(fact => fact.kind === 'runtime' || fact.kind === 'resource' ? [{ id: fact.id, label: fact.label, type: fact.kind === 'runtime' ? 'runtime' : fact.resourceType, path: fact.filePath, binding: fact.kind === 'resource' ? fact.binding : undefined,

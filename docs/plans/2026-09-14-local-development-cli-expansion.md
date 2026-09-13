@@ -1,8 +1,8 @@
 # ローカル開発・検証CLIの追加計画
 
-作成: 2026-09-14。状態: 計画のみ・未実装。
-対象: DictionaryのMap / Categories / Stacks、および将来のAnalyzer対応。
-ユーザーの「今回は追加計画だけまとめる」に基づき、アプリケーションコードは変更しない。
+作成: 2026-09-14。状態: 実装済み。検証の制約は[実装・検証記録](2026-09-14-local-development-cli-review.md)を参照。
+対象: DictionaryのMap / Categories / Stacks、およびAnalyzer対応。
+当初は計画のみとして作成し、その後のユーザーの「実装してください」に基づいて実装した。
 
 ## 目的と範囲
 

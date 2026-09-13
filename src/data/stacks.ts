@@ -1,3 +1,4 @@
+import { localDevelopmentStacks } from './localDevelopmentStacks';
 import type { StackEntry } from '../types';
 import { expandedStacks } from './expandedStacks';
 import { applicationStacks } from './applicationStacks';
@@ -825,7 +826,7 @@ const existingStacks: StackEntry[] = [
       { targetStackId: 'github', kind: 'integrates-with', label: 'GitHubからデプロイ' },
     ],
     relatedStackIds: ['nextjs', 'github', 'github-actions', 'cloudflare-pages'],
-    packageNames: ['vercel'],
+    packageNames: [],
     aliases: ['Vercel Platform'],
     officialUrl: 'https://vercel.com/',
   }),
@@ -868,4 +869,4 @@ const existingStacks: StackEntry[] = [
   }),
 ];
 
-export const stacks: StackEntry[] = connectExpandedStacks([...existingStacks, ...expandedStacks, ...applicationStacks, ...platformStacks, ...deliveryStacks]);
+export const stacks: StackEntry[] = connectExpandedStacks([...existingStacks, ...expandedStacks, ...applicationStacks, ...platformStacks, ...deliveryStacks, ...localDevelopmentStacks]);

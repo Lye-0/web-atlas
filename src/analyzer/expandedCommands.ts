@@ -3,6 +3,7 @@ import type { ExpansionContext } from './expandedScan';
 import {expandedProjectId,localPath}from'./projectPaths';
 import{commandProjectPath}from'./commandProject';
 import{commandSubcommand,runtimeEntryArgument,workingDirectoryArgument}from'./runtimeArgv';
+import { localDevelopmentCliId, localDevelopmentOperation } from './localDevelopmentCli';
 
 const executables:Record<string,string>={node:'nodejs',npm:'npm',pnpm:'pnpm',yarn:'yarn',bun:'bun',deno:'deno',python:'python',python3:'python',pip:'pip',pip3:'pip',uv:'uv',cargo:'cargo',composer:'composer',nuget:'nuget',mvn:'maven',mvnw:'maven',gradle:'gradle',gradlew:'gradle',java:'jvm',go:'go',ruby:'ruby',php:'php',webpack:'webpack',esbuild:'esbuild',jest:'jest',pytest:'pytest',cypress:'cypress',kubectl:'kubernetes',netlify:'netlify',nginx:'nginx',httpd:'apache-http-server',apache2:'apache-http-server',dotnet:'dotnet','docker-compose':'docker-compose'};
 export function commandStackId(argv:readonly string[]):string|undefined{
@@ -11,6 +12,12 @@ export function commandStackId(argv:readonly string[]):string|undefined{
   return executable?executables[executable]:undefined;
 }
 export function commandPurpose(argv:readonly string[]):'start'|'build'|'test'|'deploy'|'install'|'tool'{
+  if (localDevelopmentCliId(argv)) {
+    const operation = localDevelopmentOperation(argv);
+    if (operation === 'local' || operation === 'remote') return argv[1] === 'emulators:exec' ? 'test' : 'start';
+    if (operation === 'deploy') return 'deploy';
+    if (argv.some(arg => ['--help', '-h', '--version', '-v'].includes(arg))) return 'tool';
+  }
   if(argv[0]==='esbuild'&&!argv.some(value=>['--version','--help'].includes(value)))return'build';
   const subcommand=commandSubcommand(argv);if(['pytest','jest','cypress'].includes(argv[0]??'')||/^(?:test|emulators:exec)$/.test(subcommand??''))return'test';
   if(/^(?:deploy|publish|apply)$/.test(subcommand??''))return'deploy';if(/^(?:build|compile|package|bundle)$/.test(subcommand??''))return'build';
@@ -24,6 +31,8 @@ export function scanCommandEvidence(context:ExpansionContext):void{
     }
     const visit=(fragment:CommandFragment)=>{
       const argv=commandArgv(fragment);const stackId=commandStackId(argv);const{start,end}=commandSourceRange(context.sources.get(script.sourcePath)??'',script,fragment);
+      const cliId = localDevelopmentCliId(argv);
+      if (cliId) context.technology(cliId, script.sourcePath, start, end, 'usage', `開発CLIの静的コマンド（${localDevelopmentOperation(argv)}）: ${argv.slice(0, 2).join(' ')}。実行状態は未観測`);
       if(stackId)context.technology(stackId,script.sourcePath,start,end,'usage',`${commandPurpose(argv)} command: ${argv.slice(0,2).join(' ')}`);
       const executable=argv[0];const runtime=({bun:'bun',deno:'deno',node:'nodejs',python:'python',python3:'python',java:'jvm',dotnet:'dotnet'}as Record<string,string>)[executable??''];
       const cwd=fragment.workingDirectory??workingDirectoryArgument(argv);const directory=cwd?localPath(script.packagePath,cwd):script.packagePath;const selected=commandProjectPath(argv,directory??script.packagePath);const project=selected.explicit?context.projects.find(project=>project.path===selected.path||project.directory===selected.path):cwd&&directory?context.owner(directory+'/'):context.projects.find(project=>expandedProjectId(project)===script.packageId)??context.owner(script.sourcePath);

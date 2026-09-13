@@ -143,3 +143,7 @@ CloudFront、Fastly、Cloudflare cache ruleset、Google Cloud CDN、Akamai、bun
 要求集合も共通の選択と右側詳細を使用する。個別要求は元IDで一時表示し、選択解除・別の選択で集合へ戻す。詳細を閉じても選択は残す。明示展開は「まとめる」まで維持し、全件個別表示中は0件の集合ノードを描かない。件数は元要求・集合内・個別表示を分け、画面内外に依存しない。通常選択と明示展開で既存の予約座標を再利用する。
 
 ラベルの現在地との関係、種類、環境は別の軸として扱う。Suiteはprovider/identity/configurationとEvidenceから説明し、接続設定という名称だけで実体を統合しない。詳細な根拠と検証結果は [表示集合の修正報告](tab10-aggregate-selection-review-20260913.md) を参照。
+
+## ローカル開発CLI（2026-09-14）
+
+Wrangler等5 CLIはsemantic inputのdevelopmentToolsで宣言・使用と元Evidenceを引き継ぎ、最も近い所属packageの構成の技術欄に表示する。依存宣言のみはdeclared、使用根拠があればsupportとし、起動成功は推定しない。CLIの追加だけでサービス・実行ブロックを生成せず、runtime/resourceは元設定のFactから扱う。[実装・検証記録](../plans/2026-09-14-local-development-cli-review.md)を参照。

@@ -52,6 +52,7 @@ export interface SemanticAnalysis {
   stats: { files: number; functions: number; models: number; unresolved: number; elapsedMs: number };
 }
 export interface SemanticInput {
+  developmentTools?: { stackId: string; path: string; declaration: boolean; evidence: SemanticEvidence }[];
   stackMetadata?:Record<string,{name:string;aliases:string[]}>;
   projectScopes?:{id:string;path:string;directory:string}[];
   sources: Record<string, string>;

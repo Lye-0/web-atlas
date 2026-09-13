@@ -1,6 +1,12 @@
 import type { CategoryEntry } from '../types';
 
 export const expandedCategories: CategoryEntry[] = [
+  { id: 'local-development-cli', name: 'ローカル開発・検証CLI', aliases: ['Local Development CLI'],
+    summary: 'サービス固有のローカル実行・検証環境を起動・管理するコマンドラインツール。',
+    description: '公開前にコードやサービス連携をPCで確認するための環境を準備・起動します。デプロイや環境管理も扱う場合がありますが、CLIそのものと、起動されるランタイム・エミュレーター・クラウド上のサービスは別の構成要素です。', role: 'ローカル開発環境の起動と検証を支援する',
+    useCases: ['デプロイ前に動作を確認する', 'サービス連携を検証する', '開発環境を共有する'],
+    differences: [{ against: 'ランタイム', explanation: 'CLIは操作を受け付ける道具、ランタイムはコードを実行する基盤です。' }, { against: 'ローカルエミュレーター', explanation: 'CLIは起動や設定を管理し、エミュレーターはサービスの振る舞いを代替します。' }, { against: 'デプロイ基盤', explanation: 'CLIは公開先を操作する道具であり、公開先のサービスそのものではありません。' }],
+    relatedCategoryIds: ['local-emulator', 'runtime', 'build-tool', 'deployment-platform', 'backend-platform'] },
   { id: 'query-schema-language', name: 'クエリ・スキーマ言語', aliases: ['Query Language', 'Schema Language'],
     summary: 'データの操作やAPI・保存構造の契約を宣言する言語。', description: 'SQLは表の検索・更新・定義を、GraphQLはAPIの型と問い合わせを表します。言語自体はDB製品や実行serverではなく、宣言を処理する実装が別に必要です。', role: 'データ操作と構造の契約を表す',
     useCases: ['必要なデータを問い合わせる', '表やAPIの型を定義する', 'データの更新を宣言する'], differences: [{ against: 'データベース', explanation: '言語は操作や構造の記法、DB製品は保存や実行を担う仕組みです。' }, { against: 'プログラミング言語', explanation: '汎用の処理手順より、対象のデータ操作や型の宣言を中心に扱います。' }], relatedCategoryIds: ['programming-language', 'relational-database', 'orm'] },

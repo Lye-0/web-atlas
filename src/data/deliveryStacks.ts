@@ -15,7 +15,7 @@ export const deliveryStacks = [
     ['宣言的なAPI資源', 'workload controller', 'service discovery'], ['workloadを配置する', 'serviceを公開する', 'replicaを維持する'], ['clusterの配置を制御する', '宣言した実行状態を維持する'], ['docker', 'docker-compose'], [], ['K8s']),
   entry('netlify', 'Netlify', 'application-platform', 'https://docs.netlify.com/', 'Webのビルドと公開、server機能を提供するプラットフォーム。',
     'build commandやpublish directoryを設定してWeb資産を公開します。functionsやredirectsも構成でき、静的ファイルの配信だけのhostingより広いアプリ機能を持ちます。',
-    ['Web build', 'deploy preview', 'functionsとredirects'], ['サイトを公開する', '変更をpreviewする', 'API処理を配置する'], ['ビルド成果物を公開する', 'Webアプリの実行機能を提供する'], ['vercel', 'astro', 'nuxt', 'sveltekit'], ['netlify-cli']),
+    ['Web build', 'deploy preview', 'functionsとredirects'], ['サイトを公開する', '変更をpreviewする', 'API処理を配置する'], ['ビルド成果物を公開する', 'Webアプリの実行機能を提供する'], ['vercel', 'astro', 'nuxt', 'sveltekit'], []),
   entry('github-pages', 'GitHub Pages', 'web-hosting', 'https://docs.github.com/en/pages', 'GitHubから静的なWebサイトを公開するhosting機能。',
     'repositoryやworkflowの成果物を使ってHTML、CSS、JavaScriptなどを配信します。任意のサーバー処理を実行する基盤とは異なり、公開用の静的資産を用意する必要があります。',
     ['静的サイト公開', 'custom domain', 'Actions連携'], ['ドキュメントを公開する', '静的成果物を配信する', 'projectページを作る'], ['Web資産を公開する', '公開先をrepositoryへ関連付ける'], ['github', 'github-actions', 'cloudflare-pages', 'firebase-hosting']),

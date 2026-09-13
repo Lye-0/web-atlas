@@ -205,7 +205,7 @@ function classifyRange(source: string, start: number, end: number, operator?: Sh
   const knownCliNames = new Set([
     'vite',
     'vitest',
-    'wrangler',
+    'wrangler', 'vercel', 'supabase',
     'firebase',
     'node',
     'npm',

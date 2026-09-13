@@ -19,6 +19,7 @@ export interface StackSupport {
 const allViews: CoverageView[] = ['stack', 'workspace', 'command', 'package', 'module', 'runtime', 'call', 'data-flow', 'data-model', 'architecture'];
 type Row = [id: string, profiles: string, identifiers: string, extensions: string, imports: string, configs: string, commands: string, views: string, primitives: string, limits: string];
 const rows: Row[] = [
+  ...[['wrangler','wrangler'], ['vercel-cli','vercel'], ['netlify-cli','netlify'], ['firebase-cli','firebase'], ['supabase-cli','supabase']].map(([id, executable]): Row => [id!, 'T', 'npm:' + ({'firebase-cli':'firebase-tools','netlify-cli':'netlify-cli','vercel-cli':'vercel'}[id!] ?? id!.replace('-cli','')), '', '', '', executable!, 'command architecture', 'cli-usage local-development declaration', '宣言・静的コマンドのみ。起動と接続成功は未観測']),
   ['python','L','','py pyi','pypi:','pyproject.toml requirements.txt setup.cfg','python python3','module runtime call data-flow data-model architecture','function call class field relative-import','動的importと実行時型は未解決'],
   ['java','L','','java','','pom.xml build.gradle','','module runtime call data-flow data-model architecture','method class field package-import','overloadの完全な型解決は対象外'],
   ['csharp','L','','cs','','*.csproj','','module runtime call data-flow data-model architecture','method class field namespace-import','reflectionと実行時DIは未解決'],
@@ -100,7 +101,7 @@ const rows: Row[] = [
   ['gitlab-ci','PT','','','','.gitlab-ci.yml','gitlab-runner','workspace command architecture','local-include job stages needs script','remote include取得禁止；local循環とroot外を拒否'],
   ['docker-compose','PT','','','','compose.yaml compose.yml docker-compose.yml docker-compose.yaml','docker-compose','command runtime architecture','service image build port depends-on','宣言と実行中を区別；曖昧なapp対応は未解決'],
   ['kubernetes','PT','','','','apiVersion:kind','kubectl','command runtime architecture','deployment service ingress selector','secretとkubeconfigを収集しない'],
-  ['netlify','P','npm:netlify-cli','','','netlify.toml','netlify','command runtime architecture','build publish function redirect','動的build式は未評価'],
+  ['netlify','P','','','','netlify.toml','netlify','command runtime architecture','build publish function redirect','動的build式は未評価'],
   ['github-pages','P','','','','actions/deploy-pages','','command architecture','workflow job artifact publish','repositoryだけでは公開を推定しない'],
   ['firebase-hosting','P','','','','firebase:hosting','firebase','command runtime architecture','target public rewrite deploy','App Hostingと同一扱いしない'],
   ['nginx','P','','','','nginx.conf','nginx','runtime architecture','server location proxy-pass upstream','includeはlocal root内のみ'],

@@ -4,6 +4,7 @@ import { commandPurpose, commandStackId } from './expandedCommands';
 import { localPath } from './projectPaths';
 import{commandProjectPath}from'./commandProject';
 import{runtimeEntryArgument,workingDirectoryArgument}from'./runtimeArgv';
+import { localDevelopmentCliTargets } from './localDevelopmentCliTargets';
 import type {
   AnalyzerProjectStore,
   AnalyzerRelationKind,
@@ -123,6 +124,8 @@ export function commandTerminalTarget(
 
 export function commandTerminalTargets(fragment:CommandFragment,store:AnalyzerProjectStore,script:PackageScriptFact):CommandTerminalTarget[]{
   const argv=commandArgv(fragment);const stackId=commandStackId(argv);const targets:CommandTerminalTarget[]=[];
+  const cliTargets = localDevelopmentCliTargets(fragment, store, script);
+  if (cliTargets) return cliTargets;
   for(const runtime of store.facts.filter(fact=>fact.kind==='runtime'&&fact.metadata.entryScriptId===script.id))targets.push({factId:runtime.id,kind:'starts'});
   const cwd=fragment.workingDirectory??workingDirectoryArgument(argv);const directory=cwd?localPath(script.packagePath,cwd):script.packagePath;const selected=commandProjectPath(argv,directory??script.packagePath);const selectedProject=selected.explicit?store.facts.find(fact=>fact.kind==='workspace-package'&&(fact.manifestPath===selected.path||fact.packagePath===selected.path))?.id:cwd&&directory?store.facts.filter(fact=>fact.kind==='workspace-package'&&(fact.packagePath===directory||directory.startsWith(fact.packagePath+'/'))).sort((a,b)=>(b.kind==='workspace-package'?b.packagePath.length:0)-(a.kind==='workspace-package'?a.packagePath.length:0))[0]?.id:script.packageId;
   if(stackId==='firebase-emulator-suite'){

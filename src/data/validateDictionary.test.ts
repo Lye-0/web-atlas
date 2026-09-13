@@ -10,8 +10,8 @@ import {
 
 describe('dictionary data', () => {
   it('contains the complete Phase 1 catalogue without broken references', () => {
-    expect(categories).toHaveLength(52);
-    expect(stacks).toHaveLength(142);
+    expect(categories).toHaveLength(53);
+    expect(stacks).toHaveLength(147);
     expect(validateDictionary(categories, stacks, stackMap)).toEqual([]);
   });
 

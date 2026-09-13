@@ -1095,12 +1095,14 @@ describe('Analyzer scan and projectors', () => {
     const worker = commandFor('dev:worker');
     expect(terminalFrom(worker, 'wrangler dev')).toEqual([
       expect.objectContaining({ targetId: 'runtime:cloudflare-workers:wrangler.jsonc', kind: 'starts' }),
+      expect.objectContaining({ targetId: 'technology:wrangler', kind: 'uses' }),
     ]);
 
     const migrate = commandFor('db:migrate');
     const d1Terminals = terminalFrom(migrate, 'wrangler d1 migrations apply DB --local --env development');
     expect(d1Terminals).toEqual([
       expect.objectContaining({ targetId: 'resource:wrangler.jsonc:d1:DB', kind: 'uses' }),
+      expect.objectContaining({ targetId: 'technology:wrangler', kind: 'uses' }),
     ]);
     expect(d1Terminals.some((edge) => edge.kind === 'starts' && edge.targetId === 'runtime:cloudflare-workers:wrangler.jsonc')).toBe(false);
     expect(migrate.edges.some((edge) => (
@@ -1111,6 +1113,7 @@ describe('Analyzer scan and projectors', () => {
     const types = commandFor('types');
     expect(terminalFrom(types, 'wrangler types')).toEqual([
       expect.objectContaining({ targetId: 'runtime:cloudflare-workers:wrangler.jsonc', kind: 'uses' }),
+      expect.objectContaining({ targetId: 'technology:wrangler', kind: 'uses' }),
     ]);
 
     const build = commandFor('build');

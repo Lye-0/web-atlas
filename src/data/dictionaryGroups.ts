@@ -52,7 +52,7 @@ export const dictionaryVisualGroups: DictionaryVisualGroup[] = [
     description: '変更を共有し、実行環境へ届ける',
     side: 'right',
     order: 5,
-    rootCategoryIds: ['version-control', 'development-platform', 'ci-cd', 'container', 'deployment-platform'],
+    rootCategoryIds: ['version-control', 'development-platform', 'ci-cd', 'container', 'deployment-platform', 'local-development-cli'],
   },
 ];
 
