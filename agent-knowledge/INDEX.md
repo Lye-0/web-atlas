@@ -44,6 +44,14 @@
 - files: `src/analyzer/semantic/architectureCommands.ts`, `src/analyzer/semantic/architectureToolFlows.ts`, `src/analyzer/semantic/architectureToolFlows.test.ts` …
 - memory: `agent-knowledge/entries/2026-09-16-architecture-tool-context-e571c4.md`
 
+### 定義の所属と用途を分離し、workspace所属は関係の根拠で確認する
+- id: `rm-20260916-definition-ownership`
+- type: `constraint`
+- maturity: `candidate`
+- tags: `ownership`, `manifest`, `workspace`, `positioning`
+- files: `src/analyzer/semantic/architecturePositioning.ts`, `src/analyzer/semantic/client.ts`, `src/components/analyzer/architectureContextPolish.test.tsx` …
+- memory: `agent-knowledge/entries/2026-09-16-definition-ownership-8c417a.md`
+
 ## analyzer-command-evidence
 
 ### CIコマンドを合成すると元範囲の座標系が変わる
