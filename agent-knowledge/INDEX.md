@@ -36,6 +36,14 @@
 - files: `src/analyzer/semantic/architectureProjection.ts`, `src/analyzer/semantic/flowPresentation.ts`, `src/analyzer/semantic/flow3DInput.ts` …
 - memory: `agent-knowledge/entries/2026-09-13-architecture-selection-scope-318c64.md`
 
+### ツールの使用は操作文脈として同じArchitectureへ接続する
+- id: `rm-20260916-architecture-tool-context`
+- type: `decision`
+- maturity: `candidate`
+- tags: `tool-usage`, `environment`, `provenance`, `operation`
+- files: `src/analyzer/semantic/architectureCommands.ts`, `src/analyzer/semantic/architectureToolFlows.ts`, `src/analyzer/semantic/architectureToolFlows.test.ts` …
+- memory: `agent-knowledge/entries/2026-09-16-architecture-tool-context-e571c4.md`
+
 ## analyzer-command-evidence
 
 ### CIコマンドを合成すると元範囲の座標系が変わる
