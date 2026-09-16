@@ -147,3 +147,21 @@ CloudFront、Fastly、Cloudflare cache ruleset、Google Cloud CDN、Akamai、bun
 ## ローカル開発CLI（2026-09-14）
 
 Wrangler等5 CLIはsemantic inputのdevelopmentToolsで宣言・使用と元Evidenceを引き継ぎ、最も近い所属packageの構成の技術欄に表示する。依存宣言のみはdeclared、使用根拠があればsupportとし、起動成功は推定しない。CLIの追加だけでサービス・実行ブロックを生成せず、runtime/resourceは元設定のFactから扱う。[実装・検証記録](../plans/2026-09-14-local-development-cli-review.md)を参照。
+
+## 同じ図に置く操作・成果物・実行構成（2026-09-16）
+
+最新合意では、使用コマンドの根拠があるツールを補足欄だけに限定しない。CLIの依存宣言のみから常駐サービスを作らない規則は維持し、起動・生成・公開・DB適用の使用文脈を独立した操作として同じArchitecture Modelへ追加する。環境・用途ごとの必須モードは設けない。
+
+`architectureCommands`は既存Command Flowのworkspace/script解決とEvidenceを再利用し、scanからworkerへ一度だけ渡す。コマンドID・script ID・演算子・呼出関係を保持し、転送されたリテラル引数は元scriptを変更せず別の呼出文脈とする。
+
+`architectureToolFlows`は操作、コード・定義、成果物、環境別実行構成を追加する。図のルートで主要経路が読めるよう、論理的な所属はlogicalOwnerId/ownerPathで保持し、表示の環境囲いをparentIdの階層へ流用しない。通常の選択はこの対応付けを再実行しない。
+
+Wranglerのmain・env・bindingとコマンドを照合する。D1は既存のidentity/configuration occurrenceへ対応付け、local構成をcloudの実体と混同しない。`remote: true`の明示bindingはlocal Workerからでもcloud対象を維持する。元のDBアクセス式がinferredなら、実行構成へ対応付けた関係もinferredのまま元relationをprovenanceに保持する。
+
+成果物は正規化したパスと環境で識別する。Drizzleのschema/out、Wranglerのmigrations_dir/assets.directory、ViteのoutDir等を照合する。動的outDirを既定distとして埋めない。生成ファイルの存在、出力先宣言、生成・公開・適用の実観測は異なる。
+
+各操作は実行場所、対象環境、操作先を分けて説明する。scriptに書かれたツールの実行場所は原則未確認。`&&`/`||`等は条件付きの後続記述として保持し、混合グラフの全辺を実行順と扱わない。
+
+2Dは対象環境ごとの薄い囲い・見出しと操作関係名を表示し、初期の過剰な縮小を避ける。3Dも同じモデルを使い、主要操作等は汎用の密度集約へ混ぜない。自動省略のアルゴリズムは変更せず、表示グループへの所属だけを設定する。元の所属、選択、内部詳細＋外側概要、未特定要求の一時取り出しは既存の投影・キャッシュを使用する。
+
+対応範囲・検証・残件は[統合経路の実装記録](tab10-unified-tool-flows-review-20260916.md)を参照。

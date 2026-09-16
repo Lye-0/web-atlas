@@ -11,6 +11,7 @@ import { resolveSemanticFlowHover, semanticFlowNodeRelationKinds, semanticFlowNo
 import { semanticFlowHoverBindings } from './semanticFlowHoverBindings';
 import { semanticRelationLabel } from './semanticFlowLanguage';
 import './semantic-flow-relation-interaction.css';
+import { semanticFlowRegions } from '../../analyzer/semantic/flowRegions';
 
 export type FlowCamera2D = NonNullable<NonNullable<AnalyzerViewSession['flowCameras']>['2d']>;
 export interface FlowCameraCommand { kind: 'fit' | 'reset' | 'focus' | 'zoom-in' | 'zoom-out'; nonce: number; ids?: string[] }
@@ -55,7 +56,7 @@ export function SemanticFlow2D(props: Explorer2DProps) {
   return <SemanticLocalFlow2D key={props.visitId ?? props.location?.centerId} {...props} />;
 }
 
-function SemanticLocalFlow2D({ graph, explorer, nodeDisplays, selectedIds, selectedEdgeId, matchIds, command, motion, overlayTop, location, direction = 'both', camera: savedCamera, onCamera, onSelect, onArchitectureNodeClick, onSelectEdge, onClear, hoverTarget, onHoverTarget, explicitPathNodeIds, explicitPathEdgeIds }: Explorer2DProps) {
+function SemanticLocalFlow2D({ showGroupBounds, graph, explorer, nodeDisplays, selectedIds, selectedEdgeId, matchIds, command, motion, overlayTop, location, direction = 'both', camera: savedCamera, onCamera, onSelect, onArchitectureNodeClick, onSelectEdge, onClear, hoverTarget, onHoverTarget, explicitPathNodeIds, explicitPathEdgeIds }: Explorer2DProps) {
   const root = useRef<SVGSVGElement>(null);
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [camera, setCamera] = useState<FlowCamera2D>(savedCamera ?? { x: 100, y: 100, scale: 1 });
@@ -64,6 +65,7 @@ function SemanticLocalFlow2D({ graph, explorer, nodeDisplays, selectedIds, selec
   const lastCommand = useRef<number | undefined>(undefined);
   const centerId = location?.centerId ?? graph.nodes[0]?.id ?? '';
   const positions = useMemo(() => graph.view === 'architecture-map' ? layoutSemanticFlow(graph, '2d') : layoutExplorerRelations(graph, centerId), [graph, centerId]);
+  const environmentRegions = useMemo(() => graph.view === 'architecture-map' && graph.nodes.some(n => n.attributes.unifiedFlow) ? semanticFlowRegions(positions, '2d') : [], [graph, positions]);
   const displays = useMemo(() => nodeDisplays ?? semanticNodeDisplays(graph.nodes, explorer?.nodes), [nodeDisplays, graph.nodes, explorer]);
   const paths = useMemo(() => semanticFlowEdgePaths(graph, positions, selectedIds, selectedEdgeId, '2d'), [graph, positions, selectedIds, selectedEdgeId]);
   const shownPaths = useMemo(() => paths.filter(path => explorerEdgeVisible(path.edge, selectedIds, direction, selectedEdgeId)), [paths, selectedIds, direction, selectedEdgeId]);
@@ -119,6 +121,7 @@ function SemanticLocalFlow2D({ graph, explorer, nodeDisplays, selectedIds, selec
         for (const path of paths) for (const point of path.points) { minX = Math.min(minX, point.x - 6); maxX = Math.max(maxX, point.x + 6); minY = Math.min(minY, point.y - 6); maxY = Math.max(maxY, point.y + 6); }
         const scale = Math.min(1.05, (viewport.width - 32) / (maxX - minX), (plot.height - 16) / (maxY - minY));
         if (graph.view === 'architecture-map' || scale >= .8) initial = { x: viewport.width / 2 - (minX + maxX) / 2 * scale, y: plot.centerY - (minY + maxY) / 2 * scale, scale };
+        if (graph.nodes.some(node => node.attributes.unifiedFlow) && scale < .65) initial = { x: 30-minX*.65, y: plot.top+40-minY*.65, scale:.65 };
       }
       commit(initial);
       setInitialized(true);
@@ -128,7 +131,7 @@ function SemanticLocalFlow2D({ graph, explorer, nodeDisplays, selectedIds, selec
       commit(current => ({ ...current, x: current.x + (viewport.width - previous.width) / 2, y: current.y + (viewport.height - previous.height) / 2 }));
     }
     previousSize.current = viewport;
-  }, [graph.view, positions, paths, viewport, commit, overlayTop, centerId, initialized]);
+  }, [graph.view, graph.nodes, positions, paths, viewport, commit, overlayTop, centerId, initialized]);
   const zoom = useCallback((factor: number, x = viewport.width / 2, y = viewport.height / 2) => commit(current => {
     const scale = Math.max(.000001, Math.min(5, current.scale * factor));
     return { scale, x: x - (x - current.x) * scale / current.scale, y: y - (y - current.y) * scale / current.scale };
@@ -176,6 +179,10 @@ function SemanticLocalFlow2D({ graph, explorer, nodeDisplays, selectedIds, selec
     }}>
     <defs>{['#82c6e2', '#dfb785', '#afcbbd', '#496660'].map(color => <marker key={color} id={`flow-arrow-${color.slice(1)}`} viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse" markerUnits="strokeWidth"><path d="M 0 0 L 10 5 L 0 10 z" fill={color} /></marker>)}</defs>
     <g transform={`translate(${camera.x} ${camera.y}) scale(${camera.scale})`} visibility={ready ? undefined : 'hidden'}>
+      <g className="architecture-environment-regions" pointerEvents="none">{environmentRegions.map(region => <g key={region.id}>
+        {showGroupBounds !== false && <rect x={region.x-12} y={region.y-20} width={region.width+24} height={region.height+40} rx={12} fill="none" stroke="#496660" strokeDasharray="5 5" opacity={.45} />}
+        <text x={region.x} y={region.y-4} fill="#afcbbd" fontSize={12}>{region.label}</text>
+      </g>)}</g>
       <g data-flow-layer="edge-targets">{shownPaths.map(path => <path key={path.edge.id} data-edge-hit-id={path.edge.id} d={path.svgPath} className="semantic-flow-edge-hit" role="button" tabIndex={path.selected ? 0 : -1} aria-label={`${semanticRelationLabel(path.edge, graph.view)}の根拠を表示`}
           {...semanticFlowHoverBindings<SVGPathElement>(onHoverTarget, { kind: 'edge', id: path.edge.id }, `2d-edge:${path.edge.id}`)}
           onClick={event => { event.stopPropagation(); if (!drag.current?.moved) onSelectEdge(path.edge.id); drag.current = undefined; }}
@@ -205,6 +212,7 @@ function SemanticLocalFlow2D({ graph, explorer, nodeDisplays, selectedIds, selec
       })}</g>
       <g data-flow-layer="edges" pointerEvents="none">{shownPaths.map(path => <g key={path.edge.id} data-edge-id={path.edge.id} data-source={path.edge.source} data-target={path.edge.target} data-direction={path.direction ?? ''} data-flow-emphasized={emphasis.edgeIds.has(path.edge.id) || undefined} opacity={emphasis.edgeIds.size && !emphasis.edgeIds.has(path.edge.id) ? explicitPathEdgeIds?.has(path.edge.id) ? .7 : .18 : undefined}>
         <path d={path.svgPath} fill="none" stroke={path.color} strokeWidth={path.selected ? 2.6 : graph.view === 'data-flow' && (location?.depth ?? 1) > 1 ? 1.9 : 1.2} opacity={path.selected ? 1 : graph.view === 'architecture-map' ? .7 : graph.view === 'data-flow' && (location?.depth ?? 1) > 1 ? .85 : .4} markerEnd={`url(#flow-arrow-${path.color.slice(1)})`} />
+        {graph.view === 'architecture-map' && (path.edge.kind.startsWith('flow-') || emphasis.edgeIds.has(path.edge.id)) && path.points.length > 0 && <text x={path.points[Math.floor(path.points.length/2)]!.x} y={path.points[Math.floor(path.points.length/2)]!.y-7} textAnchor="middle" fill={path.color} fontSize={10} stroke="#09110e" strokeWidth={4} paintOrder="stroke">{semanticRelationLabel(path.edge, graph.view)}</text>}
       </g>)}</g>
       <SvgFlowParticles paths={particlePaths} scale={camera.scale} enabled={motion.enabled} visible={motion.visible} reduced={motion.reduced} />
     </g>

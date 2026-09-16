@@ -11,7 +11,7 @@ export function semanticAggregationInput(graph: SemanticGraph, positions: readon
     const node = point.node, owner = explorer?.owners.get(node.id), scope = owner ? explorer?.scopes.get(owner.scopeId) : undefined;
     if (node.architecture) {
       const arch = node.architecture;
-      const membership = node.attributes.architectureRequestGroup ? node.id : arch.request ? `${arch.request.ownerId}:${arch.request.kind}` : arch.parentId ?? 'project';
+      const membership = node.attributes.architectureRequestGroup || node.attributes.unifiedFlow ? node.id : arch.request ? `${arch.request.ownerId}:${arch.request.kind}` : arch.parentId ?? 'project';
       return { id: node.id, x: point.x, y: point.y, z: point.z, category: `${architectureKindLabels[arch.kind]} · ${confidenceLabels[node.confidence]}`, parentGroups: [],
         group: identity({ id: JSON.stringify(['architecture', membership, arch.kind, [...arch.environments].sort(), node.confidence]),
           label: `${scope?.label ?? node.group} · ${architectureKindLabels[arch.kind]} · ${arch.environments.filter(env => !env.startsWith('except:')).join(' / ') || '共通・環境未指定'}`, minimumMembers: 8 }) };

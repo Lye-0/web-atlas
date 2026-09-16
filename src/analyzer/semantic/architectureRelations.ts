@@ -1,6 +1,10 @@
 import type { SemanticEdge, SemanticRelationSource } from './types';
 
 const labels: Record<string, string> = {
+  'flow-input': '入力として使う', 'flow-starts': '起動する指定', 'flow-deploys': '公開する指定',
+  'flow-generates': '生成する指定', 'flow-applies': 'DB変更を適用する指定', 'flow-serves': 'アプリのコードを配信',
+  'flow-configures': '実行構成のコード', 'flow-invokes': 'scriptの呼出記述', 'flow-artifact': '同じ成果物パス',
+  'flow-precedes': '条件付きの後続操作',
   'declaration-dependency': '依存として宣言', 'code-reference': 'コードから参照', calls: '処理を呼び出す',
   callback: 'コールバックとして渡す', handles: '担当する処理', 'registers-event': 'イベント処理を登録',
   'http-request': 'HTTPリクエストを送る', message: 'メッセージを送る', 'data-operation': 'リソースへの操作を要求',
@@ -18,6 +22,7 @@ const labels: Record<string, string> = {
   'delivery-origin': '配信元のoriginを指定',
 };
 export function architectureRelationLabel(edge: SemanticRelationSource) {
+  if (edge.kind === 'flow-precedes' || edge.kind === 'flow-invokes') return edge.label;
   return labels[edge.kind] ?? '関係種別未判定';
 }
 

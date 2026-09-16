@@ -967,6 +967,7 @@ function commandNode(
     evidenceIds,
     metadata: {
       commandType: fragment.kind,
+      ...(fragment.workingDirectory ? { workingDirectory: fragment.workingDirectory } : {}),
       ...(fragment.operator ? { operator: fragment.operator } : {}),
       ...(fragment.packageSelector ? { packageSelector: fragment.packageSelector } : {}),
       ...(fragment.scriptName ? { scriptName: fragment.scriptName } : {}),

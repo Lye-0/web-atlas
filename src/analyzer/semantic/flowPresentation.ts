@@ -30,6 +30,20 @@ export function layoutSemanticFlow(graph: SemanticGraph, mode: '2d' | '3d', expl
   if (mode === '3d') return layoutSemanticCloud(graph, explorer);
   if (graph.view === 'architecture-map' && graph.architectureView?.positions2d) return graph.nodes.map(node => ({ node, ...graph.architectureView!.positions2d!.get(node.id)! }));
   const depths = semanticDepths(graph);
+  if (graph.view === 'architecture-map' && graph.nodes.some(node => node.attributes.unifiedFlow)) {
+    const groups = new Map<string, Map<number, SemanticNode[]>>();
+    for (const node of graph.nodes) {
+      const environment = String(node.attributes.flowEnvironment ?? '共通・環境未特定'), levels = groups.get(environment) ?? new Map<number, SemanticNode[]>();
+      const depth = depths.get(node.id) ?? 0, list = levels.get(depth) ?? []; list.push(node); levels.set(depth, list); groups.set(environment, levels);
+    }
+    const points: SemanticPosition[] = []; let y = 0;
+    for (const [, levels] of [...groups].sort(([a],[b]) => a.localeCompare(b))) {
+      let rows = 1;
+      for (const [depth,nodes] of levels) { nodes.sort((a,b)=>a.id.localeCompare(b.id)); rows=Math.max(rows,nodes.length); nodes.forEach((node,index)=>points.push({node,x:depth*360,y:y+index*156,z:0})); }
+      y += rows*156+110;
+    }
+    return points;
+  }
   if (graph.view === 'architecture-map') {
     const levels = new Map<number, SemanticNode[]>();
     for (const node of graph.nodes) { const depth = depths.get(node.id) ?? 0, members = levels.get(depth) ?? []; members.push(node); levels.set(depth, members); }

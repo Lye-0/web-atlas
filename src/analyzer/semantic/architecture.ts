@@ -11,7 +11,7 @@ import { parseManifest,type ManifestProject } from '../manifestAdapters';
 import { responsibility, semanticLanguage } from './languages';
 import type { SemanticAnalysis, SemanticConfidence, SemanticEdge, SemanticEvidence, SemanticGraph, SemanticInput, SemanticNode } from './types';
 
-export type ArchitectureKind = 'application' | 'component' | 'shared-code' | 'code-package' | 'resource' | 'external-service' | 'external-program' | 'unresolved';
+export type ArchitectureKind = 'application' | 'component' | 'shared-code' | 'code-package' | 'resource' | 'external-service' | 'external-program' | 'unresolved' | 'tool-operation' | 'artifact' | 'execution-config' | 'code-definition';
 export interface ArchitectureRole { label: string; confidence: SemanticConfidence; reason: string; evidence: SemanticEvidence[] }
 export interface ArchitectureEntity {
   kind: ArchitectureKind; parentId?: string; ownerPath?: string; entryPaths: string[];

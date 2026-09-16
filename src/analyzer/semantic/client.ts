@@ -1,11 +1,12 @@
 import { localDevelopmentCliIds } from '../localDevelopmentCli';
+import { architectureCommands } from './architectureCommands';
 import type { AnalyzerProjectStore } from '../types';
 import type { SemanticAnalysis, SemanticInput } from './types';
 import{stacks}from'../../data';
 const stackMetadata=Object.fromEntries(stacks.map(stack=>[stack.id,{name:stack.name,aliases:stack.aliases??[]}]));
 
 export function semanticInput(store: AnalyzerProjectStore): SemanticInput {
-  return { sources: store.semanticSources ?? store.sources,stackMetadata,
+  return { sources: store.semanticSources ?? store.sources,stackMetadata, commands: architectureCommands(store),
     developmentTools: store.facts.flatMap(fact => fact.kind === 'technology' && localDevelopmentCliIds.some(id => id === fact.dictionaryStackId) ? store.evidence.filter(item => fact.evidenceIds.includes(item.id)).map(item => {
       const range = item.highlightRanges[0], line = range?.start.line ?? item.contextStartLine, endLine = range?.end.line ?? line;
       const lines = (store.sources[item.filePath] ?? '').split('\n');

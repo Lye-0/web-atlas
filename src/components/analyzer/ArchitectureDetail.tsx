@@ -99,11 +99,19 @@ export function ArchitectureDetail({ node, edge, graph, visible, sources, store,
       <dl className="analyzer-metadata-list architecture-summary">
         <div><dt>現在地との関係</dt><dd>{scopeRole === 'inside' ? '現在地の内部' : scopeRole === 'direct' ? '外側の接続相手' : scopeRole === 'surrounding' ? '周辺' : visible.architectureView?.scopeId ? '現在の図の外側' : 'プロジェクト全体'}</dd></div>
         <div><dt>種類</dt><dd>{arch.request ? '個別要求（接続先未特定）' : architectureKindLabels[arch.kind]}</dd></div>
-        <div><dt>役割</dt><dd>{arch.request ? `${({ http: 'HTTP要求のコードを確認。接続先は未特定', process: '起動要求のコードを確認。起動先は未特定', auth: '認証SDKの使用・設定コードを確認。プロジェクトは未特定' })[arch.request.kind]}` : arch.codeUsage?.reason ?? (arch.roles.length ? `${arch.roles.slice(0, 2).map(role => role.label).join(' / ')}${arch.roles.length > 2 ? ` ほか${arch.roles.length - 2}役割` : ''}（${arch.roles.every(role => role.confidence === 'source') ? 'ソース・設定で確認' : '推定を含む'}）` : '具体的な役割は未判定')}</dd></div>
+        <div><dt>役割</dt><dd>{arch.request ? `${({ http: 'HTTP要求のコードを確認。接続先は未特定', process: '起動要求のコードを確認。起動先は未特定', auth: '認証SDKの使用・設定コードを確認。プロジェクトは未特定' })[arch.request.kind]}` : (arch.roles.length ? `${arch.roles.slice(0, 2).map(role => role.label).join(' / ')}${arch.roles.length > 2 ? ` ほか${arch.roles.length - 2}役割` : ''}（${arch.roles.every(role => role.confidence === 'source') ? 'ソース・設定で確認' : '推定を含む'}）` : arch.codeUsage ? 'コードを提供する構成。プロジェクト固有の担当は未判定' : '具体的な役割は未判定')}</dd></div>
         {requestOrigin ? <div><dt>要求元</dt><dd>{requestOrigin.label.replace(/^要求元：/, '')}<small className="architecture-count-note">要求を書いた側です。接続先の所属は未特定です。</small>{requestOrigin.sources.length > 1 && <Disclosure title="要求元の内訳">{() => <>{requestOrigin.sources.map(source => <p key={source.id}>{otherButton(source.id, `request-${source.id}`)}</p>)}{requestOrigin.unknown && <p>要求元未確認の要求も含みます。</p>}</>}</Disclosure>}</dd></div>
           : <div><dt>所属</dt><dd>{arch.parentId ? byId.get(arch.parentId)?.label : arch.ownerPath || (['application', 'component', 'shared-code', 'code-package'].includes(arch.kind) ? 'プロジェクト' : '外部・設定上の対象')}</dd></div>}
         <div><dt>環境・設定</dt><dd>{arch.context.join(' / ') || '実行先未判定'} · {architectureEnvironmentLabel(arch.environments)}</dd></div>
       </dl>
+      {node.attributes.unifiedFlow && <section className="architecture-context-note" aria-label="操作と対応の確認状態">
+        <strong>{arch.kind === 'tool-operation' ? '操作の記述・実行未観測' : '設定上の対応・稼働未観測'}</strong>
+        {node.attributes.command && <p><code style={{overflowWrap:'anywhere',whiteSpace:'pre-wrap'}}>{String(node.attributes.command)}</code></p>}
+        <p>対象環境：{architectureEnvironmentLabel(arch.environments)} · 実行場所：{String(node.attributes.executionPlace ?? '未確認').replace('unconfirmed','未確認')}</p>
+        {node.attributes.targetPlace && <p>操作先：{String(node.attributes.targetPlace).replace('unconfirmed','未確認')}</p>}
+        {node.attributes.resolution && <p>{String(node.attributes.resolution)}</p>}
+        {node.attributes.artifactState && <p>{String(node.attributes.artifactState)}</p>}
+      </section>}
       <div className="architecture-summary-partners"><strong>主な相手</strong>{partners.slice(0, 3).map(partnerEntry)}{partners.length > 3 && <small>ほか{partners.length - 3}相手。つながる相手で確認できます。</small>}{!partners.length && <p>現在の表示条件で、つながる相手はありません。</p>}</div>
       {(canOpen ? canOpen(node.id) : children.length > 0) && <button className="architecture-open-action" onClick={() => onOpen(node.id)}>{outside ? 'この構成を開く' : '内部を開く'}</button>}
       <Disclosure title="専門Viewで調べる">{() => <><SemanticLinks analysis={analysis} node={node} onJump={onJump} /><ArchitectureExpertLinks node={node} store={store} /></>}</Disclosure>

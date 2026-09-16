@@ -103,6 +103,7 @@ export function semanticNodeDisplay(node: SemanticNode): SemanticNodeDisplay {
     const scopeRole = node.attributes.architectureScopeRole;
     const scope = scopeRole === 'inside' || scopeRole === 'direct' || scopeRole === 'surrounding' ? scopeRole : undefined;
     const location = [node.attributes.architectureContext ? '表示範囲外・周辺概要' : '',
+      node.attributes.flowEnvironment ? `${node.attributes.flowEnvironment}${node.attributes.executionPlace ? ` · 実行場所:${node.attributes.executionPlace === 'unconfirmed' ? '未確認' : node.attributes.executionPlace}` : ''}` : '',
       identity || ['resource', 'external-service'].includes(arch.kind) ? architectureEnvironmentLabel(arch.environments) : arch.context.join(' / '),
       binding ? `${binding}${identity?.identifier ? ` · ID:${identity.identifier.slice(0, 8)}` : ' · 同一性未確認'}` : arch.request || node.attributes.architectureRequestGroup ? '' : arch.parentId ? node.group : arch.ownerPath,
       Number(node.attributes.architectureInternalCount) > 0 ? `内部関係 ${node.attributes.architectureInternalCount}件` : '',

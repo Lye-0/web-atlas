@@ -29,7 +29,7 @@ describe('local development CLI identity and evidence', () => {
     expect(command.nodes.some(node => node.type === 'command' && node.metadata.dictionaryStackId === fixture.stackId && node.metadata.commandPurpose === 'local')).toBe(true);
     expect(command.edges.some(edge => edge.targetId === cli.id && edge.kind === 'uses')).toBe(true);
     const analysis = await analyzeSemanticSources(semanticInput(store), testLanguage, undefined, testParser);
-    expect(analysis.architecture!.nodes.some(node => node.attributes.dictionaryStackId === fixture.stackId)).toBe(false);
+    expect(analysis.architecture!.nodes.filter(node => node.attributes.dictionaryStackId === fixture.stackId).every(node => node.architecture?.kind === 'tool-operation')).toBe(true);
     const tools = analysis.architecture!.nodes.flatMap(node => node.architecture?.technologies ?? []).filter(tool => tool.name === fixture.stackId);
     expect(tools.some(tool => tool.usage === 'support' && tool.evidence.some(item => item.path === 'package.json'))).toBe(true);
     expect(store.relations.some(relation => relation.kind === 'depends-on' && relation.targetId === cli.id && relation.metadata.packageName === fixture.packageName)).toBe(true);
