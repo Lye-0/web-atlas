@@ -54,6 +54,16 @@
 - files: `src/analyzer/providerAdapters.ts`, `src/analyzer/yamlCommandOffsets.ts`, `src/analyzer/commandParser.ts` …
 - memory: `agent-knowledge/entries/2026-09-12-ci-command-source-offsets-b84d19.md`
 
+## analyzer-evidence
+
+### 呼出チェーンは開始位置だけで要求のASTを対応付けない
+- id: `rm-20260916-http-call-range`
+- type: `failure`
+- maturity: `candidate`
+- tags: `http`, `source-range`, `callback`, `binding`
+- files: `src/analyzer/semantic/architecture.ts`, `src/analyzer/semantic/architectureSyntax.ts`, `src/analyzer/semantic/httpFetchBinding.ts` …
+- memory: `agent-knowledge/entries/2026-09-16-http-call-range-7ea21c.md`
+
 ## analyzer-flow
 
 ### Flowの共有ホバーは入力元と表示寿命を区別する
@@ -173,6 +183,14 @@
 - tags: `scope`, `endpoint`, `identity`, `3d`
 - files: `src/analyzer/graph3DRegions.ts`, `src/components/analyzer/AnalyzerGraph3DStage.tsx`, `src/components/analyzer/graph3DLabels.test.ts` …
 - memory: `agent-knowledge/entries/2026-09-12-scope-render-port-identity-dc2a11.md`
+
+### Canvasの非同期初期化は破棄済みDOMへの接続を試み得る
+- id: `rm-20260916-canvas-detached-connect`
+- type: `failure`
+- maturity: `candidate`
+- tags: `r3f`, `lifecycle`, `canvas`
+- files: `src/components/analyzer/semanticCanvasLifecycle.ts`, `src/components/analyzer/semanticCanvasLifecycle.test.ts`, `src/components/analyzer/SemanticFlow3D.tsx`
+- memory: `agent-knowledge/entries/2026-09-16-canvas-detached-connect-05c4d7.md`
 
 ## analyzer-session
 
