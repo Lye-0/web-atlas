@@ -81,6 +81,7 @@ describe('dictionary data', () => {
       rootCategoryIds: [...group.rootCategoryIds],
     }));
     duplicatedOrderGroups[2].order = duplicatedOrderGroups[0].order;
+    duplicatedOrderGroups[2].side = duplicatedOrderGroups[0].side;
     expect(validateDictionaryVisualGroups(duplicatedOrderGroups, categories)).toContain(
       `Visual group order is duplicated on ${duplicatedOrderGroups[2].side}: ${duplicatedOrderGroups[2].order}`,
     );

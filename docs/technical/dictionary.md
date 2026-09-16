@@ -143,4 +143,6 @@ MapはResizeObserverでコンテナの実幅を把握し、CSS container query�
 
 採用形式とテストの対応は[94件受入台帳](../plans/2026-09-12-dictionary-analyzer-acceptance.md)を参照。
 
+2026-09-16: 2列Mapは左に「UIとアプリケーション→データとストレージ」、右に「言語と実行基盤→品質と検証→開発と配信」を置く。大カテゴリを分割せず下端の差を抑え、配信を右列の最下段とする。1列表示と移動ボタンの順序は言語→UI→データ→品質→配信を維持する。147技術時点、viewport 1280/1440/1920pxで下端差は約931pxから約383pxへ減少。
+
 2026-09-14追加の5 CLIはlocalDevelopmentStacksで定義し、「開発と配信」のルートカテゴリlocal-development-cliへ配置する。npm識別子はCLIへ対応し、サービス・SDK・runtime・Emulator Suiteと区別する。説明と相互リンク、検証結果は[CLI実装記録](../plans/2026-09-14-local-development-cli-review.md)を参照。
