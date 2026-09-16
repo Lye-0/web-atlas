@@ -3,6 +3,7 @@ import { layoutSemanticCloud } from './flowCloud';
 import { layoutSemanticFlow } from './flowPresentation';
 import { architectureRelationClass, architectureRelationCounts } from './architectureRelations';
 import { uniqueArchitectureEvidence } from './architectureEvidence';
+import { layoutArchitectureRelations } from './architectureLayout';
 
 const id = (...parts: string[]) => `architecture:${JSON.stringify(parts)}`;
 type Point = { x: number; y: number; z: number };
@@ -70,6 +71,14 @@ function architectureIndex(model: SemanticGraph): ArchitectureIndex {
     const anchor = anchors.get(owner) ?? point;
     // Keep local detail spacing, with a compact and invariant frame of roots.
     positions.set(node.id, { x: point.x - anchor.x * .6, y: point.y - anchor.y * .6, z: point.z - anchor.z * .6 });
+  }
+  if(model.nodes.some(node=>node.attributes.unifiedFlow)){
+    const roots=model.nodes.filter(node=>!node.architecture?.parentId&&!node.architecture?.request),rootIds=new Set(roots.map(n=>n.id));
+    const owners=new Map(model.nodes.map(n=>[n.id,ancestors.get(n.id)!.at(-1)!]));
+    const edges=aggregateArchitectureEdges(model.edges,owners).filter(e=>rootIds.has(e.source)&&rootIds.has(e.target));
+    const anchors=new Map(layoutArchitectureRelations({view:'architecture-map',nodes:roots,edges}).map(p=>[p.node.id,{x:p.x*.48,y:p.y*.48,z:(positions.get(p.node.id)?.z??0)*.35}]));
+    const previous=new Map(positions);
+    for(const node of model.nodes){const owner=node.architecture?.request?.ownerId??ancestors.get(node.id)!.at(-1)!,base=anchors.get(owner),old=previous.get(owner),point=previous.get(node.id);if(base&&old&&point)positions.set(node.id,{x:base.x+(point.x-old.x)*.55,y:base.y+(point.y-old.y)*.55,z:base.z+(point.z-old.z)*.55});}
   }
   const result = { byId, ancestors, positions, scopes: new Map() }; indices.set(model, result); return result;
 }

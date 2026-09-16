@@ -7,6 +7,7 @@ export interface ArchitectureCommand {
   id: string; scriptId: string; label: string; path: string; directory: string;
   scriptName: string; sourceScriptId?: string; sourceCommandId?: string;
   operator?: string;
+  invocationLabel?: string;
   argv: string[]; workingDirectory?: string; evidence: SemanticEvidence[];
   targets: string[]; calls: {target:string; id:string; operator?:string; parallel:boolean; evidence:SemanticEvidence[]}[];
 }
@@ -42,7 +43,7 @@ export function architectureCommands(store: AnalyzerProjectStore): ArchitectureC
     for(const call of wrapper.calls) {
       const children=[...output.values()].filter(c=>c.scriptId===call.target);if(!children.length)continue;
       const context=`${call.target}:invocation:${wrapper.id}`;
-      for(const child of children) output.set(`${child.id}:invocation:${wrapper.id}`,{...child,id:`${child.id}:invocation:${wrapper.id}`,sourceCommandId:child.id,sourceScriptId:child.scriptId,scriptId:context,argv:[...child.argv,...extra],label:`${child.label} ${extra.join(' ')}`,evidence:[...child.evidence,...call.evidence]});
+      for(const child of children) output.set(`${child.id}:invocation:${wrapper.id}`,{...child,id:`${child.id}:invocation:${wrapper.id}`,sourceCommandId:child.id,sourceScriptId:child.scriptId,scriptId:context,invocationLabel:`${wrapper.directory||'root'} / ${wrapper.scriptName}`,argv:[...child.argv,...extra],label:`${child.label} ${extra.join(' ')}`,evidence:[...child.evidence,...call.evidence]});
       call.target=context;
     }
   }

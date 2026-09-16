@@ -53,8 +53,9 @@ for (const name of ['git-lines', 'vehicle-management', 'web-atlas']) it.skipIf(!
     expect(root.nodes.some(n => n.label === 'git（起動先の既定値）' && n.confidence === 'inferred')).toBe(true);
     const host = model.nodes.find(n => n.architecture?.context.includes('Extension Host') && n.architecture.kind === 'application')!;
     const webview = model.nodes.find(n => n.architecture?.context.includes('Webview / ブラウザ') && n.architecture.kind === 'application')!;
-    const partners = architecturePartners(root.edges, host.id);
+    const partners = architecturePartners(root.edges.filter(edge=>!edge.details?.structural), host.id);
     expect(partners).toHaveLength(2);
+    expect(root.edges.filter(edge=>edge.source===host.id&&edge.kind==='flow-definition').every(edge=>edge.details?.structural)).toBe(true);
     expect(partners.find(partner => partner.otherId === webview.id)?.direction).toBe('相手から・相手への関係あり');
     expect(host.architecture?.technologies?.find(t => t.name === 'react')?.usage).toBe('declared');
     expect(webview.architecture?.technologies?.find(t => t.name === 'react')?.usage).toBe('source');

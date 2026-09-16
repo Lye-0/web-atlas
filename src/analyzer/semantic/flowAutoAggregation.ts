@@ -3,6 +3,7 @@ import type { SemanticPosition } from './presentation';
 import type { SemanticExplorerModel } from './semanticExplorer';
 import { confidenceLabels, kindLabels, type SemanticGraph, type SemanticNode, type SemanticEdge } from './types';
 import { architectureKindLabels } from './architectureMetadata';
+import { architectureEnvironmentContext } from './architectureContext';
 
 export function semanticAggregationInput(graph: SemanticGraph, positions: readonly SemanticPosition[], explorer?: SemanticExplorerModel) {
   const identities = new Map<string, AggregationGroupIdentity>();
@@ -14,7 +15,7 @@ export function semanticAggregationInput(graph: SemanticGraph, positions: readon
       const membership = node.attributes.architectureRequestGroup || node.attributes.unifiedFlow ? node.id : arch.request ? `${arch.request.ownerId}:${arch.request.kind}` : arch.parentId ?? 'project';
       return { id: node.id, x: point.x, y: point.y, z: point.z, category: `${architectureKindLabels[arch.kind]} · ${confidenceLabels[node.confidence]}`, parentGroups: [],
         group: identity({ id: JSON.stringify(['architecture', membership, arch.kind, [...arch.environments].sort(), node.confidence]),
-          label: `${scope?.label ?? node.group} · ${architectureKindLabels[arch.kind]} · ${arch.environments.filter(env => !env.startsWith('except:')).join(' / ') || '共通・環境未指定'}`, minimumMembers: 8 }) };
+          label: `${scope?.label ?? node.group} · ${architectureKindLabels[arch.kind]} · ${architectureEnvironmentContext(node).label}`, minimumMembers: 8 }) };
     }
     const unresolved = !node.architecture && node.kind === 'external' && node.confidence === 'unresolved';
     const membership = unresolved ? node.path ?? node.evidence[0]?.path ?? '呼び出し箇所の所属未判定' : scope?.id ?? node.path ?? node.group;

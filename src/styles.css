@@ -5193,3 +5193,5 @@ summary:focus-visible {
   .map-visual-group { padding-top: 10px; }
   .map-mobile-group-item { --map-group-branch-offset: calc(.784rem + 10px); }
 }
+.architecture-relation-readout { padding: 8px 12px; border-left: 2px solid var(--accent-strong); background: var(--surface); font-size: .85rem; overflow-wrap: anywhere; }
+.architecture-relation-readout small { display: block; margin-top: 4px; opacity: .8; }

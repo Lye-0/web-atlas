@@ -1,3 +1,4 @@
+import { architectureEnvironmentContext, architectureUsageContext } from '../../analyzer/semantic/architectureContext';
 import { architectureRequestTitle } from './architectureRequestPresentation';
 import { kindLabels, type SemanticNode } from '../../analyzer/semantic/types';
 import { architectureEnvironmentLabel, architectureKindLabels } from '../../analyzer/semantic/architectureMetadata';
@@ -102,17 +103,16 @@ export function semanticNodeDisplay(node: SemanticNode): SemanticNodeDisplay {
     const binding = identity?.configurations[0]?.binding;
     const scopeRole = node.attributes.architectureScopeRole;
     const scope = scopeRole === 'inside' || scopeRole === 'direct' || scopeRole === 'surrounding' ? scopeRole : undefined;
-    const location = [node.attributes.architectureContext ? '表示範囲外・周辺概要' : '',
-      node.attributes.flowEnvironment ? `${node.attributes.flowEnvironment}${node.attributes.executionPlace ? ` · 実行場所:${node.attributes.executionPlace === 'unconfirmed' ? '未確認' : node.attributes.executionPlace}` : ''}` : '',
-      identity || ['resource', 'external-service'].includes(arch.kind) ? architectureEnvironmentLabel(arch.environments) : arch.context.join(' / '),
-      binding ? `${binding}${identity?.identifier ? ` · ID:${identity.identifier.slice(0, 8)}` : ' · 同一性未確認'}` : arch.request || node.attributes.architectureRequestGroup ? '' : arch.parentId ? node.group : arch.ownerPath,
-      Number(node.attributes.architectureInternalCount) > 0 ? `内部関係 ${node.attributes.architectureInternalCount}件` : '',
-    ].filter(Boolean).join(' · ') || node.path || '構成要素';
-    const kind = node.attributes.architectureRequestGroup ? '表示上の集合' : arch.request ? '接続先未特定' : architectureKindLabels[arch.kind];
+    const environment = architectureEnvironmentContext(node);
+    const usage = architectureUsageContext(node);
+    const state = node.confidence === 'observed' ? '実測' : node.confidence === 'inferred' ? '推定' : identity?.status === 'unconfirmed' ? '同一性未確認' : '';
+    const location = [usage || arch.ownerPath || (arch.request ? node.path : ''), environment.label,
+      arch.kind !== 'tool-operation' && ['local','cloud'].includes(String(node.attributes.executionPlace)) ? String(node.attributes.executionPlace) : '', state].filter(Boolean).join(' · ');
+    const kind = arch.kind === 'application' ? '論理アプリ' : node.attributes.architectureRequestGroup ? '表示上の集合' : arch.request ? '接続先未特定' : architectureKindLabels[arch.kind];
     const dataRole = scope ? `${({ inside: '内部', direct: '外側の接続相手', surrounding: '周辺' })[scope]} · 種類：${kind}` : node.attributes.architectureContext ? `表示範囲外 · ${kind}` : kind;
-    const disambiguation = identity ? `${architectureEnvironmentLabel(arch.environments)}${binding ? ` · ${binding}` : ''}${identity.identifier ? ` · ID:${identity.identifier.length > 10 ? `${identity.identifier.slice(0, 4)}…${identity.identifier.slice(-4)}` : identity.identifier}` : ' · 同一性未確認'}`
+    const disambiguation = usage ? [usage,environment.meaning === 'explicit' || environment.meaning === 'default' ? environment.label : ''].filter(Boolean).join(' · ') : identity ? `${environment.label}${binding ? ` · ${binding}` : ''}${identity.identifier ? ` · ID:${identity.identifier.length > 10 ? `${identity.identifier.slice(0, 4)}…${identity.identifier.slice(-4)}` : identity.identifier}` : ' · 同一性未確認'}`
       : arch.request ? node.evidence[0] ? `${node.evidence[0].path.split(/[\\/]/).at(-1)}:${node.evidence[0].line} · 範囲 ${node.evidence[0].start}–${node.evidence[0].end}` : node.path ?? 'ソース箇所未確認'
-        : Number(node.attributes.architectureInternalCount) > 0 ? `内部関係 ${node.attributes.architectureInternalCount}件` : undefined;
+        : [arch.ownerPath,environment.label,state].filter(Boolean).join(' · ');
     return { title: architectureRequestTitle(node), location, dataRole, disambiguation, scopeRole: scope, tooltip: `${node.label}\n${dataRole}\n${location}\n${identity?.identifier ? `識別子: ${identity.identifier}\n` : ''}${arch.request?.expression ?? node.evidence[0]?.description ?? ''}` };
   }
   const initializer = node.kind === 'function' && node.attributes.initializer === true;
@@ -171,7 +171,7 @@ export function semanticNodeDisplays(nodes: Iterable<SemanticNode>, contextNodes
     const members = collisions.get(key) ?? []; members.push(node); collisions.set(key, members);
   }
   for (const members of collisions.values()) if (members.length > 1) [...members].sort((a, b) => a.id.localeCompare(b.id)).forEach((node, index) => {
-    displays.get(node.id)!.location += ` · 対象 ${index + 1}`;
+    if (node.architecture?.kind !== 'tool-operation') displays.get(node.id)!.location += ` · 対象 ${index + 1}`;
   });
   const names = new Map<string, SemanticNode[]>();
   for (const node of items) {
@@ -187,6 +187,7 @@ export function semanticNodeDisplays(nodes: Iterable<SemanticNode>, contextNodes
         const display = displays.get(node.id)!;
         const source = node.evidence[0];
         if (node.architecture?.identity && display.disambiguation && identifiers.get(display.disambiguation) === 1) continue;
+        if (node.architecture?.kind === 'tool-operation' && display.disambiguation && identifiers.get(display.disambiguation) === 1) continue;
         const sourceLocation = source ? `${source.path}:${source.line}` : node.path;
         display.disambiguation = node.architecture?.request && source ? `${architectureRequestSources([node], architectureNodes).label} · 箇所 ${source.start}–${source.end} · ${source.path}:${source.line}`
           : `${display.disambiguation ?? display.location}${sourceLocation ? ` · ${sourceLocation}` : ''}`;

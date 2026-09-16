@@ -5,6 +5,7 @@ const labels: Record<string, string> = {
   'flow-generates': '生成する指定', 'flow-applies': 'DB変更を適用する指定', 'flow-serves': 'アプリのコードを配信',
   'flow-configures': '実行構成のコード', 'flow-invokes': 'scriptの呼出記述', 'flow-artifact': '同じ成果物パス',
   'flow-precedes': '条件付きの後続操作',
+  'flow-definition': '論理定義と構成の対応',
   'declaration-dependency': '依存として宣言', 'code-reference': 'コードから参照', calls: '処理を呼び出す',
   callback: 'コールバックとして渡す', handles: '担当する処理', 'registers-event': 'イベント処理を登録',
   'http-request': 'HTTPリクエストを送る', message: 'メッセージを送る', 'data-operation': 'リソースへの操作を要求',
@@ -21,9 +22,16 @@ const labels: Record<string, string> = {
   'cdn-domain': 'CDNの配信ドメインを指定',
   'delivery-origin': '配信元のoriginを指定',
 };
-export function architectureRelationLabel(edge: SemanticRelationSource) {
-  if (edge.kind === 'flow-precedes' || edge.kind === 'flow-invokes') return edge.label;
-  return labels[edge.kind] ?? '関係種別未判定';
+const relationLabels = new WeakMap<SemanticRelationSource, string>();
+export function architectureRelationLabel(edge: SemanticRelationSource):string {
+  const cached=relationLabels.get(edge);if(cached)return cached;
+  if ((edge as SemanticEdge).provenance?.edges.length) {
+    const kinds=[...new Set(architectureRelationOriginals([edge]).map(original=>original.kind))];
+    if(kinds.length>1){relationLabels.set(edge,'複数種別の関係');return '複数種別の関係';}
+    if(kinds.length===1&&!labels[edge.kind]){const label=labels[kinds[0]!]??'関係種別未判定';relationLabels.set(edge,label);return label;}
+  }
+  const label=edge.kind === 'flow-precedes' || edge.kind === 'flow-invokes'?edge.label:labels[edge.kind] ?? '関係種別未判定';
+  relationLabels.set(edge,label);return label;
 }
 
 export function architectureRelationClass(edge: SemanticEdge, source: string, target: string): 'connection' | 'internal' | 'self' {

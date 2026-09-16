@@ -153,6 +153,7 @@ export function explorerChildren(model: SemanticExplorerModel, location: Explore
 function explorerAdjacency(graph: SemanticGraph) {
   const incoming = new Map<string, SemanticEdge[]>(), outgoing = new Map<string, SemanticEdge[]>();
   for (const edge of graph.edges) {
+    if (edge.details?.structural) continue;
     const before = incoming.get(edge.target) ?? []; before.push(edge); incoming.set(edge.target, before);
     const after = outgoing.get(edge.source) ?? []; after.push(edge); outgoing.set(edge.source, after);
   }

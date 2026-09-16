@@ -1,6 +1,7 @@
 import { compareAnalyzerSearchResults, matchAnalyzerSearch, normalizeAnalyzerQuery, type AnalyzerSearchDocument } from '../search';
 import type { SemanticNode } from './types';
 import { architectureKindLabels } from './architectureMetadata';
+import { architectureUsageContext } from './architectureContext';
 
 /** Only recognizable source names, explicit aliases, paths and ownership are searchable. */
 export function semanticSearchDocument(node: SemanticNode): AnalyzerSearchDocument {
@@ -11,7 +12,7 @@ export function semanticSearchDocument(node: SemanticNode): AnalyzerSearchDocume
     names: [node.label, ...(node.data ? [node.data.expression] : []), ...values(['name', 'qualifiedName', 'className', 'callee', 'event', 'command', 'serviceName', 'binding', 'aliases','technologyName','dictionaryStackId']),
       ...(node.architecture ? [architectureKindLabels[node.architecture.kind], node.architecture.request?.expression ?? '', node.architecture.identity?.identifier ?? '', ...node.architecture.identity?.configurations.map(setting => setting.binding ?? '') ?? []] : [])],
     paths: [node.path ?? '', ...values(['entryPath']), ...(node.architecture?.files ?? []), ...(node.architecture?.identity?.configurations.map(setting => setting.path) ?? [])],
-    groups: [node.group, ...values(['ownerName', 'runtimeName']), ...(node.architecture?.environments ?? [])],
+    groups: [node.group, ...values(['ownerName', 'runtimeName','scriptName','invocationLabel','workingDirectory','configurationPath']), ...(node.architecture?.environments ?? []),architectureUsageContext(node)],
     fields: [...(node.fields ?? []), ...(node.model?.choices?.flatMap(choice => choice.fields ?? []) ?? [])].flatMap(field => [field.name, field.type]),
   };
 }
@@ -19,7 +20,7 @@ export function semanticSearchDocument(node: SemanticNode): AnalyzerSearchDocume
 export function searchSemanticNodes(nodes: readonly SemanticNode[], query: string) {
   return nodes.flatMap(node => {
     const match = matchAnalyzerSearch(semanticSearchDocument(node), query);
-    return match ? [{ node, id: node.id, label: node.label, path: node.path, match }] : [];
+    return match ? [{ node, id: node.id, label: node.label, path: architectureUsageContext(node) || node.path, match }] : [];
   }).sort(compareAnalyzerSearchResults);
 }
 

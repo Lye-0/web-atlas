@@ -11,6 +11,7 @@ import { buildArchitectureModel } from './architecture';
 import { refineStackSemantics } from './stackSemantics';
 import { addStackArchitecture } from './stackArchitecture';
 import { addArchitectureToolFlows } from './architectureToolFlows';
+import { finalizeArchitectureContext } from './architectureContext';
 
 const functionTypes = new Set(['function_declaration', 'function_definition', 'function_expression', 'arrow_function', 'method_definition', 'method_declaration', 'constructor_declaration', 'function_item', 'method', 'singleton_method', 'local_function_statement', 'lambda_expression', 'function_literal', 'function_signature']);
 const modelTypes = new Set(['interface_declaration', 'type_alias_declaration', 'type_item', 'class_declaration', 'class_definition', 'class_specifier', 'class', 'struct_item', 'struct_specifier', 'type_spec', 'record_declaration', 'enum_declaration', 'enum_item', 'object_declaration', 'trait_item']);
@@ -449,6 +450,7 @@ export async function analyzeSemanticSources(input: SemanticInput, loadLanguage:
   analysis.architecture = buildArchitectureModel(input, analysis);
   addStackArchitecture(analysis.architecture, input, analysis);
   addArchitectureToolFlows(analysis.architecture, input);
+  finalizeArchitectureContext(analysis.architecture);
   analysis.stats.models = analysis.nodes.filter(node => node.kind === 'model' && !node.attributes.dataModelExcluded).length;
   analysis.stats.elapsedMs = Math.round(performance.now() - started);
   return analysis;

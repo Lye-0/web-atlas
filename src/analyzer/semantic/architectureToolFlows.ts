@@ -75,7 +75,7 @@ export function addArchitectureToolFlows(model:ArchitectureModel,input:SemanticI
     const place=a.includes('--remote')?'cloud':a.includes('--local')||purpose==='serve'||purpose==='start'?'local':'unconfirmed';
     const product=({firebase:'firebase-cli',vercel:'vercel-cli',netlify:'netlify-cli',supabase:'supabase-cli','drizzle-kit':'drizzle-orm'} as Record<string,string>)[tool!]??tool!;
     const name=tool==='drizzle-kit'?'Drizzle Kit':input.stackMetadata?.[product]?.name??tool!;
-    const op=add(key('operation',cmd.id),`${name}：${purposes[purpose]}`,'tool-operation',cmd.evidence,environment?[environment]:[],{sourceId:cmd.sourceCommandId??cmd.id,scriptId:cmd.sourceScriptId??cmd.scriptId,dictionaryStackId:product,purpose,executionPlace:'unconfirmed',targetPlace:place,command:cmd.label,ownerPath:unit.architecture?.ownerPath??'',resolution:'操作対象は未特定'});
+    const op=add(key('operation',cmd.id),`${name}：${purposes[purpose]}`,'tool-operation',cmd.evidence,environment?[environment]:[],{scriptName:cmd.scriptName,workingDirectory:cmd.workingDirectory??cmd.directory,invocationLabel:cmd.invocationLabel??'',usageArguments:cmd.argv.slice(1).join(' '),sourceId:cmd.sourceCommandId??cmd.id,scriptId:cmd.sourceScriptId??cmd.scriptId,dictionaryStackId:product,purpose,executionPlace:'unconfirmed',targetPlace:place,command:cmd.label,ownerPath:unit.architecture?.ownerPath??'',resolution:'操作対象は未特定'});
     operations.set(cmd.id,op);op.architecture!.roles=[{label:`${name}で${purposes[purpose]}する操作の記述`,confidence:'source',reason:'実際のコマンドと設定を照合。実行・成功は未観測',evidence:cmd.evidence}];op.architecture!.technologyNames=[product];op.architecture!.context=['静的コマンド・実行未観測'];if(tool==='vite'&&purpose==='serve'&&explicitEnvironment===undefined)op.attributes.defaultEnvironment='Vite devの既定mode=development';
     const cwd=cmd.workingDirectory??option(a,'--cwd','--workdir');const base=cwd===undefined?cmd.directory:staticPath(cmd.directory,cwd);
     if(!base||/[$`]/.test(environment))continue;
@@ -84,10 +84,13 @@ export function addArchitectureToolFlows(model:ArchitectureModel,input:SemanticI
     const paths=candidates.filter((p):p is string=>Boolean(p&&Object.hasOwn(input.sources,p)));
     if(explicit!==undefined&&paths.length!==1||paths.length>1)continue;
     const path=paths[0],settings=path?config(path):{}, evidence=uniqueArchitectureEvidence([...cmd.evidence,...(path?at(path,'操作対象・入出力の設定（実行未観測）'):[])]);
+    if(path)op.attributes.configurationPath=path;
     if(tool==='wrangler'){
       if(!path)continue;const selected=environment?obj(obj(settings.env)[environment]):settings;if(environment&&!Object.hasOwn(obj(settings.env),environment))continue;
       const main=str(selected.main??settings.main),targetUnit=units.find(n=>n.architecture?.entryPaths.includes(localPath(dir(path),main)??''))??owner(path);
       if(!targetUnit)continue;
+      op.architecture!.environments=[environment||'default'];
+      op.attributes.environmentSource=environment?'コマンドの明示環境指定':'明示envなし・照合した既定設定';
       if(purpose==='apply'){
         const dbName=a[4],list=Array.isArray(selected.d1_databases)?selected.d1_databases.map(obj):[];
         const binding=list.filter(v=>v.binding===dbName||v.database_name===dbName);if(binding.length!==1)continue;
@@ -148,7 +151,7 @@ export function addArchitectureToolFlows(model:ArchitectureModel,input:SemanticI
     for(const from of reached(previous.id))for(const to of reached(next.id))if(from.id!==to.id)connect(from,to,'flow-precedes',label,next.evidence,'',{id:key('command-order',previous.id,next.id),source:previous.id,target:next.id,kind:'flow-precedes',label,confidence:'source',evidence:next.evidence,views:['architecture-map'],details:{conditional:next.operator!==';',contextId:next.scriptId,reason:`演算子 ${next.operator} の記述。前後の成功・実行は未観測`}});
   }
   for(const [scriptId,cs]of scripts){const invokes=cs.filter(c=>c.calls.some(l=>scripts.has(l.target)));if(!invokes.length)continue;const targets=reached(scriptId);if(!targets.length)continue;
-    const script=add(key('script',scriptId),`${cs[0]!.scriptName} · 開始script`,'tool-operation',uniqueArchitectureEvidence(cs.flatMap(c=>c.evidence)),[],{scriptId,sourceId:scriptId,purpose:'script',executionPlace:'unconfirmed',ownerPath:cs[0]!.directory});
+    const script=add(key('script',scriptId),`${cs[0]!.scriptName} · 開始script`,'tool-operation',uniqueArchitectureEvidence(cs.flatMap(c=>c.evidence)),[],{scriptName:cs[0]!.scriptName,scriptId,sourceId:scriptId,purpose:'script',executionPlace:'unconfirmed',ownerPath:cs[0]!.directory});
     for(const c of invokes)for(const link of c.calls)for(const target of reached(link.target)){
       const label=link.parallel?'並列の呼出記述':link.operator==='&&'?'成功時の呼出記述':link.operator==='||'?'失敗時の呼出記述':'scriptから呼び出す記述';
       connect(script,target,'flow-invokes',label,link.evidence,'',{id:link.id,source:c.id,target:link.target,kind:'flow-invokes',label,confidence:'source',evidence:link.evidence,views:['architecture-map'],details:{contextId:c.id,conditional:Boolean(link.operator),reason:`元コマンド関係。operator=${link.operator??'なし'} / parallel=${link.parallel}。実行未観測`}});

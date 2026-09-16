@@ -40,7 +40,7 @@ export interface SemanticEdge {
   /** Original source relations behind a display aggregate or compressed runtime path. */
   provenance?: { edges: SemanticRelationSource[]; intermediateNodeIds?: string[] };
   details?: { environment?: string; reason?: string; callSiteId?: string; argumentIndex?: number; fieldId?: string; propertyPath?: string[]; conditional?: boolean; contextId?: string; sourceEdgeIds?: string[];
-    architectureOrigin?: 'source' | 'architecture'; architectureRelation?: 'connection' | 'internal' | 'self'; configurationId?: string };
+    architectureOrigin?: 'source' | 'architecture'; architectureRelation?: 'connection' | 'internal' | 'self'; configurationId?: string; structural?: boolean };
 }
 export type SemanticRelationSource = Pick<SemanticEdge, 'id' | 'source' | 'target' | 'kind' | 'label' | 'confidence' | 'evidence' | 'details'>;
 export interface SemanticCoverage { path: string; language: string; status: 'parsed' | 'partial' | 'unsupported' | 'skipped'; message?: string }
