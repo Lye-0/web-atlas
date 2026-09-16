@@ -3,6 +3,7 @@ import { architectureRequestTitle } from './architectureRequestPresentation';
 import { kindLabels, type SemanticNode } from '../../analyzer/semantic/types';
 import { architectureEnvironmentLabel, architectureKindLabels } from '../../analyzer/semantic/architectureMetadata';
 import { architectureRequestSources } from './architectureSummary';
+import { architectureShortPath } from './architectureShortPath';
 
 export interface SemanticNodeDisplay {
   title: string;
@@ -179,14 +180,26 @@ export function semanticNodeDisplays(nodes: Iterable<SemanticNode>, contextNodes
     const name = displays.get(node.id)!.title, named = names.get(name) ?? [];
     named.push(node); names.set(name, named);
   }
+  const architectureNames=new Map<string,SemanticNode[]>();
+  for(const n of architectureNodes.values())if(n.architecture){const peers=architectureNames.get(n.label)??[];peers.push(n);architectureNames.set(n.label,peers);}
   for (const named of names.values()) {
-    if (named.length < 2) continue;
+    const peers=named.every(n=>n.architecture)?architectureNames.get(named[0]!.label)??named:named;
+    if (peers.length < 2) continue;
     if (named.every(node => node.architecture)) {
+      const ownerPath=(n:SemanticNode)=>n.architecture?.ownerPath??n.path??'';
+      const paths=peers.map(ownerPath);
+      const shortened=new Set<string>();
+      if(new Set(paths).size>1)for(const node of named)if(node.attributes.compositionRole&&!node.architecture?.request){
+        const display=displays.get(node.id)!,full=ownerPath(node),short=architectureShortPath(full,paths),usage=architectureUsageContext(node);
+        display.disambiguation=usage?short+(display.disambiguation??usage).slice((full||'root').length):`${short} · ${(display.disambiguation??display.location).replace(full?`${full} · `:'\0','')}`;
+        shortened.add(node.id);
+      }
       const identifiers = new Map<string | undefined, number>();
       for (const node of named) { const value = displays.get(node.id)?.disambiguation; identifiers.set(value, (identifiers.get(value) ?? 0) + 1); }
       for (const node of named) {
         const display = displays.get(node.id)!;
         const source = node.evidence[0];
+        if(shortened.has(node.id)&&display.disambiguation&&identifiers.get(display.disambiguation)===1)continue;
         if (node.architecture?.identity && display.disambiguation && identifiers.get(display.disambiguation) === 1) continue;
         if (node.architecture?.kind === 'tool-operation' && display.disambiguation && identifiers.get(display.disambiguation) === 1) continue;
         const sourceLocation = source ? `${source.path}:${source.line}` : node.path;

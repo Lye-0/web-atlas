@@ -83,6 +83,20 @@ describe('Architecture readability preserves identity and relation meaning', () 
 
 async function open(details: HTMLDetailsElement) { await act(async () => { details.open = true; details.dispatchEvent(new Event('toggle')); }); }
 describe('Architecture summaries in the detail panel', () => {
+  it('gives known and unresolved peers independent preview budgets and access to every entry', async () => {
+    const owner=node('owner'), known=Array.from({length:5},(_,i)=>node(`known-${i}`)), unknown=Array.from({length:6},(_,i)=>request(`unknown-${i}`,owner.id));
+    const graph:SemanticGraph={view:'architecture-map',nodes:[owner,...known,...unknown],edges:[...unknown,...known].map(n=>edge(`edge-${n.id}`,owner.id,n.id))};
+    const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+    try {
+      await act(async()=>root.render(<MemoryRouter><ArchitectureDetail node={owner} graph={graph} visible={graph} analysis={analysis} store={store} sources={{}} onSelect={vi.fn()} onSelectEdge={vi.fn()} onOpen={vi.fn()} onReveal={vi.fn()} onJump={vi.fn()} onClose={vi.fn()}/></MemoryRouter>));
+      const knownSection=host.querySelector('section[aria-label="構成上の相手"]')!,unknownSection=host.querySelector('section[aria-label="接続先が未特定の要求"]')!;
+      expect(knownSection.querySelectorAll('[data-partner-id]')).toHaveLength(3);expect(unknownSection.querySelectorAll('[data-partner-id]')).toHaveLength(3);
+      await act(async()=>knownSection.querySelector('button')!.click());
+      expect(knownSection.querySelectorAll('[data-partner-id]')).toHaveLength(5);expect(unknownSection.querySelectorAll('[data-partner-id]')).toHaveLength(3);
+      await act(async()=>unknownSection.querySelector('button')!.click());
+      expect(unknownSection.querySelectorAll('[data-partner-id]')).toHaveLength(6);expect(unknownSection.textContent).toContain('未特定対象 6件 · 表示集合 0件');
+    } finally {await act(async()=>root.unmount());host.remove();}
+  });
   it('defers a node evidence collection until requested, then retains different descriptions at the same source site', async () => {
     const object = node('A'), read = vi.fn(() => [source, { ...source, description: 'another explanation' }]);
     Object.defineProperty(object, 'evidence', { get: read, enumerable: true });

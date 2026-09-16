@@ -11,7 +11,7 @@ import { confidenceLabels, type SemanticAnalysis, type SemanticEdge, type Semant
 import { uniqueArchitectureEvidence } from '../../analyzer/semantic/architectureEvidence';
 import { architectureEnvironmentLabel, architectureKindLabels } from '../../analyzer/semantic/architectureMetadata';
 import { architectureRelationCounts, architectureRelationLabel, architectureRelationOriginals } from '../../analyzer/semantic/architectureRelations';
-import { architecturePartners, architectureRelationSummary, architectureRequestSources } from './architectureSummary';
+import { architecturePartners, architecturePeerSummary, architectureRelationSummary, architectureRequestSources } from './architectureSummary';
 import { semanticNodeDisplays } from './semanticFlowDisplay';
 import { ArchitectureEvidenceHeading, ArchitectureEvidenceList as EvidenceList } from './ArchitectureEvidence';
 import { architectureEvidencePaths } from './architectureEvidencePaths';
@@ -65,6 +65,7 @@ export function ArchitectureDetail({ node, edge, graph, visible, sources, store,
   onJump: (id: string, view: SemanticViewId) => void; onHoverTarget?: SemanticFlowHoverHandler;
 }) {
   const [relationLimit, setRelationLimit] = useState(20);
+  const [knownLimit,setKnownLimit]=useState(3),[unknownLimit,setUnknownLimit]=useState(3);
   const outside = Boolean(node && visible.architectureView?.scopeId && !visible.architectureView.detailIds.includes(node.id));
   const arch = node?.architecture, children = graph.nodes.filter(n => n.architecture?.parentId === node?.id);
   const byId = useMemo(() => new Map([...graph.nodes, ...visible.nodes].map(n => [n.id, n])), [graph.nodes, visible.nodes]);
@@ -73,6 +74,7 @@ export function ArchitectureDetail({ node, edge, graph, visible, sources, store,
   const boundary = useMemo(() => visible.architectureView?.boundaryRelations.filter(e => e.source === node?.id || e.target === node?.id) ?? [], [visible.architectureView?.boundaryRelations, node?.id]);
   const relations = useMemo(() => [...visible.edges.filter(e => e.source === node?.id || e.target === node?.id), ...boundary], [visible.edges, node?.id, boundary]);
   const partners = useMemo(() => architecturePartners(relations, node?.id ?? ''), [relations, node?.id]);
+  const peerSummary=useMemo(()=>architecturePeerSummary(partners,byId),[partners,byId]);
   const partnerDisplays = useMemo(() => semanticNodeDisplays(partners.flatMap(partner => { const other = byId.get(partner.otherId); return other ? [other] : []; }), byId), [partners, byId]);
   const title = node ? architectureRequestTitle(node) : (edge ? architectureRelationLabel(edge) : '構成の詳細');
   const requestGroup = visible.architectureView?.requestGroups.find(group => group.memberIds.includes(node?.id ?? ''));
@@ -108,6 +110,8 @@ export function ArchitectureDetail({ node, edge, graph, visible, sources, store,
         <div><dt>現在地との関係</dt><dd>{scopeRole === 'inside' ? '現在地の内部' : scopeRole === 'direct' ? '外側の接続相手' : scopeRole === 'surrounding' ? '周辺' : visible.architectureView?.scopeId ? '現在の図の外側' : 'プロジェクト全体'}</dd></div>
         <div><dt>種類</dt><dd>{arch.request ? '個別要求（接続先未特定）' : arch.kind === 'application' ? '論理アプリ・コード上の実行単位' : architectureKindLabels[arch.kind]}</dd></div>
         {node.attributes.compositionRole && <div><dt>構成上の位置づけ</dt><dd>{String(node.attributes.compositionRole)}<Disclosure title="位置づけの判定根拠">{()=> <><p>{String(node.attributes.compositionReason)}</p><small>根拠：{String(node.attributes.compositionEvidencePath)}。読込済みの対象です。</small></>}</Disclosure></dd></div>}
+        {node.attributes.definitionPath && <div><dt>所属する定義</dt><dd><code style={{overflowWrap:'anywhere'}}>{String(node.attributes.definitionPath)}</code><small>{String(node.attributes.definitionLocation)}</small></dd></div>}
+        {Array.isArray(node.attributes.definitionWorkspace)&&node.attributes.definitionWorkspace.length>0&&<div><dt>workspace所属の根拠</dt><dd>{node.attributes.definitionWorkspace.join(' / ')}<small>所属の確認であり、主要/補助用途の判定とは別です。</small></dd></div>}
         <div><dt>役割</dt><dd>{arch.request ? `${({ http: 'HTTP要求のコードを確認。接続先は未特定', process: '起動要求のコードを確認。起動先は未特定', auth: '認証SDKの使用・設定コードを確認。プロジェクトは未特定' })[arch.request.kind]}` : (arch.roles.length ? `${arch.roles.slice(0, 2).map(role => role.label).join(' / ')}${arch.roles.length > 2 ? ` ほか${arch.roles.length - 2}役割` : ''}（${arch.roles.every(role => role.confidence === 'source') ? 'ソース・設定で確認' : '推定を含む'}）` : arch.codeUsage ? 'コードを提供する構成。プロジェクト固有の担当は未判定' : '具体的な役割は未判定')}</dd></div>
         {requestOrigin ? <div><dt>要求元</dt><dd>{requestOrigin.label.replace(/^要求元：/, '')}<small className="architecture-count-note">要求を書いた側です。接続先の所属は未特定です。</small>{requestOrigin.sources.length > 1 && <Disclosure title="要求元の内訳">{() => <>{requestOrigin.sources.map(source => <p key={source.id}>{otherButton(source.id, `request-${source.id}`)}</p>)}{requestOrigin.unknown && <p>要求元未確認の要求も含みます。</p>}</>}</Disclosure>}</dd></div>
           : <div><dt>所属</dt><dd>{arch.parentId ? byId.get(arch.parentId)?.label : (arch.ownerPath !== undefined ? arch.ownerPath || 'プロジェクト直下' : '') || (['application', 'component', 'shared-code', 'code-package'].includes(arch.kind) ? 'プロジェクト' : '外部・設定上の対象')}</dd></div>}
@@ -131,7 +135,8 @@ export function ArchitectureDetail({ node, edge, graph, visible, sources, store,
         {node.attributes.targetResolution && <p>論理アプリとの対応：{String(node.attributes.targetResolution)}</p>}
         {node.attributes.artifactState && <p>{String(node.attributes.artifactState)}</p>}
       </section>}
-      <div className="architecture-summary-partners"><strong>主な相手</strong>{partners.slice(0, 3).map(partnerEntry)}{partners.length > 3 && <small>ほか{partners.length - 3}相手。つながる相手で確認できます。</small>}{!partners.length && <p>現在の表示条件で、つながる相手はありません。</p>}</div>
+      <section className="architecture-summary-partners" aria-label="構成上の相手"><strong>構成上の相手 · {peerSummary.known.length}相手</strong>{peerSummary.known.slice(0,knownLimit).map(partnerEntry)}{peerSummary.known.length>knownLimit&&<button onClick={()=>setKnownLimit(n=>n+20)}>残りの構成上の相手を見る（{peerSummary.known.length-knownLimit}）</button>}{!peerSummary.known.length&&<p>現在の表示条件で、構成上の相手はありません。</p>}</section>
+      {peerSummary.unresolved.length>0&&<section className="architecture-summary-partners" aria-label="接続先が未特定の要求"><strong>接続先が未特定の要求</strong><p>未特定対象 {peerSummary.targets}件 · 表示集合 {peerSummary.groups}件 · ソース {peerSummary.sites}箇所</p><small>表示集合は、同一サービスとして確認したものではありません。</small>{peerSummary.unresolved.slice(0,unknownLimit).map(partnerEntry)}{peerSummary.unresolved.length>unknownLimit&&<button onClick={()=>setUnknownLimit(n=>n+20)}>未特定要求の残りの内訳を見る（{peerSummary.unresolved.length-unknownLimit}項目）</button>}</section>}
       {(canOpen ? canOpen(node.id) : children.length > 0) && <button className="architecture-open-action" onClick={() => onOpen(node.id)}>{outside ? 'この構成を開く' : '内部を開く'}</button>}
       <Disclosure title="専門Viewで調べる">{() => <><SemanticLinks analysis={analysis} node={node} onJump={onJump} /><ArchitectureExpertLinks node={node} store={store} /></>}</Disclosure>
       <Disclosure title={`内部の構成 · 全${children.length}要素 / 表示条件内の関係 ${architectureRelationCounts(internal).records}件`}>{() => <>
@@ -140,7 +145,7 @@ export function ArchitectureDetail({ node, edge, graph, visible, sources, store,
         {internal.length > 0 && <><p>現在の表示条件で同じ構成要素に収まる関係です。下位の再帰も含み、構成全体の自己通信を意味しません。</p>{internal.map(e => <p key={e.id}>{relationButton(e)}</p>)}</>}
         <Disclosure title="構成ファイル一覧">{() => arch.files.map(path => <p key={path}><code>{path}</code></p>)}</Disclosure>
       </>}</Disclosure>
-      <Disclosure title={`つながる相手 · ${partners.length}相手`}>{() => <>
+      <Disclosure title={`つながる相手 · 構成 ${peerSummary.known.length}相手 / 未特定 ${peerSummary.targets}対象`}>{() => <>
         <p>現在の環境・補助コードなどの表示条件を適用。内部関係は別欄です。構成全体の境界接続は内部の対応箇所を確認できていません。</p>
         {partners.slice(0, relationLimit).map(partnerEntry)}{partners.length > relationLimit && <button onClick={() => setRelationLimit(relationLimit + 30)}>相手をさらに表示</button>}
       </>}</Disclosure>

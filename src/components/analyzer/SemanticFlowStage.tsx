@@ -1,3 +1,4 @@
+import { ArchitectureEnvironmentKey } from './ArchitectureEnvironmentKey';
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import type { AnalyzerViewSession } from '../../analyzer/session';
 import type { SemanticEdge, SemanticGraph } from '../../analyzer/semantic/types';
@@ -110,6 +111,7 @@ export function SemanticFlowStage({ graph, explorer, nodeDisplays, navigation, m
       <div hidden={compact&&!navigationExpanded}>
       <SemanticExplorerNavigation explorer={explorer} navigation={navigation} mode={mode} graph={graph} localGraph={localGraph} selectedIds={selectedIds} selectedEdgeId={selectedEdgeId} hoverTarget={hoverTarget} onSelectEdge={selectEdge} relationHint={visibleRelation?.graph === graph ? visibleRelation.edge : undefined} />
       </div>
+      {graph.view==='architecture-map'&&mode==='2d'&&<ArchitectureEnvironmentKey nodes={graph.nodes}/>}
     </div>}
     {help && <div className="analyzer-stage-help" role="dialog" aria-label="グラフ操作ヘルプ"><strong>{graph.view === 'architecture-map' ? '構成図の操作' : mode === '2d' ? '2Dエクスプローラー' : '3D全体図'}</strong>
       <p>{graph.view === 'architecture-map' ? 'クリック・Enterで構成要素を選択し、内部を開くボタンで下位の構成へ移動します。パンくず・親へ・戻るで階層と訪問先を移動できます。2Dはドラッグで移動、3Dはドラッグで回転します。ホイールと＋ / −で拡大縮小できます。' : mode === '2d' ? 'ブロックをクリック・Enterで開き、パンくずや「親へ」で所属階層を移動します。「戻る」とブラウザの戻る・進むは訪問した場所を復元します。関係図の対象はクリックで選択し、「この要素を中心に見る」で中心を切り替えます。関係図はドラッグと矢印キーで移動、ホイールと＋ / −で拡大縮小できます。' : 'ドラッグで回転、右ドラッグで移動。点やラベルから対象を選択できます。ホイールと＋ / −で拡大縮小できます。'}</p>

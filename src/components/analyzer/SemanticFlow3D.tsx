@@ -241,6 +241,7 @@ class FlowGraphBoundary extends Component<{ children: ReactNode; onUnavailable: 
 }
 
 export function SemanticFlow3D(props: Props) {
+  const supportIds=useMemo(()=>new Set(props.graph.nodes.filter(n=>String(n.attributes.compositionRole??'').includes('補助')).map(n=>n.id)),[props.graph.nodes]);
   const sceneVisit = props.graph.view === 'architecture-map' ? props.visitId : undefined;
   const currentVisit = useRef(sceneVisit); currentVisit.current = sceneVisit;
   const reportCamera = props.onCamera;
@@ -435,7 +436,7 @@ export function SemanticFlow3D(props: Props) {
     <svg className="semantic-flow-label-leaders" aria-hidden="true">{labels.filter(label => !label.region && (aggregation.individualIds.has(label.id) || aggregation.aggregates.some(group => group.id === label.id))).map(label => <line key={label.id} ref={element => labelLayer.attachLeader(label.id, element)} />)}</svg>
     <div className="semantic-flow-3d-labels">{labels.filter(label => label.region ? regionNodes.has(label.id) : aggregation.individualIds.has(label.id) || aggregation.aggregates.some(group => group.id === label.id)).map(label => <button key={label.id} ref={element => labelLayer.attach(label.id, element)} type="button"
       data-architecture-node-id={props.graph.view === 'architecture-map' && !label.region ? label.id : undefined} data-flow-label-id={label.id} data-flow-inspected={label.id === inspectedId || undefined} data-flow-role={label.role} data-flow-emphasized={label.emphasized || undefined} className={`${label.selected ? 'is-selected' : ''}${label.match ? ' is-match' : ''}${label.hovered ? ' is-hovered' : ''}${label.related ? ' is-related' : ''}${label.region ? ' is-region' : ''}${label.aggregate ? ' is-aggregate' : ''}${label.emphasized ? ' is-emphasized' : ''}${label.dimmed ? ' is-dimmed' : ''}`} aria-pressed={label.region ? undefined : label.selected} title={`${label.tooltip ?? `${label.label}\n${label.path}`}${label.roleLabel ? `\n${label.roleLabel}` : ''}`}
-      data-architecture-scope-role={label.scopeRole} data-architecture-active={label.scopeActive || undefined}
+      data-composition-support={supportIds.has(label.id)||undefined} data-architecture-scope-role={label.scopeRole} data-architecture-active={label.scopeActive || undefined}
       aria-label={label.region ? `${label.label}の領域へ移動 · ${label.path}` : undefined}
       onPointerDown={event => { if (props.graph.view === 'architecture-map' && !label.region && event.button === 0 && event.pointerType !== 'touch') labelLayer.pinPointerLabel(label.id); }}
       onPointerCancel={() => labelLayer.releasePointerLabel(label.id)}

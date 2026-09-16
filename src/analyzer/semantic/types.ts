@@ -55,7 +55,7 @@ export interface SemanticInput {
   commands?: import('./architectureCommands').ArchitectureCommand[];
   developmentTools?: { stackId: string; path: string; declaration: boolean; evidence: SemanticEvidence }[];
   stackMetadata?:Record<string,{name:string;aliases:string[]}>;
-  projectScopes?:{id:string;path:string;directory:string}[];
+  projectScopes?:{id:string;path:string;directory:string;workspaceDeclarations?:string[]}[];
   sources: Record<string, string>;
   imports: { from: string; to: string; specifier: string }[];
   resources: { id: string; label: string; type: string; path?: string; binding?: string; entryPath?: string; evidence?: SemanticEvidence[]; attributes?: SemanticNode['attributes'] }[];

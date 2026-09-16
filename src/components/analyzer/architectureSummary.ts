@@ -27,6 +27,19 @@ export function architectureRelationSummary(edges: readonly SemanticEdge[]) {
 }
 
 export type ArchitectureDirection = 'incoming' | 'outgoing' | 'self';
+
+/** Entity identity and relation confidence are separate axes; no name matching. */
+export function architecturePeerSummary(partners:ReturnType<typeof architecturePartners>,nodes:ReadonlyMap<string,SemanticNode>){
+ const known:typeof partners=[],unresolved:typeof partners=[],targets=new Set<string>();let groups=0;
+ for(const partner of partners){const node=nodes.get(partner.otherId);
+  if(node?.architecture&&node.architecture.kind!=='unresolved'&&!node.architecture.request&&!node.attributes.architectureRequestGroup){known.push(partner);continue;}
+  unresolved.push(partner);const members=Array.isArray(node?.attributes.requestIds)?node.attributes.requestIds:[];
+  if(node?.attributes.architectureRequestGroup)groups++;
+  for(const id of members.length?members:[partner.otherId]){const member=nodes.get(id);targets.add(member?.architecture?.request?.sourceId??id);}
+ }
+ const edges=unresolved.flatMap(p=>p.relations.flatMap(r=>r.edges));
+ return {known,unresolved,targets:targets.size,groups,sites:architectureRelationSummary(edges).sites};
+}
 export function architecturePartners(edges: readonly SemanticEdge[], nodeId: string) {
   const partners = new Map<string, { otherId: string; relations: Map<string, { direction: ArchitectureDirection; edges: SemanticEdge[] }> }>();
   for (const edge of edges) {
