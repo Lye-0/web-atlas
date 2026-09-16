@@ -26,6 +26,9 @@
 .architecture-boundary-relations > div { max-height: 140px; overflow: auto; display: grid; gap: 5px; padding-block: 8px; }
 .architecture-boundary-relations button { text-align: left; white-space: normal; }
 .architecture-count-note { display: block; font-size: 10px; color: #9fbaac; }
+.architecture-detail .architecture-summary dd, .architecture-detail .analyzer-detail-accordion-body { min-width:0; overflow-wrap:anywhere; }
+.architecture-detail .architecture-summary dd > small { display:block; margin-top:4px; color:#a8bfb1; }
+.architecture-detail .analyzer-detail-accordion-body code:not(pre code) { white-space:pre-wrap; overflow-wrap:anywhere; }
 .architecture-request-inspection { position: absolute; z-index: 6; right: 14px; bottom: 70px; width: min(350px, calc(100% - 28px)); max-height: 300px; overflow: auto; padding: 12px; background: #10231cf5; color: #d7e7dc; border: 1px solid #769a86; border-radius: 6px; font-size: 12px; }
 .architecture-request-inspection > div { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .architecture-request-inspection p { line-height: 1.65; }

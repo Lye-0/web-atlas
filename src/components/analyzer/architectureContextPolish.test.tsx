@@ -1,6 +1,8 @@
 import {describe,it,expect} from 'vitest';
-import {architectureEnvironmentHeadings,architectureBoundaryMarks} from '../../analyzer/semantic/architectureHeadings';
-import {semanticFlowRegions} from '../../analyzer/semantic/flowRegions';
+import {architectureBoundaryHeadings} from '../../analyzer/semantic/architectureHeadings';
+import {semanticFlowRegions,semanticFlowRegionIdentity} from '../../analyzer/semantic/flowRegions';
+import {architectureDefinitionPresentation} from './architectureDefinitionPresentation';
+import {buildSemanticExplorer} from '../../analyzer/semantic/semanticExplorer';
 import {describeArchitecturePositioning} from '../../analyzer/semantic/architecturePositioning';
 import {architecturePartners,architecturePeerSummary} from './architectureSummary';
 import {architectureShortPath} from './architectureShortPath';
@@ -9,12 +11,35 @@ const ev={path:'package.json',start:0,end:12,line:1,endLine:1,description:'defin
 const node=(id:string,kind:NonNullable<SemanticNode['architecture']>['kind']='application',path=''):SemanticNode=>({id,label:'same',kind:'subsystem',group:'project',confidence:'source',evidence:[{...ev,path:path?path+'/definition':'package.json'}],attributes:{},architecture:{kind,ownerPath:path,entryPaths:[],roles:[],environments:[],context:[],files:[],memberIds:[],technologyNames:[],auxiliary:false}});
 const edge=(id:string,target:string,confidence:SemanticEdge['confidence']='source'):SemanticEdge=>({id,source:'app',target,kind:'service-use',label:'relation',confidence,views:['architecture-map'],evidence:[ev]});
 describe('Architecture environment, definition and peer presentation',()=>{
- it('keeps overlapping and long environment headings distinct with stable keyed marks',()=>{
+ it('keeps same-name boundary IDs separate and honours obstacles and viewport changes',()=>{
+  const n=node('a'),positions=[{node:n,x:0,y:0,z:0}],base=semanticFlowRegions(positions,'2d')[0]!;
+  const regions=[{...base,id:'first',label:'共有：日本語 / long-environment-name'},{...base,id:'second',label:'共有：日本語 / long-environment-name'}];
+  for(const width of [390,768,1440]){
+   const names=architectureBoundaryHeadings(regions,positions,{x:width/2,y:400,scale:.3},{width,height:900},120,[{left:0,top:120,width:80,height:80}]);
+   expect(names.map(n=>n.id)).toEqual(['first','second']);expect(names.every(n=>n.left>=12&&n.left+n.width<=width-12&&n.top>=128)).toBe(true);
+  }
+ });
+ it('uses one environment identity for wire regions and the mounted 3D region membership',()=>{
+  const n={...node('env-node'),attributes:{flowEnvironment:'任意環境'}},positions=[{node:n,x:0,y:0,z:0}];
+  const explorer=buildSemanticExplorer({view:'architecture-map',nodes:[n],edges:[]},new Set());
+  expect(semanticFlowRegions(positions,'3d',explorer)[0]!.id).toBe(semanticFlowRegionIdentity(n,explorer).id);
+  expect(semanticFlowRegionIdentity(n).label).toBe('任意環境');
+ });
+ it('describes an inherited role as its recorded owner and preserves the entity kind',()=>{
+  const owner=node('owner'),artifact=node('artifact','artifact'),tool=node('tool','tool-operation');owner.label='App';owner.attributes={definitionPath:'deep/app/package.json',definitionOwnerId:'owner',compositionRole:'実行構成として定義'};
+  artifact.attributes={...owner.attributes};tool.attributes={...owner.attributes};const nodes=new Map([owner,artifact,tool].map(n=>[n.id,n])),before=JSON.stringify([...nodes.values()]);
+  for(const n of [artifact,tool]){const d=architectureDefinitionPresentation(n,nodes);expect(d.inherited).toBe(true);expect(d.owner?.label).toBe('App');expect(d.shortPath).toBe('package.json');}
+  expect(architectureDefinitionPresentation(owner,nodes).inherited).toBe(false);expect(JSON.stringify([...nodes.values()])).toBe(before);
+ });
+ it('keeps direct names readable, non-overlapping and keyed independently of input order',()=>{
   const nodes=['stage-one','stage-two','unknown','a very long environment identity that must remain readable'].map((label,i)=>({...node(String(i)),attributes:{flowEnvironment:label}}));
   const positions=nodes.map(n=>({node:n,x:0,y:0,z:0})),regions=semanticFlowRegions(positions,'2d');
-  expect(architectureEnvironmentHeadings(nodes)).toEqual(architectureEnvironmentHeadings([...nodes].reverse()));
-  expect(architectureEnvironmentHeadings(nodes).map(h=>h.label)).toContain(nodes[3]!.attributes.flowEnvironment);
-  for(const scale of [.2,1,3]){const marks=architectureBoundaryMarks(regions,positions,scale);expect(marks).toEqual(architectureBoundaryMarks([...regions].reverse(),positions,scale));for(let i=0;i<marks.length;i++)for(let j=i+1;j<marks.length;j++)expect(Math.abs(marks[i]!.y-marks[j]!.y)).toBeGreaterThanOrEqual(24/scale);}
+  for(const scale of [.2,1,3]){const camera={x:650,y:450,scale},size={width:1400,height:1000},headings=architectureBoundaryHeadings(regions,positions,camera,size,150);
+   expect(headings).toHaveLength(4);expect(headings).toEqual(architectureBoundaryHeadings([...regions].reverse(),positions,camera,size,150));
+   expect(headings.map(h=>h.label)).toContain(nodes[3]!.attributes.flowEnvironment);
+   for(let i=0;i<headings.length;i++)for(let j=i+1;j<headings.length;j++){const a=headings[i]!,b=headings[j]!;expect(a.left+a.width<=b.left||b.left+b.width<=a.left||a.top+a.height<=b.top||b.top+b.height<=a.top).toBe(true);}
+  }
+  expect(architectureBoundaryHeadings(regions,positions,{x:-5000,y:0,scale:1},{width:1400,height:1000})).toEqual([]);
  });
  it.each(['tools/deep/package','renamed/place'])('keeps independent definitions in %s separate from the project root',path=>{
   const root=node('architecture:["package","package.json"]'),nested=node(`architecture:["manifest","${path}/Package.swift","${path}"]`,'code-package',path),child=node('child','component',path+'/Sources');nested.evidence=[{...ev,path:path+'/Package.swift'}];child.architecture!.parentId=nested.id;

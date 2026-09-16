@@ -83,6 +83,17 @@ describe('Architecture readability preserves identity and relation meaning', () 
 
 async function open(details: HTMLDetailsElement) { await act(async () => { details.open = true; details.dispatchEvent(new Event('toggle')); }); }
 describe('Architecture summaries in the detail panel', () => {
+  it('keeps definition paths and inherited reasoning behind the existing classification disclosure', async () => {
+    const owner=node('owner'),artifact=node('artifact');owner.label='Owner app';artifact.architecture!.kind='artifact';
+    const path='deep/location/with/a/long/name/Owner/package.json';artifact.attributes={definitionPath:path,definitionOwnerId:owner.id,definitionLocation:'読込プロジェクト配下の個別定義 · deep/location/with/a/long/name/Owner',compositionRole:'実行構成として定義',compositionReason:'OWNER REASON',compositionEvidencePath:path,definitionWorkspace:['workspace.yaml']};
+    const graph:SemanticGraph={view:'architecture-map',nodes:[owner,artifact],edges:[]},host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+    try{
+      await act(async()=>root.render(<MemoryRouter><ArchitectureDetail node={artifact} graph={graph} visible={graph} analysis={analysis} store={store} sources={{}} onSelect={vi.fn()} onSelectEdge={vi.fn()} onOpen={vi.fn()} onReveal={vi.fn()} onJump={vi.fn()} onClose={vi.fn()}/></MemoryRouter>));
+      const summary=host.querySelector('.architecture-summary')!;expect(summary.textContent).toContain('成果物');expect(summary.textContent).toContain('定義元の構成の位置づけOwner app');expect(summary.textContent).toContain('package.json');expect(summary.textContent).not.toContain(path);expect(host.textContent).not.toContain('OWNER REASON');
+      const disclosure=[...host.querySelectorAll('details')].find(d=>d.querySelector('summary')?.textContent==='分類・同一性の判定理由')!;await open(disclosure);
+      expect(disclosure.textContent).toContain(path);expect(disclosure.textContent).toContain('OWNER REASON');expect(disclosure.textContent).toContain('workspace.yaml');expect(disclosure.textContent).toContain('定義パスをコピー');
+    }finally{await act(async()=>root.unmount());host.remove();}
+  });
   it('gives known and unresolved peers independent preview budgets and access to every entry', async () => {
     const owner=node('owner'), known=Array.from({length:5},(_,i)=>node(`known-${i}`)), unknown=Array.from({length:6},(_,i)=>request(`unknown-${i}`,owner.id));
     const graph:SemanticGraph={view:'architecture-map',nodes:[owner,...known,...unknown],edges:[...unknown,...known].map(n=>edge(`edge-${n.id}`,owner.id,n.id))};

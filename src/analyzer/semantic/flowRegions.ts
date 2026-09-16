@@ -24,10 +24,13 @@ export function semanticRegionIdentity(node: SemanticNode): SemanticRegionIdenti
   return { id: `group:${node.group}`, label: node.group || '所属情報なし', kind: 'group' };
 }
 
+export function semanticFlowRegionIdentity(node:SemanticNode,explorer?:SemanticExplorerModel){
+  return explorer && !node.attributes.flowEnvironment ? explorerRegionIdentity(explorer,node.id) : semanticRegionIdentity(node);
+}
 export function semanticFlowRegions(positions: readonly SemanticPosition[], mode: '2d' | '3d', explorer?: SemanticExplorerModel): SemanticFlowRegion[] {
   const groups = new Map<string, { identity: SemanticRegionIdentity; positions: SemanticPosition[] }>();
   for (const position of positions) {
-    const identity = explorer && !position.node.attributes.flowEnvironment ? explorerRegionIdentity(explorer, position.node.id) : semanticRegionIdentity(position.node);
+    const identity = semanticFlowRegionIdentity(position.node,explorer);
     const group = groups.get(identity.id) ?? { identity, positions: [] };
     group.positions.push(position); groups.set(identity.id, group);
   }

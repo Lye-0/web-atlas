@@ -1,3 +1,4 @@
+import {architectureDefinitionPresentation} from './architectureDefinitionPresentation';
 import { architectureEnvironmentContext, architectureUsageContext, architectureTargetSummary } from '../../analyzer/semantic/architectureContext';
 import { useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
@@ -21,6 +22,10 @@ import './architecture-detail.css';
 import { architectureProviderExplanation, architectureRequestPartition, architectureRequestTitle } from './architectureRequestPresentation';
 import { publicUrlText } from '../../analyzer/urlPrivacy';
 
+function DefinitionPath({path}:{path:string}) {
+ const [status,setStatus]=useState('');
+ return <div className="architecture-evidence-full-path"><code tabIndex={0}>{path}</code><button type="button" onClick={async()=>{try{await navigator.clipboard.writeText(path);setStatus('コピーしました');}catch{setStatus('完全なパスを選択してコピーできます。');}}}>定義パスをコピー</button><span role="status">{status}</span></div>;
+}
 function Disclosure({ title, children }: { title: ReactNode; children: () => ReactNode }) {
   const [open, setOpen] = useState(false);
   return <details className="analyzer-detail-accordion" onToggle={event => setOpen(event.currentTarget.open)}><summary>{title}</summary>{open && <div className="analyzer-detail-accordion-body">{children()}</div>}</details>;
@@ -69,6 +74,7 @@ export function ArchitectureDetail({ node, edge, graph, visible, sources, store,
   const outside = Boolean(node && visible.architectureView?.scopeId && !visible.architectureView.detailIds.includes(node.id));
   const arch = node?.architecture, children = graph.nodes.filter(n => n.architecture?.parentId === node?.id);
   const byId = useMemo(() => new Map([...graph.nodes, ...visible.nodes].map(n => [n.id, n])), [graph.nodes, visible.nodes]);
+  const definition=useMemo(()=>node?architectureDefinitionPresentation(node,byId):undefined,[node,byId]);
   const operationTargets = useMemo(() => node?.architecture?.kind === 'tool-operation' ? architectureTargetSummary(node, analysis.architecture?.edges ?? [], byId) : [], [node, analysis.architecture?.edges, byId]);
   const internal = useMemo(() => visible.architectureView?.internalRelations.filter(e => e.source === node?.id) ?? [], [visible.architectureView?.internalRelations, node?.id]);
   const boundary = useMemo(() => visible.architectureView?.boundaryRelations.filter(e => e.source === node?.id || e.target === node?.id) ?? [], [visible.architectureView?.boundaryRelations, node?.id]);
@@ -109,13 +115,12 @@ export function ArchitectureDetail({ node, edge, graph, visible, sources, store,
       <dl className="analyzer-metadata-list architecture-summary">
         <div><dt>現在地との関係</dt><dd>{scopeRole === 'inside' ? '現在地の内部' : scopeRole === 'direct' ? '外側の接続相手' : scopeRole === 'surrounding' ? '周辺' : visible.architectureView?.scopeId ? '現在の図の外側' : 'プロジェクト全体'}</dd></div>
         <div><dt>種類</dt><dd>{arch.request ? '個別要求（接続先未特定）' : arch.kind === 'application' ? '論理アプリ・コード上の実行単位' : architectureKindLabels[arch.kind]}</dd></div>
-        {node.attributes.compositionRole && <div><dt>構成上の位置づけ</dt><dd>{String(node.attributes.compositionRole)}<Disclosure title="位置づけの判定根拠">{()=> <><p>{String(node.attributes.compositionReason)}</p><small>根拠：{String(node.attributes.compositionEvidencePath)}。読込済みの対象です。</small></>}</Disclosure></dd></div>}
-        {node.attributes.definitionPath && <div><dt>所属する定義</dt><dd><code style={{overflowWrap:'anywhere'}}>{String(node.attributes.definitionPath)}</code><small>{String(node.attributes.definitionLocation)}</small></dd></div>}
-        {Array.isArray(node.attributes.definitionWorkspace)&&node.attributes.definitionWorkspace.length>0&&<div><dt>workspace所属の根拠</dt><dd>{node.attributes.definitionWorkspace.join(' / ')}<small>所属の確認であり、主要/補助用途の判定とは別です。</small></dd></div>}
         <div><dt>役割</dt><dd>{arch.request ? `${({ http: 'HTTP要求のコードを確認。接続先は未特定', process: '起動要求のコードを確認。起動先は未特定', auth: '認証SDKの使用・設定コードを確認。プロジェクトは未特定' })[arch.request.kind]}` : (arch.roles.length ? `${arch.roles.slice(0, 2).map(role => role.label).join(' / ')}${arch.roles.length > 2 ? ` ほか${arch.roles.length - 2}役割` : ''}（${arch.roles.every(role => role.confidence === 'source') ? 'ソース・設定で確認' : '推定を含む'}）` : arch.codeUsage ? 'コードを提供する構成。プロジェクト固有の担当は未判定' : '具体的な役割は未判定')}</dd></div>
         {requestOrigin ? <div><dt>要求元</dt><dd>{requestOrigin.label.replace(/^要求元：/, '')}<small className="architecture-count-note">要求を書いた側です。接続先の所属は未特定です。</small>{requestOrigin.sources.length > 1 && <Disclosure title="要求元の内訳">{() => <>{requestOrigin.sources.map(source => <p key={source.id}>{otherButton(source.id, `request-${source.id}`)}</p>)}{requestOrigin.unknown && <p>要求元未確認の要求も含みます。</p>}</>}</Disclosure>}</dd></div>
-          : <div><dt>所属</dt><dd>{arch.parentId ? byId.get(arch.parentId)?.label : (arch.ownerPath !== undefined ? arch.ownerPath || 'プロジェクト直下' : '') || (['application', 'component', 'shared-code', 'code-package'].includes(arch.kind) ? 'プロジェクト' : '外部・設定上の対象')}</dd></div>}
-        <div><dt>環境との対応</dt><dd>{architectureEnvironmentContext(node).label}{architectureEnvironmentContext(node).meaning === 'definition' && <small>コード上の定義です。全環境での共通利用・稼働を確認した意味ではありません。</small>}</dd></div>
+          : <div><dt>{!arch.parentId&&definition?.inherited?'定義元の構成':'所属'}</dt><dd>{!arch.parentId&&definition?.inherited ? definition.owner?.label??'名称未確認' : arch.parentId ? byId.get(arch.parentId)?.label : (arch.ownerPath !== undefined ? (arch.ownerPath.split('/').slice(-2).join('/') || 'プロジェクト直下') : '') || (['application', 'component', 'shared-code', 'code-package'].includes(arch.kind) ? 'プロジェクト' : '外部・設定上の対象')}</dd></div>}
+        <div><dt>環境との対応</dt><dd>{architectureEnvironmentContext(node).label}</dd></div>
+        {definition?.role && <div><dt>{definition.inherited?'定義元の構成の位置づけ':'この構成の位置づけ'}</dt><dd>{definition.inherited&&<strong>{definition.owner?.label??'所属する定義（名称未確認）'} · </strong>}{definition.role}</dd></div>}
+        {definition?.path && <div><dt>定義元</dt><dd>{definition.shortPath}<small>{definition.location}</small></dd></div>}
       </dl>
       {node.attributes.unifiedFlow && <section className="architecture-context-note" aria-label="操作と対応の確認状態">
         <strong>{arch.kind === 'tool-operation' ? '操作の記述・実行未観測' : '設定上の対応・稼働未観測'}</strong>
@@ -154,6 +159,11 @@ export function ArchitectureDetail({ node, edge, graph, visible, sources, store,
         {(['source', 'support', 'configuration', 'declared'] as const).map(usage => { const items = arch.technologies?.filter(item => item.usage === usage) ?? []; return items.length ? <section key={usage}><h4>{({ source: 'この構成でソース参照を確認', support: '開発・型・ビルド・テストの支援', configuration: '構成設定から確認', declared: '宣言あり・この構成での使用は未確認' })[usage]}</h4>{items.map(item => <Disclosure key={item.name} title={<TechnologyLinks name={item.name} />}>{() => <><p>{item.reason}</p>{item.declarations.map((declaration, index) => <p key={index}>{declaration.section} · <code>{declaration.path}</code></p>)}<EvidenceList evidence={uniqueArchitectureEvidence([...item.evidence, ...item.declarations.flatMap(d => d.evidence)])} sources={sources} /></>}</Disclosure>)}</section> : null; })}
       </>}</Disclosure>
       <Disclosure title="分類・同一性の判定理由">{() => <>
+        {definition?.path&&<><h4>完全な定義パス</h4><DefinitionPath path={definition.path}/><p>{String(node.attributes.definitionLocation)}</p></>}
+        {definition?.role&&<><h4>{definition.inherited?`定義元の構成の位置づけ：${definition.owner?.label??'名称未確認'}`:'この構成の位置づけ'}</h4><p>{definition.role}</p><p>{String(node.attributes.compositionReason??'判定理由未記録')}</p><p>根拠：<code>{String(node.attributes.compositionEvidencePath??'未記録')}</code></p></>}
+        {Array.isArray(node.attributes.definitionWorkspace)&&node.attributes.definitionWorkspace.length>0&&<><h4>workspace所属の根拠</h4>{node.attributes.definitionWorkspace.map(path=><p key={path}><code>{path}</code></p>)}<p>workspaceへの所属確認と、主要／補助の用途判定は別です。</p></>}
+        {arch.ownerPath!==undefined&&<p>完全な所属パス：<code>{arch.ownerPath||'プロジェクト直下'}</code></p>}
+        {architectureEnvironmentContext(node).meaning==='definition'&&<p>コード上の定義です。全環境での共通利用・稼働を確認した意味ではありません。</p>}
         <p>構成の確認状態: {confidenceLabels[node.confidence]}。役割・接続先の特定とは別に扱います。</p>
         {arch.roles.map((role, index) => <p key={index}><strong>{role.label}</strong> · {confidenceLabels[role.confidence]}<br />{role.reason}</p>)}
         {arch.codeUsage && <><p>{arch.codeUsage.reason}</p><p>確認した利用元: {arch.codeUsage.consumerIds.length}構成要素（全構成）。現在の表示範囲には出ていない利用元も含みます。</p>{arch.codeUsage.consumerIds.map(id => <p key={id}>{otherButton(id, `consumer-${id}`)}</p>)}<EvidenceList evidence={[...arch.codeUsage.declarationEvidence, ...arch.codeUsage.sourceEvidence]} sources={sources} /></>}

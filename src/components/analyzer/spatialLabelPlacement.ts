@@ -2,7 +2,7 @@ import type { FlowLabelContent, FlowLabelPlacement, FlowLabelObstacle } from './
 export const labelInset = (label: FlowLabelContent) => label.selected || label.aggregate ? 17 : 9;
 export interface SpatialLabelPoint { id: string; x: number; y: number }
 /** Shared collision, endpoint protection and retention; callers own semantic priority. */
-export function createSpatialLabelPlacer(projected: readonly SpatialLabelPoint[], size: {width:number;height:number}, top: number, bottom: number, context: {obstacles?: readonly FlowLabelObstacle[];priorityIds?:ReadonlySet<string>;hoveredIds?:ReadonlySet<string>}, selectedIds: ReadonlySet<string>, previous: ReadonlyMap<string,FlowLabelPlacement>, measure?: (label:FlowLabelContent)=>{width:number;height:number}) {
+export function createSpatialLabelPlacer(projected: readonly SpatialLabelPoint[], size: {width:number;height:number}, top: number, bottom: number, context: {obstacles?: readonly FlowLabelObstacle[];priorityIds?:ReadonlySet<string>;hoveredIds?:ReadonlySet<string>;regionLineWrap?:boolean}, selectedIds: ReadonlySet<string>, previous: ReadonlyMap<string,FlowLabelPlacement>, measure?: (label:FlowLabelContent)=>{width:number;height:number}) {
   const labels: FlowLabelPlacement[] = [];
   const occupied: FlowLabelObstacle[] = [...context.obstacles ?? []];
   // A forced label may cover ordinary background dots, but never an active
@@ -38,9 +38,10 @@ export function createSpatialLabelPlacer(projected: readonly SpatialLabelPoint[]
     const measureText = (text: string) => [...text].reduce((sum, char) => sum + (char.charCodeAt(0) > 255 ? 12 : 6.7), 16);
     // Hover must not grow a mounted hit box: a left-side label would then cover
     // its own dot and be relocated out from under the stationary pointer.
-    const width = measure?.(label).width ?? Math.min(size.width < 700 ? 175 : 225, label.selected ? 225 : Math.min(220, Math.max(90, measureText(label.label), measureText(label.disambiguation ?? ''), measureText(label.roleLabel ?? ''))));
+    const baseWidth = measure?.(label).width ?? Math.min(size.width < 700 ? 175 : 225, label.selected ? 225 : Math.min(220, Math.max(90, measureText(label.label), measureText(label.disambiguation ?? ''), measureText(label.roleLabel ?? ''))));
+    const width = label.region && context.regionLineWrap ? Math.min(size.width < 700 ? 175 : 225, Math.max(110,baseWidth+12)) : baseWidth;
     // Each supplemental row has a fixed 16px line box in the mounted label.
-    const height = measure?.(label).height ?? (label.region || label.selected || label.aggregate ? 46 : 28) + (label.disambiguation ? 16 : 0) + (label.roleLabel ? 16 : 0);
+    const height = measure?.(label).height ?? (label.region && context.regionLineWrap ? 60 : label.region || label.selected || label.aggregate ? 46 : 28) + (label.disambiguation ? 16 : 0) + (label.roleLabel ? 16 : 0);
     const inset = labelInset(label);
     const prior = previous.get(label.id);
     const choices = [...(prior?.selected === label.selected && prior.pointX !== undefined && prior.pointY !== undefined ? [[prior.x - prior.pointX, prior.y - prior.pointY]] : []),
