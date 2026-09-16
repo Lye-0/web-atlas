@@ -52,6 +52,14 @@
 - files: `src/analyzer/semantic/architecturePositioning.ts`, `src/analyzer/semantic/client.ts`, `src/components/analyzer/architectureContextPolish.test.tsx` …
 - memory: `agent-knowledge/entries/2026-09-16-definition-ownership-8c417a.md`
 
+### 囲い生成とDOMラベルの所属索引で同じ領域IDを使う
+- id: `rm-20260917-region-label-identity`
+- type: `constraint`
+- maturity: `candidate`
+- tags: `regions`, `labels`, `identity`, `projection`
+- files: `src/analyzer/semantic/flowRegions.ts`, `src/components/analyzer/SemanticFlow3D.tsx`, `src/components/analyzer/semanticFlowLabels.ts` …
+- memory: `agent-knowledge/entries/2026-09-17-region-label-identity-915acd.md`
+
 ## analyzer-command-evidence
 
 ### CIコマンドを合成すると元範囲の座標系が変わる
