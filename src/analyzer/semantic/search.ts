@@ -12,7 +12,7 @@ export function semanticSearchDocument(node: SemanticNode): AnalyzerSearchDocume
     names: [node.label, ...(node.data ? [node.data.expression] : []), ...values(['name', 'qualifiedName', 'className', 'callee', 'event', 'command', 'serviceName', 'binding', 'aliases','technologyName','dictionaryStackId']),
       ...(node.architecture ? [architectureKindLabels[node.architecture.kind], node.architecture.request?.expression ?? '', node.architecture.identity?.identifier ?? '', ...node.architecture.identity?.configurations.map(setting => setting.binding ?? '') ?? []] : [])],
     paths: [node.path ?? '', ...values(['entryPath']), ...(node.architecture?.files ?? []), ...(node.architecture?.identity?.configurations.map(setting => setting.path) ?? [])],
-    groups: [node.group, ...values(['ownerName', 'runtimeName','scriptName','invocationLabel','workingDirectory','configurationPath']), ...(node.architecture?.environments ?? []),architectureUsageContext(node)],
+    groups: [node.group, ...values(['ownerName', 'runtimeName','scriptName','invocationLabel','workingDirectory','configurationPath','inputRoot','outputPath','compositionRole','providedContent']), ...(node.architecture?.environments ?? []),architectureUsageContext(node)],
     fields: [...(node.fields ?? []), ...(node.model?.choices?.flatMap(choice => choice.fields ?? []) ?? [])].flatMap(field => [field.name, field.type]),
   };
 }

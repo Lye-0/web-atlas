@@ -278,7 +278,7 @@ export function buildArchitectureModel(input: SemanticInput, analysis: Pick<Sema
   }
   for (const request of analysis.nodes.filter(n => n.kind === 'request')) {
     const from = request.path ? fileOwners.get(request.path) : undefined; if (!from) continue;
-    const call = syntax.get(request.path!)?.calls.find(c => c.start === request.evidence[0]?.start);
+    const call = syntax.get(request.path!)?.calls.find(c => c.start === request.evidence[0]?.start && c.end === request.evidence[0]?.end);
     if (call && /(?:^|\.)(?:useQuery|useMutation)$/.test(call.callee)) continue;
     const endpoint = call ? call.literals[0] ?? call.args[0] ?? '' : string(request.attributes.endpoint);
     let origin = '';
@@ -293,6 +293,8 @@ export function buildArchitectureModel(input: SemanticInput, analysis: Pick<Sema
       request: absolute ? undefined : { kind: 'http', ownerId: owner?.id ?? from, expression: endpoint || '動的な接続先', sourceId: request.id } });
     node.evidence.push(...request.evidence); node.architecture!.memberIds.push(request.id); node.architecture!.files.push(request.path!);
     node.attributes.endpoints = unique([...(node.attributes.endpoints as string[] ?? []), endpoint || '動的な接続先']);
+    node.attributes.requestCall=call?.callee??String(request.attributes.callee??'');
+    if(!absolute)node.attributes.resolutionReason=endpoint.startsWith('/')?'相対要求は確認済み。対応する配信設定・実行時originは未特定':call?.literals[0]===undefined?'要求先は動的な式。静的なURLの値は未解決':'要求先の表記をURLとして解決できない';
     connect(from, node.id, 'http-request', `HTTP要求: ${endpoint || '動的な接続先'}（静的コード）`, request.evidence, absolute ? 'source' : 'unresolved');
   }
   for (const [path, raw] of configs.filter(([p]) => /\.[cm]?[jt]sx?$|\.cs$/.test(p))) {

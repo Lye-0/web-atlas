@@ -12,6 +12,8 @@ import { refineStackSemantics } from './stackSemantics';
 import { addStackArchitecture } from './stackArchitecture';
 import { addArchitectureToolFlows } from './architectureToolFlows';
 import { finalizeArchitectureContext } from './architectureContext';
+import { httpFetchSites } from './httpFetchBinding';
+import { describeArchitecturePositioning } from './architecturePositioning';
 
 const functionTypes = new Set(['function_declaration', 'function_definition', 'function_expression', 'arrow_function', 'method_definition', 'method_declaration', 'constructor_declaration', 'function_item', 'method', 'singleton_method', 'local_function_statement', 'lambda_expression', 'function_literal', 'function_signature']);
 const modelTypes = new Set(['interface_declaration', 'type_alias_declaration', 'type_item', 'class_declaration', 'class_definition', 'class_specifier', 'class', 'struct_item', 'struct_specifier', 'type_spec', 'record_declaration', 'enum_declaration', 'enum_item', 'object_declaration', 'trait_item']);
@@ -138,6 +140,7 @@ export async function analyzeSemanticSources(input: SemanticInput, loadLanguage:
       parser = createParser(grammarId); parser.setLanguage(grammar);
       let source = originalSource;
       source = scriptSource(path, source);
+      const fetchSites=/\.[cm]?[jt]sx?$/.test(path)&&/\bfetch\b/.test(source)?httpFetchSites(path,source):undefined;
       tree = parser.parse(source);
       if (!tree) throw new Error('構文解析を完了できませんでした');
       const root = tree.rootNode;
@@ -352,7 +355,7 @@ export async function analyzeSemanticSources(input: SemanticInput, loadLanguage:
             if (handler) { builder.edge(entry.id, handler.node.id, 'handles', 'event handler', ['runtime-flow'], [ev]); handler.node.attributes.entry = true; }
             else { const candidate = argumentsList[/^(?:onDidReceiveMessage|onMessage|subscribe)$/.test(leaf(callee)) ? 0 : /^(?:addEventListener|registerCommand)$/.test(leaf(callee)) ? 1 : argumentsList.length - 1]; if (candidate) entry.attributes.handler = candidate.text; }
           }
-          if (/(?:^|\.)(?:fetch|axios|request|requestJson|apiRequest|apiFetch|useQuery|useMutation)$/.test(callee) || /axios\.(?:get|post|put|delete|patch)$/.test(callee)) {
+          if ((fetchSites?.has(`${ast.startIndex}:${ast.endIndex}`) || /^(?:[\w$]+\.)*(?:fetch|axios|request|requestJson|apiRequest|apiFetch|useQuery|useMutation)$/.test(callee) || /^axios\.(?:get|post|put|delete|patch)$/.test(callee)) && (!/(?:^|\.)fetch$/.test(callee)||!fetchSites||fetchSites.has(`${ast.startIndex}:${ast.endIndex}`))) {
             const address = record.literalArgs.find(value => /^(?:https?:|\/)/.test(value)) ?? record.literalArgs[0];
             op.kind = 'request'; op.label = address ? address.slice(0, 140) : `${leaf(callee)} · URL未解決`;
             op.attributes.endpoint = address ?? ''; op.attributes.method = record.literalArgs.find(value => /^(GET|POST|PUT|PATCH|DELETE)$/.test(value)) ?? (callee.includes('axios.') ? leaf(callee).toUpperCase() : 'GET');
@@ -451,6 +454,7 @@ export async function analyzeSemanticSources(input: SemanticInput, loadLanguage:
   addStackArchitecture(analysis.architecture, input, analysis);
   addArchitectureToolFlows(analysis.architecture, input);
   finalizeArchitectureContext(analysis.architecture);
+  describeArchitecturePositioning(analysis.architecture,input);
   analysis.stats.models = analysis.nodes.filter(node => node.kind === 'model' && !node.attributes.dataModelExcluded).length;
   analysis.stats.elapsedMs = Math.round(performance.now() - started);
   return analysis;

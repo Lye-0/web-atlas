@@ -106,9 +106,10 @@ export function semanticNodeDisplay(node: SemanticNode): SemanticNodeDisplay {
     const environment = architectureEnvironmentContext(node);
     const usage = architectureUsageContext(node);
     const state = node.confidence === 'observed' ? '実測' : node.confidence === 'inferred' ? '推定' : identity?.status === 'unconfirmed' ? '同一性未確認' : '';
-    const location = [usage || arch.ownerPath || (arch.request ? node.path : ''), environment.label,
+    const location = [usage || arch.ownerPath || (arch.request ? node.path : ''), environment.label, node.attributes.compositionRole && String(node.attributes.compositionRole).includes('補助') ? String(node.attributes.compositionRole) : '',
       arch.kind !== 'tool-operation' && ['local','cloud'].includes(String(node.attributes.executionPlace)) ? String(node.attributes.executionPlace) : '', state].filter(Boolean).join(' · ');
-    const kind = arch.kind === 'application' ? '論理アプリ' : node.attributes.architectureRequestGroup ? '表示上の集合' : arch.request ? '接続先未特定' : architectureKindLabels[arch.kind];
+    const role = String(node.attributes.compositionRole??'');
+    const kind = (arch.kind === 'application' ? '論理アプリ' : node.attributes.architectureRequestGroup ? '表示上の集合' : arch.request ? '接続先未特定' : architectureKindLabels[arch.kind]) + (role.includes('補助') ? role.includes('推定') ? ' · 補助（推定）' : ' · 補助' : '');
     const dataRole = scope ? `${({ inside: '内部', direct: '外側の接続相手', surrounding: '周辺' })[scope]} · 種類：${kind}` : node.attributes.architectureContext ? `表示範囲外 · ${kind}` : kind;
     const disambiguation = usage ? [usage,environment.meaning === 'explicit' || environment.meaning === 'default' ? environment.label : ''].filter(Boolean).join(' · ') : identity ? `${environment.label}${binding ? ` · ${binding}` : ''}${identity.identifier ? ` · ID:${identity.identifier.length > 10 ? `${identity.identifier.slice(0, 4)}…${identity.identifier.slice(-4)}` : identity.identifier}` : ' · 同一性未確認'}`
       : arch.request ? node.evidence[0] ? `${node.evidence[0].path.split(/[\\/]/).at(-1)}:${node.evidence[0].line} · 範囲 ${node.evidence[0].start}–${node.evidence[0].end}` : node.path ?? 'ソース箇所未確認'

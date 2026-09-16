@@ -47,13 +47,20 @@ export function addArchitectureToolFlows(model:ArchitectureModel,input:SemanticI
     node.architecture!.context=['ローカルのリソース構成'];return node;
   };
   const execution=(unit:SemanticNode,path:string,environment:string,place:string,evidence:SemanticEvidence[])=>{
+    const settings=config(path),values=environment?obj(obj(settings.env)[environment]):settings;
+    const main=str(values.main??settings.main),assets=obj(values.assets??settings.assets);
+    const content=main&&str(assets.directory)?'Workerのリクエスト処理と静的アセット配信の構成':main?'Workerのリクエスト処理を含む構成':str(assets.directory)?'静的アセットを配信する構成':'提供するコード・アセットは未特定';
     const runtime=add(key('execution',unit.id,path,environment,place),`${unit.label} · ${environment||'既定設定'}${place==='local'?' / local':''}`,'execution-config',evidence,[environment||'default'],{logicalOwnerId:unit.id,executionPlace:place,configurationPath:path,ownerPath:unit.architecture?.ownerPath??''},unit.architecture?.entryPaths??[]);
+    runtime.attributes.providedContent=content;runtime.attributes.assetDirectory=str(assets.directory);runtime.attributes.entryDeclaration=main||'入口の宣言なし';
+    runtime.architecture!.roles=[{label:content,confidence:main||str(assets.directory)?'source':'unresolved',reason:'mainとassets.directoryの明示設定を照合。実際の配信は未観測',evidence}];
     runtime.architecture!.context=unit.architecture?.context??[];
     connect(source(unit),runtime,'flow-configures','実行構成のコード',evidence,environment);
     const belongs=(id:string)=>{let n=byId.get(id);const seen=new Set<string>();while(n&&!seen.has(n.id)){if(n.id===unit.id)return true;seen.add(n.id);n=byId.get(n.architecture?.parentId??'');}return false;};
     for(const original of initialEdges.filter(e=>belongs(e.source)&&(e.details?.environment??'')===environment)){
       const target=byId.get(original.target);if(!target)continue;
-      const settings=config(path),values=environment?obj(obj(settings.env)[environment]):settings;
+      // Definition-internal relations remain on their original owners. Only
+      // environment-grounded runtime/service relations apply to execution configs.
+      if(!main||belongs(original.target)||!['data-operation','http-request','deployment-config','service-use','message','process-start'].includes(original.kind))continue;
       const bindings=Array.isArray(values.d1_databases)?values.d1_databases.map(obj):[];
       const remoteBinding=bindings.some(b=>b.remote===true&&target.architecture?.identity?.configurations.some(c=>c.binding===b.binding&&c.path===path&&(c.environment||'')===environment));
       const local=place==='local'&&target.architecture?.context.includes('D1')&&!remoteBinding?resourceAt(target,'local',environment,evidence):target;
@@ -78,15 +85,17 @@ export function addArchitectureToolFlows(model:ArchitectureModel,input:SemanticI
     const op=add(key('operation',cmd.id),`${name}：${purposes[purpose]}`,'tool-operation',cmd.evidence,environment?[environment]:[],{scriptName:cmd.scriptName,workingDirectory:cmd.workingDirectory??cmd.directory,invocationLabel:cmd.invocationLabel??'',usageArguments:cmd.argv.slice(1).join(' '),sourceId:cmd.sourceCommandId??cmd.id,scriptId:cmd.sourceScriptId??cmd.scriptId,dictionaryStackId:product,purpose,executionPlace:'unconfirmed',targetPlace:place,command:cmd.label,ownerPath:unit.architecture?.ownerPath??'',resolution:'操作対象は未特定'});
     operations.set(cmd.id,op);op.architecture!.roles=[{label:`${name}で${purposes[purpose]}する操作の記述`,confidence:'source',reason:'実際のコマンドと設定を照合。実行・成功は未観測',evidence:cmd.evidence}];op.architecture!.technologyNames=[product];op.architecture!.context=['静的コマンド・実行未観測'];if(tool==='vite'&&purpose==='serve'&&explicitEnvironment===undefined)op.attributes.defaultEnvironment='Vite devの既定mode=development';
     const cwd=cmd.workingDirectory??option(a,'--cwd','--workdir');const base=cwd===undefined?cmd.directory:staticPath(cmd.directory,cwd);
-    if(!base||/[$`]/.test(environment))continue;
+    if(!base||/[$`]/.test(environment)){op.attributes.resolution='作業ディレクトリまたは環境指定が動的で静的に解決できない';continue;}
     const explicit=option(a,'--config','-c');
     const candidates=explicit!==undefined?[staticPath(base,explicit)]:tool==='wrangler'?['wrangler.jsonc','wrangler.json','wrangler.toml'].map(p=>localPath(base,p)):tool==='vite'?['vite.config.ts','vite.config.js','vite.config.mts','vite.config.mjs'].map(p=>localPath(base,p)):tool==='drizzle-kit'?['drizzle.config.ts','drizzle.config.js','drizzle.config.json'].map(p=>localPath(base,p)):[];
     const paths=candidates.filter((p):p is string=>Boolean(p&&Object.hasOwn(input.sources,p)));
-    if(explicit!==undefined&&paths.length!==1||paths.length>1)continue;
+    if(explicit!==undefined)op.attributes.configurationPath=staticPath(base,explicit)??explicit;
+    op.attributes.configurationStatus=paths.length===1?'読込済み':paths.length>1?'複数候補':explicit!==undefined?'指定ファイルが入力スナップショットにない':'既定設定ファイルは入力内で未検出';
+    if(explicit!==undefined&&paths.length!==1||paths.length>1){op.attributes.resolution=paths.length>1?'設定ファイルが複数あり使用する設定を確定できない':staticPath(base,explicit)?'指定設定が入力スナップショットに含まれない。原本に存在しないと確認した意味ではない':'指定設定のパスが動的または入力範囲外';continue;}
     const path=paths[0],settings=path?config(path):{}, evidence=uniqueArchitectureEvidence([...cmd.evidence,...(path?at(path,'操作対象・入出力の設定（実行未観測）'):[])]);
     if(path)op.attributes.configurationPath=path;
     if(tool==='wrangler'){
-      if(!path)continue;const selected=environment?obj(obj(settings.env)[environment]):settings;if(environment&&!Object.hasOwn(obj(settings.env),environment))continue;
+      if(!path){op.attributes.resolution='Wranglerの設定ファイルを入力内で確認できない';continue;}const selected=environment?obj(obj(settings.env)[environment]):settings;if(environment&&!Object.hasOwn(obj(settings.env),environment)){op.attributes.resolution='指定された環境が読込済み設定に見つからない';continue;}
       const main=str(selected.main??settings.main),targetUnit=units.find(n=>n.architecture?.entryPaths.includes(localPath(dir(path),main)??''))??owner(path);
       if(!targetUnit)continue;
       op.architecture!.environments=[environment||'default'];
@@ -109,8 +118,15 @@ export function addArchitectureToolFlows(model:ArchitectureModel,input:SemanticI
         op.attributes.resolution='コマンドとWrangler設定を照合。稼働・公開状態は未観測';
       }
     }else if(tool==='vite'){
-      const root=staticPath(base,str(settings.root)||'.');if(!root)continue;
-      connect(source(unit),op,'flow-input','入力コード',evidence,environment);
+      if(path&&!architectureSyntax(path,input.sources[path]!).config){op.attributes.resolution='設定のexportは動的または未対応の構文。任意の設定コードは実行しない';continue;}
+      if(Object.hasOwn(settings,'root')&&typeof settings.root!=='string'){op.attributes.resolution='設定rootが動的で入力コードを解決できない';continue;}
+      const root=staticPath(base,str(settings.root)||'.');if(!root){op.attributes.resolution='設定rootが入力範囲外で解決できない';continue;}
+      op.attributes.inputRoot=root;
+      const matches=units.filter(n=>n.architecture?.context.some(c=>c.includes('ブラウザ'))&&n.architecture.entryPaths.some(p=>root==='.'||p===root||p.startsWith(root+'/')));
+      const targetUnit=matches.length===1?matches[0]:matches.length===0&&unit.architecture?.context.includes('ブラウザ')&&unit.architecture.ownerPath===(root==='.'?'':root)?unit:undefined;
+      op.attributes.targetResolution=targetUnit?'入力rootとブラウザ入口を照合':matches.length>1?'入力rootに複数の論理アプリがあり対応先を一意にできない':'入力rootと既存の論理アプリ境界の対応が未特定';
+      const code=targetUnit?source(targetUnit):add(key('code-root',root),`${root} · 入力コード`,'code-definition',evidence,[],{ownerPath:root},sourcePaths.filter(p=>root==='.'||p.startsWith(root+'/')));
+      connect(code,op,'flow-input','入力コード',evidence,environment);
       if(purpose==='build'){
         const build=obj(settings.build),out=option(a,'--outDir')??str(build.outDir);
         // Vite 2–8 documented default. Dynamic config/unknown version must not become dist.
@@ -118,11 +134,12 @@ export function addArchitectureToolFlows(model:ArchitectureModel,input:SemanticI
         const knownVersion=/^[~^]?[2-8]\./.test(version);
         const dynamic=path&&!architectureSyntax(path,input.sources[path]!).config||Object.hasOwn(build,'outDir')&&typeof build.outDir!=='string';
         const output=staticPath(root,out||(!dynamic&&knownVersion?'dist':undefined));
-        if(output){const files=artifact(output,'Web成果物',evidence,environment);files.attributes.defaultOutput=!out;connect(op,files,'flow-generates','生成する指定',evidence,environment);op.attributes.resolution=out?'明示出力先':'Vite 2–8の既定outDir=dist。生成未観測';}
+        if(output){const files=artifact(output,'Web成果物',evidence,environment);files.attributes.defaultOutput=!out;connect(op,files,'flow-generates','生成する指定',evidence,environment);op.attributes.outputPath=output;op.attributes.resolution=out?'明示出力先':'Vite 2–8の既定outDir=dist。生成未観測';}
+        else op.attributes.resolution=dynamic?'出力先が動的または未対応の設定。出力パスは未解決':'出力指定がなく既定値を適用できるViteバージョンも確認できない';
       }else{
-        const server=add(key('dev-server',unit.id,environment,root),`${unit.label} · 開発サーバー`,'execution-config',evidence,environment?[environment]:[],{logicalOwnerId:unit.id,ownerPath:unit.architecture?.ownerPath??'',executionPlace:'local',host:option(a,'--host')??str(obj(settings.server).host),port:option(a,'--port')??str(obj(settings.server).port)},[root]);
+        const server=add(key('dev-server',unit.id,environment,root),`${targetUnit?.label??root} · 開発配信`,'execution-config',evidence,environment?[environment]:[],{...(targetUnit?{logicalOwnerId:targetUnit.id}:{}),scriptOwnerId:unit.id,inputRoot:root,ownerPath:unit.architecture?.ownerPath??'',executionPlace:'unconfirmed',configurationPath:path??'',providedContent:'入力rootのブラウザ用コードを開発配信する構成',host:option(a,'--host')??str(obj(settings.server).host),port:option(a,'--port')??str(obj(settings.server).port)},[root]);
         connect(op,server,'flow-starts','開発配信を起動する指定',evidence,environment);
-        if(unit.architecture?.context.includes('ブラウザ'))connect(server,unit,'flow-serves','アプリのコードを配信',evidence,environment);
+        if(targetUnit)connect(server,targetUnit,'flow-serves','アプリのコードを配信',evidence,environment);
         op.attributes.resolution='開発配信の使用記述。ブラウザ起動・稼働は未観測';
       }
     }else if(tool==='drizzle-kit'){

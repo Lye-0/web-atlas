@@ -96,7 +96,9 @@ export function ArchitectureDetail({ node, edge, graph, visible, sources, store,
     <div className="analyzer-detail-heading"><h3>{title}</h3><button type="button" aria-label="詳細を閉じる" onClick={onClose}>×</button></div>
     {node && arch && <>
       <p className="architecture-detail-kind"><strong>選択中</strong> · {architectureKindLabels[arch.kind]}</p>
+      {node.attributes.providedContent && <p className="architecture-context-note">提供内容：{String(node.attributes.providedContent)}</p>}
       {arch.request && <section className="architecture-request-expression"><h4>記録された要求</h4><code>{publicUrlText(arch.request.expression ?? '式未記録')}</code><p>接続先未特定。式の実行・補完は行わず、記録されたコードを表示しています。</p>
+        {node.attributes.requestCall && <p>確認した呼び出し：<code>{String(node.attributes.requestCall)}</code></p>}{node.attributes.resolutionReason && <p>{String(node.attributes.resolutionReason)}</p>}
         {node.evidence[0] && <p>{node.evidence[0].path}:{node.evidence[0].line} · 範囲 {node.evidence[0].start}–{node.evidence[0].end}</p>}
         {requestGroup && requestPartition && <><p>{visible.architectureView?.explicitNodeIds.includes(node.id) ? '明示展開による個別表示' : '選択中の一時表示。選択解除・別の選択で集合に戻ります。'}</p><p>元の要求 {requestPartition.originalIds.length}件 · 集合内 {requestPartition.groupedIds.length}件 · 個別表示 {requestPartition.individualIds.length}件</p><button onClick={() => onSelect(requestGroup.id)}>元の集合の内訳を見る</button></>}
       </section>}
@@ -105,13 +107,17 @@ export function ArchitectureDetail({ node, edge, graph, visible, sources, store,
       <dl className="analyzer-metadata-list architecture-summary">
         <div><dt>現在地との関係</dt><dd>{scopeRole === 'inside' ? '現在地の内部' : scopeRole === 'direct' ? '外側の接続相手' : scopeRole === 'surrounding' ? '周辺' : visible.architectureView?.scopeId ? '現在の図の外側' : 'プロジェクト全体'}</dd></div>
         <div><dt>種類</dt><dd>{arch.request ? '個別要求（接続先未特定）' : arch.kind === 'application' ? '論理アプリ・コード上の実行単位' : architectureKindLabels[arch.kind]}</dd></div>
+        {node.attributes.compositionRole && <div><dt>構成上の位置づけ</dt><dd>{String(node.attributes.compositionRole)}<Disclosure title="位置づけの判定根拠">{()=> <><p>{String(node.attributes.compositionReason)}</p><small>根拠：{String(node.attributes.compositionEvidencePath)}。読込済みの対象です。</small></>}</Disclosure></dd></div>}
         <div><dt>役割</dt><dd>{arch.request ? `${({ http: 'HTTP要求のコードを確認。接続先は未特定', process: '起動要求のコードを確認。起動先は未特定', auth: '認証SDKの使用・設定コードを確認。プロジェクトは未特定' })[arch.request.kind]}` : (arch.roles.length ? `${arch.roles.slice(0, 2).map(role => role.label).join(' / ')}${arch.roles.length > 2 ? ` ほか${arch.roles.length - 2}役割` : ''}（${arch.roles.every(role => role.confidence === 'source') ? 'ソース・設定で確認' : '推定を含む'}）` : arch.codeUsage ? 'コードを提供する構成。プロジェクト固有の担当は未判定' : '具体的な役割は未判定')}</dd></div>
         {requestOrigin ? <div><dt>要求元</dt><dd>{requestOrigin.label.replace(/^要求元：/, '')}<small className="architecture-count-note">要求を書いた側です。接続先の所属は未特定です。</small>{requestOrigin.sources.length > 1 && <Disclosure title="要求元の内訳">{() => <>{requestOrigin.sources.map(source => <p key={source.id}>{otherButton(source.id, `request-${source.id}`)}</p>)}{requestOrigin.unknown && <p>要求元未確認の要求も含みます。</p>}</>}</Disclosure>}</dd></div>
-          : <div><dt>所属</dt><dd>{arch.parentId ? byId.get(arch.parentId)?.label : arch.ownerPath || (['application', 'component', 'shared-code', 'code-package'].includes(arch.kind) ? 'プロジェクト' : '外部・設定上の対象')}</dd></div>}
+          : <div><dt>所属</dt><dd>{arch.parentId ? byId.get(arch.parentId)?.label : (arch.ownerPath !== undefined ? arch.ownerPath || 'プロジェクト直下' : '') || (['application', 'component', 'shared-code', 'code-package'].includes(arch.kind) ? 'プロジェクト' : '外部・設定上の対象')}</dd></div>}
         <div><dt>環境との対応</dt><dd>{architectureEnvironmentContext(node).label}{architectureEnvironmentContext(node).meaning === 'definition' && <small>コード上の定義です。全環境での共通利用・稼働を確認した意味ではありません。</small>}</dd></div>
       </dl>
       {node.attributes.unifiedFlow && <section className="architecture-context-note" aria-label="操作と対応の確認状態">
         <strong>{arch.kind === 'tool-operation' ? '操作の記述・実行未観測' : '設定上の対応・稼働未観測'}</strong>
+        {arch.kind !== 'tool-operation' && node.attributes.configurationPath && <p>設定：<code>{String(node.attributes.configurationPath)}</code></p>}
+        {node.attributes.entryDeclaration && <p>入口：<code>{String(node.attributes.entryDeclaration)}</code></p>}
+        {node.attributes.assetDirectory && <p>アセットの指定：<code>{String(node.attributes.assetDirectory)}</code></p>}
         {node.attributes.command && <OperationCommand key={node.id} command={String(node.attributes.command)} />}
         <p>対象環境：{architectureEnvironmentContext(node).label}</p>{node.attributes.environmentSource && <small>{String(node.attributes.environmentSource)}</small>}
         <p>{arch.kind === 'tool-operation' ? '操作の実行場所' : '構成上の実行場所'}：{String(node.attributes.executionPlace ?? '未確認').replace('unconfirmed','未確認')}</p>
@@ -119,6 +125,10 @@ export function ArchitectureDetail({ node, edge, graph, visible, sources, store,
         {arch.kind === 'tool-operation' && <div><strong>操作対象</strong>{operationTargets.map(target => <p key={target.id}>{otherButton(target.id, 'operation-target')}</p>)}{!operationTargets.length && <p>対応先未特定</p>}<p>{architectureUsageContext(node)}</p><p>作業ディレクトリ：<code>{String(node.attributes.workingDirectory ?? arch.ownerPath ?? '未特定')}</code></p>{node.attributes.configurationPath && <p>設定：<code>{String(node.attributes.configurationPath)}</code></p>}</div>}
         {typeof node.attributes.logicalOwnerId === 'string' && <p>{node.attributes.logicalAssociation==='owner'?'定義を所有する構成':'対応する論理定義'}：{otherButton(node.attributes.logicalOwnerId, 'logical-owner')}</p>}
         {node.attributes.resolution && <p>{String(node.attributes.resolution)}</p>}
+        {node.attributes.configurationStatus && <p>設定の状態：{String(node.attributes.configurationStatus)}</p>}
+        {node.attributes.inputRoot && <p>入力root：<code>{String(node.attributes.inputRoot)}</code></p>}
+        {node.attributes.outputPath && <p>確認できた出力：<code>{String(node.attributes.outputPath)}</code></p>}
+        {node.attributes.targetResolution && <p>論理アプリとの対応：{String(node.attributes.targetResolution)}</p>}
         {node.attributes.artifactState && <p>{String(node.attributes.artifactState)}</p>}
       </section>}
       <div className="architecture-summary-partners"><strong>主な相手</strong>{partners.slice(0, 3).map(partnerEntry)}{partners.length > 3 && <small>ほか{partners.length - 3}相手。つながる相手で確認できます。</small>}{!partners.length && <p>現在の表示条件で、つながる相手はありません。</p>}</div>
@@ -147,7 +157,7 @@ export function ArchitectureDetail({ node, edge, graph, visible, sources, store,
       </>}</Disclosure>
       <Disclosure title="実行・配信・接続">{() => <>
         <section data-architecture-settings="entries"><h4>確認した入口の宣言：{arch.entryPaths.length}件</h4>{arch.entryPaths.map(path => <p key={path}><code>{path}</code></p>)}{!arch.entryPaths.length && <p>この解析範囲では入口宣言を確認していません。</p>}</section>
-        {arch.configurationVariants !== undefined && <section data-architecture-settings="variants"><h4>実行・配信の設定宣言：{arch.configurationVariants.length}件</h4>{arch.configurationVariants.map(variant => <div key={variant.environment}><p>{variant.environment || '既定設定'}: 名前の宣言 {variant.name || '未指定'}<br />入口 {variant.entryPath || '未指定（静的配信など）'}{variant.inherited.length > 0 && <small>上位の宣言を参照: {variant.inherited.join(', ')}。配備名は未観測</small>}</p><EvidenceList evidence={variant.evidence} sources={sources} /></div>)}</section>}
+        {arch.configurationVariants !== undefined && <section data-architecture-settings="variants"><h4>実行・配信の設定宣言：{arch.configurationVariants.length}件</h4>{arch.configurationVariants.map(variant => <div key={variant.environment}><p>{variant.environment || '既定設定'}: 名前の宣言 {variant.name || '未指定'}<br />入口 {variant.entryPath || '宣言なし（提供内容は設定から別途確認）'}{variant.inherited.length > 0 && <small>上位の宣言を参照: {variant.inherited.join(', ')}。配備名は未観測</small>}</p><EvidenceList evidence={variant.evidence} sources={sources} /></div>)}</section>}
         {arch.identity?.configurations !== undefined && <section data-architecture-settings="connections"><h4>接続先の設定：{arch.identity.configurations.length}件</h4>{arch.identity.configurations.map(setting => <Disclosure key={setting.id} title={`${setting.environment || '既定設定'} · ${setting.binding || setting.name || '対象設定'}`}>
           {() => <><p>設定ファイル: <code>{setting.path}</code></p><p>名前: {setting.name || '未指定'} · 識別子: <code>{setting.identifier || '未指定'}</code></p><EvidenceList evidence={setting.evidence} sources={sources} /></>}</Disclosure>)}</section>}
         {arch.configurationVariants === undefined && arch.identity?.configurations === undefined && <p data-architecture-settings="unknown">配信・接続の設定情報は、この構成の解析結果には記録されていません。設定が存在しないと確認した0件とは区別します。</p>}

@@ -45,7 +45,7 @@ describe('Architecture focus/context independent contracts', () => {
   });
   it('T04 keeps distinct unknown requests underneath an explicitly marked display group', () => {
     const source = 'fetch(urlOne); fetch(urlTwo);';
-    const requests = [0, 15].map((start, i) => ({ ...node(`request-${i}`), architecture: undefined, kind: 'request' as const, path: 'main.ts', evidence: [{ ...evidence(i + 1)[0]!, start }], attributes: {} }));
+    const requests = [0, 15].map((start, i) => ({ ...node(`request-${i}`), architecture: undefined, kind: 'request' as const, path: 'main.ts', evidence: [{ ...evidence(i + 1)[0]!, start, end: start + 'fetch(urlOne)'.length }], attributes: {} }));
     const graph = build({ 'package.json': '{"name":"web","scripts":{"dev":"vite"}}', 'main.ts': source }, requests);
     const unknown = graph.nodes.filter(n => n.architecture?.kind === 'unresolved');
     expect(unknown).toHaveLength(2); expect(new Set(unknown.map(n => n.id)).size).toBe(2);
