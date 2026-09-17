@@ -18,7 +18,7 @@ describe('content labels, counts and membership',()=>{
  it('separates environment, composition and routes in one native selector',()=>{
   const choices=[unknown,{id:'logical',label:'論理定義',meaning:'definition',group:'composition' as const},{id:'db',label:'DB構造変更',group:'path' as const}];
   const host=document.createElement('div');host.innerHTML=renderToStaticMarkup(<ArchitectureContentControl choices={choices} value="logical" onChange={()=>{}}/>);
-  expect([...host.querySelectorAll('optgroup')].map(e=>e.label)).toEqual(['環境・設定から見る','構成区分から見る','経路から見る']);expect(host.querySelector('option[selected]')?.textContent).toBe('論理定義');
+  expect([...host.querySelectorAll('optgroup')].map(e=>e.label)).toEqual(['基本表示','環境・設定','構成区分','経路']);expect(host.querySelector('option[selected]')?.textContent).toBe('論理定義');
  });
  it('distinguishes missing target environment from execution location and known peers',()=>{
   const script=node([],{purpose:'script',executionPlace:'unconfirmed'});expect(architectureContentMembership(script,unknown,'core').reason).toContain('script自身');
