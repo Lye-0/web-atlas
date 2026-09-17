@@ -14,7 +14,7 @@ it.skipIf(!process.env.CONTENT_REVIEW)('checks all content choices against the t
   const store=JSON.parse(readFileSync(`.cache/cross-project/${project}.browser.store.json`,'utf8'));
   const model=(await analyzeSemanticSources(semanticInput(store),testLanguage,undefined,testParser)).architecture!;
   const before=JSON.stringify(model),choices=architectureContentChoices(model),ids=new Set(model.nodes.map(n=>n.id)),edges=new Set(model.edges.map(e=>e.id));
-  const ranges=choices.filter(c=>c.id!=='all').map(choice=>{const range=architectureContentRange(model,choice.id)!;
+  const ranges=choices.filter(c=>c.group!=='overview').map(choice=>{const range=architectureContentRange(model,choice.id)!;
    expect(range.graph.nodes.every(n=>ids.has(n.id)&&model.nodes.includes(n))).toBe(true);expect(range.graph.edges.every(e=>edges.has(e.id)&&model.edges.includes(e))).toBe(true);
    if(choice.path==='database')expect(range.graph.edges.some(e=>['http-request','service-use','data-operation'].includes(e.kind))).toBe(false);
    if(process.env.RANGE_REVIEW){

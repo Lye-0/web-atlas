@@ -14,7 +14,7 @@ const cache=new WeakMap<SemanticGraph,{choices:ArchitectureContentChoice[];range
 
 export function architectureContentChoices(model:SemanticGraph):ArchitectureContentChoice[]{
  const old=cache.get(model);if(old)return old.choices;
- const choices:ArchitectureContentChoice[]=[{id:'all',label:'全体',group:'overview'}],env=new Map<string,ArchitectureContentChoice>(),nodesById=new Map(model.nodes.map(n=>[n.id,n]));
+ const choices:ArchitectureContentChoice[]=[{id:'all',label:'全体',group:'overview'},{id:'simple-overview',label:'簡易全体',group:'overview'}],env=new Map<string,ArchitectureContentChoice>(),nodesById=new Map(model.nodes.map(n=>[n.id,n]));
  for(const n of model.nodes){const e=architectureEnvironmentContext(n);
   if(e.meaning==='explicit')for(const name of e.environments)env.set(JSON.stringify(['environment',name]),{id:JSON.stringify(['environment',name]),label:name,group:'environment',environment:name,meaning:'explicit'});
   else {const members=e.meaning==='shared'?[...e.environments].sort():undefined,id=JSON.stringify(['partition',e.meaning,members??[]]);env.set(id,{id,label:e.meaning==='shared'?`共有（${members!.join(' / ')}）`:e.meaning==='unknown'?'対象環境未特定':e.label,group:e.meaning==='shared'||e.meaning==='definition'?'composition':'environment',meaning:e.meaning,members});}
@@ -31,7 +31,7 @@ export function architectureContentChoices(model:SemanticGraph):ArchitectureCont
 
 /** A typed edge slice. Peers and ownership context never become unrestricted traversal seeds. */
 export function architectureContentRange(model:SemanticGraph,key:string):ArchitectureContentRange|undefined{
- if(key==='all')return undefined;
+ if(key==='all'||key==='simple-overview')return undefined;
  const choice=architectureContentChoices(model).find(c=>c.id===key);if(!choice)return undefined;
  const cached=cache.get(model)!,old=cached.ranges.get(key);if(old)return old;
  const byId=new Map(model.nodes.map(n=>[n.id,n])),roles=new Map<string,'core'|'peer'|'support'>(),edges=new Map<string,SemanticEdge>();

@@ -205,7 +205,7 @@ function SemanticLocalFlow2D({ fitInitial, onVisibleRelation, showGroupBounds, g
         const display = displays.get(point.node.id)!;
         const role = roles.get(point.node.id), roleLabel = display.dataRole ?? (role ? semanticFlowRoleLabel(role, graph.view, kinds.get(point.node.id)) : undefined);
         const matching = members.filter(id => matchIds.has(id)).length;
-        const detail = camera.scale > .4 || selected || (matching > 0 && visibleNodes.length < 100);
+        const detail = point.node.attributes.simpleOverview===true || camera.scale > .4 || selected || (matching > 0 && visibleNodes.length < 100);
         return <g key={point.node.id} transform={`translate(${point.x} ${point.y})`} role="button" tabIndex={0}
           aria-label={`${display.title}, ${roleLabel ? `${roleLabel}, ` : ''}${point.node.kind === 'external' && !point.node.architecture ? '呼び出し箇所の一例: ' : ''}${display.location}${point.node.attributes.overview ? `、${members.length}件を展開` : ''}`} aria-pressed={selected}
           className={`semantic-flow-node${selected ? ' is-selected' : ''}${matching ? ' is-match' : ''}${selectedNodes.has(point.node.id) ? ' is-connected' : ''}`}

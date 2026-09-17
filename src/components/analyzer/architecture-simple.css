@@ -1,0 +1,14 @@
+.architecture-simple-detail > h4 {margin:16px;}
+.architecture-simple-detail > button {margin:8px 16px;padding:6px 10px;border:1px solid var(--line);border-radius:4px;}
+.architecture-simple-member {margin:12px 16px;padding-block:10px;border-top:1px solid var(--line);overflow-wrap:anywhere;}
+.architecture-simple-member p {margin:5px 0;}
+.architecture-simple-member small {color:var(--muted);}
+.architecture-simple-member button {color:var(--text-soft);padding:4px 0;text-align:left;text-decoration:underline;text-underline-offset:3px;}
+.architecture-simple-detail > details {padding:12px 16px;overflow-wrap:anywhere;}
+
+@media(max-width:700px){
+ .analyzer-controls-workspace.is-fullscreen > .semantic-flow-workspace.is-simple-overview.has-detail {overflow-y:auto;grid-template-rows:600px minmax(300px,auto);align-content:start;}
+ .is-simple-overview.has-detail .semantic-flow-stage {min-height:600px;}
+ .is-simple-overview .architecture-content-note {padding:6px 10px;}
+ .is-simple-overview .architecture-content-note p {margin:3px 0;}
+}
