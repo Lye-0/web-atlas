@@ -53,6 +53,15 @@ describe('semantic Analyzer exploration', () => {
     await import('./SemanticAnalyzerPage'); await render();
   });
   afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.clearAllMocks(); vi.unstubAllGlobals(); });
+  it('keeps loading distinct from an empty graph and below the control overlays',async()=>{
+    vi.mocked(getSemanticAnalysis).mockImplementation(()=>({promise:new Promise(()=>{}),unsubscribe:()=>{}}));
+    await render({...store,scannedAt:'pending-analysis'});
+    await act(async()=>host.querySelector<HTMLAnchorElement>('a[href="/analyzer/architecture-map"]')!.click());
+    const placeholder=host.querySelector<HTMLElement>('.semantic-stage-placeholder')!;
+    expect(placeholder.textContent).toContain('構成図を準備しています');expect(placeholder.getAttribute('role')).toBe('status');
+    expect(Number.parseFloat(placeholder.style.top)).toBeGreaterThan(80);expect(host.querySelector('.semantic-empty-result')).toBeNull();
+    expect(host.querySelector('select[aria-label="表示内容"]')).not.toBeNull();
+  });
   it('keeps overview state separate, limits search, preserves mode selection, and shows empty content in a real scope',async()=>{
     const base=analysis.architecture!.nodes[0]!;
     const make=(id:string,kind:NonNullable<typeof base.architecture>['kind'],purpose='')=>({...base,id,label:id,attributes:{purpose,unifiedFlow:true},architecture:{...base.architecture!,kind,parentId:undefined as string|undefined,request:undefined,auxiliary:false}});
@@ -67,8 +76,8 @@ describe('semantic Analyzer exploration', () => {
     const camera=()=>host.querySelector('.semantic-flow-2d')?.getAttribute('data-camera-scale');
     expect(content().value).toBe('all');await search('app-a');const original=ids(),originalCamera=camera(),jobs=vi.mocked(getSemanticAnalysis).mock.calls.length;
     const searchInput=host.querySelector<HTMLInputElement>('input[type="search"]')!,selector=content();
-    await act(async()=>host.querySelector<HTMLButtonElement>('[aria-label="全画面表示"]')!.click());expect(host.querySelector('.analyzer-controls-workspace.is-fullscreen')!.contains(searchInput)).toBe(true);expect(host.querySelector('.analyzer-controls-workspace.is-fullscreen')!.contains(selector)).toBe(true);
-    await act(async()=>host.querySelector<HTMLButtonElement>('[aria-label="全画面を終了"]')!.click());expect(content()).toBe(selector);expect(host.querySelector('input[type="search"]')).toBe(searchInput);expect(searchInput.value).toBe('app-a');
+    await act(async()=>host.querySelector<HTMLButtonElement>('[aria-label="全画面表示"]')!.click());expect(searchInput.closest('.analyzer-workspace-search')?.hasAttribute('hidden')).toBe(true);expect(host.querySelector('.analyzer-controls-workspace.is-fullscreen')!.contains(selector)).toBe(true);
+    await act(async()=>host.querySelector<HTMLButtonElement>('[aria-label="全画面を終了"]')!.click());expect(content()).toBe(selector);expect(host.querySelector('input[type="search"]')).toBe(searchInput);expect(searchInput.value).toBe('app-a');expect(searchInput.closest('.analyzer-workspace-search')?.hasAttribute('hidden')).toBe(false);
     await change('simple-overview');expect(ids().every(id=>id?.startsWith('architecture-simple:'))).toBe(true);const simpleIds=ids(),simpleCamera=camera();
     await search('child');expect(host.querySelector('[role="option"]')?.textContent).toContain('要約の内訳に一致');await act(async()=>host.querySelector<HTMLElement>('[role="option"]')!.click());expect(host.querySelector('.architecture-detail')?.textContent).toContain('child');expect(camera()).toBe(simpleCamera);expect(ids()).toEqual(simpleIds);
     await act(async()=>button('3D').click());expect(host.querySelector('.architecture-detail h3')?.textContent).toBe('app-a');await act(async()=>button('2D').click());await change('all');expect(ids()).toEqual(original);expect(camera()).toBe(originalCamera);expect(host.querySelector<HTMLInputElement>('input[type="search"]')!.value).toBe('app-a');

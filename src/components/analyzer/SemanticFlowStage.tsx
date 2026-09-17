@@ -13,7 +13,8 @@ import type { FlowLabelObstacle } from './semanticFlowLabels';
 
 const SemanticFlow3D = lazy(() => import('./SemanticFlow3D').then(module => ({ default: module.SemanticFlow3D })));
 
-export function SemanticFlowStage({ graph, explorer, nodeDisplays, navigation, mode, direction, selectedIds, selectedEdgeId, matchIds, focus, cameras, onCamera, onMode, particleMode, onParticleMode, onSelect, onArchitectureNodeClick, onSelectEdge, onClear, isFullscreen, onFullscreen, onUnavailable, hoverTarget, onHoverTarget, showGroupBounds = true, onGroupBounds, autoAggregation = true, onAutoAggregation, aggregationState, onAggregationState, totalNodeCount, fineExpandedScopeIds, onFineExpandedScopeIds, architectureControls, contentControls, contentDescription, architectureOverlay }: {
+export function SemanticFlowStage({ loading=false, graph, explorer, nodeDisplays, navigation, mode, direction, selectedIds, selectedEdgeId, matchIds, focus, cameras, onCamera, onMode, particleMode, onParticleMode, onSelect, onArchitectureNodeClick, onSelectEdge, onClear, isFullscreen, onFullscreen, onUnavailable, hoverTarget, onHoverTarget, showGroupBounds = true, onGroupBounds, autoAggregation = true, onAutoAggregation, aggregationState, onAggregationState, totalNodeCount, fineExpandedScopeIds, onFineExpandedScopeIds, architectureControls, contentControls, contentDescription, architectureOverlay }: {
+  loading?:boolean;
   architectureControls?: ReactNode; contentControls?:ReactNode; contentDescription?:ReactNode; architectureOverlay?: ReactNode;
   nodeDisplays?: SemanticFlowRenderProps['nodeDisplays'];
   graph: SemanticGraph; explorer?: SemanticExplorerModel; navigation?: SemanticExplorerNavigationActions; mode: '2d' | '3d'; direction?: 'both' | 'incoming' | 'outgoing'; selectedIds: ReadonlySet<string>; selectedEdgeId?: string; matchIds: ReadonlySet<string>;
@@ -116,7 +117,7 @@ export function SemanticFlowStage({ graph, explorer, nodeDisplays, navigation, m
       <p>{graph.view === 'architecture-map' ? 'クリック・Enterで構成要素を選択し、内部を開くボタンで下位の構成へ移動します。パンくず・親へ・戻るで階層と訪問先を移動できます。2Dはドラッグで移動、3Dはドラッグで回転します。ホイールと＋ / −で拡大縮小できます。' : mode === '2d' ? 'ブロックをクリック・Enterで開き、パンくずや「親へ」で所属階層を移動します。「戻る」とブラウザの戻る・進むは訪問した場所を復元します。関係図の対象はクリックで選択し、「この要素を中心に見る」で中心を切り替えます。関係図はドラッグと矢印キーで移動、ホイールと＋ / −で拡大縮小できます。' : 'ドラッグで回転、右ドラッグで移動。点やラベルから対象を選択できます。ホイールと＋ / −で拡大縮小できます。'}</p>
       <p>検索入力はプロジェクト全体の候補を強調します。候補を選ぶと対象の場所へ移動します。2Dと3Dの切り替えは各モードの場所を復元し、明示的な相互ジャンプは選んだ対象へ移動します。</p>
       <p>{semanticFlowDirectionLanguage(graph.view).help}</p><button type="button" onClick={() => setHelp(false)}>ヘルプを閉じる</button></div>}
-    {mode === '2d' ? <SemanticFlow2D key={navigation?.visitId ?? '2d'} {...properties} graph={localGraph} location={navigation?.location} visitId={navigation?.visitId}
+    {loading||!graph.nodes.length?<div className="semantic-stage-placeholder" style={{top:overlayTop+16}} role={loading?'status':undefined}>{loading?<p>構成図を準備しています…</p>:<><h3>表示する対象がありません</h3><p>フィルターまたは表示データを変更してください。</p></>}</div>:mode === '2d' ? <SemanticFlow2D key={navigation?.visitId ?? '2d'} {...properties} graph={localGraph} location={navigation?.location} visitId={navigation?.visitId}
       scrollTop={navigation?.scrollTop} onScroll={navigation?.onScroll} onOpenScope={navigation?.onOpenScope} onOpenNode={navigation?.onOpenNode}
       fitInitial={Boolean(contentDescription)} camera={cameras?.['2d']} onCamera={camera => onCamera('2d', camera)} />
       : graph.nodes.length ? <Suspense fallback={<p className="semantic-flow-loading" role="status">3D全体図を準備中…</p>}><SemanticFlow3D key={graph.view === 'architecture-map' ? 'architecture-3d' : navigation?.visitId ?? '3d'} {...properties}

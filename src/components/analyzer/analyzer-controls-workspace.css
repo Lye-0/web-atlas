@@ -5,7 +5,7 @@
 .analyzer-workspace-search :is(.analyzer-search-control,.analyzer-filter-control) {display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;}
 .analyzer-workspace-search .analyzer-search-control {flex:1 1 280px;min-width:160px;}
 .analyzer-controls-workspace.is-fullscreen {position:fixed;inset:0;z-index:1000;width:100vw;height:100dvh;max-width:none;box-sizing:border-box;padding:10px;background:var(--bg);overflow:hidden;}
-.analyzer-controls-workspace.is-fullscreen > .analyzer-workspace-search {flex:0 1 auto;max-height:38dvh;overflow:auto;}
+.analyzer-controls-workspace.is-fullscreen > .analyzer-workspace-search {display:none;}
 .analyzer-controls-workspace.is-fullscreen > .analyzer-workspace.is-fullscreen {position:relative;inset:auto;width:100%;height:auto;flex:1;min-height:0;padding:0;z-index:auto;}
 .analyzer-controls-workspace.is-fullscreen .analyzer-search-results {margin-block:4px;}
 .analyzer-filter-applied {font-size:.75rem;color:var(--muted);overflow-wrap:anywhere;}

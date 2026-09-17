@@ -321,7 +321,7 @@ function LegacyAnalyzerPage() {
 
           {view==='command'&&<AnalyzerViewTabs/>}
           <div ref={view==='command'?fullscreen.root:undefined} className={view==='command'?`analyzer-controls-workspace${fullscreen.isFullscreen?' is-fullscreen':''}`:undefined} style={view==='command'?undefined:{display:'contents'}} role={view==='command'&&fullscreen.isFullscreen?'dialog':undefined} aria-modal={view==='command'&&fullscreen.isFullscreen||undefined} aria-label={view==='command'&&fullscreen.isFullscreen?'Command Flow 全画面表示':undefined} onKeyDownCapture={view==='command'?fullscreen.onKeyDownCapture:undefined}>
-          <div className={view==='command'?'analyzer-workspace-search':undefined} style={view==='command'?undefined:{display:'contents'}}>
+          <div hidden={view==='command'&&fullscreen.isFullscreen} className={view==='command'?'analyzer-workspace-search':undefined} style={view==='command'?undefined:{display:'contents'}}>
           <AnalyzerToolbar workspaceControls={view==='command'}
             view={view}
             search={search}
