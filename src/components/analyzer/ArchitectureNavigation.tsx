@@ -18,7 +18,7 @@ export function ArchitectureNavigation({ explorer, navigation, graph, selectedId
   const current = items.at(-1), currentElement = useRef<HTMLSpanElement>(null), previousScope = useRef(scopeId);
   useLayoutEffect(() => { if (previousScope.current !== scopeId) currentElement.current?.focus({ preventScroll: true }); previousScope.current = scopeId; }, [scopeId]);
   const label = (item: typeof items[number]) => item.id === 'project' ? `プロジェクト（${navigation.projectLabel || '名称未確認'}）` : item.label;
-  const explanation = scopeId === 'project' ? 'プロジェクト全体の構成を表示'
+  const explanation = scopeId === 'project' ? navigation.contentLabel?`プロジェクト内の「${navigation.contentLabel}」を表示`:'プロジェクト全体の構成を表示'
     : mode === '3d' && navigation.surroundings !== false ? `${current?.label ?? '現在地'}の内部構成＋外側の概要を表示`
       : projection?.contextIds.length ? `${current?.label ?? '現在地'}の内部構成＋直接の相手を表示` : `${current?.label ?? '現在地'}の内部構成を表示`;
   return <div className="semantic-explorer-navigation architecture-navigation">

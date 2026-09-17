@@ -43,6 +43,7 @@ export interface SemanticFlowRenderProps {
 }
 
 interface Explorer2DProps extends SemanticFlowRenderProps {
+  fitInitial?: boolean;
   camera?: FlowCamera2D; onCamera: (camera: FlowCamera2D) => void;
   location?: ExplorerLocation; visitId?: string; scrollTop?: number; onScroll?: (top: number) => void; onOpenScope?: (id: string) => void; onOpenNode?: (id: string) => void;
 }
@@ -58,7 +59,7 @@ export function SemanticFlow2D(props: Explorer2DProps) {
   return <SemanticLocalFlow2D key={props.visitId ?? props.location?.centerId} {...props} />;
 }
 
-function SemanticLocalFlow2D({ onVisibleRelation, showGroupBounds, graph, explorer, nodeDisplays, selectedIds, selectedEdgeId, matchIds, command, motion, overlayTop, location, direction = 'both', camera: savedCamera, onCamera, onSelect, onArchitectureNodeClick, onSelectEdge, onClear, hoverTarget, onHoverTarget, explicitPathNodeIds, explicitPathEdgeIds }: Explorer2DProps) {
+function SemanticLocalFlow2D({ fitInitial, onVisibleRelation, showGroupBounds, graph, explorer, nodeDisplays, selectedIds, selectedEdgeId, matchIds, command, motion, overlayTop, location, direction = 'both', camera: savedCamera, onCamera, onSelect, onArchitectureNodeClick, onSelectEdge, onClear, hoverTarget, onHoverTarget, explicitPathNodeIds, explicitPathEdgeIds }: Explorer2DProps) {
   const relationHint = (hoverTarget?.kind === 'edge' ? graph.edges.find(edge=>edge.id===hoverTarget.id) : undefined) ?? graph.edges.find(edge=>edge.id===selectedEdgeId);
   useEffect(() => { onVisibleRelation?.(relationHint); return () => onVisibleRelation?.(undefined); }, [relationHint,onVisibleRelation]);
   const root = useRef<SVGSVGElement>(null);
@@ -132,7 +133,7 @@ function SemanticLocalFlow2D({ onVisibleRelation, showGroupBounds, graph, explor
         for (const path of paths) for (const point of path.points) { minX = Math.min(minX, point.x - 6); maxX = Math.max(maxX, point.x + 6); minY = Math.min(minY, point.y - 6); maxY = Math.max(maxY, point.y + 6); }
         const scale = Math.min(1.05, (viewport.width - 32) / (maxX - minX), (plot.height - 16) / (maxY - minY));
         if (graph.view === 'architecture-map' || scale >= .8) initial = { x: viewport.width / 2 - (minX + maxX) / 2 * scale, y: plot.centerY - (minY + maxY) / 2 * scale, scale };
-        if (graph.nodes.some(node => node.attributes.unifiedFlow) && scale < .65) initial = { x: 30-minX*.65, y: plot.top+40-minY*.65, scale:.65 };
+        if (!fitInitial && graph.nodes.some(node => node.attributes.unifiedFlow) && scale < .65) initial = { x: 30-minX*.65, y: plot.top+40-minY*.65, scale:.65 };
       }
       commit(initial);
       setInitialized(true);
@@ -142,7 +143,7 @@ function SemanticLocalFlow2D({ onVisibleRelation, showGroupBounds, graph, explor
       commit(current => ({ ...current, x: current.x + (viewport.width - previous.width) / 2, y: current.y + (viewport.height - previous.height) / 2 }));
     }
     previousSize.current = viewport;
-  }, [graph.view, graph.nodes, positions, paths, viewport, commit, overlayTop, centerId, initialized]);
+  }, [graph.view, graph.nodes, positions, paths, viewport, commit, overlayTop, centerId, initialized, fitInitial]);
   const zoom = useCallback((factor: number, x = viewport.width / 2, y = viewport.height / 2) => commit(current => {
     const scale = Math.max(.000001, Math.min(5, current.scale * factor));
     return { scale, x: x - (x - current.x) * scale / current.scale, y: y - (y - current.y) * scale / current.scale };

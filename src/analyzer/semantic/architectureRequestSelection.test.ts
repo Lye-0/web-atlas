@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import { architectureScopeGraph } from './architectureProjection';
+import { architectureContentRange } from './architectureContent';
 import type { SemanticGraph, SemanticNode } from './types';
 import { architectureProviderExplanation, architectureRequestPartition, architectureRequestTitle } from '../../components/analyzer/architectureRequestPresentation';
 import { semanticNodeDisplay } from '../../components/analyzer/semanticFlowDisplay';
@@ -13,6 +14,17 @@ const fixture = (count: number): SemanticGraph => ({ view: 'architecture-map', n
 const graph = (model: SemanticGraph, selectedNodeId?: string, expandedRequestGroupIds?: string[]) => architectureScopeGraph(model, undefined, '', false, { selectedNodeId, expandedRequestGroupIds });
 
 describe('request display partition and stable identity', () => {
+  it('keeps every request searchable and partition counts stable inside a runtime content slice',()=>{
+    const model=fixture(24),owner={...request(99),id:'owner',architecture:{...request(99).architecture!,kind:'application' as const,request:undefined}};
+    model.nodes.push(owner);model.edges=model.nodes.filter(n=>n.id!=='owner').map(n=>({id:`edge-${n.id}`,source:'owner',target:n.id,kind:'http-request',label:'request',confidence:'unresolved' as const,evidence:[],views:['architecture-map']}));
+    const slice=architectureContentRange(model,'path:runtime')!.graph,base=graph(slice),group=base.architectureView!.requestGroups[0]!;
+    expect(slice.nodes.filter(n=>n.architecture?.request)).toHaveLength(24);
+    expect(group.memberIds).toHaveLength(24);
+    const selected=graph(slice,'r0'),partition=architectureRequestPartition(group.memberIds,selected);
+    expect(partition.individualIds).toEqual(['r0']);expect(partition.groupedIds).toHaveLength(23);
+    const expanded=graph(slice,group.id,[group.id]);expect(expanded.nodes.filter(n=>n.architecture?.request)).toHaveLength(24);
+    expect(graph(slice)).toBe(base);expect(slice.nodes.every(n=>model.nodes.includes(n))).toBe(true);
+  });
   it.each([0, 1, 2, 24])('preserves all %i original IDs through selection, replacement, expansion and return', count => {
     const model = fixture(count), original = JSON.stringify(model), base = graph(model), group = base.architectureView!.requestGroups[0];
     if (count < 2) { expect(group).toBeUndefined(); expect(base.nodes).toHaveLength(count); return; }

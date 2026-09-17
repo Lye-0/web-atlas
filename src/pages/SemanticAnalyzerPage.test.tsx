@@ -53,6 +53,26 @@ describe('semantic Analyzer exploration', () => {
     await import('./SemanticAnalyzerPage'); await render();
   });
   afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.clearAllMocks(); vi.unstubAllGlobals(); });
+  it('keeps overview state separate, limits search, preserves mode selection, and shows empty content in a real scope',async()=>{
+    const base=analysis.architecture!.nodes[0]!;
+    const make=(id:string,kind:NonNullable<typeof base.architecture>['kind'],purpose='')=>({...base,id,label:id,attributes:{purpose,unifiedFlow:true},architecture:{...base.architecture!,kind,parentId:undefined as string|undefined,request:undefined,auxiliary:false}});
+    const app=make('app-a','application'),child=make('child','component'),op=make('generate','tool-operation','generate'),sql=make('sql','artifact'),other=make('outside','external-service');child.architecture.parentId=app.id;
+    const edge=(id:string,source:string,target:string,kind:string)=>({...analysis.edges[0]!,id,source,target,kind,views:['architecture-map' as const]});
+    const architecture={view:'architecture-map' as const,nodes:[app,child,op,sql,other],edges:[edge('generated','generate','sql','flow-generates'),edge('outside-edge','sql','outside','data-operation')],environments:[],limitations:[]};
+    vi.mocked(getSemanticAnalysis).mockImplementation(()=>({promise:Promise.resolve({...analysis,architecture}),unsubscribe:()=>{}}));await render({...store,scannedAt:'content'});
+    await act(async()=>host.querySelector<HTMLAnchorElement>('a[href="/analyzer/architecture-map"]')!.click());
+    const content=()=>host.querySelector<HTMLSelectElement>('select[aria-label="表示内容"]')!;
+    const change=async(value:string)=>act(async()=>{content().value=value;content().dispatchEvent(new Event('change',{bubbles:true}));});
+    const ids=()=>[...host.querySelectorAll('[data-node-id]')].map(e=>e.getAttribute('data-node-id'));
+    const camera=()=>host.querySelector('.semantic-flow-2d')?.getAttribute('data-camera-scale');
+    expect(content().value).toBe('all');await search('app-a');const original=ids(),originalCamera=camera(),jobs=vi.mocked(getSemanticAnalysis).mock.calls.length;
+    await change('path:database');expect(ids()).toContain('generate');expect(ids()).not.toContain('outside');await search('outside');expect(host.querySelectorAll('[role="option"]')).toHaveLength(0);
+    await search('sql');await act(async()=>host.querySelector('[data-node-id="sql"]')!.dispatchEvent(new MouseEvent('click',{bubbles:true})));
+    expect(host.querySelector('.semantic-detail')?.textContent).toContain('この表示範囲の外側');await act(async()=>button('3D').click());expect(content().value).toBe('path:database');expect(host.querySelector('.semantic-detail h3')?.textContent).toBe('sql');
+    await act(async()=>button('2D').click());await change('all');expect(ids()).toEqual(original);expect(camera()).toBe(originalCamera);expect(host.querySelector<HTMLInputElement>('input[type="search"]')!.value).toBe('app-a');
+    await act(async()=>host.querySelector('[data-node-id="app-a"]')!.dispatchEvent(new MouseEvent('click',{bubbles:true})));await act(async()=>button('内部を開く').click());await change('path:database');
+    expect(host.querySelector('[aria-label="構成図の現在地"] [aria-current="page"]')?.textContent).toBe('app-a');expect(ids()).toHaveLength(0);expect(host.textContent).toContain('現在の階層・フィルターに該当する内容がありません');expect(vi.mocked(getSemanticAnalysis).mock.calls.length).toBe(jobs);
+  });
   it('keeps selections and 3D mode per view while separating models from function calls', async () => {
     expect(host.querySelectorAll('.analyzer-view-tabs a')).toHaveLength(10);
     expect(host.querySelector('.semantic-object-list')).toBeNull();

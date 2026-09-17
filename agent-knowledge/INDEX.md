@@ -52,6 +52,14 @@
 - files: `src/analyzer/semantic/architecturePositioning.ts`, `src/analyzer/semantic/client.ts`, `src/components/analyzer/architectureContextPolish.test.tsx` …
 - memory: `agent-knowledge/entries/2026-09-16-definition-ownership-8c417a.md`
 
+### 表示内容の状態は実scopeと分離し、訪問履歴のカメラも同期する
+- id: `rm-20260917-content-scope-state`
+- type: `constraint`
+- maturity: `candidate`
+- tags: `content-selection`, `scope`, `camera`, `session`
+- files: `src/analyzer/semantic/architectureContentState.ts`, `src/analyzer/semantic/architectureContent.test.ts`, `src/pages/FlowAnalyzerPage.tsx` …
+- memory: `agent-knowledge/entries/2026-09-17-content-scope-state-c62b18.md`
+
 ### 囲い生成とDOMラベルの所属索引で同じ領域IDを使う
 - id: `rm-20260917-region-label-identity`
 - type: `constraint`

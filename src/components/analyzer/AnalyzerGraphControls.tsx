@@ -6,16 +6,17 @@ import './analyzer-graph-controls.css';
 
 /** One control order, markup and visual treatment for every Analyzer renderer. */
 export function AnalyzerGraphControls({ elementRef, mode, onMode, cameraApplicable = true, cameraTitle, onFit, onReset, onZoomIn, onZoomOut, zoomLabel, zoomLabelRef, canFocus, onFocus,
-  particleMode, onParticleMode, showGroupBounds, onGroupBounds, autoAggregation, onAutoAggregation, isFullscreen, onFullscreen, help, onHelp, children, compact = false }: {
+  particleMode, onParticleMode, showGroupBounds, onGroupBounds, autoAggregation, onAutoAggregation, isFullscreen, onFullscreen, help, onHelp, children, primaryContent, compact = false }: {
   elementRef?: Ref<HTMLDivElement>; mode?: '2d' | '3d'; onMode?: (mode: '2d' | '3d') => void;
   cameraApplicable?: boolean; cameraTitle?: string; onFit: () => void; onReset: () => void; onZoomIn: () => void; onZoomOut: () => void;
   zoomLabel?: string; zoomLabelRef?: Ref<HTMLSpanElement>; canFocus: boolean; onFocus: () => void;
   particleMode: SpatialParticleMode; onParticleMode: (mode: SpatialParticleMode) => void;
   showGroupBounds?: boolean; onGroupBounds?: (value: boolean) => void; autoAggregation?: boolean; onAutoAggregation?: (value: boolean) => void;
-  isFullscreen?: boolean; onFullscreen?: () => void; help: boolean; onHelp: (value: boolean) => void; children?: ReactNode; compact?: boolean;
+  isFullscreen?: boolean; onFullscreen?: () => void; help: boolean; onHelp: (value: boolean) => void; children?: ReactNode; primaryContent?:ReactNode; compact?: boolean;
 }) {
   const [expanded,setExpanded]=useState(false);
   return <div ref={elementRef} className="analyzer-stage-controls analyzer-graph-controls" aria-label="グラフ操作">
+    {primaryContent}
     {onMode && <div className="semantic-flow-mode" role="group" aria-label="表示モード"><button type="button" aria-pressed={mode === '2d'} onClick={() => onMode('2d')}>2D</button><button type="button" aria-pressed={mode === '3d'} onClick={() => onMode('3d')}>3D</button></div>}
     {compact&&<button type="button" aria-expanded={expanded} onClick={()=>setExpanded(!expanded)}>その他の操作</button>}
     <div className="analyzer-controls-secondary" hidden={compact&&!expanded}>

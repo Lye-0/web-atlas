@@ -8,6 +8,7 @@ import { ArchitectureNavigation } from './ArchitectureNavigation';
 import type { SemanticFlowHoverTarget } from '../../analyzer/semantic/flowRelationInteraction';
 
 export interface SemanticExplorerNavigationActions {
+  contentLabel?:string;
   projectLabel?: string; surroundings?: boolean; canOpenScope?: (id: string) => boolean;
   location: ExplorerLocation; visitId: string; scrollTop: number; canBack: boolean;
   activePath?: ExplorerLocation;

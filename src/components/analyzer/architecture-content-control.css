@@ -1,0 +1,6 @@
+.architecture-content-control {display:flex;align-items:center;gap:8px;max-width:100%;min-width:0;color:var(--muted);font-size:12px;}
+.architecture-content-control > span {white-space:nowrap;}
+.architecture-content-control select {width:220px;max-width:calc(100vw - 110px);min-width:0;height:34px;padding:4px 8px;border:1px solid var(--line);border-radius:5px;background:var(--surface);color:var(--text);text-overflow:ellipsis;}
+.architecture-content-control select:focus-visible {outline:2px solid var(--accent);outline-offset:2px;}
+.architecture-content-note {padding:8px 12px;margin:6px 0;background:var(--surface);color:var(--muted);font-size:12px;overflow-wrap:anywhere;}
+.architecture-content-note button {margin:4px 8px 0 0;padding:5px 9px;border:1px solid var(--line);border-radius:5px;color:var(--text);background:var(--surface);}
