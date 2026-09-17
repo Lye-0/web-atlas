@@ -62,13 +62,13 @@ function RelationEvidence({ edges, sources }: { edges: SemanticEdge[]; sources: 
   </>; }}</Disclosure>;
 }
 
-export function ArchitectureDetail({ node, edge, graph, visible, sources, store, analysis, canOpen, onOpen, onReveal, onSelect, onSelectEdge, onJump, onClose, onHoverTarget, contentAllowedIds, onShowAll }: {
+export function ArchitectureDetail({ node, edge, graph, visible, sources, store, analysis, canOpen, onOpen, onReveal, onSelect, onSelectEdge, onJump, onClose, onHoverTarget, contentAllowedIds, contentMembership, onShowAll }: {
   node?: SemanticNode; edge?: SemanticEdge; graph: SemanticGraph; visible: SemanticGraph; sources: Record<string, string>;
   store: AnalyzerProjectStore; analysis: SemanticAnalysis;
   canOpen?: (id: string) => boolean;
   onOpen: (id: string) => void; onReveal: (id: string) => void; onSelect: (id: string) => void; onSelectEdge: (id: string) => void; onClose: () => void;
   onJump: (id: string, view: SemanticViewId) => void; onHoverTarget?: SemanticFlowHoverHandler;
-  contentAllowedIds?:ReadonlySet<string>;onShowAll?:(id:string)=>void;
+  contentMembership?:{label:string;reason:string;source?:string};contentAllowedIds?:ReadonlySet<string>;onShowAll?:(id:string)=>void;
 }) {
   const [relationLimit, setRelationLimit] = useState(20);
   const [knownLimit,setKnownLimit]=useState(3),[unknownLimit,setUnknownLimit]=useState(3);
@@ -123,6 +123,7 @@ export function ArchitectureDetail({ node, edge, graph, visible, sources, store,
         {definition?.role && <div><dt>{definition.inherited?'定義元の構成の位置づけ':'この構成の位置づけ'}</dt><dd>{definition.inherited&&<strong>{definition.owner?.label??'所属する定義（名称未確認）'} · </strong>}{definition.role}</dd></div>}
         {definition?.path && <div><dt>定義元</dt><dd>{definition.shortPath}<small>{definition.location}</small></dd></div>}
       </dl>
+      {contentMembership&&<section className="architecture-context-note" aria-label="表示内容への含まれ方"><strong>{contentMembership.label}</strong><p>{contentMembership.reason}</p>{contentMembership.source&&<small>{contentMembership.source}</small>}</section>}
       {node.attributes.unifiedFlow && <section className="architecture-context-note" aria-label="操作と対応の確認状態">
         <strong>{arch.kind === 'tool-operation' ? '操作の記述・実行未観測' : '設定上の対応・稼働未観測'}</strong>
         {arch.kind !== 'tool-operation' && node.attributes.configurationPath && <p>設定：<code>{String(node.attributes.configurationPath)}</code></p>}

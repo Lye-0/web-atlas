@@ -3,10 +3,10 @@ id: rm-20260917-content-scope-state
 topic: analyzer-architecture
 type: constraint
 status: active
-maturity: candidate
+maturity: reused
 created: 2026-09-17
 last_verified: 2026-09-17
-source_commit: "b028452"
+source_commit: "7ce445b"
 related_files:
   - src/analyzer/semantic/architectureContentState.ts
   - src/analyzer/semantic/architectureContent.test.ts
@@ -37,6 +37,8 @@ Architectureの表示内容変更は階層移動ではない。内容×実scope�
 ## Evidence
 
 source_commitを基点とする今回の変更で検証。vehicleの全体→DB→全体で位置/カメラ/ID一致、DB再訪で検索/選択/カメラ復元、実LegacyHost内部で空のDB内容でもscope保持。範囲外APIへの明示移動で実scopeと選択が一致。
+
+プリセット仕上げでも再検証。実際の2Dパン/ズーム・3D回転の往復で両カメラ一致、5要求の明示展開を別内容へ混入させず復元、全体フィルターを独立保持。既存の状態管理は正常であり、名称短縮やグループ変更を理由に置き換えなかった。
 
 ## Verification
 

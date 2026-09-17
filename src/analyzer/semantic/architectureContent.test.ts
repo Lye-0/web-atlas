@@ -8,6 +8,32 @@ const n=(id:string,kind='application',purpose='',env:string[]=[]):SemanticNode=>
 const e=(id:string,source:string,target:string,kind:string):SemanticEdge=>({id,source,target,kind,label:kind,confidence:'inferred',views:['architecture-map'],evidence:[{path:'input.ts',start:0,end:4,line:1,endLine:1,description:id}]});
 function fixture():SemanticGraph{return {view:'architecture-map',nodes:[n('app'),n('schema','code-definition'),n('gen','tool-operation','generate'),n('sql','artifact'),n('apply','tool-operation','apply',['staging']),n('db','resource','',['staging']),n('auth','external-service'),n('code','code-definition'),n('build','tool-operation','build'),n('files','artifact'),n('publish','tool-operation','deploy',['production']),n('server','execution-config','',['production']),n('start','tool-operation','start',['staging']),n('local','execution-config','',['staging']),n('script','tool-operation','script')],edges:[e('schema-gen','schema','gen','flow-input'),e('gen-sql','gen','sql','flow-generates'),e('sql-apply','sql','apply','flow-input'),e('apply-db','apply','db','flow-applies'),e('app-db','app','db','data-operation'),e('app-auth','app','auth','service-use'),e('code-build','code','build','flow-input'),e('build-files','build','files','flow-generates'),e('files-publish','files','publish','flow-input'),e('publish-server','publish','server','flow-deploys'),e('server-db','server','db','data-operation'),e('code-start','code','start','flow-input'),e('start-local','start','local','flow-starts'),e('script-start','script','start','flow-invokes'),e('script-publish','script','publish','flow-invokes')]};}
 describe('Architecture content slices',()=>{
+ it('limits logical definitions to units and directly evidenced execution configurations',()=>{
+  const model=fixture(),core=n('unresolved-app'),code=model.nodes.find(n=>n.id==='code')!,runtime=model.nodes.find(n=>n.id==='server')!;
+  code.attributes.logicalOwnerId='app';runtime.attributes.logicalOwnerId='app';model.nodes.push(core);
+  model.edges.push(e('app-runtime','app','server','flow-definition'),e('app-local','app','local','flow-definition'),e('code-runtime','code','server','flow-configures'),e('app-code','app','code','flow-definition'),e('unrelated-kind','app','server','http-request'));
+  const before=JSON.stringify(model),slice=architectureContentRange(model,'["partition","definition",[]]')!;
+  expect(slice.graph.nodes.map(n=>n.id).sort()).toEqual(['app','code','local','server','unresolved-app']);
+  expect(slice.graph.edges.map(e=>e.id)).toEqual(['app-runtime','app-local','code-runtime','app-code']);
+  expect(slice.roles.get('app')).toBe('core');expect(slice.roles.get('server')).toBe('peer');expect(slice.roles.get('code')).toBe('support');
+  expect(JSON.stringify(model)).toBe(before);expect(slice.graph.edges.every(e=>model.edges.includes(e))).toBe(true);
+ });
+ it('retains direct serving correspondence without following runtime resource use',()=>{
+  const model=fixture();model.edges.push(e('serves','local','app','flow-serves'),e('db-use','local','db','data-operation'));
+  const slice=architectureContentRange(model,'["partition","definition",[]]')!;expect(slice.graph.nodes.map(n=>n.id)).toEqual(['app','local']);expect(slice.graph.edges.map(e=>e.id)).toEqual(['serves']);
+ });
+ it('does not infer an environment from a script label or turn a known peer into an unknown core',()=>{
+  const script=n('script-prod','tool-operation','script'),op=n('publish-prod','tool-operation','deploy',['production']);script.label='deploy:production';op.attributes.executionPlace='unconfirmed';
+  const model:SemanticGraph={view:'architecture-map',nodes:[script,op],edges:[e('invokes','script-prod','publish-prod','flow-invokes')]};
+  const slice=architectureContentRange(model,'["partition","unknown",[]]')!;expect(slice.roles.get(script.id)).toBe('core');expect(slice.roles.get(op.id)).toBeUndefined();expect(op.architecture!.environments).toEqual(['production']);
+  expect(architectureContentChoices(model).find(c=>c.environment==='production')!.id).toBe('["environment","production"]');
+ });
+ it('keeps prior candidate keys while separating composition and disambiguating actual environment names',()=>{
+  const model:SemanticGraph={view:'architecture-map',nodes:[n('app'),n('default','execution-config','',['default']),n('named','execution-config','',['既定設定']),n('long','execution-config','',['staging-とても長い任意の環境名-東日本'])],edges:[]};
+  const choices=architectureContentChoices(model);expect(choices.find(c=>c.id==='["partition","definition",[]]')?.group).toBe('composition');
+  expect(choices.find(c=>c.id==='["environment","既定設定"]')?.label).toBe('環境「既定設定」');expect(choices.find(c=>c.id==='all')?.label).toBe('全体');
+  expect(choices.find(c=>c.environment?.startsWith('staging'))?.label).toContain('東日本');
+ });
  it('distinguishes shared, default and unknown partitions without inventing an environment',()=>{
   const shared=n('shared','artifact');shared.attributes.sharedEnvironments=['preview-青','release'];
   const model:SemanticGraph={view:'architecture-map',nodes:[shared,n('default','execution-config','',['default']),n('unknown','execution-config'),n('preview','execution-config','',['preview-青'])],edges:[]};
@@ -27,6 +53,12 @@ describe('Architecture content slices',()=>{
 });
 describe('content-local session state',()=>{
  const initial=()=>enterExplorerVisit({...createInitialAnalyzerViewSession(),search:'overview',selectedNodeId:'root',detailOpen:true},{id:'real-visit',mode:'2d',twoD:{location:{scopeId:'project',depth:1,direction:'both'},scrollTop:0,camera:{x:12,y:34,scale:1.2}},selectedNodeId:'root',detailOpen:true});
+ it('restores per-content 3D cameras, filters and explicit requests without resetting shared flow options',()=>{
+  const whole=recordExplorerCamera({...initial(),semantic:{...createInitialAnalyzerViewSession().semantic!,kind:'application'},architecture:{expandedRequestGroupIds:['whole-group']},flow:{mode:'3d',expandedGroupIds:[],particleMode:'off'}},'3d',{position:[1,2,3],target:[4,5,6],zoom:2});
+  const focused=recordExplorerCamera({...switchArchitectureContent(whole,'path:database'),search:'migration',architecture:{expandedRequestGroupIds:['db-group']}},'3d',{position:[10,20,30],target:[40,50,60],zoom:3});
+  const restored=switchArchitectureContent(focused,'all');expect(restored.flowCameras?.['3d']).toEqual(whole.flowCameras?.['3d']);expect(restored.semantic?.kind).toBe('application');expect(restored.architecture?.expandedRequestGroupIds).toEqual(['whole-group']);expect(restored.flow?.particleMode).toBe('off');
+  const again=switchArchitectureContent(restored,'path:database');expect(again.flowCameras?.['3d']).toEqual(focused.flowCameras?.['3d']);expect(again.architecture?.expandedRequestGroupIds).toEqual(['db-group']);expect(again.search).toBe('migration');
+ });
  it('restores overview and selected content cameras, search, selection and expansion without a fake visit',()=>{const a=initial(),b=switchArchitectureContent(a,'path:database');expect(b.explorer?.currentVisitId).toBe(a.explorer?.currentVisitId);expect(b.selectedNodeId).toBeUndefined();expect(b.flowCameras?.['2d']).toBeUndefined();const edited=recordExplorerCamera({...b,search:'db',aggregation:{expandedGroupIds:['g'],collapsedGroupIds:[]}},'2d',{x:7,y:8,scale:2});const all=switchArchitectureContent(edited,'all');expect(all.search).toBe('overview');expect(all.selectedNodeId).toBe('root');expect(all.flowCameras?.['2d']).toEqual({x:12,y:34,scale:1.2});const again=switchArchitectureContent(all,'path:database');expect(again.search).toBe('db');expect(again.aggregation?.expandedGroupIds).toEqual(['g']);expect(again.flowCameras?.['2d']?.x).toBe(7);});
  it('keeps actual scope on a content change and drops all banks on input replacement',()=>{const a=initial(),inside=enterExplorerVisit(a,{id:'inside',previousId:'real-visit',mode:'2d',twoD:{location:{scopeId:'api',depth:1,direction:'both'},scrollTop:0},detailOpen:false});const selected=switchArchitectureContent(inside,'path:start');expect(selected.explorer?.twoD.location.scopeId).toBe('api');const back=preserveArchitectureContentScope(selected,enterExplorerVisit(selected,{...inside.explorer!.visits['real-visit']!}));expect(back.architectureContent?.key).toBe('path:start');const session={...createInitialAnalyzerSessionState(),views:{...createInitialAnalyzerSessionState().views,'architecture-map':back}};expect(analyzerSessionReducer(session,{type:'replaceProject',store:{files:[],facts:[],relations:[],evidence:[],sources:{},warnings:[],scannedAt:'next'}}).views['architecture-map'].architectureContent).toBeUndefined();});
 });

@@ -55,10 +55,18 @@
 ### 表示内容の状態は実scopeと分離し、訪問履歴のカメラも同期する
 - id: `rm-20260917-content-scope-state`
 - type: `constraint`
-- maturity: `candidate`
+- maturity: `reused`
 - tags: `content-selection`, `scope`, `camera`, `session`
 - files: `src/analyzer/semantic/architectureContentState.ts`, `src/analyzer/semantic/architectureContent.test.ts`, `src/pages/FlowAnalyzerPage.tsx` …
 - memory: `agent-knowledge/entries/2026-09-17-content-scope-state-c62b18.md`
+
+### 囲いの論理定義区分を論理アプリプリセットの全探索起点にしない
+- id: `rm-20260917-definition-preset-boundary`
+- type: `constraint`
+- maturity: `candidate`
+- tags: `preset`, `definition`, `environment`
+- files: `src/analyzer/semantic/architectureContent.ts`, `src/analyzer/semantic/architectureContext.ts`, `src/analyzer/semantic/architectureContent.test.ts` …
+- memory: `agent-knowledge/entries/2026-09-17-definition-preset-boundary-6729ca.md`
 
 ### 囲い生成とDOMラベルの所属索引で同じ領域IDを使う
 - id: `rm-20260917-region-label-identity`

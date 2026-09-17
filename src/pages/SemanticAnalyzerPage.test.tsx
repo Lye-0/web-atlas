@@ -71,7 +71,7 @@ describe('semantic Analyzer exploration', () => {
     expect(host.querySelector('.semantic-detail')?.textContent).toContain('この表示範囲の外側');await act(async()=>button('3D').click());expect(content().value).toBe('path:database');expect(host.querySelector('.semantic-detail h3')?.textContent).toBe('sql');
     await act(async()=>button('2D').click());await change('all');expect(ids()).toEqual(original);expect(camera()).toBe(originalCamera);expect(host.querySelector<HTMLInputElement>('input[type="search"]')!.value).toBe('app-a');
     await act(async()=>host.querySelector('[data-node-id="app-a"]')!.dispatchEvent(new MouseEvent('click',{bubbles:true})));await act(async()=>button('内部を開く').click());await change('path:database');
-    expect(host.querySelector('[aria-label="構成図の現在地"] [aria-current="page"]')?.textContent).toBe('app-a');expect(ids()).toHaveLength(0);expect(host.textContent).toContain('現在の階層・フィルターに該当する内容がありません');expect(vi.mocked(getSemanticAnalysis).mock.calls.length).toBe(jobs);
+    expect(host.querySelector('[aria-label="構成図の現在地"] [aria-current="page"]')?.textContent).toBe('app-a');expect(ids()).toHaveLength(0);expect(host.textContent).toContain('現在の階層には、この内容の中心となる対象や直接の相手がありません');expect(vi.mocked(getSemanticAnalysis).mock.calls.length).toBe(jobs);
   });
   it('keeps selections and 3D mode per view while separating models from function calls', async () => {
     expect(host.querySelectorAll('.analyzer-view-tabs a')).toHaveLength(10);

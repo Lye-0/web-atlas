@@ -33,6 +33,8 @@ import './semantic-flow.css';
 import {architectureContentChoices,architectureContentRange,contentHasScope} from '../analyzer/semantic/architectureContent';
 import {switchArchitectureContent,preserveArchitectureContentScope} from '../analyzer/semantic/architectureContentState';
 import {ArchitectureContentControl} from '../components/analyzer/ArchitectureContentControl';
+import {ArchitectureContentSummary} from '../components/analyzer/ArchitectureContentSummary';
+import {architectureContentMembership} from '../components/analyzer/architectureContentMembership';
 
 const semanticFlowDefaults: NonNullable<AnalyzerViewSession['semantic']> = { scope: '', kind: '', confidence: '', layer: 'source', depth: 0, direction: 'both', orbit: false, overview: true, page: 0, auxiliary: false, members: undefined };
 const defaultFlow: NonNullable<AnalyzerViewSession['flow']> = { mode: '2d', expandedGroupIds: [] };
@@ -75,6 +77,7 @@ export default function FlowAnalyzerPage({ view }: { view: SemanticExplorerViewI
   const wholeGraph = useMemo(() => projectSemanticView(analysis ?? emptyAnalysis, view, traces, view === 'data-model' ? 'source' : options.layer), [analysis, view, traces, options.layer]);
   const contentChoices=useMemo(()=>view==='architecture-map'?architectureContentChoices(wholeGraph):[],[wholeGraph,view]);
   const contentRange=useMemo(()=>view==='architecture-map'?architectureContentRange(wholeGraph,contentKey):undefined,[wholeGraph,view,contentKey]);
+  const contentChoice=contentChoices.find(choice=>choice.id===contentKey);
   const graph=contentRange?.graph??wholeGraph;
   const contentIds=useMemo(()=>contentRange?new Set(graph.nodes.map(n=>n.id)):undefined,[contentRange,graph.nodes]);
   const changeContent=(key:string)=>{clearHover();setFocus(undefined);setShowWholeTarget(undefined);writeView(view,current=>switchArchitectureContent(current,key));};
@@ -82,6 +85,8 @@ export default function FlowAnalyzerPage({ view }: { view: SemanticExplorerViewI
   const byId = useMemo(() => new Map(graph.nodes.map(node => [node.id, node])), [graph.nodes]);
   const allNodes = useMemo(() => new Map([...(analysis?.nodes ?? []), ...graph.nodes].map(node => [node.id, node])), [analysis, graph.nodes]);
   const selected = session.selectedNodeId ? byId.get(session.selectedNodeId) : undefined;
+  const contentRole=selected&&contentRange?.roles.get(selected.id);
+  const contentMembership=selected&&contentChoice&&contentRole?architectureContentMembership(selected,contentChoice,contentRole):undefined;
   const architectureLocation = session.explorer?.twoD.location;
   const filtered = useMemo<SemanticGraph>(() => {
     const members = options.members ? new Set(options.members) : undefined;
@@ -253,7 +258,7 @@ export default function FlowAnalyzerPage({ view }: { view: SemanticExplorerViewI
         role={fullscreen.isFullscreen ? 'dialog' : undefined} aria-modal={fullscreen.isFullscreen || undefined} aria-label={fullscreen.isFullscreen ? `${view} 全画面表示` : undefined} onKeyDownCapture={event => { architectureGesture.bindings.onKeyDownCapture?.(); fullscreen.onKeyDownCapture(event); }}>
         {<SemanticFlowStage key={`${view}:${state.scanVersion}:${contentKey}`} graph={stageGraph} explorer={explorer} nodeDisplays={stageDisplays} mode={flow.mode} direction={options.direction} selectedIds={selectedIds} selectedEdgeId={selectedEdge?.id} matchIds={matchIds} focus={focus}
           contentControls={view==='architecture-map'?<ArchitectureContentControl choices={contentChoices} value={contentKey} onChange={changeContent}/>:undefined}
-          contentDescription={contentRange&&<div className="architecture-content-note"><strong>{contentChoices.find(c=>c.id===contentKey)?.label}に関係する構成を表示</strong><p>解析全体 {wholeGraph.nodes.length}対象 · この内容 {graph.nodes.length}対象 / {graph.edges.length}関係。表示集合を含まない構成モデルのID数です。</p>{!stageGraph.nodes.length&&<p>現在の階層・フィルターに該当する内容がありません。構成が存在しないという意味ではありません。<button onClick={navigation.project}>プロジェクトへ</button></p>}<button onClick={()=>changeContent('all')}>全体に戻す</button></div>}
+          contentDescription={contentRange&&contentChoice&&<ArchitectureContentSummary choice={contentChoice} nodes={graph.nodes.length} edges={graph.edges.length} total={wholeGraph.nodes.length} emptyScope={contentEmpty} emptyFiltered={!stageGraph.nodes.length} onProject={navigation.project} onAll={()=>changeContent('all')}/>}
           architectureControls={view === 'architecture-map' && flow.mode === '3d' && architectureBase?.scopeId ? <button type="button" aria-label="周辺構成" aria-pressed={session.architecture?.surroundings !== false} title="直接つながる外側の接続相手は残します" onClick={() => updateView(view, { architecture: { ...session.architecture, surroundings: session.architecture?.surroundings === false } })}>周辺構成：{session.architecture?.surroundings !== false ? '表示' : '非表示'}</button> : undefined}
           navigation={{ contentLabel: contentRange?contentChoices.find(c=>c.id===contentKey)?.label:undefined, location: explorerLocation, activePath: navigation.activePath, visitId: navigation.visitId, scrollTop: navigation.scrollTop, canBack: navigation.canBack,
             projectLabel: state.folderHandle?.name ?? store.facts.find(fact => fact.kind === 'project')?.label, surroundings: session.architecture?.surroundings !== false, canOpenScope: navigation.canOpenScope,
@@ -270,7 +275,7 @@ export default function FlowAnalyzerPage({ view }: { view: SemanticExplorerViewI
           onUnavailable={() => { setUnavailable3D(true); navigation.changeMode('2d'); }} />}
         {store && view === 'architecture-map' && session.detailOpen && inspectedRequests && <ArchitectureRequestInspection key={inspectedRequests.id} group={inspectedRequests} nodes={byId} visible={stageGraph} onSelect={selectNode} onClose={() => { clearHover(); updateView(view, current => recordExplorerSelection(current, { selectedNodeId: current.selectedNodeId, selectedEdgeId: current.selectedEdgeId, detailOpen: false })); }} expanded={session.architecture?.expandedRequestGroupIds?.includes(inspectedRequests.id) ?? false}
           onExpanded={expanded => updateView(view, { architecture: { ...session.architecture, expandedRequestGroupIds: [...session.architecture?.expandedRequestGroupIds?.filter(id => id !== inspectedRequests.id) ?? [], ...(expanded ? [inspectedRequests.id] : [])] } })} />}
-        {store && view === 'architecture-map' && session.detailOpen && (selected || selectedEdge) && <ArchitectureDetail key={selected?.id ?? selectedEdge?.id} contentAllowedIds={contentIds} onShowAll={showInWhole} node={stageGraph.nodes.find(n => n.id === selected?.id) ?? selected} edge={selectedEdge} graph={wholeGraph} visible={stageGraph} sources={store.semanticSources ?? store.sources} store={store} analysis={analysis!} canOpen={navigation.canOpenScope} onOpen={navigation.openScope} onReveal={id => navigation.jumpMode(flow.mode, id)} onSelect={selectNode} onSelectEdge={selectEdge} onJump={jump} onHoverTarget={onHoverTarget} onClose={() => { clearHover(); updateView(view, current => recordExplorerSelection(current, { selectedNodeId: current.selectedNodeId, selectedEdgeId: current.selectedEdgeId, detailOpen: false })); }} />}
+        {store && view === 'architecture-map' && session.detailOpen && (selected || selectedEdge) && <ArchitectureDetail key={selected?.id ?? selectedEdge?.id} contentAllowedIds={contentIds} contentMembership={contentMembership} onShowAll={showInWhole} node={stageGraph.nodes.find(n => n.id === selected?.id) ?? selected} edge={selectedEdge} graph={wholeGraph} visible={stageGraph} sources={store.semanticSources ?? store.sources} store={store} analysis={analysis!} canOpen={navigation.canOpenScope} onOpen={navigation.openScope} onReveal={id => navigation.jumpMode(flow.mode, id)} onSelect={selectNode} onSelectEdge={selectEdge} onJump={jump} onHoverTarget={onHoverTarget} onClose={() => { clearHover(); updateView(view, current => recordExplorerSelection(current, { selectedNodeId: current.selectedNodeId, selectedEdgeId: current.selectedEdgeId, detailOpen: false })); }} />}
         {store && view !== 'architecture-map' && session.detailOpen && (selected || selectedEdge) && <SemanticFlowDetail key={selected?.id ?? selectedEdge?.id} node={selected} edge={selectedEdge} nodes={allNodes} edges={graph.edges} sources={store.semanticSources ?? store.sources} view={view}
           openChoiceIds={session.modelOpenChoiceIds} onOpenChoiceIds={modelOpenChoiceIds => updateView(view, { modelOpenChoiceIds })}
           fieldId={session.semanticFieldId} onField={semanticFieldId => updateView(view, current => recordExplorerSelection(current, { selectedNodeId: current.selectedNodeId, selectedEdgeId: current.selectedEdgeId, detailOpen: current.detailOpen, semanticFieldId }))}
