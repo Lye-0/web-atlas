@@ -1,16 +1,7 @@
-.architecture-environment-headings { position:absolute; inset:0; pointer-events:none; overflow:hidden; }
-.architecture-environment-headings > svg { position:absolute; width:100%; height:100%; }
-.architecture-environment-headings path { stroke:#78998b; stroke-width:1; fill:none; }
-.architecture-environment-heading { position:absolute; pointer-events:auto; }
-.architecture-environment-heading > button { display:block; width:100%; padding:5px 10px; border:1px solid #637e72; border-radius:5px; background:#102019; color:#d0e6d9; text-align:left; font-size:13px; line-height:18px; font-weight:600; cursor:pointer; }
-.architecture-environment-heading > button > span { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:anywhere; }
-.architecture-environment-heading > button:focus-visible { outline:2px solid #b4dfcd; outline-offset:2px; }
-.architecture-environment-heading:has(button:focus-visible), .architecture-environment-heading:has(button[aria-expanded='true']) { z-index:2; }
-.architecture-environment-full { margin:4px 0 0; padding:10px; border:1px solid #78998b; border-radius:5px; background:#102019; color:#d0e6d9; font-size:13px; line-height:1.5; overflow-wrap:anywhere; max-height:180px; overflow:auto; }
-.semantic-flow-3d-labels button[data-architecture-region] > strong { font-size:13px; line-height:18px; white-space:normal; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow-wrap:anywhere; }
-.architecture-region-full { display:none; }
-.semantic-flow-3d-labels button[data-architecture-region]:focus-visible { z-index:3; outline:2px solid #b4dfcd; }
-.semantic-flow-3d-labels button[data-architecture-region]:focus-visible .architecture-region-full { display:block; position:absolute; top:100%; left:0; width:100%; padding:10px; background:#102019; color:#d0e6d9; border:1px solid #78998b; white-space:normal; overflow-wrap:anywhere; }
+.architecture-environment-name { fill:#92aa9e; font-size:12px; font-weight:400; }
+.semantic-flow-3d-labels button.is-region[data-architecture-region] { background:transparent; border:0; box-shadow:none; color:#92aa9e; }
+.semantic-flow-3d-labels button.is-region[data-architecture-region] > strong { font-size:12px; line-height:18px; font-weight:400; white-space:normal; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow-wrap:anywhere; }
+.semantic-flow-3d-labels button.is-region[data-architecture-region]:focus-visible { outline:1px solid #b4dfcd; outline-offset:2px; }
 .semantic-flow-node[data-composition-support]:not(.is-selected):not(.is-match):not(.is-connected) > rect { fill:#111b18; stroke-dasharray:4 3; }
 .semantic-flow-3d-labels button[data-composition-support]:not(.is-selected):not(.is-match):not(.is-related):not(.is-hovered) { background:#111b18; border-style:dashed; }
 .semantic-flow-3d-labels button[data-composition-support]:not(.is-selected):not(.is-match):not(.is-related):not(.is-hovered) > strong { font-weight:500; }

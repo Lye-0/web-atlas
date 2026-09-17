@@ -1,4 +1,6 @@
 import {describe,it,expect} from 'vitest';
+import {renderToStaticMarkup} from 'react-dom/server';
+import {ArchitectureEnvironmentHeadings} from './ArchitectureEnvironmentHeadings';
 import {architectureBoundaryHeadings} from '../../analyzer/semantic/architectureHeadings';
 import {semanticFlowRegions,semanticFlowRegionIdentity} from '../../analyzer/semantic/flowRegions';
 import {architectureDefinitionPresentation} from './architectureDefinitionPresentation';
@@ -11,19 +13,26 @@ const ev={path:'package.json',start:0,end:12,line:1,endLine:1,description:'defin
 const node=(id:string,kind:NonNullable<SemanticNode['architecture']>['kind']='application',path=''):SemanticNode=>({id,label:'same',kind:'subsystem',group:'project',confidence:'source',evidence:[{...ev,path:path?path+'/definition':'package.json'}],attributes:{},architecture:{kind,ownerPath:path,entryPaths:[],roles:[],environments:[],context:[],files:[],memberIds:[],technologyNames:[],auxiliary:false}});
 const edge=(id:string,target:string,confidence:SemanticEdge['confidence']='source'):SemanticEdge=>({id,source:'app',target,kind:'service-use',label:'relation',confidence,views:['architecture-map'],evidence:[ev]});
 describe('Architecture environment, definition and peer presentation',()=>{
- it('keeps same-name boundary IDs separate and honours obstacles and viewport changes',()=>{
+ it('keeps same-name boundary IDs separate inside their own header padding',()=>{
   const n=node('a'),positions=[{node:n,x:0,y:0,z:0}],base=semanticFlowRegions(positions,'2d')[0]!;
   const regions=[{...base,id:'first',label:'共有：日本語 / long-environment-name'},{...base,id:'second',label:'共有：日本語 / long-environment-name'}];
-  for(const width of [390,768,1440]){
-   const names=architectureBoundaryHeadings(regions,positions,{x:width/2,y:400,scale:.3},{width,height:900},120,[{left:0,top:120,width:80,height:80}]);
-   expect(names.map(n=>n.id)).toEqual(['first','second']);expect(names.every(n=>n.left>=12&&n.left+n.width<=width-12&&n.top>=128)).toBe(true);
-  }
+  const before=JSON.stringify(regions),names=architectureBoundaryHeadings(regions);
+  expect(names.map(n=>n.id)).toEqual(['first','second']);
+  for(const h of names){expect(h.left).toBeGreaterThan(base.x-12);expect(h.left+h.width).toBeLessThanOrEqual(base.x+base.width+12);expect(h.top-h.borderTop).toBe(12);expect(h.top+h.height).toBeLessThan(base.y);}
+  expect(JSON.stringify(regions)).toBe(before);
  });
  it('uses one environment identity for wire regions and the mounted 3D region membership',()=>{
   const n={...node('env-node'),attributes:{flowEnvironment:'任意環境'}},positions=[{node:n,x:0,y:0,z:0}];
   const explorer=buildSemanticExplorer({view:'architecture-map',nodes:[n],edges:[]},new Set());
   expect(semanticFlowRegions(positions,'3d',explorer)[0]!.id).toBe(semanticFlowRegionIdentity(n,explorer).id);
   expect(semanticFlowRegionIdentity(n).label).toBe('任意環境');
+ });
+ it('uses only nearby header space when a different region has a node at the heading',()=>{
+  const base=semanticFlowRegions([{node:node('a'),x:0,y:0,z:0}],'2d')[0]!;
+  const obstacle={node:node('other'),x:0,y:base.y-20,z:0},before=JSON.stringify([base,obstacle]);
+  const h=architectureBoundaryHeadings([base],[obstacle])[0]!;
+  expect(h.left-base.x).toBeLessThanOrEqual(160);expect(h.top+h.height).toBeLessThanOrEqual(obstacle.y-62);expect(h.top-h.borderTop).toBe(12);
+  expect(JSON.stringify([base,obstacle])).toBe(before);
  });
  it('describes an inherited role as its recorded owner and preserves the entity kind',()=>{
   const owner=node('owner'),artifact=node('artifact','artifact'),tool=node('tool','tool-operation');owner.label='App';owner.attributes={definitionPath:'deep/app/package.json',definitionOwnerId:'owner',compositionRole:'実行構成として定義'};
@@ -34,12 +43,16 @@ describe('Architecture environment, definition and peer presentation',()=>{
  it('keeps direct names readable, non-overlapping and keyed independently of input order',()=>{
   const nodes=['stage-one','stage-two','unknown','a very long environment identity that must remain readable'].map((label,i)=>({...node(String(i)),attributes:{flowEnvironment:label}}));
   const positions=nodes.map(n=>({node:n,x:0,y:0,z:0})),regions=semanticFlowRegions(positions,'2d');
-  for(const scale of [.2,1,3]){const camera={x:650,y:450,scale},size={width:1400,height:1000},headings=architectureBoundaryHeadings(regions,positions,camera,size,150);
-   expect(headings).toHaveLength(4);expect(headings).toEqual(architectureBoundaryHeadings([...regions].reverse(),positions,camera,size,150));
+  const headings=architectureBoundaryHeadings(regions);
+   expect(headings).toHaveLength(4);expect(headings).toEqual(architectureBoundaryHeadings([...regions].reverse()));
    expect(headings.map(h=>h.label)).toContain(nodes[3]!.attributes.flowEnvironment);
    for(let i=0;i<headings.length;i++)for(let j=i+1;j<headings.length;j++){const a=headings[i]!,b=headings[j]!;expect(a.left+a.width<=b.left||b.left+b.width<=a.left||a.top+a.height<=b.top||b.top+b.height<=a.top).toBe(true);}
+  expect(headings[3]!.lines.join('')).toBe(headings[3]!.label);
+  for(const scale of [.2,1,3]){
+   const host=document.createElement('div');host.innerHTML=renderToStaticMarkup(<svg><g transform={`translate(10 20) scale(${scale})`}><ArchitectureEnvironmentHeadings headings={headings}/></g></svg>);
+   expect(host.querySelectorAll('text')).toHaveLength(4);expect(host.querySelector('button,rect,path,line,foreignObject')).toBeNull();
+   expect(host.querySelector('text')?.closest('g[transform]')?.getAttribute('transform')).toBe(`translate(10 20) scale(${scale})`);
   }
-  expect(architectureBoundaryHeadings(regions,positions,{x:-5000,y:0,scale:1},{width:1400,height:1000})).toEqual([]);
  });
  it.each(['tools/deep/package','renamed/place'])('keeps independent definitions in %s separate from the project root',path=>{
   const root=node('architecture:["package","package.json"]'),nested=node(`architecture:["manifest","${path}/Package.swift","${path}"]`,'code-package',path),child=node('child','component',path+'/Sources');nested.evidence=[{...ev,path:path+'/Package.swift'}];child.architecture!.parentId=nested.id;

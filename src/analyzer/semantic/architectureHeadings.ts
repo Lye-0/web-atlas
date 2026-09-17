@@ -1,37 +1,30 @@
 import type {SemanticFlowRegion} from './flowRegions';
 import type {SemanticPosition} from './presentation';
 
-export interface HeadingBox {left:number;top:number;width:number;height:number}
-export interface ArchitectureHeading extends HeadingBox {id:string;label:string;anchorX:number;anchorY:number}
-const intersects=(a:HeadingBox,b:HeadingBox)=>a.left<b.left+b.width+6&&a.left+a.width+6>b.left&&a.top<b.top+b.height+6&&a.top+a.height+6>b.top;
-const clamp=(n:number,min:number,max:number)=>Math.max(min,Math.min(max,n));
+export interface ArchitectureHeading {id:string;label:string;left:number;top:number;width:number;height:number;lines:string[];borderTop:number}
+const overlaps=(a:ArchitectureHeading,b:{left:number;top:number;width:number;height:number})=>a.left<b.left+b.width+12&&a.left+a.width+12>b.left&&a.top<b.top+b.height+6&&a.top+a.height+6>b.top;
 
-/** Screen-space names follow a visible boundary without moving nodes or the camera. */
-export function architectureBoundaryHeadings(regions:readonly SemanticFlowRegion[],positions:readonly SemanticPosition[],camera:{x:number;y:number;scale:number},viewport:{width:number;height:number},overlayTop=0,extra:readonly HeadingBox[]=[]):ArchitectureHeading[]{
- const top=Math.max(12,overlayTop+8),bottom=viewport.height-76,right=viewport.width-12;
- if(right<100||bottom-top<50)return [];
- const obstacles:HeadingBox[]=[...extra,...positions.map(p=>({left:camera.x+(p.x-124)*camera.scale,top:camera.y+(p.y-62)*camera.scale,width:248*camera.scale,height:124*camera.scale})).filter(b=>b.left<right&&b.left+b.width>0&&b.top<bottom&&b.top+b.height>top)];
- const placed:ArchitectureHeading[]=[];
- for(const region of [...regions].sort((a,b)=>a.id.localeCompare(b.id))){
-  const left=camera.x+(region.x-12)*camera.scale,r=camera.x+(region.x+region.width+12)*camera.scale,t=camera.y+(region.y-20)*camera.scale,b=camera.y+(region.y+region.height+20)*camera.scale;
-  if(r<12||left>right||b<top||t>bottom)continue;
-  const units=[...region.label].reduce((sum,ch)=>sum+(ch.codePointAt(0)!>127?13:7.5),0);
-  const width=Math.min(Math.max(110,units+24),228,right-12),height=units>width-24?48:30;
-  const candidates:ArchitectureHeading[]=[];
-  const add=(x:number,y:number,ax:number,ay:number)=>{if(x>=12&&x+width<=right&&y>=top&&y+height<=bottom)candidates.push({id:region.id,label:region.label,left:x,top:y,width,height,anchorX:ax,anchorY:ay});};
-  // Search along the same visible boundary, never pin an offscreen group to the centre.
-  for(const offset of [8,36,72]){
-   for(const x of [left,r])if(x>=12&&x<=right){
-    const start=clamp(t,top,Math.max(top,bottom-height));
-    for(let y=start;y<=Math.min(b,bottom-height);y+=height+8){add(x-width-offset,y,x,clamp(y+height/2,t,b));add(x+offset,y,x,clamp(y+height/2,t,b));}
-   }
-   for(const y of [t,b])if(y>=top&&y<=bottom){
-    const start=clamp(left,12,Math.max(12,right-width));
-    for(let x=start;x<=Math.min(r,right-width);x+=width+8){add(x,y-height-offset,clamp(x+width/2,left,r),y);add(x,y+offset,clamp(x+width/2,left,r),y);}
-   }
+/** World-space text inside the header padding; camera changes never rearrange it. */
+export function architectureBoundaryHeadings(regions:readonly SemanticFlowRegion[],positions:readonly SemanticPosition[]=[]):ArchitectureHeading[]{
+ const headings:ArchitectureHeading[]=[];
+ const nodes=positions.map(p=>({left:p.x-124,top:p.y-62,width:248,height:124}));
+ for(const r of [...regions].sort((a,b)=>a.id.localeCompare(b.id))){
+  const maxWidth=Math.max(24,Math.min(320,r.width-4)),lines:string[]=[];let line='',length=0,maxLine=0;
+  for(const char of r.label){const size=char.codePointAt(0)!>127?12:8;if(char==='\n'||length+size>maxWidth){lines.push(line);maxLine=Math.max(maxLine,length);line='';length=0;if(char==='\n')continue;}line+=char;length+=size;}
+  lines.push(line);maxLine=Math.max(maxLine,length);
+  const height=lines.length*16,width=Math.min(maxWidth,maxLine+2);
+  const h:ArchitectureHeading={id:r.id,label:r.label,left:r.x+2,top:r.y-height-8,width,height,lines,borderTop:0};
+  // Prefer a neighbouring position on the same top edge. If it cannot fit,
+  // add only another line of header padding, without moving any member node.
+  const occupied=[...headings,...nodes];
+  let other=occupied.find(o=>overlaps(h,o));
+  while(other){
+   const next=other.left+other.width+12;
+   if(next+width<=r.x+r.width-2&&next-r.x<=Math.max(160,width+12))h.left=next;
+   else {h.left=r.x+2;h.top=Math.min(h.top,other.top-height-6);}
+   other=occupied.find(o=>overlaps(h,o));
   }
-  const candidate=candidates.find(c=>!obstacles.some(o=>intersects(c,o))&&!placed.some(o=>intersects(c,o)));
-  if(candidate)placed.push(candidate);
+  h.borderTop=Math.min(r.y-20,h.top-12);headings.push(h);
  }
- return placed;
+ return headings;
 }

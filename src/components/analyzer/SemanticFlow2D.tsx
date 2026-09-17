@@ -58,7 +58,7 @@ export function SemanticFlow2D(props: Explorer2DProps) {
   return <SemanticLocalFlow2D key={props.visitId ?? props.location?.centerId} {...props} />;
 }
 
-function SemanticLocalFlow2D({ extraLabelObstacles, onVisibleRelation, showGroupBounds, graph, explorer, nodeDisplays, selectedIds, selectedEdgeId, matchIds, command, motion, overlayTop, location, direction = 'both', camera: savedCamera, onCamera, onSelect, onArchitectureNodeClick, onSelectEdge, onClear, hoverTarget, onHoverTarget, explicitPathNodeIds, explicitPathEdgeIds }: Explorer2DProps) {
+function SemanticLocalFlow2D({ onVisibleRelation, showGroupBounds, graph, explorer, nodeDisplays, selectedIds, selectedEdgeId, matchIds, command, motion, overlayTop, location, direction = 'both', camera: savedCamera, onCamera, onSelect, onArchitectureNodeClick, onSelectEdge, onClear, hoverTarget, onHoverTarget, explicitPathNodeIds, explicitPathEdgeIds }: Explorer2DProps) {
   const relationHint = (hoverTarget?.kind === 'edge' ? graph.edges.find(edge=>edge.id===hoverTarget.id) : undefined) ?? graph.edges.find(edge=>edge.id===selectedEdgeId);
   useEffect(() => { onVisibleRelation?.(relationHint); return () => onVisibleRelation?.(undefined); }, [relationHint,onVisibleRelation]);
   const root = useRef<SVGSVGElement>(null);
@@ -71,7 +71,8 @@ function SemanticLocalFlow2D({ extraLabelObstacles, onVisibleRelation, showGroup
   const centerId = location?.centerId ?? graph.nodes[0]?.id ?? '';
   const positions = useMemo(() => graph.view === 'architecture-map' ? layoutSemanticFlow(graph, '2d') : layoutExplorerRelations(graph, centerId), [graph, centerId]);
   const environmentRegions = useMemo(() => graph.view === 'architecture-map' && graph.nodes.some(n => n.attributes.unifiedFlow) ? semanticFlowRegions(positions, '2d') : [], [graph, positions]);
-  const environmentHeadings=useMemo(()=>showGroupBounds===false?[]:architectureBoundaryHeadings(environmentRegions,positions,camera,viewport,overlayTop,extraLabelObstacles),[environmentRegions,positions,camera,viewport,overlayTop,extraLabelObstacles,showGroupBounds]);
+  const environmentHeadings=useMemo(()=>architectureBoundaryHeadings(environmentRegions,positions),[environmentRegions,positions]);
+  const environmentHeaderById=useMemo(()=>new Map(environmentHeadings.map(h=>[h.id,h])),[environmentHeadings]);
   const displays = useMemo(() => nodeDisplays ?? semanticNodeDisplays(graph.nodes, explorer?.nodes), [nodeDisplays, graph.nodes, explorer]);
   const paths = useMemo(() => semanticFlowEdgePaths(graph, positions, selectedIds, selectedEdgeId, '2d'), [graph, positions, selectedIds, selectedEdgeId]);
   const shownPaths = useMemo(() => paths.filter(path => explorerEdgeVisible(path.edge, selectedIds, direction, selectedEdgeId)), [paths, selectedIds, direction, selectedEdgeId]);
@@ -190,8 +191,9 @@ function SemanticLocalFlow2D({ extraLabelObstacles, onVisibleRelation, showGroup
     <defs>{['#82c6e2', '#dfb785', '#afcbbd', '#496660'].map(color => <marker key={color} id={`flow-arrow-${color.slice(1)}`} viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse" markerUnits="strokeWidth"><path d="M 0 0 L 10 5 L 0 10 z" fill={color} /></marker>)}</defs>
     <g transform={`translate(${camera.x} ${camera.y}) scale(${camera.scale})`} visibility={ready ? undefined : 'hidden'}>
       <g className="architecture-environment-regions" pointerEvents="none">{environmentRegions.map(region => <g key={region.id}>
-        {showGroupBounds !== false && <rect x={region.x-12} y={region.y-20} width={region.width+24} height={region.height+40} rx={12} fill="none" stroke="#496660" strokeDasharray="5 5" opacity={.45} />}
+        {showGroupBounds !== false && <rect x={region.x-12} y={environmentHeaderById.get(region.id)?.borderTop??region.y-20} width={region.width+24} height={region.y+region.height+20-(environmentHeaderById.get(region.id)?.borderTop??region.y-20)} rx={12} fill="none" stroke="#496660" strokeDasharray="5 5" opacity={.45} />}
       </g>)}</g>
+      {showGroupBounds!==false&&<ArchitectureEnvironmentHeadings headings={environmentHeadings}/ >}
       <g data-flow-layer="edge-targets">{shownPaths.map(path => <path key={path.edge.id} data-edge-hit-id={path.edge.id} d={path.svgPath} className="semantic-flow-edge-hit" role="button" tabIndex={path.selected ? 0 : -1} aria-label={`${semanticRelationLabel(path.edge, graph.view)}の根拠を表示`}
           {...semanticFlowHoverBindings<SVGPathElement>(onHoverTarget, { kind: 'edge', id: path.edge.id }, `2d-edge:${path.edge.id}`)}
           onClick={event => { event.stopPropagation(); if (!drag.current?.moved) onSelectEdge(path.edge.id); drag.current = undefined; }}
@@ -225,6 +227,6 @@ function SemanticLocalFlow2D({ extraLabelObstacles, onVisibleRelation, showGroup
       </g>)}</g>
       <SvgFlowParticles paths={particlePaths} scale={camera.scale} enabled={motion.enabled} visible={motion.visible} reduced={motion.reduced} />
     </g>
-  </svg>{ready && <ArchitectureEnvironmentHeadings headings={environmentHeadings}/ >}{!ready && positions.length > 0 && <p className="semantic-flow-loading" role="status">関係を表示しています…</p>}
+  </svg>{!ready && positions.length > 0 && <p className="semantic-flow-loading" role="status">関係を表示しています…</p>}
     {positions.length === 0 && <div className="semantic-empty-result"><h3>表示する対象がありません</h3><p>フィルターまたは表示データを変更してください。</p></div>}</>;
 }
