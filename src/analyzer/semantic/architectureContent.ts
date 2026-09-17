@@ -97,7 +97,7 @@ export function architectureContentRange(model:SemanticGraph,key:string):Archite
   if(n&&['application','code-package','shared-code','code-definition'].includes(n.architecture?.kind??'')){edges.set(e.id,e);add(other,'support');}
  }
  for(const id of [...roles.keys()]){let parent=byId.get(id)?.architecture?.parentId;const seen=new Set<string>();while(parent&&!seen.has(parent)){seen.add(parent);add(parent,'support');parent=byId.get(parent)?.architecture?.parentId;}}
- const graph:SemanticGraph={view:'architecture-map',nodes:model.nodes.filter(n=>roles.has(n.id)),edges:model.edges.filter(e=>edges.has(e.id))};
+ const graph:SemanticGraph={view:'architecture-map',nodes:model.nodes.filter(n=>roles.has(n.id)),edges:model.edges.filter(e=>edges.has(e.id)),...(logical?{architectureContentLayout:'logical-definitions' as const}:{})};
  const result={graph,roles,edgeIds:new Set(edges.keys())};cached.ranges.set(key,result);return result;
 }
 

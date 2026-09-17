@@ -1,8 +1,8 @@
 import {describe,it,expect} from 'vitest';
 import {renderToStaticMarkup} from 'react-dom/server';
-import {ArchitectureContentSummary,architectureContentDescription} from './ArchitectureContentSummary';
+import {ArchitectureContentSummary} from './ArchitectureContentSummary';
 import {ArchitectureContentControl} from './ArchitectureContentControl';
-import {architectureContentMembership} from './architectureContentMembership';
+import {architectureContentMembership,architectureContentDescription} from './architectureContentMembership';
 import type {ArchitectureContentChoice} from '../../analyzer/semantic/architectureContent';
 import type {SemanticNode} from '../../analyzer/semantic/types';
 const unknown:ArchitectureContentChoice={id:'unknown',label:'対象環境未特定',group:'environment',meaning:'unknown'};
@@ -10,8 +10,9 @@ const node=(environments:string[]=[],attributes:SemanticNode['attributes']={}):S
 describe('content labels, counts and membership',()=>{
  it('keeps full arbitrary names near the selector and puts the counting definition behind disclosure',()=>{
   const choice={...unknown,label:'共有（staging-東日本-長い環境名 / release-西日本-長い環境名）'};
-  const host=document.createElement('div');host.innerHTML=renderToStaticMarkup(<ArchitectureContentSummary choice={choice} nodes={12} edges={8} total={99} emptyScope={false} emptyFiltered={false} onProject={()=>{}} onAll={()=>{}}/>);
-  expect(host.querySelector('.architecture-content-name')?.textContent).toBe(choice.label);expect(host.textContent).toContain('12対象・8関係');expect(host.querySelector('details')?.textContent).toContain('解析全体には99対象');
+  const host=document.createElement('div');host.innerHTML=renderToStaticMarkup(<ArchitectureContentSummary current={{view:'architecture-map',nodes:[node()],edges:[]}} choice={choice} nodes={12} edges={8} total={99} emptyScope={false} emptyFiltered={false} onProject={()=>{}} onAll={()=>{}}/>);
+  expect(host.querySelector('.architecture-content-name')?.textContent).toBe(choice.label);expect(host.querySelector('details')?.textContent).toContain('12対象・8関係');expect(host.querySelector('details')?.textContent).toContain('解析全体：99対象');
+  const main=host.cloneNode(true) as HTMLElement;main.querySelector('details')?.remove();expect(main.textContent).toContain('現在の図：1構成要素・0本の関係線');expect(main.textContent).not.toContain('12対象');
   expect(host.querySelector('details')?.hasAttribute('open')).toBe(false);expect(host.textContent).not.toContain('構成モデルのID数');
  });
  it('separates environment, composition and routes in one native selector',()=>{

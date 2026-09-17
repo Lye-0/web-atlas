@@ -60,7 +60,7 @@ export interface SemanticInput {
   imports: { from: string; to: string; specifier: string }[];
   resources: { id: string; label: string; type: string; path?: string; binding?: string; entryPath?: string; evidence?: SemanticEvidence[]; attributes?: SemanticNode['attributes'] }[];
 }
-export interface SemanticGraph { view: SemanticViewId; nodes: SemanticNode[]; edges: SemanticEdge[]; architectureView?: import('./architectureProjection').ArchitectureProjection; }
+export interface SemanticGraph { view: SemanticViewId; nodes: SemanticNode[]; edges: SemanticEdge[]; architectureView?: import('./architectureProjection').ArchitectureProjection; architectureContentLayout?:'logical-definitions'; }
 
 export const confidenceLabels: Record<SemanticConfidence, string> = { source: 'ソースで確認', inferred: '推定', observed: '実測', unresolved: '未解決' };
 export const kindLabels: Record<SemanticKind, string> = { function: 'Function', entry: 'Entry point', request: 'API request', operation: 'Operation', value: 'Data', model: 'Model / Schema', resource: 'Resource', subsystem: 'Subsystem', external: 'External call', span: 'Span', log: 'Log' };

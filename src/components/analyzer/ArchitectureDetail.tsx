@@ -1,3 +1,4 @@
+import {architectureContentCoverage} from './architectureContentCoverage';
 import {architectureDefinitionPresentation} from './architectureDefinitionPresentation';
 import { architectureEnvironmentContext, architectureUsageContext, architectureTargetSummary } from '../../analyzer/semantic/architectureContext';
 import { useMemo, useState, type ReactNode } from 'react';
@@ -62,24 +63,27 @@ function RelationEvidence({ edges, sources }: { edges: SemanticEdge[]; sources: 
   </>; }}</Disclosure>;
 }
 
-export function ArchitectureDetail({ node, edge, graph, visible, sources, store, analysis, canOpen, onOpen, onReveal, onSelect, onSelectEdge, onJump, onClose, onHoverTarget, contentAllowedIds, contentMembership, onShowAll }: {
+export function ArchitectureDetail({ node, edge, graph, visible, sources, store, analysis, canOpen, onOpen, onReveal, onSelect, onSelectEdge, onJump, onClose, onHoverTarget, contentAllowedIds, contentEdgeIds, contentMembership, onShowAll }: {
   node?: SemanticNode; edge?: SemanticEdge; graph: SemanticGraph; visible: SemanticGraph; sources: Record<string, string>;
   store: AnalyzerProjectStore; analysis: SemanticAnalysis;
   canOpen?: (id: string) => boolean;
   onOpen: (id: string) => void; onReveal: (id: string) => void; onSelect: (id: string) => void; onSelectEdge: (id: string) => void; onClose: () => void;
   onJump: (id: string, view: SemanticViewId) => void; onHoverTarget?: SemanticFlowHoverHandler;
-  contentMembership?:{label:string;reason:string;source?:string};contentAllowedIds?:ReadonlySet<string>;onShowAll?:(id:string)=>void;
+  contentMembership?:{label:string;reason:string;source?:string};contentAllowedIds?:ReadonlySet<string>;contentEdgeIds?:ReadonlySet<string>;onShowAll?:(id:string)=>void;
 }) {
   const [relationLimit, setRelationLimit] = useState(20);
   const [knownLimit,setKnownLimit]=useState(3),[unknownLimit,setUnknownLimit]=useState(3);
   const outside = Boolean(node && visible.architectureView?.scopeId && !visible.architectureView.detailIds.includes(node.id));
   const arch = node?.architecture, children = graph.nodes.filter(n => n.architecture?.parentId === node?.id);
   const byId = useMemo(() => new Map([...graph.nodes, ...visible.nodes].map(n => [n.id, n])), [graph.nodes, visible.nodes]);
+  const coverage=useMemo(()=>architectureContentCoverage(contentAllowedIds,graph,visible),[contentAllowedIds,graph,visible]);
   const definition=useMemo(()=>node?architectureDefinitionPresentation(node,byId):undefined,[node,byId]);
   const operationTargets = useMemo(() => node?.architecture?.kind === 'tool-operation' ? architectureTargetSummary(node, analysis.architecture?.edges ?? [], byId) : [], [node, analysis.architecture?.edges, byId]);
   const internal = useMemo(() => visible.architectureView?.internalRelations.filter(e => e.source === node?.id) ?? [], [visible.architectureView?.internalRelations, node?.id]);
   const boundary = useMemo(() => visible.architectureView?.boundaryRelations.filter(e => e.source === node?.id || e.target === node?.id) ?? [], [visible.architectureView?.boundaryRelations, node?.id]);
-  const relations = useMemo(() => [...visible.edges.filter(e => e.source === node?.id || e.target === node?.id), ...boundary,...(contentAllowedIds?graph.edges.filter(e=>(e.source===node?.id&&!contentAllowedIds.has(e.target)||e.target===node?.id&&!contentAllowedIds.has(e.source))):[])], [visible.edges, node?.id, boundary,contentAllowedIds,graph.edges]);
+  const relations = useMemo(() => [...visible.edges.filter(e => e.source === node?.id || e.target === node?.id), ...boundary,...(contentAllowedIds?graph.edges.filter(e=>(e.source===node?.id||e.target===node?.id)&&(contentEdgeIds?!contentEdgeIds.has(e.id):coverage(e.source===node?.id?e.target:e.source).state==='outside')):[])], [visible.edges, node?.id, boundary,contentAllowedIds,contentEdgeIds,coverage,graph.edges]);
+  const projectedRelationIds=useMemo(()=>new Set([...visible.edges,...boundary,...internal].map(e=>e.id)),[visible.edges,boundary,internal]);
+  const relationInContent=(edge:SemanticEdge)=>!contentEdgeIds||contentEdgeIds.has(edge.id)||projectedRelationIds.has(edge.id);
   const partners = useMemo(() => architecturePartners(relations, node?.id ?? ''), [relations, node?.id]);
   const peerSummary=useMemo(()=>architecturePeerSummary(partners,byId),[partners,byId]);
   const partnerDisplays = useMemo(() => semanticNodeDisplays(partners.flatMap(partner => { const other = byId.get(partner.otherId); return other ? [other] : []; }), byId), [partners, byId]);
@@ -87,7 +91,7 @@ export function ArchitectureDetail({ node, edge, graph, visible, sources, store,
   const requestGroup = visible.architectureView?.requestGroups.find(group => group.memberIds.includes(node?.id ?? ''));
   const requestPartition = requestGroup && architectureRequestPartition(requestGroup.memberIds, visible);
   const scopeRole = node?.attributes.architectureScopeRole;
-  const otherButton = (otherId: string, key: string) => { const other = byId.get(otherId); return <button onClick={() => contentAllowedIds&&!contentAllowedIds.has(otherId)?onShowAll?.(otherId):onSelect(otherId)} {...semanticFlowHoverBindings<HTMLButtonElement>(onHoverTarget, { kind: 'node', id: otherId }, `architecture-detail-node:${key}`)}>{contentAllowedIds&&!contentAllowedIds.has(otherId)?'全体で表示：':''}{other?.label ?? '元の対象'}{other && architectureUsageContext(other) ? ` · ${architectureUsageContext(other)}` : ''}{other?.architecture?.identity ? ` · ${architectureEnvironmentLabel(other.architecture.environments)}` : ''}</button>; };
+  const otherButton = (otherId: string, key: string) => { const other = byId.get(otherId); return <button onClick={() => coverage(otherId).state==='outside'?onShowAll?.(coverage(otherId).wholeTarget):onSelect(otherId)} {...semanticFlowHoverBindings<HTMLButtonElement>(onHoverTarget, { kind: 'node', id: otherId }, `architecture-detail-node:${key}`)}>{coverage(otherId).state==='outside'?'全体で表示：':''}{other?.label ?? '元の対象'}{other && architectureUsageContext(other) ? ` · ${architectureUsageContext(other)}` : ''}{other?.architecture?.identity ? ` · ${architectureEnvironmentLabel(other.architecture.environments)}` : ''}</button>; };
   const relationButton = (edge: SemanticEdge) => { const summary = architectureRelationSummary([edge]); return <button onClick={() => onSelectEdge(edge.id)} {...semanticFlowHoverBindings<HTMLButtonElement>(onHoverTarget, { kind: 'edge', id: edge.id }, `architecture-detail-edge:${edge.id}`)}>{architectureRelationLabel(edge)} · {summary.status} · {summary.sites}箇所{edge.details?.environment ? ` · ${edge.details.environment}` : ''}</button>; };
   const partnerDetails = (partner: ReturnType<typeof architecturePartners>[number]) => <>
     <p>{otherButton(partner.otherId, `partner-${partner.otherId}`)} を選択{!visible.nodes.some(item => item.id === partner.otherId) ? ' · 現在の階層では点を表示していない境界の相手' : ''}</p>
@@ -96,10 +100,11 @@ export function ArchitectureDetail({ node, edge, graph, visible, sources, store,
       <strong>{architectureRelationLabel(first)}</strong><p className="architecture-relation-status">{summary.status} · {summary.sites}箇所{first.details?.environment ? ` · ${first.details.environment}` : ''}</p>
       {group.edges.some(item => boundary.includes(item)) && <p>構成全体の接続 · 内部の対応箇所は未確認</p>}
       <RelationEvidence edges={group.edges} sources={sources} />
-      {!(contentAllowedIds&&!contentAllowedIds.has(partner.otherId))&&group.edges.map(item => <button key={item.id} onClick={() => onSelectEdge(item.id)} {...semanticFlowHoverBindings<HTMLButtonElement>(onHoverTarget, { kind: 'edge', id: item.id }, `architecture-partner-edge:${item.id}`)}>図で関係を選択{group.edges.length > 1 ? ` · ${architectureRelationSummary([item]).status}` : ''}</button>)}
+      {group.edges.some(item=>!relationInContent(item))&&<p>この関係は表示内容の範囲外です。<button onClick={()=>onShowAll?.(coverage(partner.otherId).wholeTarget)}>全体で相手を表示</button></p>}
+      {coverage(partner.otherId).state!=='outside'&&group.edges.filter(relationInContent).map(item => <button key={item.id} onClick={() => onSelectEdge(item.id)} {...semanticFlowHoverBindings<HTMLButtonElement>(onHoverTarget, { kind: 'edge', id: item.id }, `architecture-partner-edge:${item.id}`)}>図で関係を選択{group.edges.length > 1 ? ` · ${architectureRelationSummary([item]).status}` : ''}</button>)}
     </div>; })}
   </>;
-  const partnerEntry = (partner: ReturnType<typeof architecturePartners>[number]) => { const other = byId.get(partner.otherId), disambiguation = other?.architecture ? partnerDisplays.get(partner.otherId)?.disambiguation : undefined; return <div className="architecture-partner" data-partner-id={partner.otherId} key={partner.otherId}><Disclosure title={<span><strong>{other?.label ?? '元の対象'}</strong>{contentAllowedIds&&!contentAllowedIds.has(partner.otherId)&&<small>この表示範囲の外側</small>}{disambiguation && <small>{disambiguation}</small>}<small>{partner.description}／{partner.direction}</small></span>}>{() => partnerDetails(partner)}</Disclosure></div>; };
+  const partnerEntry = (partner: ReturnType<typeof architecturePartners>[number]) => { const other = byId.get(partner.otherId), disambiguation = other?.architecture ? partnerDisplays.get(partner.otherId)?.disambiguation : undefined; return <div className="architecture-partner" data-partner-id={partner.otherId} key={partner.otherId}><Disclosure title={<span><strong>{other?.label ?? '元の対象'}</strong>{coverage(partner.otherId).state==='outside'&&<small>この表示範囲の外側</small>}{coverage(partner.otherId).state==='partial'&&<small>一部を表示（この内容：{coverage(partner.otherId).inside}/{coverage(partner.otherId).total}対象）</small>}{disambiguation && <small>{disambiguation}</small>}<small>{partner.description}／{partner.direction}</small></span>}>{() => partnerDetails(partner)}</Disclosure></div>; };
   const requestOrigin = node && (arch?.request || node.attributes.architectureRequestGroup) ? architectureRequestSources(Array.isArray(node.attributes.requestIds) ? node.attributes.requestIds.map(id => byId.get(id)) : [node], byId) : undefined;
   return <aside className="analyzer-detail-panel is-module-detail semantic-detail semantic-flow-detail architecture-detail" aria-label="構成の詳細">
     <div className="analyzer-detail-heading"><h3>{title}</h3><button type="button" aria-label="詳細を閉じる" onClick={onClose}>×</button></div>
@@ -148,7 +153,7 @@ export function ArchitectureDetail({ node, edge, graph, visible, sources, store,
       <Disclosure title="専門Viewで調べる">{() => <><SemanticLinks analysis={analysis} node={node} onJump={onJump} /><ArchitectureExpertLinks node={node} store={store} /></>}</Disclosure>
       <Disclosure title={`内部の構成 · 全${children.length}要素 / 表示条件内の関係 ${architectureRelationCounts(internal).records}件`}>{() => <>
         <p>全構成の内訳（補助コードを含む）: {children.length}内部構成要素 · {arch.files.length}固有ファイル · {arch.memberIds.length}下位解析対象</p>
-        {children.map(child => <p key={child.id}>{child.label}{child.architecture?.auxiliary ? ' · 補助コード' : ''} · {contentAllowedIds&&!contentAllowedIds.has(child.id)?<><small>この表示範囲の外側</small><button onClick={()=>onShowAll?.(child.id)}>全体で表示</button></>:<button onClick={() => onReveal(child.id)}>この要素へ移動</button>}</p>)}
+        {children.map(child => <p key={child.id}>{child.label}{child.architecture?.auxiliary ? ' · 補助コード' : ''} · {coverage(child.id).state==='outside'?<><small>この表示範囲の外側</small><button onClick={()=>onShowAll?.(child.id)}>全体で表示</button></>:<button onClick={() => onReveal(child.id)}>この要素へ移動</button>}</p>)}
         {internal.length > 0 && <><p>現在の表示条件で同じ構成要素に収まる関係です。下位の再帰も含み、構成全体の自己通信を意味しません。</p>{internal.map(e => <p key={e.id}>{relationButton(e)}</p>)}</>}
         <Disclosure title="構成ファイル一覧">{() => arch.files.map(path => <p key={path}><code>{path}</code></p>)}</Disclosure>
       </>}</Disclosure>

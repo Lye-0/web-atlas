@@ -52,6 +52,14 @@
 - files: `src/analyzer/semantic/architecturePositioning.ts`, `src/analyzer/semantic/client.ts`, `src/components/analyzer/architectureContextPolish.test.tsx` …
 - memory: `agent-knowledge/entries/2026-09-16-definition-ownership-8c417a.md`
 
+### 表示集合の範囲を正規ID集合へ表示IDで照合しない
+- id: `rm-20260917-content-coverage-original-ids`
+- type: `failure`
+- maturity: `candidate`
+- tags: `content-coverage`, `presentation-group`, `original-id`
+- files: `src/components/analyzer/architectureContentCoverage.ts`, `src/components/analyzer/architectureContentCoverage.test.tsx`, `src/components/analyzer/ArchitectureDetail.tsx` …
+- memory: `agent-knowledge/entries/2026-09-17-content-coverage-original-ids-ec50a7.md`
+
 ### 表示内容の状態は実scopeと分離し、訪問履歴のカメラも同期する
 - id: `rm-20260917-content-scope-state`
 - type: `constraint`

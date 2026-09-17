@@ -4,6 +4,7 @@ import { layoutSemanticFlow } from './flowPresentation';
 import { architectureRelationClass, architectureRelationCounts } from './architectureRelations';
 import { uniqueArchitectureEvidence } from './architectureEvidence';
 import { layoutArchitectureRelations } from './architectureLayout';
+import {layoutArchitectureDefinitions} from './architectureDefinitionLayout';
 
 const id = (...parts: string[]) => `architecture:${JSON.stringify(parts)}`;
 type Point = { x: number; y: number; z: number };
@@ -199,7 +200,7 @@ export function projectArchitectureScope(base: PreparedArchitectureScope, option
     const graph = buildArchitectureScope(base, { ...options, selectedNodeId: undefined, selectedEdgeId: undefined });
     // Explicit expansion uses the same reserved coordinates as temporary exposure.
     const collapsed = options.expandedRequestGroupIds?.length ? projectArchitectureScope(base, { ...options, selectedNodeId: undefined, selectedEdgeId: undefined, expandedRequestGroupIds: [] }) : undefined;
-    const positions = new Map(collapsed?.architectureView?.positions2d ?? layoutSemanticFlow(graph, '2d').map(p => [p.node.id, { x: p.x, y: p.y, z: p.z }]));
+    const positions = new Map(collapsed?.architectureView?.positions2d ?? (base.model.architectureContentLayout==='logical-definitions'&&options.mode!=='3d'?layoutArchitectureDefinitions(graph):layoutSemanticFlow(graph, '2d')).map(p => [p.node.id, { x: p.x, y: p.y, z: p.z }]));
     const bottom = Math.max(0, ...[...positions.values()].map(p => p.y));
     let row = 0;
     for (const group of graph.architectureView!.requestGroups) for (const member of group.memberIds) {

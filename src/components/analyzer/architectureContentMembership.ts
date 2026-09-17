@@ -15,3 +15,12 @@ export function architectureContentMembership(node:SemanticNode,choice:Architect
  }else if(choice.meaning==='unknown')reason+=` この対象自身の環境との対応は「${environment.label}」のままです。`;
  return {label,reason,source:typeof node.attributes.environmentSource==='string'?node.attributes.environmentSource:undefined};
 }
+
+export function architectureContentDescription(choice:ArchitectureContentChoice){
+ if(choice.meaning==='definition')return '論理アプリ・構成単位と、直接対応する実行・配信構成を表示します。';
+ if(choice.meaning==='unknown')return '対象・所属の環境名が未特定の構成と、直接関係する相手を表示します。操作の実行場所とは別の区分です。';
+ if(choice.meaning==='default')return '環境名を指定しない既定設定と、直接関係する構成を表示します。本番環境を意味する区分ではありません。';
+ if(choice.meaning==='shared')return '複数環境との対応が記録された共通の構成と、直接関係する相手を表示します。';
+ if(choice.meaning==='explicit')return 'この環境に属する構成と、直接関係する相手を表示します。';
+ return 'この経路の入力・操作・出力と、対応する構成を表示します。';
+}
