@@ -1,3 +1,4 @@
+import '../components/analyzer/analyzer-controls-workspace.css';
 import { AnalyzerEmptyState } from '../components/analyzer/AnalyzerEmptyState';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -205,20 +206,25 @@ export default function FlowAnalyzerPage({ view }: { view: SemanticExplorerViewI
     } catch { if (current()) setError('再解析できませんでした。フォルダを選び直してください。'); }
     finally { if (current()) setRescanning(false); }
   };
-  const activeFilters = [options.scope, options.kind, options.confidence, options.layer !== 'source', options.direction !== 'both', options.auxiliary, options.members?.length].filter(Boolean).length;
+  const activeFilters = [options.environment, options.scope, options.kind, options.confidence, options.layer !== 'source', options.direction !== 'both', options.auxiliary, options.members?.length].filter(Boolean).length;
   if (!store) return <div className="page-stack analyzer-page"><AnalyzerProjectHeader onScanned={replaceProject} /><AnalyzerEmptyState /></div>;
   return <div className="page-stack analyzer-page semantic-flow-page">
     <AnalyzerProjectHeader onScanned={replaceProject} />
     <section className="analyzer-shell" aria-labelledby="analyzer-view-title">
       <AnalyzerViewHeading view={view}><span>{store?.files.length ?? 0} files indexed</span><span title={semanticQuestions[view]}>{analysis ? view === 'architecture-map' ? `表示中 ${(stageGraph.architectureView?.detailEntityCount ?? 0) + (stageGraph.architectureView?.contextEntityCount ?? 0)}構成要素 / 未特定要求 ${stageGraph.architectureView?.requestCount ?? 0}対象 · 線 ${stageGraph.edges.length}本` : `解析全体 ${graph.nodes.length.toLocaleString()}対象 · 絞り込み後 ${filtered.nodes.length.toLocaleString()}対象 / ${filtered.edges.length.toLocaleString()}関係 · ${flow.mode === '3d' ? '3Dは全体を表示' : explorerLocation.centerId ? '中心からの局所関係' : `この階層 ${currentChildren.length.toLocaleString()}項目`}` : store ? 'ソースを解析中' : 'プロジェクト未選択'}</span></AnalyzerViewHeading>
-      <div className="analyzer-toolbar"><AnalyzerViewTabs /><div className="analyzer-control-row">
+      {view==='architecture-map'&&<AnalyzerViewTabs/>}
+      <div ref={view==='architecture-map'?fullscreen.root:undefined} className={view==='architecture-map'?`analyzer-controls-workspace${fullscreen.isFullscreen?' is-fullscreen':''}`:undefined} style={view==='architecture-map'?undefined:{display:'contents'}} role={view==='architecture-map'&&fullscreen.isFullscreen?'dialog':undefined} aria-modal={view==='architecture-map'&&fullscreen.isFullscreen||undefined} aria-label={view==='architecture-map'&&fullscreen.isFullscreen?'Architecture Map 全画面表示':undefined} onKeyDownCapture={view==='architecture-map'?fullscreen.onKeyDownCapture:undefined}>
+      <div className={view==='architecture-map'?'analyzer-workspace-search':undefined} style={view==='architecture-map'?undefined:{display:'contents'}}>
+      <div className="analyzer-toolbar">{view!=='architecture-map'&&<AnalyzerViewTabs />}<div className="analyzer-control-row">
         <AnalyzerSearchControl value={session.search} onChange={search => updateView(view, { search })} label={view === 'architecture-map' ? '構成要素を検索' : '関数・データ・モデルを検索'} placeholder="名前・パス・所属（複数語はAND）" />
-        {view === 'architecture-map' && Boolean(analysis?.architecture?.environments.length) && <label className="analyzer-filter-control"><span>環境</span><select aria-label="構成の環境" value={options.environment ?? ''} onChange={event => { clearSelection(); changeOptions({ environment: event.target.value }); }}><option value="">論理構成・全設定</option>{analysis?.architecture?.environments.map(name => <option key={name}>{name}</option>)}</select></label>}
+
         <label className="analyzer-filter-control"><span>責務</span><select value={options.scope} onChange={event => changeOptions({ scope: event.target.value, members: undefined })}><option value="">すべて</option>{[...new Set(graph.nodes.map(node => node.group))].sort().map(group => <option key={group}>{group}</option>)}</select></label>
         <label className="analyzer-filter-control"><span>種類</span><select value={options.kind} onChange={event => changeOptions({ kind: event.target.value })}><option value="">すべて</option>{[...new Set(graph.nodes.map(node => view === 'architecture-map' ? node.architecture?.kind ?? node.kind : node.kind))].sort().map(kind => <option key={kind} value={kind}>{view === 'architecture-map' ? architectureKindLabels[kind as keyof typeof architectureKindLabels] : kindLabels[kind as keyof typeof kindLabels]}</option>)}</select></label>
-        <button type="button" className="analyzer-quiet-button" aria-expanded={settings} aria-controls="semantic-flow-settings" onClick={() => setSettings(!settings)}>詳細設定{activeFilters ? ` (${activeFilters})` : ''}</button>
+        <button type="button" className="analyzer-quiet-button" aria-expanded={settings} aria-controls="semantic-flow-settings" onClick={() => setSettings(!settings)}>{view==='architecture-map'?'詳細な絞り込み':'詳細設定'}{activeFilters ? ` (${activeFilters})` : ''}</button>
+        {view==='architecture-map'&&options.environment&&<span className="analyzer-filter-applied">環境による追加絞り込み：{options.environment}</span>}
       </div></div>
       {settings && <div id="semantic-flow-settings" className="semantic-flow-settings">
+        {view === 'architecture-map' && Boolean(analysis?.architecture?.environments.length) && <label className="analyzer-filter-control"><span>環境による追加絞り込み</span><select aria-label="構成の環境" value={options.environment ?? ''} onChange={event => { clearSelection(); changeOptions({ environment: event.target.value }); }}><option value="">論理構成・全設定</option>{analysis?.architecture?.environments.map(name => <option key={name}>{name}</option>)}</select></label>}
         <label>確度<select value={options.confidence} onChange={event => changeOptions({ confidence: event.target.value })}><option value="">すべて</option>{Object.entries(confidenceLabels).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
         {view === 'architecture-map' ? <p>構成図はソースと配置設定から作成します。現在の稼働・通信は観測していません。</p> : view !== 'data-model' ? <label>表示データ<select value={options.layer} onChange={event => changeOptions({ layer: event.target.value as typeof options.layer })}><option value="source">ソース解析</option><option value="observed">実行ログ・Trace</option><option value="combined">ソース ＋ 実測</option></select></label> : <p>データ構造はソースの定義を表示します。現在のTrace形式にはモデル定義との比較用サンプルがありません。</p>}
         <label>線の方向（選択対象）<select value={options.direction} onChange={event => changeOptions({ direction: event.target.value as typeof options.direction })}><option value="both">入る・出る関係</option><option value="incoming">{semanticFlowDirectionLanguage(view).incoming}から</option><option value="outgoing">{semanticFlowDirectionLanguage(view).outgoing}へ</option></select></label>
@@ -254,8 +260,9 @@ export default function FlowAnalyzerPage({ view }: { view: SemanticExplorerViewI
         }
         navigation.jumpMode(flow.mode, id, fields.length === 1 ? fields[0]!.id : undefined);
       }} loading={Boolean(store && !analysis && !error)} />
-      <div {...architectureGesture.bindings} ref={fullscreen.root} className={`analyzer-workspace semantic-flow-workspace${session.detailOpen && (selected || selectedEdge || inspectedRequests) ? ' has-detail' : ''}${fullscreen.isFullscreen ? ' is-fullscreen' : ''}`}
-        role={fullscreen.isFullscreen ? 'dialog' : undefined} aria-modal={fullscreen.isFullscreen || undefined} aria-label={fullscreen.isFullscreen ? `${view} 全画面表示` : undefined} onKeyDownCapture={event => { architectureGesture.bindings.onKeyDownCapture?.(); fullscreen.onKeyDownCapture(event); }}>
+      </div>
+      <div {...architectureGesture.bindings} ref={view==='architecture-map'?undefined:fullscreen.root} className={`analyzer-workspace semantic-flow-workspace${session.detailOpen && (selected || selectedEdge || inspectedRequests) ? ' has-detail' : ''}${fullscreen.isFullscreen ? ' is-fullscreen' : ''}`}
+        role={view!=='architecture-map'&&fullscreen.isFullscreen ? 'dialog' : undefined} aria-modal={view!=='architecture-map'&&fullscreen.isFullscreen || undefined} aria-label={fullscreen.isFullscreen ? `${view} 全画面表示` : undefined} onKeyDownCapture={event => { architectureGesture.bindings.onKeyDownCapture?.(); if(view!=='architecture-map')fullscreen.onKeyDownCapture(event); }}>
         {<SemanticFlowStage key={`${view}:${state.scanVersion}:${contentKey}`} graph={stageGraph} explorer={explorer} nodeDisplays={stageDisplays} mode={flow.mode} direction={options.direction} selectedIds={selectedIds} selectedEdgeId={selectedEdge?.id} matchIds={matchIds} focus={focus}
           contentControls={view==='architecture-map'?<ArchitectureContentControl choices={contentChoices} value={contentKey} onChange={changeContent}/>:undefined}
           contentDescription={contentRange&&contentChoice&&<ArchitectureContentSummary current={stageGraph} choice={contentChoice} nodes={graph.nodes.length} edges={graph.edges.length} total={wholeGraph.nodes.length} emptyScope={contentEmpty} emptyFiltered={!stageGraph.nodes.length} onProject={navigation.project} onAll={()=>changeContent('all')}/>}
@@ -281,6 +288,7 @@ export default function FlowAnalyzerPage({ view }: { view: SemanticExplorerViewI
           fieldId={session.semanticFieldId} onField={semanticFieldId => updateView(view, current => recordExplorerSelection(current, { selectedNodeId: current.selectedNodeId, selectedEdgeId: current.selectedEdgeId, detailOpen: current.detailOpen, semanticFieldId }))}
           hoverTarget={hoverTarget} onHoverTarget={onHoverTarget}
           onSelect={selectNode} onSelectEdge={selectEdge} onClose={() => { clearHover(); updateView(view, current => recordExplorerSelection(current, { selectedNodeId: current.selectedNodeId, selectedEdgeId: current.selectedEdgeId, detailOpen: false })); }} onJump={jump} />}
+      </div>
       </div>
       {analysis && <details className="semantic-coverage"><summary>解析範囲 · {analysis.stats.files.toLocaleString()} files · 解析全体で定義先が未特定の呼び出し {analysis.stats.unresolved.toLocaleString()}箇所 · {(analysis.stats.elapsedMs / 1000).toFixed(1)}秒</summary>
         <p>ソースで確認＝構文上の宣言・関係。推定＝名前・設定・callback契約からの対応付け。実測＝読み込んだ実行記録。未解決＝静的に呼び出し先を確定できない関係。イベント登録と実際の実行は区別されます。</p>

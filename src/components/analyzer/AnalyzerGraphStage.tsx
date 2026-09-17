@@ -670,11 +670,11 @@ export function AnalyzerGraphStage({ controlsExtras,
       tabIndex={0}
       aria-label={`${view.view} graph stage. Drag to pan and use the wheel to zoom. Semantic zoom: ${zoomLevel}.`}
     >
-      <AnalyzerGraphControls mode="2d" onMode={onMode} onFit={fit} onReset={resetTransform}
+      <AnalyzerGraphControls primaryContent={controlsExtras} mode="2d" onMode={onMode} onFit={fit} onReset={resetTransform}
         onZoomIn={() => changeZoom(1.14)} onZoomOut={() => changeZoom(0.88)} zoomLabel={Math.round(transform.scale * 100) + '%'}
         canFocus={Boolean(selectedPosition)} onFocus={focusSelection}
         particleMode={flow.mode} onParticleMode={flow.setMode}
-        isFullscreen={isFullscreen} onFullscreen={onToggleFullscreen} help={showHelp} onHelp={setShowHelp}>{controlsExtras}</AnalyzerGraphControls>
+        isFullscreen={isFullscreen} onFullscreen={onToggleFullscreen} help={showHelp} onHelp={setShowHelp}/>
       {showHelp && (
         <div id="analyzer-graph-help" className="analyzer-stage-help" role="dialog" aria-label="グラフ操作ヘルプ">
           <strong>グラフ操作</strong>

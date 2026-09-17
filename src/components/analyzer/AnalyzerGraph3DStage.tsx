@@ -380,13 +380,13 @@ export function AnalyzerGraph3DStage(props: Props) {
   const labelledIds = new Set(labelContents.map(label => labelDescriptors.get(label.id)?.entityId));
   const unlabelledConnections = [...new Set(relevantEdges.flatMap(edge => [edge.sourceId, edge.targetId]))].map(id=>owners.get(id)??id).filter((id,index,ids)=>ids.indexOf(id)===index && displayed.has(id) && !labelledIds.has(id)).length;
   return <div ref={setStage} className="analyzer-graph-stage analyzer-spatial-graph-stage semantic-flow-stage analyzer-graph-3d" data-view={model.view} data-render-mode="3d">
-    <AnalyzerGraphControls mode="3d" onMode={props.onMode}
+    <AnalyzerGraphControls primaryContent={props.controlsExtras} mode="3d" onMode={props.onMode}
       onFit={() => setCommand(current => ({ nonce: current.nonce + 1, action: 'fit' }))} onReset={() => setCommand(current => ({ nonce: current.nonce + 1, action: 'reset' }))}
       onZoomIn={() => setCommand(current => ({ nonce: current.nonce + 1, action: 'in' }))} onZoomOut={() => setCommand(current => ({ nonce: current.nonce + 1, action: 'out' }))}
       canFocus={Boolean(state.selectedNodeId || state.selectedRegionId || state.selectedEdgeId)} onFocus={() => setCommand(current => ({ nonce: current.nonce + 1, ids: state.selectedRegionId ? [state.selectedRegionId] : [...protectedIds] }))}
       particleMode={motion.mode} onParticleMode={motion.setMode} showGroupBounds={props.showGroupBounds} onGroupBounds={graph.regions.length || model.view === 'dependencies' ? props.onGroupBounds : undefined}
       autoAggregation={props.autoAggregation} onAutoAggregation={groups.length ? props.onAutoAggregation : undefined}
-      isFullscreen={props.isFullscreen} onFullscreen={props.onFullscreen} help={help} onHelp={setHelp}>{props.controlsExtras}</AnalyzerGraphControls>
+      isFullscreen={props.isFullscreen} onFullscreen={props.onFullscreen} help={help} onHelp={setHelp}/>
     {help && <div className="analyzer-stage-help" role="dialog" aria-label="グラフ操作ヘルプ"><strong>3D全体図</strong><p>ドラッグで回転、右ドラッグで移動。点やラベルから対象を選択できます。ホイールと＋ / −で拡大縮小できます。</p><p>検索結果と「選択へ移動」で対象へ移動します。青は選択対象から出る関係、橙は入る関係です。所属の線は実在する包含関係を示します。</p><button type="button" onClick={() => setHelp(false)}>ヘルプを閉じる</button></div>}
     {displayPoints.length===0 && !graph.regions.some(region=>props.showGroupBounds || region.original.id===state.selectedRegionId || displayEdges.some(edge=>edge.source===region.original.id||edge.target===region.original.id)) && <div className="analyzer-graph-empty" role="status">現在のFilterに一致するNodeまたはRegionはありません。</div>}
     <CanvasBoundary onUnavailable={props.onUnavailable}><Canvas orthographic frameloop="demand" dpr={[1, 2]} onCreated={initializeSemanticCanvas} gl={defaults => recoverableWebGLRenderer({ ...defaults, antialias: true, alpha: true }, props.onUnavailable)} fallback={<p>3D表示を利用できません。</p>}>

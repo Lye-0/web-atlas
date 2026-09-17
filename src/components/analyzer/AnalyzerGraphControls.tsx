@@ -1,4 +1,5 @@
-import { useState, type ReactNode, type Ref } from 'react';
+import { useCallback,useLayoutEffect,useRef,useState, type ReactNode, type Ref } from 'react';
+import {AnalyzerDisplaySettings} from './AnalyzerDisplaySettings';
 import { SpatialParticleControl } from './SpatialParticleControl';
 import { AutoAggregationToggle } from './AutoAggregationPanel';
 import type { SpatialParticleMode } from './useSpatialFlowMotion';
@@ -15,21 +16,26 @@ export function AnalyzerGraphControls({ elementRef, mode, onMode, cameraApplicab
   isFullscreen?: boolean; onFullscreen?: () => void; help: boolean; onHelp: (value: boolean) => void; children?: ReactNode; primaryContent?:ReactNode; compact?: boolean;
 }) {
   const [expanded,setExpanded]=useState(false);
-  return <div ref={elementRef} className="analyzer-stage-controls analyzer-graph-controls" aria-label="グラフ操作">
+  const root=useRef<HTMLDivElement|null>(null),[narrow,setNarrow]=useState(false),organized=Boolean(primaryContent);
+  const setRoot=useCallback((node:HTMLDivElement|null)=>{root.current=node;if(typeof elementRef==='function')elementRef(node);else if(elementRef)elementRef.current=node;},[elementRef]);
+  useLayoutEffect(()=>{const parent=root.current?.parentElement;if(!organized||!parent)return;const measure=()=>setNarrow(parent.getBoundingClientRect().width<=980);measure();if(typeof ResizeObserver==='undefined')return;const observer=new ResizeObserver(measure);observer.observe(parent);return()=>observer.disconnect();},[organized]);
+  const effectiveCompact=compact||organized&&narrow;
+  const displaySettings=<><SpatialParticleControl mode={particleMode} onChange={onParticleMode} onOpen={() => onHelp(false)} />
+    {onGroupBounds && <button type="button" className="semantic-flow-bounds-toggle" aria-label="分類の囲い" aria-pressed={showGroupBounds} onClick={() => onGroupBounds(!showGroupBounds)}>分類の囲い：{showGroupBounds ? 'ON' : 'OFF'}</button>}
+    {onAutoAggregation && <AutoAggregationToggle enabled={autoAggregation ?? true} onChange={onAutoAggregation} />}{children}</>;
+  return <div ref={setRoot} className={`analyzer-stage-controls analyzer-graph-controls${organized?' is-organized':''}${effectiveCompact?' is-compact':''}`} aria-label="グラフ操作">
     {primaryContent}
     {onMode && <div className="semantic-flow-mode" role="group" aria-label="表示モード"><button type="button" aria-pressed={mode === '2d'} onClick={() => onMode('2d')}>2D</button><button type="button" aria-pressed={mode === '3d'} onClick={() => onMode('3d')}>3D</button></div>}
-    {compact&&<button type="button" aria-expanded={expanded} onClick={()=>setExpanded(!expanded)}>その他の操作</button>}
-    <div className="analyzer-controls-secondary" hidden={compact&&!expanded}>
+    {effectiveCompact&&<button type="button" aria-expanded={expanded} onClick={()=>setExpanded(!expanded)}>その他の操作</button>}
+    <div className="analyzer-controls-secondary" hidden={effectiveCompact&&!expanded}>
     <button type="button" disabled={!cameraApplicable} onClick={onFit} title={cameraTitle ?? '現在の関係図全体を収める'}>Fit</button>
     <button type="button" disabled={!cameraApplicable} onClick={onReset} title={cameraTitle ?? '現在の図のカメラを初期位置へ戻す'}>Reset</button>
     <button type="button" disabled={!cameraApplicable} aria-label="Zoom in" title={cameraTitle} onClick={onZoomIn}>+</button>
     <button type="button" disabled={!cameraApplicable} aria-label="Zoom out" title={cameraTitle} onClick={onZoomOut}>−</button>
     {zoomLabel && <span aria-label="ズーム倍率" ref={zoomLabelRef}>{zoomLabel}</span>}
-    <SpatialParticleControl mode={particleMode} onChange={onParticleMode} onOpen={() => onHelp(false)} />
-    {onGroupBounds && <button type="button" className="semantic-flow-bounds-toggle" aria-label="分類の囲い" aria-pressed={showGroupBounds} onClick={() => onGroupBounds(!showGroupBounds)}>分類の囲い：{showGroupBounds ? 'ON' : 'OFF'}</button>}
-    {onAutoAggregation && <AutoAggregationToggle enabled={autoAggregation ?? true} onChange={onAutoAggregation} />}
-    {children}
+    {!organized&&displaySettings}
     </div>
+    {organized&&<AnalyzerDisplaySettings>{displaySettings}</AnalyzerDisplaySettings>}
     <button type="button" disabled={!canFocus} onClick={onFocus}>選択へ移動</button>
     {onFullscreen && <button type="button" aria-label={isFullscreen ? '全画面を終了' : '全画面表示'} title={isFullscreen ? '全画面を終了' : '全画面表示'} aria-pressed={isFullscreen} onClick={onFullscreen}>
       <svg aria-hidden="true" focusable="false" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}>

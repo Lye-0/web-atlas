@@ -34,6 +34,16 @@ describe.each(['architecture', 'workspace', 'command', 'dependencies'] as const)
     await act(async () => root.render(<MemoryRouter initialEntries={[`/analyzer/${view}`]}><AnalyzerSessionProvider><Project store={store} /><SelectionProbe view={view} /></AnalyzerSessionProvider></MemoryRouter>));
   });
   afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+  if(view==='command')it('keeps one command selector and the same search input inside fullscreen',async()=>{
+    const entry=host.querySelector<HTMLSelectElement>('[aria-label="Command Flowのentry script"]')!,search=host.querySelector<HTMLInputElement>('input[type="search"]')!;
+    expect(host.querySelectorAll('[aria-label="Command Flowのentry script"]')).toHaveLength(1);expect(entry.closest('.analyzer-controls-secondary')).toBeNull();
+    await act(async()=>host.querySelector<HTMLButtonElement>('[aria-label="全画面表示"]')!.click());
+    const fullscreen=host.querySelector('.analyzer-controls-workspace.is-fullscreen')!;expect(fullscreen.contains(entry)).toBe(true);expect(fullscreen.contains(search)).toBe(true);
+    const value=entry.options[0]!.value;await act(async()=>{entry.value=value;entry.dispatchEvent(new Event('change',{bubbles:true}));});
+    await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!.call(search,'tsc');search.dispatchEvent(new Event('input',{bubbles:true}));});
+    await act(async()=>search.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true})));expect(search.value).toBe('');expect(host.querySelector('.analyzer-controls-workspace.is-fullscreen')).not.toBeNull();
+    await act(async()=>host.querySelector<HTMLButtonElement>('[aria-label="全画面を終了"]')!.click());expect(host.querySelector('[aria-label="Command Flowのentry script"]')).toBe(entry);expect(entry.value).toBe(value);
+  });
   it('keeps every logical candidate reachable and only selects on explicit choice', async () => {
     const input = host.querySelector<HTMLInputElement>('input[aria-label="Analyzer Nodeを検索"]')!;
     const setQuery = (value: string) => act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value); input.dispatchEvent(new Event('input', { bubbles: true })); });

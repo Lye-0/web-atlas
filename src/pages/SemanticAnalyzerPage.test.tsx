@@ -66,6 +66,9 @@ describe('semantic Analyzer exploration', () => {
     const ids=()=>[...host.querySelectorAll('[data-node-id]')].map(e=>e.getAttribute('data-node-id'));
     const camera=()=>host.querySelector('.semantic-flow-2d')?.getAttribute('data-camera-scale');
     expect(content().value).toBe('all');await search('app-a');const original=ids(),originalCamera=camera(),jobs=vi.mocked(getSemanticAnalysis).mock.calls.length;
+    const searchInput=host.querySelector<HTMLInputElement>('input[type="search"]')!,selector=content();
+    await act(async()=>host.querySelector<HTMLButtonElement>('[aria-label="全画面表示"]')!.click());expect(host.querySelector('.analyzer-controls-workspace.is-fullscreen')!.contains(searchInput)).toBe(true);expect(host.querySelector('.analyzer-controls-workspace.is-fullscreen')!.contains(selector)).toBe(true);
+    await act(async()=>host.querySelector<HTMLButtonElement>('[aria-label="全画面を終了"]')!.click());expect(content()).toBe(selector);expect(host.querySelector('input[type="search"]')).toBe(searchInput);expect(searchInput.value).toBe('app-a');
     await change('path:database');expect(ids()).toContain('generate');expect(ids()).not.toContain('outside');await search('outside');expect(host.querySelectorAll('[role="option"]')).toHaveLength(0);
     await search('sql');await act(async()=>host.querySelector('[data-node-id="sql"]')!.dispatchEvent(new MouseEvent('click',{bubbles:true})));
     expect(host.querySelector('.semantic-detail')?.textContent).toContain('この表示範囲の外側');await act(async()=>button('3D').click());expect(content().value).toBe('path:database');expect(host.querySelector('.semantic-detail h3')?.textContent).toBe('sql');
@@ -270,6 +273,7 @@ describe('semantic Analyzer exploration', () => {
     await act(async () => button('3D').click()); await act(async () => button('3Dテスト移動').click());
     await chooseArchitecture(ids.B!); expect(current()).toBe('A');
     expect(host.querySelector('.semantic-detail')?.textContent).toContain('表示範囲外');
+    await act(async()=>button('表示設定').click());
     await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="周辺構成"]')!.click());
     expect([...host.querySelectorAll<HTMLElement>('[data-node-id]')].map(element => element.dataset.nodeId)).not.toContain(ids.B);
     expect(host.querySelector('.semantic-detail h3')?.textContent).toBe('B');

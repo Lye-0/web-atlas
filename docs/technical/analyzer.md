@@ -194,6 +194,8 @@ BrowserのFile System Access APIがない場合はdirectory file inputを使い�
 
 ## Validation
 
+Tab 3 Command FlowとTab 10 Architecture Mapは、検索・絞り込み・検索結果と図/詳細欄を同じ全画面ルートに置く。通常表示と全画面で同一の入力DOMとセッションを使い、開始コマンド/表示内容は図のツールバー先頭に常設する。2D/3Dとも主要セレクターを補助操作の折り畳みに入れない。幅に応じてカメラ操作を「その他の操作」に、粒子・囲い等を「表示設定」にまとめる。他タブは既存のツールバー構成を維持する。検証は[検索行・操作行の整理記録](analyzer-control-rows-review-20260917.md)を参照。
+
 The cross-View stabilization and performance results are recorded in [the stabilization review](analyzer-cross-tab-stabilization-review.md). Module selection, source-edge selection and explicit connection framing do not open containing directories. The spatial renderer extracts protected canonical endpoints from the existing manual scope; clearing them restores its prior closure. Only an explicit hierarchy/open action changes directory expansion. Camera requests are scoped to the current View and source store and cleared on selection cancellation/input replacement. Module aggregate markers retain hit targets for every current representative, while only spaced priority captions remain continuously visible.
 
 Native scrollbars use the application's dark color scheme, a muted green-grey thumb and a transparent track. Standard thin scrollbars retain native wheel, dragging and keyboard behavior; forced-colors restores platform coloring and width. This does not change the graph layout or scroll-area ownership.
