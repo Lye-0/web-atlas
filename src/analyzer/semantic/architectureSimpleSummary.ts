@@ -30,3 +30,9 @@ export function simpleRelationOverview(simple:ArchitectureSimple,edge:SemanticEd
  const variants=new Set(edges.map(e=>JSON.stringify([e.kind,e.details?.environment??'',e.confidence])));
  return {sentence,usage:simpleUsageSummary(uses),records:ids.size,variants:variants.size,kind:relation.kind==='path'?'複数段階の経路':relation.kind==='aggregate'?'複数関係の束':'直接関係'};
 }
+export function simplePeerGroups(simple:ArchitectureSimple,id:string,edges:SemanticEdge[]){
+ const groups=new Map<string,{id:string;relations:ReturnType<typeof simplePeers>}>();
+ for(const relation of simplePeers(simple,id,edges)){const group=groups.get(relation.id)??{id:relation.id,relations:[]};group.relations.push(relation);groups.set(relation.id,group);}
+ const secondary=(peer:string)=>simple.units.get(id)?.role==='context'?0:simple.units.get(peer)?.role==='context'?1:0;
+ return [...groups.values()].sort((a,b)=>secondary(a.id)-secondary(b.id));
+}

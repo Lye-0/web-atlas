@@ -21,7 +21,11 @@ export function SemanticExplorerNavigation({ explorer, navigation, mode, graph, 
   explorer: SemanticExplorerModel; navigation: SemanticExplorerNavigationActions; mode: '2d' | '3d'; graph: SemanticGraph; localGraph: SemanticGraph; selectedIds: ReadonlySet<string>; selectedEdgeId?: string;
   hoverTarget?: SemanticFlowHoverTarget; onSelectEdge?: (id: string) => void; relationHint?: SemanticEdge;
 }) {
-  if (graph.view === 'architecture-map') return <ArchitectureNavigation mode={mode} explorer={explorer} navigation={navigation} graph={graph} selectedId={[...selectedIds][0]} selectedEdgeId={hoverTarget?.kind === 'edge' ? hoverTarget.id : selectedEdgeId} onSelectEdge={onSelectEdge} relationHint={relationHint} />;
+  if (graph.view === 'architecture-map') {
+    const simple=graph.nodes.some(n=>n.attributes.simpleOverview),temporary=simple&&hoverTarget?.kind==='edge';
+    const hint=simple?(temporary?graph.edges.find(e=>e.id===hoverTarget.id)??(relationHint?.id===hoverTarget.id?relationHint:undefined):undefined):relationHint;
+    return <ArchitectureNavigation mode={mode} explorer={explorer} navigation={navigation} graph={graph} selectedId={[...selectedIds][0]} selectedEdgeId={!simple&&hoverTarget?.kind === 'edge' ? hoverTarget.id : selectedEdgeId} onSelectEdge={onSelectEdge} relationHint={hint} temporaryRelation={temporary&&hoverTarget.id!==selectedEdgeId} />;
+  }
   return <FlowNavigation explorer={explorer} navigation={navigation} mode={mode} graph={graph} localGraph={localGraph} selectedIds={selectedIds} selectedEdgeId={selectedEdgeId} />;
 }
 

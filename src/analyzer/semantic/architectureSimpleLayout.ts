@@ -5,10 +5,11 @@ type Point={x:number;y:number;z:number};
 
 /** Pack connected primary diagrams; reserve support space locally rather than stretching every row. */
 export function layoutSimpleArchitecture(graph:SemanticGraph,units:ReadonlyMap<string,SimpleUnit>,owners:ReadonlyMap<string,string>){
- const primary=graph.nodes.filter(n=>units.get(n.id)?.role==='primary'&&n.architecture?.kind!=='shared-code'),mainIds=new Set(primary.map(n=>n.id)),byId=new Map(graph.nodes.map(n=>[n.id,n]));
+ const primary=graph.nodes.filter(n=>units.get(n.id)?.role==='primary'&&n.architecture?.kind!=='shared-code'&&n.attributes.simpleCategory!=='destination'),mainIds=new Set(primary.map(n=>n.id)),byId=new Map(graph.nodes.map(n=>[n.id,n]));
  const mainEdges=graph.edges.filter(e=>mainIds.has(e.source)&&mainIds.has(e.target)&&!e.details?.structural&&!e.kind.startsWith('flow-'));
- const positions2d=new Map<string,Point>(),positions=new Map<string,Point>(),supportByOwner=new Map<string,SemanticNode[]>(),shared:SemanticNode[]=[],context:SemanticNode[]=[],database:SemanticNode[]=[];
+ const positions2d=new Map<string,Point>(),positions=new Map<string,Point>(),supportByOwner=new Map<string,SemanticNode[]>(),shared:SemanticNode[]=[],context:SemanticNode[]=[],database:SemanticNode[]=[],destinations:SemanticNode[]=[];
   for(const n of graph.nodes){const unit=units.get(n.id)!;if(mainIds.has(n.id))continue;const targets=[...new Set(unit.targetIds.map(id=>owners.get(id)).filter((id):id is string=>Boolean(id&&mainIds.has(id))))];
+  if(n.attributes.simpleCategory==='destination'){destinations.push(n);continue;}
   if(n.attributes.simpleSupportPurpose==='DB構造変更'){database.push(n);continue;}
   if(unit.role==='support'&&targets.length===1){const list=supportByOwner.get(targets[0]!)??[];list.push(n);supportByOwner.set(targets[0]!,list);}else if(unit.role==='support')shared.push(n);else context.push(n);
  }
@@ -41,11 +42,12 @@ export function layoutSimpleArchitecture(graph:SemanticGraph,units:ReadonlyMap<s
  }
  const placeNear=(n:SemanticNode,targets:Point[],fallbackIndex:number)=>{
   const center=targets.length?{x:targets.reduce((sum,p)=>sum+p.x,0)/targets.length,y:targets.reduce((sum,p)=>sum+p.y,0)/targets.length}:{x:(fallbackIndex%4)*280,y:Math.max(0,...[...positions2d.values()].map(p=>p.y))+140};
-  const secondary=Boolean(n.attributes.simpleSupportPurpose),candidates=[];for(let row=secondary?1:-3;row<=6;row++)for(let col=-3;col<=3;col++)candidates.push({x:center.x+col*250,y:center.y+row*110,z:0,score:Math.abs(col)*1.5+Math.abs(row)+(row<0?.5:0)});
+  const destination=n.attributes.simpleCategory==='destination',secondary=Boolean(n.attributes.simpleSupportPurpose),candidates=[];for(let row=destination?-2:secondary?1:-3;row<=6;row++)for(let col=destination?1:-3;col<=4;col++)candidates.push({x:center.x+col*250,y:center.y+row*110,z:0,score:Math.abs(col)*1.5+Math.abs(row)+(row<0?.5:0)});
   candidates.sort((a,b)=>a.score-b.score||a.y-b.y||a.x-b.x);const spot=candidates.find(p=>[...positions2d.values()].every(other=>Math.abs(p.x-other.x)>=235||Math.abs(p.y-other.y)>=90))??{x:center.x,y:center.y+550,z:0};
   positions2d.set(n.id,{x:spot.x,y:spot.y,z:0});positions.set(n.id,{x:spot.x*.55,y:spot.y*.55,z:units.get(n.id)?.role==='support'?-90:90});
  };
  shared.sort((a,b)=>a.id.localeCompare(b.id)).forEach((n,i)=>placeNear(n,units.get(n.id)!.targetIds.map(id=>positions2d.get(owners.get(id)??'')).filter((p):p is Point=>Boolean(p)),i));
+ destinations.sort((a,b)=>a.id.localeCompare(b.id)).forEach((n,i)=>{const operations=graph.edges.filter(e=>e.target===n.id&&e.kind==='flow-deploys').map(e=>positions2d.get(e.source)).filter((p):p is Point=>Boolean(p));placeNear(n,operations,i);});
  context.sort((a,b)=>a.id.localeCompare(b.id)).forEach((n,i)=>{const neighbours=graph.edges.flatMap(e=>e.source===n.id?[e.target]:e.target===n.id?[e.source]:[]);placeNear(n,neighbours.map(id=>positions2d.get(id)).filter((p):p is Point=>Boolean(p)),i);});
  return {positions,positions2d};
 }

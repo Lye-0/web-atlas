@@ -10,6 +10,7 @@
 .simple-overview-section p {margin:6px 0;}
 .simple-overview-section small {display:block;color:var(--muted);}
 .simple-overview-section button {text-align:left;color:var(--accent);text-decoration:underline;text-underline-offset:3px;}
+.simple-peer {margin-block:10px;}
 .simple-detail-search {display:flex;flex-direction:column;gap:6px;margin-bottom:10px;}
 .simple-detail-search input {min-width:0;width:100%;box-sizing:border-box;padding:7px;border:1px solid var(--line);border-radius:4px;}
 .architecture-simple-detail .analyzer-detail-accordion {padding:8px 0;}

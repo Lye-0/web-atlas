@@ -53,7 +53,7 @@ it.skipIf(!process.env.SIMPLE_BOUNDS)('checks all three saved inputs, region red
  for(const project of ['vehicle-management','git-lines','web-atlas']){
   const model:SemanticGraph=JSON.parse(readFileSync(`.cache/simple-polish/${project}.model.json`,'utf8')),base=prepareArchitectureScope(model,undefined,'',true),start=performance.now(),simple=architectureSimpleOverview(base),coldMs=performance.now()-start;
   const regions=semanticFlowRegions(layoutSemanticFlow(simple.graph,'2d'),'2d'),old=JSON.parse(readFileSync(`.cache/simple-bounds/${project}.before.json`,'utf8'));
-  expect(simple.graph.nodes.map(n=>n.id).sort()).toEqual(old.graph.nodes.map((n:SemanticNode)=>n.id).sort());expect(simple.graph.edges.map(e=>e.id).sort()).toEqual(old.graph.edges.map((e:SemanticEdge)=>e.id).sort());
+  expect([...simple.owners.keys()].sort()).toEqual(base.allowed.map(n=>n.id).sort());expect([...new Set([...simple.units.values()].flatMap(u=>u.internalEdges).concat([...simple.relations.values()].flatMap(r=>r.edgeIds)))].sort()).toEqual(model.edges.map(e=>e.id).sort());
   const oldBounds=new Set(old.graph.nodes.filter((n:SemanticNode)=>n.attributes.simpleRole!=='context').map((n:SemanticNode)=>n.attributes.simpleRegionId)).size;
   expect(regions.length).toBeLessThanOrEqual(oldBounds);expect(regions.every(r=>r.count>1)).toBe(true);const evidenceStart=performance.now(),stats=simple.graph.nodes.map(n=>({label:n.label,...simpleEvidenceStats(n.evidence)})),siteMs=performance.now()-evidenceStart;
   const warm=performance.now();for(let i=0;i<100;i++){architectureSimpleOverview(base);for(const n of simple.graph.nodes)simpleEvidenceStats(n.evidence);}const warm100Ms=performance.now()-warm;

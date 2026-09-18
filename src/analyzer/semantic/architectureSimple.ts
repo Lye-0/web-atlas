@@ -5,6 +5,7 @@ import {simpleUsageIndex,simplePurposes,simplePurposeOrder} from './architecture
 import {layoutSimpleArchitecture} from './architectureSimpleLayout';
 import {architectureEnvironmentContext} from './architectureContext';
 import {simpleUsageSummary} from './architectureSimpleSummary';
+import {simpleStructuralGroups} from './architectureSimpleGroups';
 
 export const SIMPLE_OVERVIEW='simple-overview';
 export interface SimpleUnit {id:string;anchorId?:string;members:string[];internalEdges:string[];reason:string;role:'primary'|'support'|'context';targetIds:string[];purposes:string[]}
@@ -20,20 +21,24 @@ export function architectureSimpleOverview(base:PreparedArchitectureScope,surrou
  let variants=cache.get(base);if(!variants){variants=new Map();cache.set(base,variants);}const old=variants.get(surroundings);if(old)return old;
  const original=base.model,{byId,adjacent,usages}=simpleUsageIndex(original),allowed=new Set(base.allowed.map(n=>n.id));
  const owners=new Map<string,string>(),units=new Map<string,SimpleUnit>(),representatives=new Map<string,SemanticNode>();
+ const structuralGroups=simpleStructuralGroups(original,allowed);
  const isAnchor=(n:SemanticNode)=>major.has(n.architecture?.kind??'')&&(n.architecture?.kind!=='component'||!n.architecture.parentId||n.architecture.entryPaths.length>0||n.architecture.parentId===base.scopeId);
  const parentAnchor=(n:SemanticNode)=>{let id=n.architecture?.parentId;const seen=new Set<string>();while(id&&!seen.has(id)){seen.add(id);const p=byId.get(id);if(!p)break;if(allowed.has(id)&&isAnchor(p))return id;id=p.architecture?.parentId;}return undefined;};
+ const privateToParent=(n:SemanticNode,parent:string)=>{if(n.architecture?.kind!=='shared-code')return true;const uses=(adjacent.get(n.id)??[]).filter(e=>e.target===n.id&&e.source!==n.id&&['code-reference','declaration-dependency'].includes(e.kind));return uses.length>0&&uses.every(e=>{const source=byId.get(e.source);return e.source===parent||source?.attributes.logicalOwnerId===parent||Boolean(source&&parentAnchor(source)===parent);});};
  const assign=(n:SemanticNode,id:string,reason:string,role:SimpleUnit['role'],anchorId?:string,label?:string,targetIds:string[]=[])=>{
   owners.set(n.id,id);let u=units.get(id);if(!u){u={id,anchorId,members:[],internalEdges:[],reason,role,targetIds,purposes:[]};units.set(id,u);representatives.set(id,label?{...n,label}:n);}u.members.push(n.id);
   const purpose=String(n.attributes.purpose??'');if(simplePurposeOrder.includes(purpose)&&!u.purposes.includes(purpose))u.purposes.push(purpose);
  };
  for(const n of base.allowed)if(isAnchor(n)){
   // An internal test component stays with its real app; only independently classified roots form auxiliary groups.
-  const parent=parentAnchor(n);if(parent&&n.architecture?.entryPaths.length===0&&n.architecture?.parentId!==base.scopeId)continue;
+  const parent=parentAnchor(n);if(parent&&n.architecture?.entryPaths.length===0&&n.architecture?.parentId!==base.scopeId&&privateToParent(n,parent))continue;
+  const group=structuralGroups.get(n.id);if(group){assign(n,group.id,group.reason,group.category==='unconfirmed'?'context':'primary',undefined,group.label,group.targetIds);continue;}
   const role=auxRole(n);
   if(role&&!parent){assign(n,key('auxiliary-roots',role),'既存の用途判定に基づく独立した補助構成の集合','context',undefined,role==='inferred'?'記録・実験を支える構成（推定）':role==='test'?'テストを支える構成':'開発・検証を支える構成');}
   else assign(n,key('entity',n.id),'構成と、その内部・環境別の定義','code-package'===n.architecture?.kind?'context':'primary',n.id);
  }
- for(const n of base.allowed){if(owners.has(n.id)||!['component','execution-config','code-definition'].includes(n.architecture?.kind??''))continue;
+ for(const n of base.allowed){if(owners.has(n.id))continue;const group=structuralGroups.get(n.id);if(group){assign(n,group.id,group.reason,'primary',undefined,group.label,group.targetIds);continue;}
+  if(!['component','execution-config','code-definition','shared-code'].includes(n.architecture?.kind??''))continue;
   const logical=n.attributes.logicalOwnerId,parent=typeof logical==='string'&&allowed.has(logical)&&owners.has(logical)?logical:parentAnchor(n),owner=parent&&owners.get(parent);
   if(owner){const unit=units.get(owner)!;assign(n,owner,unit.reason,unit.role,unit.anchorId);}
  }
@@ -78,7 +83,7 @@ export function architectureSimpleOverview(base:PreparedArchitectureScope,surrou
  const within=(id:string)=>{if(!base.scopeId)return true;let node=byId.get(id);const seen=new Set<string>();while(node&&!seen.has(node.id)){if(node.id===base.scopeId)return true;seen.add(node.id);node=byId.get(node.architecture?.parentId??'');}return false;};
  const inside=new Set([...units].filter(([,u])=>u.members.some(within)).map(([id])=>id)),shown=new Set(inside);
  if(base.scopeId)for(const e of edges.values())if(inside.has(e.source)||inside.has(e.target)){shown.add(e.source);shown.add(e.target);}
- if(base.scopeId&&surroundings)for(const [id,u]of units)if(u.anchorId)shown.add(id);
+ if(base.scopeId&&surroundings)for(const [id,u]of units)if(u.anchorId||structuralGroups.has(u.members[0]!))shown.add(id);
  const nodes:SemanticNode[]=[...units].filter(([id])=>shown.has(id)).map(([id,u])=>{const n=representatives.get(id)!,members=u.members.map(id=>byId.get(id)!),purpose=simplePurposeOrder.filter(p=>u.purposes.includes(p)).map(p=>simplePurposes[p]).join('・');
   const configurations=members.filter(m=>m.architecture?.kind==='execution-config'),relevant=u.role==='support'&&u.purposes.length?members.filter(m=>m.architecture?.kind==='tool-operation'&&m.attributes.purpose!=='script'):u.anchorId&&configurations.length?configurations:members.filter(m=>m.architecture?.kind!=='unresolved'&&m.attributes.purpose!=='script'),contexts=relevant.map(architectureEnvironmentContext),environments=[...new Set(contexts.flatMap(c=>c.environments))];
   const environmentLabels=[...new Set(contexts.map(c=>c.label))];
@@ -86,10 +91,15 @@ export function architectureSimpleOverview(base:PreparedArchitectureScope,surrou
  });
  const dedicated=new Map<string,SemanticNode[]>();
  for(const n of nodes){const u=units.get(n.id)!,targets=[...new Set(u.targetIds.map(id=>owners.get(id)).filter((id):id is string=>Boolean(id)))];
+  const group=structuralGroups.get(u.members[0]!);n.attributes.simpleCategory=group?.category??'';
+  if(group&&n.architecture)n.architecture.identity=undefined;
+  if(group?.category==='destination'||group?.category==='resources')n.attributes.simpleRows=u.members.map(id=>{const member=byId.get(id)!;return `${architectureEnvironmentContext(member).label}${member.attributes.executionPlace?` / ${member.attributes.executionPlace}`:''}：${member.attributes.providedContent??member.label}`;});
   n.attributes.simpleRegionId='';n.attributes.simpleRegionLabel='';
   n.attributes.simpleUsageSummary=simpleUsageSummary(u.members.map(id=>byId.get(id)!));
+  if(u.purposes.includes('deploy')){const operations=u.members.filter(id=>byId.get(id)?.attributes.purpose==='deploy'),unresolved=operations.filter(id=>!(adjacent.get(id)??[]).some(e=>e.source===id&&e.kind==='flow-deploys'&&byId.get(e.target)?.architecture?.kind!=='unresolved'&&byId.has(e.target)));if(unresolved.length)n.attributes.simplePublicationNote=`公開先の構成が未解決：${unresolved.length}使用`;}
+  if(n.architecture?.kind==='artifact'&&!u.members.some(id=>(adjacent.get(id)??[]).some(e=>e.source===id&&e.kind==='flow-input'&&byId.get(e.target)?.attributes.purpose==='deploy')))n.attributes.simplePublicationNote=original.nodes.some(item=>item.attributes.purpose==='deploy')?'この成果物を公開操作へ渡す関係は未確認':'公開操作は未検出';
   const databaseChange=u.role==='support'&&(u.purposes.some(p=>p==='generate'||p==='apply')||u.members.some(id=>['artifact','code-definition'].includes(byId.get(id)?.architecture?.kind??'')&&(adjacent.get(id)??[]).some(e=>['flow-input','flow-generates'].includes(e.kind)&&['generate','apply'].includes(usages.get(e.source===id?e.target:e.source)?.purpose??''))));
-  n.attributes.simpleSupportPurpose=databaseChange?'DB構造変更':n.architecture?.kind==='shared-code'?'共有コード':u.role==='context'?'補助・所属未判定':'';
+  n.attributes.simpleSupportPurpose=group?.category==='unconfirmed'?'実行用途未確認':databaseChange?'DB構造変更':n.architecture?.kind==='shared-code'?'共有コード':u.role==='context'?'補助・所属未判定':'';
   if(u.role==='support'&&u.purposes.length&&targets.length===1&&nodes.find(item=>item.id===targets[0])?.architecture?.kind==='application'){
    const list=dedicated.get(targets[0]!)??[];list.push(n);dedicated.set(targets[0]!,list);
   }

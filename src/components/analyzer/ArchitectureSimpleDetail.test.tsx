@@ -21,6 +21,14 @@ it('exposes original intermediate IDs and evidence only on explicit disclosure',
   await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='全体で詳しく見る：target')!.click());expect(show).toHaveBeenCalledWith('target');
  }finally{await act(async()=>root.unmount());host.remove();vi.unstubAllGlobals();}
 });
+it('keeps the publishing operation visible as a peer of a destination collection',async()=>{
+ vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT',true);
+ const make=(id:string,kind:NonNullable<SemanticNode['architecture']>['kind']):SemanticNode=>({id,label:id,kind:'subsystem',group:'test',confidence:'source',evidence:[],attributes:{},architecture:{kind,entryPaths:[],roles:[],environments:[],context:[],memberIds:[],files:[],technologyNames:[],auxiliary:false}});
+ const app=make('app','application'),publisher=make('publisher','tool-operation'),destination=make('serving','execution-config');publisher.attributes.purpose='deploy';destination.attributes.logicalOwnerId='app';
+ const simple=architectureSimpleOverview(prepareArchitectureScope({view:'architecture-map',nodes:[app,publisher,destination],edges:[{id:'publish',source:'publisher',target:'serving',kind:'flow-deploys',label:'publish',confidence:'source',evidence:[],views:['architecture-map']}]})),host=document.createElement('div'),root=createRoot(host);document.body.append(host);
+ try{await act(async()=>root.render(<ArchitectureSimpleDetail simple={simple} node={simple.graph.nodes.find(n=>n.id===simple.owners.get('serving'))} sources={{}} onShowAll={()=>{}} onOpen={()=>{}} canOpen={()=>true} onClose={()=>{}}/>));expect(host.textContent).toContain('publisher');expect(host.textContent).toContain('公開する指定');expect(host.textContent).not.toContain('この構成の内部を開く');}
+ finally{await act(async()=>root.unmount());host.remove();vi.unstubAllGlobals();}
+});
 it('keeps membership, evidence preview and copied path paired while explaining peer direction',async()=>{
  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT',true);
  const make=(id:string):SemanticNode=>({id,label:id,kind:'subsystem',group:'test',confidence:'source',evidence:[],attributes:{},architecture:{kind:'application',entryPaths:[],roles:[],environments:[],context:[],memberIds:[],files:[],technologyNames:[],auxiliary:false}});
@@ -34,4 +42,13 @@ it('keeps membership, evidence preview and copied path paired while explaining p
   await open('内部構成');expect(host.textContent).toContain('所属：apps/api');expect(host.textContent).toContain('代表的な根拠：api/auth.ts · L2');expect(host.textContent).not.toContain('apps/api:2');
   await open('完全なパス・その他の根拠');await open('auth.ts');expect(host.textContent).toContain('2  AUTH');expect(host.textContent).toContain('ソース範囲：6–10');await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='パスをコピー')!.click());expect(copy).toHaveBeenCalledWith('apps/api/auth.ts');
  }finally{await act(async()=>root.unmount());host.remove();if(descriptor)Object.defineProperty(navigator,'clipboard',descriptor);else Reflect.deleteProperty(navigator,'clipboard');vi.unstubAllGlobals();}
+});
+it('separates tools, artifacts and definitions in the support overview',async()=>{
+ vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT',true);
+ const make=(id:string,kind:NonNullable<SemanticNode['architecture']>['kind']):SemanticNode=>({id,label:id,kind:'subsystem',group:'test',confidence:'source',evidence:[],attributes:{},architecture:{kind,entryPaths:[],roles:[],environments:[],context:[],memberIds:[],files:[],technologyNames:[],auxiliary:false}});
+ const db=make('database','resource'),schema=make('schema','code-definition'),sql=make('sql-output','artifact'),gen=make('generator','tool-operation'),apply=make('apply','tool-operation');gen.attributes.purpose='generate';apply.attributes.purpose='apply';
+ const model:SemanticGraph={view:'architecture-map',nodes:[db,schema,sql,gen,apply],edges:[['in','schema','generator','flow-input'],['out','generator','sql-output','flow-generates'],['read','sql-output','apply','flow-input'],['apply','apply','database','flow-applies']].map(([id,source,target,kind])=>({id:id!,source:source!,target:target!,kind:kind!,label:kind!,confidence:'source',evidence:[],views:['architecture-map']}))};
+ const simple=architectureSimpleOverview(prepareArchitectureScope(model)),host=document.createElement('div'),root=createRoot(host);document.body.append(host);
+ try{await act(async()=>root.render(<ArchitectureSimpleDetail simple={simple} node={simple.graph.nodes.find(n=>n.id===simple.owners.get('database'))} sources={{}} onShowAll={()=>{}} onOpen={()=>{}} canOpen={()=>false} onClose={()=>{}}/>));const section=[...host.querySelectorAll('section')].find(s=>s.querySelector('h4')?.textContent==='開発・公開・更新に関わるもの')!;expect(section.textContent).toContain('道具');expect(section.textContent).toContain('成果物');expect(section.textContent).toContain('定義');const tools=[...section.children].find(c=>c.querySelector(':scope > strong')?.textContent==='道具')!;expect(tools.textContent).toContain('generator');expect(tools.textContent).not.toContain('sql-output');expect(tools.textContent).not.toContain('schema');}
+ finally{await act(async()=>root.unmount());host.remove();vi.unstubAllGlobals();}
 });
