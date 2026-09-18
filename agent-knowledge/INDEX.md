@@ -84,6 +84,14 @@
 - files: `src/analyzer/semantic/flowRegions.ts`, `src/components/analyzer/SemanticFlow3D.tsx`, `src/components/analyzer/semanticFlowLabels.ts` …
 - memory: `agent-knowledge/entries/2026-09-17-region-label-identity-915acd.md`
 
+### Architectureの代表パスとEvidence行は独立している
+- id: `rm-20260918-architecture-evidence-location-pair`
+- type: `failure`
+- maturity: `candidate`
+- tags: `evidence`, `source-location`, `display`
+- files: `src/analyzer/semantic/architectureSimpleEvidence.ts`, `src/analyzer/semantic/architectureSimpleUsage.ts`, `src/analyzer/semantic/architectureSimpleBounds.test.ts` …
+- memory: `agent-knowledge/entries/2026-09-18-architecture-evidence-location-pair-d8f016.md`
+
 ### 簡易要約では補助用途より実際の所属を先に解決する
 - id: `rm-20260918-simple-ownership-before-auxiliary`
 - type: `failure`

@@ -31,12 +31,12 @@ export function semanticFlowRegionIdentity(node:SemanticNode,explorer?:SemanticE
 export function semanticFlowRegions(positions: readonly SemanticPosition[], mode: '2d' | '3d', explorer?: SemanticExplorerModel): SemanticFlowRegion[] {
   const groups = new Map<string, { identity: SemanticRegionIdentity; positions: SemanticPosition[] }>();
   for (const position of positions) {
-    if(position.node.attributes.simpleOverview&&position.node.attributes.simpleRole==='context')continue;
+    if(position.node.attributes.simpleOverview&&!position.node.attributes.simpleRegionId)continue;
     const identity = semanticFlowRegionIdentity(position.node,explorer);
     const group = groups.get(identity.id) ?? { identity, positions: [] };
     group.positions.push(position); groups.set(identity.id, group);
   }
-  return [...groups.values()].map(({ identity, positions: members }) => {
+  return [...groups.values()].filter(({positions:members})=>!members[0]?.node.attributes.simpleOverview||members.length>1).map(({ identity, positions: members }) => {
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
     const ids = new Set<string>();
     for (const point of members) {
@@ -47,7 +47,7 @@ export function semanticFlowRegions(positions: readonly SemanticPosition[], mode
     const horizontal = mode === '2d' ? 132 : 18, above = mode === '2d' ? 64 : 18, below = mode === '2d' ? 48 : 18;
     return { ...identity, x: minX - horizontal, y: minY - above, width: maxX - minX + horizontal * 2, height: maxY - minY + above + below,
       z: minZ - 20, depth: maxZ - minZ + 40, count: ids.size, nodeIds: members.map(point => point.node.id) };
-  });
+  }).filter(region=>!region.id.startsWith('simple-region:')||!positions.some(p=>!region.nodeIds.includes(p.node.id)&&p.x>region.x&&p.x<region.x+region.width&&p.y>region.y&&p.y<region.y+region.height));
 }
 
 export function semanticMapBounds(regions: readonly SemanticMapRect[]): SemanticMapRect {

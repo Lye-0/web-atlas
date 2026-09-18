@@ -1,4 +1,5 @@
 import type {SemanticGraph,SemanticNode,SemanticEdge} from './types';
+import {simpleEvidenceLocation} from './architectureSimpleEvidence';
 
 export const simplePurposes:Record<string,string>={serve:'開発',build:'ビルド',start:'起動',deploy:'公開',generate:'SQL生成',apply:'DB適用',script:'開始script'};
 export const simplePurposeOrder=['serve','build','start','deploy','generate','apply'];
@@ -30,7 +31,6 @@ export function simpleUsageIndex(model:SemanticGraph){
 
 /** Script context is source metadata, never parsed out of a generated ID. */
 export function simpleMemberCaption(n:SemanticNode){
- const at=n.evidence[0],file=(n.path??at?.path??'').split('/').slice(-2).join('/');
  const context=n.architecture?.kind==='tool-operation'?[n.attributes.scriptName,n.attributes.invocationLabel,n.attributes.usageArguments].filter(Boolean).join(' · '):n.architecture?.request?.expression??'';
- return [context,file+(at?`:${at.line}${at.endLine!==at.line?`–${at.endLine}`:''}`:'')].filter(Boolean).join(' · ');
+ return [context,`代表的な根拠：${simpleEvidenceLocation(n.evidence[0])}`].filter(Boolean).join(' · ');
 }

@@ -19,6 +19,7 @@ export function architectureEnvironmentContext(node:SemanticNode):{meaning:Envir
 
 /** Stable source context shared by diagram, search, partner rows and details. */
 export function architectureUsageContext(node:SemanticNode):string {
+  if(node.attributes.simpleOverview)return String(node.attributes.simpleUsageSummary??'');
   if(node.architecture?.kind!=='tool-operation')return '';
   const owner=node.architecture.ownerPath||'root';
   const script=typeof node.attributes.scriptName==='string'?node.attributes.scriptName:'';

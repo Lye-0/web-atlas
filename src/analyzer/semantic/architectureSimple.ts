@@ -4,6 +4,7 @@ import {uniqueArchitectureEvidence} from './architectureEvidence';
 import {simpleUsageIndex,simplePurposes,simplePurposeOrder} from './architectureSimpleUsage';
 import {layoutSimpleArchitecture} from './architectureSimpleLayout';
 import {architectureEnvironmentContext} from './architectureContext';
+import {simpleUsageSummary} from './architectureSimpleSummary';
 
 export const SIMPLE_OVERVIEW='simple-overview';
 export interface SimpleUnit {id:string;anchorId?:string;members:string[];internalEdges:string[];reason:string;role:'primary'|'support'|'context';targetIds:string[];purposes:string[]}
@@ -83,9 +84,17 @@ export function architectureSimpleOverview(base:PreparedArchitectureScope,surrou
   const environmentLabels=[...new Set(contexts.map(c=>c.label))];
   return {...n,id,label:u.role==='support'&&purpose?`${n.label}：${purpose}`:n.label,confidence:members.some(n=>n.confidence==='unresolved')?'unresolved':members.some(n=>n.confidence==='inferred')||new Set(members.map(n=>n.confidence)).size>1?'inferred':n.confidence,evidence:uniqueArchitectureEvidence(members.flatMap(n=>n.evidence)),architecture:n.architecture?{...n.architecture,parentId:undefined,request:undefined,memberIds:[...u.members],environments}:undefined,attributes:{...n.attributes,sharedEnvironments:[],simpleEnvironmentLabel:environmentLabels.join(' / '),simpleEnvironmentMixed:environmentLabels.length>1,simpleOverview:true,simpleRole:u.role,simpleMemberIds:[...u.members],architectureContext:!inside.has(id),architecturePeripheral:!inside.has(id),architectureScopeRole:base.scopeId?(inside.has(id)?'inside':'surrounding'):'',simpleAnchorId:u.anchorId??''}};
  });
- for(const n of nodes){const u=units.get(n.id)!,targets=[...new Set(u.targetIds.map(id=>owners.get(id)).filter((id):id is string=>Boolean(id)))],subject=u.role==='primary'?n.id:u.role==='support'&&targets.length===1?targets[0]:undefined;
-  n.attributes.simpleRegionId=subject??(u.role==='support'?key('shared-support',targets):'context');n.attributes.simpleRegionLabel=subject?(nodes.find(n=>n.id===subject)?.label??'構成')+' と支援':u.role==='support'?(targets.length?'複数対象への支援':'対象未特定の支援'):'補助・所属未判定の構成';
+ const dedicated=new Map<string,SemanticNode[]>();
+ for(const n of nodes){const u=units.get(n.id)!,targets=[...new Set(u.targetIds.map(id=>owners.get(id)).filter((id):id is string=>Boolean(id)))];
+  n.attributes.simpleRegionId='';n.attributes.simpleRegionLabel='';
+  n.attributes.simpleUsageSummary=simpleUsageSummary(u.members.map(id=>byId.get(id)!));
+  const databaseChange=u.role==='support'&&(u.purposes.some(p=>p==='generate'||p==='apply')||u.members.some(id=>['artifact','code-definition'].includes(byId.get(id)?.architecture?.kind??'')&&(adjacent.get(id)??[]).some(e=>['flow-input','flow-generates'].includes(e.kind)&&['generate','apply'].includes(usages.get(e.source===id?e.target:e.source)?.purpose??''))));
+  n.attributes.simpleSupportPurpose=databaseChange?'DB構造変更':n.architecture?.kind==='shared-code'?'共有コード':u.role==='context'?'補助・所属未判定':'';
+  if(u.role==='support'&&u.purposes.length&&targets.length===1&&nodes.find(item=>item.id===targets[0])?.architecture?.kind==='application'){
+   const list=dedicated.get(targets[0]!)??[];list.push(n);dedicated.set(targets[0]!,list);
+  }
  }
+ for(const [id,supports]of dedicated){const app=nodes.find(n=>n.id===id)!;for(const n of [app,...supports]){n.attributes.simpleRegionId=id;n.attributes.simpleRegionLabel=`${app.label} の支援`;}}
  const visibleEdges=[...edges.values()].filter(e=>shown.has(e.source)&&shown.has(e.target)),graph:SemanticGraph={view:'architecture-map',nodes,edges:visibleEdges};
  const {positions,positions2d}=layoutSimpleArchitecture(graph,units,owners);
  graph.architectureView={scopeId:base.scopeId,detailIds:nodes.filter(n=>inside.has(n.id)).map(n=>n.id),contextIds:nodes.filter(n=>!inside.has(n.id)).map(n=>n.id),peripheralIds:[],internalRelations:[],boundaryRelations:[],positions,positions2d,requestGroups:[],representedNodeIds:nodes.flatMap(n=>units.get(n.id)!.members),detailCount:inside.size,contextCount:nodes.length-inside.size,detailEntityCount:nodes.filter(n=>inside.has(n.id)).length,contextEntityCount:nodes.filter(n=>!inside.has(n.id)).length,requestCount:0,internalRecordCount:0,explicitNodeIds:[]};

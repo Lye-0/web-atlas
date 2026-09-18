@@ -21,3 +21,17 @@ it('exposes original intermediate IDs and evidence only on explicit disclosure',
   await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='全体で詳しく見る：target')!.click());expect(show).toHaveBeenCalledWith('target');
  }finally{await act(async()=>root.unmount());host.remove();vi.unstubAllGlobals();}
 });
+it('keeps membership, evidence preview and copied path paired while explaining peer direction',async()=>{
+ vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT',true);
+ const make=(id:string):SemanticNode=>({id,label:id,kind:'subsystem',group:'test',confidence:'source',evidence:[],attributes:{},architecture:{kind:'application',entryPaths:[],roles:[],environments:[],context:[],memberIds:[],files:[],technologyNames:[],auxiliary:false}});
+ const app=make('api'),peer=make('browser'),component=make('Authentication');component.architecture!.kind='component';component.architecture!.parentId='api';component.path='apps/api';component.evidence=[{path:'apps/api/auth.ts',line:2,endLine:2,start:6,end:10,description:'auth marker'}];
+ const model:SemanticGraph={view:'architecture-map',nodes:[app,peer,component],edges:[{id:'request',source:'browser',target:'api',kind:'http-request',label:'HTTP',confidence:'source',evidence:[],views:['architecture-map']}]};
+ const simple=architectureSimpleOverview(prepareArchitectureScope(model)),host=document.createElement('div'),root=createRoot(host),copy=vi.fn().mockResolvedValue(undefined),descriptor=Object.getOwnPropertyDescriptor(navigator,'clipboard');Object.defineProperty(navigator,'clipboard',{value:{writeText:copy},configurable:true});document.body.append(host);
+ try{
+  await act(async()=>root.render(<ArchitectureSimpleDetail simple={simple} node={simple.graph.nodes.find(n=>n.id===simple.owners.get('api'))} sources={{'apps/api/auth.ts':'first\nAUTH\nlast'}} onShowAll={()=>{}} onOpen={()=>{}} canOpen={()=>false} onClose={()=>{}}/>));
+  expect(host.textContent).toContain('browser → この構成');expect(host.textContent).not.toContain('この構成 → browser');
+  const open=async(text:string)=>{const d=[...host.querySelectorAll('details')].find(d=>d.querySelector(':scope > summary')?.textContent?.includes(text))!;await act(async()=>{d.open=true;d.dispatchEvent(new Event('toggle'));});};
+  await open('内部構成');expect(host.textContent).toContain('所属：apps/api');expect(host.textContent).toContain('代表的な根拠：api/auth.ts · L2');expect(host.textContent).not.toContain('apps/api:2');
+  await open('完全なパス・その他の根拠');await open('auth.ts');expect(host.textContent).toContain('2  AUTH');expect(host.textContent).toContain('ソース範囲：6–10');await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='パスをコピー')!.click());expect(copy).toHaveBeenCalledWith('apps/api/auth.ts');
+ }finally{await act(async()=>root.unmount());host.remove();if(descriptor)Object.defineProperty(navigator,'clipboard',descriptor);else Reflect.deleteProperty(navigator,'clipboard');vi.unstubAllGlobals();}
+});
