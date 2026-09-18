@@ -5,7 +5,7 @@ type: failure
 status: active
 maturity: reused
 created: 2026-09-18
-last_verified: 2026-09-18
+last_verified: 2026-09-19
 source_commit: "33e40cb"
 related_files:
   - src/analyzer/semantic/architectureSimpleLayout.ts
@@ -41,3 +41,7 @@ promoted_to: null
 1. `pnpm exec vitest run src/analyzer/semantic/architectureRouteLanes.test.ts`。
 2. 小構成と大構成の両方で原本から操作・到着先まで追う。列の整列や保存ID数だけを可読性の根拠にしない。
 3. 経路帯外の参照・通常通信・補助が失われず、選択で座標を再生成しないことを確認する。
+
+## 2026-09-19 再検証
+
+共有コードを利用元の近くへ置く処理でも、利用元より先に配置すると未配置として遠いサービス列へ落ちる。経路なしの独立アプリ/CLIと補助を先に配置し、その後で共有部分を一度だけ配置する。利用元はIDを重複排除し、主利用元がある場合は多数の補助参照を優先しない。既に正常なWeb/API共有位置と全主経路座標の不変を3入力で確認。architectureCorrespondence.test.tsに未配置利用元・共有自身の経路・対応情報の正負例を追加した。

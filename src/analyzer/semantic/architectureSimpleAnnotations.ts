@@ -2,10 +2,21 @@ import type {SemanticGraph,SemanticNode,SemanticEdge} from './types';
 import type {ArchitectureSimple,SimpleRelation,SimpleUnit} from './architectureSimple';
 import {architectureEnvironmentContext} from './architectureContext';
 
-/** Only folded start-script invocation is an annotation; preconditions and data flow remain lines. */
+export const simpleCorrespondenceKinds=new Set(['flow-definition','flow-configures','flow-serves']);
+/** Recorded owner/source correspondence, never inferred from an alternative route. */
+export function isSimpleCorrespondence(edge:SemanticEdge,byId:ReadonlyMap<string,SemanticNode>){
+ const source=byId.get(edge.source),target=byId.get(edge.target);if(!source||!target||!edge.evidence.length)return false;
+ const pending=[edge],seen=new Set<SemanticEdge>();for(let i=0;i<pending.length;i++){const e=pending[i]!;if(seen.has(e))continue;seen.add(e);if(!simpleCorrespondenceKinds.has(e.kind))return false;pending.push(...(e.provenance?.edges??[]) as SemanticEdge[]);}
+ if(edge.kind==='flow-definition')return edge.details?.structural===true&&target.attributes.logicalOwnerId===source.id&&['execution-config','code-definition'].includes(target.architecture?.kind??'');
+ if(edge.kind==='flow-configures')return edge.details?.structural===true&&source.architecture?.kind==='code-definition'&&target.architecture?.kind==='execution-config'&&typeof source.attributes.logicalOwnerId==='string'&&source.attributes.logicalOwnerId===target.attributes.logicalOwnerId;
+ return edge.kind==='flow-serves'&&edge.details?.architectureOrigin==='architecture'&&source.architecture?.kind==='execution-config'&&source.attributes.logicalOwnerId===target.id&&target.architecture?.kind==='application';
+}
+/** Folded invocation and verified correspondence become annotations; operations and use stay lines. */
 export function simpleReferenceEdges(graph:SemanticGraph,original:SemanticGraph,units:ReadonlyMap<string,SimpleUnit>,relations:ReadonlyMap<string,SimpleRelation>){
  const byId=new Map(original.nodes.map(n=>[n.id,n])),edges=new Map(original.edges.map(e=>[e.id,e])),shown=new Map(graph.nodes.map(n=>[n.id,n]));
- return graph.edges.filter(e=>e.kind==='flow-invokes'&&shown.get(e.source)?.architecture?.kind!=='tool-operation'&&shown.get(e.target)?.architecture?.kind==='tool-operation'&&(relations.get(e.id)?.edgeIds??[]).every(id=>{const raw=edges.get(id);return raw&&byId.get(raw.source)?.attributes.purpose==='script';})&&units.has(e.source));
+ return graph.edges.filter(e=>{const originals=(relations.get(e.id)?.edgeIds??[]).map(id=>edges.get(id));if(!originals.length||originals.some(e=>!e))return false;
+  return originals.every(raw=>isSimpleCorrespondence(raw!,byId))||e.kind==='flow-invokes'&&shown.get(e.source)?.architecture?.kind!=='tool-operation'&&shown.get(e.target)?.architecture?.kind==='tool-operation'&&originals.every(raw=>byId.get(raw!.source)?.attributes.purpose==='script')&&units.has(e.source);
+ });
 }
 export function simpleResourceEndpoints(simple:ArchitectureSimple,edge:SemanticEdge){
  const rawIds=new Set(simple.relations.get(edge.id)?.edgeIds??[]),byId=new Map(simple.original.nodes.map(n=>[n.id,n])),groups=new Map<string,{node:SemanticNode;members:SemanticNode[];edgeIds:string[]}>();

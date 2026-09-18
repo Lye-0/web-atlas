@@ -64,13 +64,16 @@ export function layoutSimpleArchitecture(graph:SemanticGraph){
  const groups=new Map<string,SemanticNode[]>();for(const n of remaining){const k=kind(n),list=groups.get(k)??[];list.push(n);groups.set(k,list);}
  const width=Math.max(3,Math.min(5,1+Math.max(0,...rank.values())));
  const sideColumn=1+Math.max(1,...[...positions2d.keys()].map(id=>rank.get(id)!)),sideRows:number[]=[];
- for(const category of ['shared','service','no-route','context']){
+ // Place all independent users before shared code; otherwise no-route users fall back to the far service column.
+ for(const category of ['service','no-route','context','shared']){
   const list=groups.get(category)??[];if(!list.length)continue;
   list.sort((a,b)=>{const ar=relatedRows(a),br=relatedRows(b);return (ar.length?Math.min(...ar):Infinity)-(br.length?Math.min(...br):Infinity)||compare(a,b);});
   if(category==='shared'||category==='service'){
-   for(const n of list){const users=graph.edges.filter(e=>e.target===n.id&&e.kind==='simple-reference').map(e=>positions2d.get(e.source)).filter((p):p is Point=>Boolean(p));const rows=(category==='shared'&&users.length?users.map(p=>p.y):relatedRows(n)).sort((a,b)=>a-b);let y=rows.length?rows[Math.floor(rows.length/2)]!:top;
-    const column=category==='shared'&&users.length?Math.round(users.map(p=>p.x/350).sort((a,b)=>a-b)[Math.floor(users.length/2)]!)-1:sideColumn;
-    while([...positions2d.values()].some(p=>p.x===column*350&&Math.abs(p.y-y)<140))y+=140;
+   for(const n of list){const userIds=[...new Set(graph.edges.filter(e=>e.target===n.id&&e.kind==='simple-reference'&&e.source!==n.id).map(e=>e.source))],primary=userIds.filter(id=>byId.get(id)?.attributes.simpleRole!=='context'&&byId.get(id)?.architecture?.kind!=='shared-code'),users=(primary.length?primary:userIds).map(id=>positions2d.get(id)).filter((p):p is Point=>Boolean(p));const rows=(category==='shared'&&users.length?users.map(p=>p.y):relatedRows(n)).sort((a,b)=>a-b);let y=rows.length?rows[Math.floor(rows.length/2)]!:top;
+    let column=category==='shared'&&users.length?Math.round(users.map(p=>p.x/350).sort((a,b)=>a-b)[Math.floor(users.length/2)]!)-1:sideColumn;
+    const desired=y,occupied=[...positions2d.values()],free=(c:number,row:number)=>occupied.every(p=>p.x!==c*350||Math.abs(p.y-row)>=140);
+    if(category==='shared'&&!free(column,y)){const candidates:{column:number;y:number;score:number}[]=[];for(const c of [column,column+1,column-1])for(let distance=0;distance<=graph.nodes.length;distance++)for(const row of distance?[desired-distance*140,desired+distance*140]:[desired])if(free(c,row))candidates.push({column:c,y:row,score:users.length?users.reduce((sum,p)=>sum+Math.abs(p.x-c*350)+Math.abs(p.y-row),0):Math.abs(c-column)*350+Math.abs(row-desired)});const closest=candidates.sort((a,b)=>a.score-b.score)[0];if(closest){column=closest.column;y=closest.y;}}
+    else if(category!=='shared')while(!free(column,y))y+=140;
     sideRows.push(y);put(n,column,y,category);n.attributes.simplePlacementLabel=category==='shared'?'共有部分':'利用・接続先';}
    top=Math.max(top,...sideRows.map(y=>y+180));continue;
   }
