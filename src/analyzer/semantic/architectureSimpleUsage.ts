@@ -1,7 +1,7 @@
 import type {SemanticGraph,SemanticNode,SemanticEdge} from './types';
 import {simpleEvidenceLocation} from './architectureSimpleEvidence';
 
-export const simplePurposes:Record<string,string>={serve:'開発',build:'ビルド',start:'起動',deploy:'公開',generate:'SQL生成',apply:'DB適用',script:'開始script'};
+export const simplePurposes:Record<string,string>={serve:'開発配信',build:'ビルド',start:'起動',deploy:'公開',generate:'SQL生成',apply:'DB適用',script:'開始script'};
 export const simplePurposeOrder=['serve','build','start','deploy','generate','apply'];
 export interface SimpleUsage {targets:string[];family:string;context:string;tool:string;purpose:string;resolved:boolean}
 export function simpleUsageIndex(model:SemanticGraph){
@@ -19,13 +19,11 @@ export function simpleUsageIndex(model:SemanticGraph){
   // A schema generator can share DB support, but only via its actual SQL output and apply operation.
   if(purpose==='generate')for(const out of edges.filter(e=>e.source===n.id&&e.kind==='flow-generates'))for(const input of adjacent.get(out.target)??[])if(input.source===out.target&&input.kind==='flow-input')for(const apply of adjacent.get(input.target)??[])if(apply.source===input.target&&apply.kind==='flow-applies')targets.add(apply.target);
   if(!targets.size)for(const e of edges)if(e.source===n.id&&e.kind==='flow-generates'&&byId.get(e.target)?.architecture?.kind==='artifact')targets.add(e.target);
-  const applicationTargets=targets.size>0&&[...targets].every(id=>['application','shared-code','code-package'].includes(byId.get(id)?.architecture?.kind??''));
-  const family=applicationTargets&&['start','serve','build','deploy'].includes(purpose)?'application-lifecycle':purpose||'unknown';
-  usages.set(n.id,{targets:[...targets].sort(),purpose,family,tool:String(n.attributes.dictionaryStackId??n.label.split('：')[0]??n.id),context:JSON.stringify([n.attributes.configurationPath??n.attributes.inputRoot??n.attributes.workingDirectory??n.attributes.ownerPath??n.id,...(applicationTargets?[]:[n.attributes.targetPlace,n.architecture?.environments])]),resolved:targets.size>0});
+  const inputs=[...new Set(edges.filter(e=>e.target===n.id&&e.kind==='flow-input').map(e=>logical(e.source)??e.source))].sort();
+  const outputs=[...new Set(edges.filter(e=>e.source===n.id&&['flow-generates','flow-starts','flow-deploys','flow-applies'].includes(e.kind)).map(e=>JSON.stringify([e.kind,e.target,e.details?.environment??'',e.details?.conditional??false])))].sort();
+  const context=[n.attributes.configurationPath??'',n.attributes.inputRoot??'',n.attributes.workingDirectory??n.attributes.ownerPath??(n.attributes.configurationPath||n.attributes.inputRoot?'':n.id),inputs,outputs,n.attributes.targetPlace??'', [...(n.architecture?.environments??[])].sort(),String(n.attributes.usageArguments??'').trim()];
+  usages.set(n.id,{targets:[...targets].sort(),purpose,family:purpose||'unknown',tool:String(n.attributes.dictionaryStackId??n.label.split('：')[0]??n.id),context:JSON.stringify(context),resolved:targets.size>0||inputs.length>0});
  }
- const outputs=new Map<string,string[]>(),contexts=new Map<string,Set<string>>();
- for(const [id,u] of usages){if(u.family!=='application-lifecycle')continue;const paths=(adjacent.get(id)??[]).filter(e=>e.source===id&&e.kind==='flow-generates').map(e=>String(byId.get(e.target)?.attributes.artifactPath??e.target)).sort();outputs.set(id,paths);const k=JSON.stringify([u.tool,u.targets,u.context]),set=contexts.get(k)??new Set<string>();for(const path of paths)set.add(path);contexts.set(k,set);}
- for(const [id,u]of usages){const set=contexts.get(JSON.stringify([u.tool,u.targets,u.context]));if(set&&set.size>1)u.context=JSON.stringify([u.context,outputs.get(id)??[]]);}
  return {byId,adjacent,usages};
 }
 

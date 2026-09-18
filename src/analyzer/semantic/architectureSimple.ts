@@ -52,7 +52,7 @@ export function architectureSimpleOverview(base:PreparedArchitectureScope,surrou
  // Inputs/outputs that merely connect a unique producing use to consuming uses become a finite two-stage path.
  const foldedArtifacts=new Map<string,{producer:string;edgeId:string}>();
  for(const n of base.allowed){if(owners.has(n.id)||n.architecture?.kind!=='artifact')continue;const edges=adjacent.get(n.id)??[],incoming=edges.filter(e=>e.target===n.id),outgoing=edges.filter(e=>e.source===n.id);
-  if(incoming.length===1&&incoming[0]!.kind==='flow-generates'&&byId.get(incoming[0]!.source)?.attributes.purpose==='build'&&outgoing.length&&outgoing.every(e=>e.kind==='flow-input'&&usages.has(e.target))){const owner=owners.get(incoming[0]!.source);if(owner){const unit=units.get(owner)!;assign(n,owner,'生成する成果物を含むビルドの支援用途',unit.role);foldedArtifacts.set(n.id,{producer:incoming[0]!.source,edgeId:incoming[0]!.id});}}
+  if(incoming.length===1&&incoming[0]!.kind==='flow-generates'&&byId.get(incoming[0]!.source)?.attributes.purpose==='build'&&outgoing.length===1&&outgoing.every(e=>e.kind==='flow-input'&&usages.has(e.target))){const owner=owners.get(incoming[0]!.source);if(owner){const unit=units.get(owner)!;assign(n,owner,'生成する成果物を含むビルドの支援用途',unit.role);foldedArtifacts.set(n.id,{producer:incoming[0]!.source,edgeId:incoming[0]!.id});}}
  }
  for(const n of base.allowed){if(owners.has(n.id))continue;const kind=n.architecture?.kind;
   if(kind==='unresolved'){
@@ -89,24 +89,22 @@ export function architectureSimpleOverview(base:PreparedArchitectureScope,surrou
   const environmentLabels=[...new Set(contexts.map(c=>c.label))];
   return {...n,id,label:u.role==='support'&&purpose?`${n.label}：${purpose}`:n.label,confidence:members.some(n=>n.confidence==='unresolved')?'unresolved':members.some(n=>n.confidence==='inferred')||new Set(members.map(n=>n.confidence)).size>1?'inferred':n.confidence,evidence:uniqueArchitectureEvidence(members.flatMap(n=>n.evidence)),architecture:n.architecture?{...n.architecture,parentId:undefined,request:undefined,memberIds:[...u.members],environments}:undefined,attributes:{...n.attributes,sharedEnvironments:[],simpleEnvironmentLabel:environmentLabels.join(' / '),simpleEnvironmentMixed:environmentLabels.length>1,simpleOverview:true,simpleRole:u.role,simpleMemberIds:[...u.members],architectureContext:!inside.has(id),architecturePeripheral:!inside.has(id),architectureScopeRole:base.scopeId?(inside.has(id)?'inside':'surrounding'):'',simpleAnchorId:u.anchorId??''}};
  });
- const dedicated=new Map<string,SemanticNode[]>();
- for(const n of nodes){const u=units.get(n.id)!,targets=[...new Set(u.targetIds.map(id=>owners.get(id)).filter((id):id is string=>Boolean(id)))];
+ for(const n of nodes){const u=units.get(n.id)!;
   const group=structuralGroups.get(u.members[0]!);n.attributes.simpleCategory=group?.category??'';
   if(group&&n.architecture)n.architecture.identity=undefined;
-  if(group?.category==='destination'||group?.category==='resources')n.attributes.simpleRows=u.members.map(id=>{const member=byId.get(id)!;return `${architectureEnvironmentContext(member).label}${member.attributes.executionPlace?` / ${member.attributes.executionPlace}`:''}：${member.attributes.providedContent??member.label}`;});
+  if(group?.category==='destination'||group?.category==='runtime'||group?.category==='resources')n.attributes.simpleRows=u.members.map(id=>{const member=byId.get(id)!;return `${architectureEnvironmentContext(member).label}${member.attributes.executionPlace?` / ${member.attributes.executionPlace}`:''}：${member.attributes.providedContent??member.label}`;});
   n.attributes.simpleRegionId='';n.attributes.simpleRegionLabel='';
   n.attributes.simpleUsageSummary=simpleUsageSummary(u.members.map(id=>byId.get(id)!));
   if(u.purposes.includes('deploy')){const operations=u.members.filter(id=>byId.get(id)?.attributes.purpose==='deploy'),unresolved=operations.filter(id=>!(adjacent.get(id)??[]).some(e=>e.source===id&&e.kind==='flow-deploys'&&byId.get(e.target)?.architecture?.kind!=='unresolved'&&byId.has(e.target)));if(unresolved.length)n.attributes.simplePublicationNote=`公開先の構成が未解決：${unresolved.length}使用`;}
   if(n.architecture?.kind==='artifact'&&!u.members.some(id=>(adjacent.get(id)??[]).some(e=>e.source===id&&e.kind==='flow-input'&&byId.get(e.target)?.attributes.purpose==='deploy')))n.attributes.simplePublicationNote=original.nodes.some(item=>item.attributes.purpose==='deploy')?'この成果物を公開操作へ渡す関係は未確認':'公開操作は未検出';
   const databaseChange=u.role==='support'&&(u.purposes.some(p=>p==='generate'||p==='apply')||u.members.some(id=>['artifact','code-definition'].includes(byId.get(id)?.architecture?.kind??'')&&(adjacent.get(id)??[]).some(e=>['flow-input','flow-generates'].includes(e.kind)&&['generate','apply'].includes(usages.get(e.source===id?e.target:e.source)?.purpose??''))));
   n.attributes.simpleSupportPurpose=group?.category==='unconfirmed'?'実行用途未確認':databaseChange?'DB構造変更':n.architecture?.kind==='shared-code'?'共有コード':u.role==='context'?'補助・所属未判定':'';
-  if(u.role==='support'&&u.purposes.length&&targets.length===1&&nodes.find(item=>item.id===targets[0])?.architecture?.kind==='application'){
-   const list=dedicated.get(targets[0]!)??[];list.push(n);dedicated.set(targets[0]!,list);
-  }
+  const kind=n.architecture?.kind??'';
+  n.attributes.simpleStage=group?.category==='destination'||group?.category==='runtime'?'arrival':kind==='artifact'?'artifact':u.role==='context'?'context':kind==='tool-operation'?'operation':['application','component','shared-code','code-definition'].includes(kind)?'source':'arrival';
+  if(n.attributes.simpleStage==='source')u.reason='原本・定義と内部のコード。起動後の構成・公開先とは別の説明単位';
  }
- for(const [id,supports]of dedicated){const app=nodes.find(n=>n.id===id)!;for(const n of [app,...supports]){n.attributes.simpleRegionId=id;n.attributes.simpleRegionLabel=`${app.label} の支援`;}}
  const visibleEdges=[...edges.values()].filter(e=>shown.has(e.source)&&shown.has(e.target)),graph:SemanticGraph={view:'architecture-map',nodes,edges:visibleEdges};
- const {positions,positions2d}=layoutSimpleArchitecture(graph,units,owners);
+ const {positions,positions2d}=layoutSimpleArchitecture(graph);
  graph.architectureView={scopeId:base.scopeId,detailIds:nodes.filter(n=>inside.has(n.id)).map(n=>n.id),contextIds:nodes.filter(n=>!inside.has(n.id)).map(n=>n.id),peripheralIds:[],internalRelations:[],boundaryRelations:[],positions,positions2d,requestGroups:[],representedNodeIds:nodes.flatMap(n=>units.get(n.id)!.members),detailCount:inside.size,contextCount:nodes.length-inside.size,detailEntityCount:nodes.filter(n=>inside.has(n.id)).length,contextEntityCount:nodes.filter(n=>!inside.has(n.id)).length,requestCount:0,internalRecordCount:0,explicitNodeIds:[]};
  const result={graph,units,relations,owners,original};variants.set(surroundings,result);return result;
 }

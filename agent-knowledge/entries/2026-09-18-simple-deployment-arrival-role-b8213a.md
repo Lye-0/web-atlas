@@ -3,7 +3,7 @@ id: rm-20260918-simple-deployment-arrival-role
 topic: analyzer-architecture
 type: failure
 status: active
-maturity: candidate
+maturity: reused
 created: 2026-09-18
 last_verified: 2026-09-18
 source_commit: "33a0cc6"
@@ -42,3 +42,7 @@ logicalOwnerIdだけでexecution-configを論理アプリへまとめると、�
 1. `pnpm exec vitest run src/analyzer/semantic/architectureSimpleDeployment.test.ts`。
 2. 公開が見えない場合、検出・元関係・owners写像の順で確認する。未検出と表示吸収を混同しない。
 3. 成果物は名前ではなく元ID/環境/記録済み入力を照合する。図の欠けを推移的な接続で埋めない。
+
+## 2026-09-18 再検証
+
+原本起点の分岐表示でも「入力と到着先を同じ所有者へ吸収しない」という原因を再確認した。現在の簡易全体は起動先を含む既存実行構成も原本から分離し、環境違いを別枝にする。この追加仕様は `docs/technical/architecture-map.md` と `architectureSourceBranches.test.ts` を参照。上のScopeの「全実行構成の独立表示を要求しない」は、この記録の因果知見だけで未検出実体を増やす権限がないという意味であり、現在の明示仕様を取り消さない。3保存入力の全ID保存・旧プリセット一致を再確認した。

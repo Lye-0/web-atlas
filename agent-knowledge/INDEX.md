@@ -95,7 +95,7 @@
 ### 論理所有者が同じでも公開の入力と到着先は同じ要約へ吸収しない
 - id: `rm-20260918-simple-deployment-arrival-role`
 - type: `failure`
-- maturity: `candidate`
+- maturity: `reused`
 - tags: `simple-overview`, `deployment`, `projection`, `destination`
 - files: `src/analyzer/semantic/architectureSimple.ts`, `src/analyzer/semantic/architectureSimpleGroups.ts`, `src/analyzer/semantic/architectureSimpleDeployment.test.ts` …
 - memory: `agent-knowledge/entries/2026-09-18-simple-deployment-arrival-role-b8213a.md`

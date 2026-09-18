@@ -14,7 +14,7 @@ const edge=(id:string,source:string,target:string,kind='http-request'):SemanticE
 const tool=(id:string)=>({...node(id,'tool-operation'),attributes:{purpose:'start',dictionaryStackId:'generic',configurationPath:`${id}.config`,scriptName:id}});
 it.each(['2d','3d'] as const)('encloses only an app and dedicated operations, never lone peers or shared support (%s)',mode=>{
  const a=node('application-a'),b=node('application-b'),db=node('database','resource'),library=node('library','shared-code'),dedicated=tool('dedicated'),shared=tool('shared');
- const model:SemanticGraph={view:'architecture-map',nodes:[a,b,db,library,dedicated,shared],edges:[edge('start',dedicated.id,a.id,'flow-starts'),edge('both-a',shared.id,a.id,'flow-starts'),edge('both-b',shared.id,b.id,'flow-starts')]};
+ const model:SemanticGraph={view:'architecture-map',nodes:[a,b,db,library,dedicated,shared],edges:[edge('input-a',a.id,dedicated.id,'flow-input'),edge('shared-a',a.id,shared.id,'flow-input'),edge('shared-b',b.id,shared.id,'flow-input'),edge('start',dedicated.id,a.id,'flow-starts'),edge('both-a',shared.id,a.id,'flow-starts'),edge('both-b',shared.id,b.id,'flow-starts')]};
  const before=JSON.stringify(model),simple=architectureSimpleOverview(prepareArchitectureScope(model)),regions=semanticFlowRegions(layoutSemanticFlow(simple.graph,mode),mode);
  expect(regions).toHaveLength(1);expect(regions[0]!.nodeIds.sort()).toEqual([simple.owners.get(a.id),simple.owners.get(dedicated.id)].sort());expect(new Set(simple.owners.keys()).size).toBe(6);expect(JSON.stringify(model)).toBe(before);
  expect(simple.graph.nodes.find(n=>n.id===simple.owners.get(b.id))!.attributes.simpleRegionId).toBe('');
