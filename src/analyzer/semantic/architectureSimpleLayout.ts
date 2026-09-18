@@ -20,9 +20,16 @@ export function layoutSimpleArchitecture(graph:SemanticGraph){
  const positions2d=new Map<string,Point>(),positions=new Map<string,Point>();
  // Source sets describe input provenance, not ownership. Shared suffixes preserve all inputs.
  const buckets=new Map<string,SemanticNode[]>();
- for(const n of graph.nodes.filter(n=>routeIds.has(n.id))){const own=[...origins.get(n.id)!].sort(),key=own.length?JSON.stringify(own):'input-unconfirmed',list=buckets.get(key)??[];list.push(n);buckets.set(key,list);}
+ // Bring the recorded feeder stages into the shared section, not only its final operation.
+ const feederSections=new Map<string,Set<string>>();
+ for(const merge of graph.nodes.filter(n=>origins.get(n.id)!.size>1)){
+  const section=JSON.stringify([...origins.get(merge.id)!].sort()),queue=[merge.id],seen=new Set(queue);
+  for(let i=0;i<queue.length;i++)for(const id of incoming.get(queue[i]!)!){if(seen.has(id)||stage(byId.get(id)!)==='source')continue;seen.add(id);const own=origins.get(id)!;if(own.size>1&&JSON.stringify([...own].sort())!==section)continue;const keys=feederSections.get(id)??new Set<string>();keys.add(section);feederSections.set(id,keys);queue.push(id);}
+ }
+ const sectionOrigins=new Map<string,string[]>();
+ for(const n of graph.nodes.filter(n=>routeIds.has(n.id))){const own=[...origins.get(n.id)!].sort(),feed=feederSections.get(n.id),key=feed?.size===1?[...feed][0]!:own.length?JSON.stringify(own):'input-unconfirmed',list=buckets.get(key)??[];list.push(n);buckets.set(key,list);if(key!=='input-unconfirmed')sectionOrigins.set(key,JSON.parse(key) as string[]);}
  const sourceOrder=new Map(sources.map((n,i)=>[n.id,i]));
- const bucketOrder=(key:string)=>{const own=[...origins.get(buckets.get(key)![0]!.id)!];return own.length?own.reduce((v,id)=>v+(sourceOrder.get(id)??0),0)/own.length:Number.MAX_SAFE_INTEGER;};
+ const bucketOrder=(key:string)=>{const own=sectionOrigins.get(key)??[];return own.length?own.reduce((v,id)=>v+(sourceOrder.get(id)??0),0)/own.length:Number.MAX_SAFE_INTEGER;};
  let top=0;
  const put=(n:SemanticNode,column:number,y:number,placement:string)=>{rank.set(n.id,column);positions2d.set(n.id,{x:column*350,y,z:0});n.attributes.simplePlacement=placement;};
  for(const [bucket,members]of [...buckets].sort(([a],[b])=>bucketOrder(a)-bucketOrder(b)||a.localeCompare(b))){
@@ -48,6 +55,9 @@ export function layoutSimpleArchitecture(graph:SemanticGraph){
   }
   top=Math.max(...members.map(n=>positions2d.get(n.id)!.y))+200;
  }
+ // If a feeder moved upward to a common section, keep its source next to that entry,
+ // rather than making readers cross the source's unrelated development rows first.
+ for(const source of sources){const point=positions2d.get(source.id)!;const feederRows=[...outgoing.get(source.id)!].filter(id=>feederSections.get(id)?.size===1).map(id=>positions2d.get(id)!.y);if(!feederRows.length)continue;let y=Math.min(point.y,...feederRows);while([...positions2d].some(([id,p])=>id!==source.id&&p.x===point.x&&Math.abs(p.y-y)<112))y+=140;point.y=y;}
  const remaining=graph.nodes.filter(n=>!positions2d.has(n.id));
  const relatedRows=(n:SemanticNode)=>graph.edges.flatMap(e=>e.source===n.id?[positions2d.get(e.target)?.y]:e.target===n.id?[positions2d.get(e.source)?.y]:[]).filter((y):y is number=>y!==undefined);
  const kind=(n:SemanticNode)=>n.architecture?.kind==='shared-code'?'shared':stage(n)==='source'?'no-route':stage(n)==='context'?'context':'service';
@@ -58,7 +68,10 @@ export function layoutSimpleArchitecture(graph:SemanticGraph){
   const list=groups.get(category)??[];if(!list.length)continue;
   list.sort((a,b)=>{const ar=relatedRows(a),br=relatedRows(b);return (ar.length?Math.min(...ar):Infinity)-(br.length?Math.min(...br):Infinity)||compare(a,b);});
   if(category==='shared'||category==='service'){
-   for(const n of list){const rows=relatedRows(n).sort((a,b)=>a-b);let y=rows.length?rows[Math.floor(rows.length/2)]!:top;while(sideRows.some(other=>Math.abs(other-y)<140))y+=140;sideRows.push(y);put(n,sideColumn,y,category);n.attributes.simplePlacementLabel=category==='shared'?'共有部分':'利用・接続先';}
+   for(const n of list){const users=graph.edges.filter(e=>e.target===n.id&&e.kind==='simple-reference').map(e=>positions2d.get(e.source)).filter((p):p is Point=>Boolean(p));const rows=(category==='shared'&&users.length?users.map(p=>p.y):relatedRows(n)).sort((a,b)=>a-b);let y=rows.length?rows[Math.floor(rows.length/2)]!:top;
+    const column=category==='shared'&&users.length?Math.round(users.map(p=>p.x/350).sort((a,b)=>a-b)[Math.floor(users.length/2)]!)-1:sideColumn;
+    while([...positions2d.values()].some(p=>p.x===column*350&&Math.abs(p.y-y)<140))y+=140;
+    sideRows.push(y);put(n,column,y,category);n.attributes.simplePlacementLabel=category==='shared'?'共有部分':'利用・接続先';}
    top=Math.max(top,...sideRows.map(y=>y+180));continue;
   }
   // A compact shelf beside the users; it must not split an existing route band.

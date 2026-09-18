@@ -6,11 +6,12 @@ import {layoutSimpleArchitecture} from './architectureSimpleLayout';
 import {architectureEnvironmentContext} from './architectureContext';
 import {simpleUsageSummary} from './architectureSimpleSummary';
 import {simpleStructuralGroups} from './architectureSimpleGroups';
+import {simpleReferenceEdges,simpleArgumentLabel} from './architectureSimpleAnnotations';
 
 export const SIMPLE_OVERVIEW='simple-overview';
 export interface SimpleUnit {id:string;anchorId?:string;members:string[];internalEdges:string[];reason:string;role:'primary'|'support'|'context';targetIds:string[];purposes:string[]}
 export interface SimpleRelation {kind:'direct'|'aggregate'|'path';edgeIds:string[];paths?:{edgeIds:string[];nodeIds:string[]}[]}
-export interface ArchitectureSimple {graph:SemanticGraph;units:ReadonlyMap<string,SimpleUnit>;relations:ReadonlyMap<string,SimpleRelation>;owners:ReadonlyMap<string,string>;original:SemanticGraph}
+export interface ArchitectureSimple {graph:SemanticGraph;units:ReadonlyMap<string,SimpleUnit>;relations:ReadonlyMap<string,SimpleRelation>;owners:ReadonlyMap<string,string>;original:SemanticGraph;referenceEdges?:SemanticEdge[]}
 const cache=new WeakMap<PreparedArchitectureScope,Map<boolean,ArchitectureSimple>>();
 const key=(...values:unknown[])=>`architecture-simple:${JSON.stringify(values)}`;
 const major=new Set(['application','component','shared-code','code-package','resource','external-service','external-program']);
@@ -109,11 +110,13 @@ export function architectureSimpleOverview(base:PreparedArchitectureScope,surrou
  const sameNames=new Map<string,SemanticNode[]>();for(const n of nodes.filter(n=>n.architecture?.kind==='tool-operation')){const list=sameNames.get(n.label)??[];list.push(n);sameNames.set(n.label,list);}
  for(const list of sameNames.values())if(list.length>1)for(const n of list){const environment=String(n.attributes.simpleEnvironmentLabel),peers=list.filter(p=>p.attributes.simpleEnvironmentLabel===n.attributes.simpleEnvironmentLabel),args=String(n.attributes.usageArguments??'').trim();
   const outputCaption=(node:SemanticNode)=>[...new Set(units.get(node.id)!.members.flatMap(id=>(adjacent.get(id)??[]).filter(e=>e.source===id&&['flow-starts','flow-deploys','flow-generates','flow-applies'].includes(e.kind)).map(e=>{const target=byId.get(e.target);return target?String(target.attributes.outputPath??target.path??target.label):'対象未確認';})))].join(' / ');
-  const context=peers.length>1?[args||'追加引数なし',new Set(peers.map(p=>p.attributes.configurationPath)).size>1?String(n.attributes.configurationPath??'設定未確認'):'',new Set(peers.map(p=>p.attributes.inputRoot)).size>1?String(n.attributes.inputRoot??'入力未確認'):'',new Set(peers.map(outputCaption)).size>1?`出力：${outputCaption(n)}`:'',new Set(peers.map(p=>p.attributes.configurationStatus)).size>1?String(n.attributes.configurationStatus??'設定確認状態不明'):''].filter(Boolean).join(' · '):'';
+  const context=peers.length>1?[args?simpleArgumentLabel(n,peers):'追加引数なし',new Set(peers.map(p=>p.attributes.configurationPath)).size>1?String(n.attributes.configurationPath??'設定未確認'):'',new Set(peers.map(p=>p.attributes.inputRoot)).size>1?String(n.attributes.inputRoot??'入力未確認'):'',new Set(peers.map(outputCaption)).size>1?`出力：${outputCaption(n)}`:'',new Set(peers.map(p=>p.attributes.configurationStatus)).size>1?String(n.attributes.configurationStatus??'設定確認状態不明'):''].filter(Boolean).join(' · '):'';
   n.label+=`（${[environment,context].filter(Boolean).join(' · ')}）`;n.attributes.simpleUsageDisambiguation=context;
  }
  const visibleEdges=[...edges.values()].filter(e=>shown.has(e.source)&&shown.has(e.target)),graph:SemanticGraph={view:'architecture-map',nodes,edges:visibleEdges};
+ const referenceEdges=simpleReferenceEdges(graph,original,units,relations),referenceIds=new Set(referenceEdges.map(e=>e.id));graph.edges=visibleEdges.filter(e=>!referenceIds.has(e.id));
+ for(const node of nodes){const references=referenceEdges.filter(e=>e.source===node.id||e.target===node.id);if(!references.length)continue;const ids=new Set(references.flatMap(e=>relations.get(e.id)?.edgeIds??[]));node.attributes.simpleReferenceCount=ids.size;node.attributes.simpleReferenceLabel=`開始定義・呼出 ${ids.size}関係（詳細）`;}
  const {positions,positions2d}=layoutSimpleArchitecture(graph);
  graph.architectureView={scopeId:base.scopeId,detailIds:nodes.filter(n=>inside.has(n.id)).map(n=>n.id),contextIds:nodes.filter(n=>!inside.has(n.id)).map(n=>n.id),peripheralIds:[],internalRelations:[],boundaryRelations:[],positions,positions2d,requestGroups:[],representedNodeIds:nodes.flatMap(n=>units.get(n.id)!.members),detailCount:inside.size,contextCount:nodes.length-inside.size,detailEntityCount:nodes.filter(n=>inside.has(n.id)).length,contextEntityCount:nodes.filter(n=>!inside.has(n.id)).length,requestCount:0,internalRecordCount:0,explicitNodeIds:[]};
- const result={graph,units,relations,owners,original};variants.set(surroundings,result);return result;
+ const result={graph,units,relations,owners,original,referenceEdges};variants.set(surroundings,result);return result;
 }

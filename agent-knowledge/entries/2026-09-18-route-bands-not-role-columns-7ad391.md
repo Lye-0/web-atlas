@@ -3,7 +3,7 @@ id: rm-20260918-route-bands-not-role-columns
 topic: analyzer-architecture
 type: failure
 status: active
-maturity: candidate
+maturity: reused
 created: 2026-09-18
 last_verified: 2026-09-18
 source_commit: "33e40cb"
@@ -34,6 +34,7 @@ promoted_to: null
 - 33e40cbの3保存入力との比較。vehicleのAPI production公開は共有区間の後置で離れ、経路なし構成が原本列を延ばしていた。
 - architectureRouteLanes.test.tsは一原本三枝の操作/到着先同一行、複数原本合流、18独立対象の保持と複数列化、外部起動対象、任意環境を検証する。
 - Chromeの小構成で枝見出しが前の行へ押し上がる二次問題を確認。共通見出しアルゴリズムではなく簡易の行高へ文字高さ分の余白を追加し、前の枝を囲わないことをテスト・画面で再確認した。
+- 053d7a5の追跡で、共有する公開操作だけを帯の中間へ置いても、そこへ入る専用ビルドが別用途の枝の向こうに残る問題を確認。共有区間から記録済み入力を有限に逆追跡し、一つの共有区間へ対応する非原本の前段も同じ帯へ入れる。原本は複製せず入口近くへ寄せる。architectureSharedPublication.test.tsでビルド/共通公開/到着先の同一行と元ID保存を再検証。
 
 ## Verification
 

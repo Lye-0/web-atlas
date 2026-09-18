@@ -95,7 +95,7 @@
 ### 原本・操作・到着先の列だけを揃えても経路はまとまらない
 - id: `rm-20260918-route-bands-not-role-columns`
 - type: `failure`
-- maturity: `candidate`
+- maturity: `reused`
 - tags: `simple-overview`, `layout`, `routes`
 - files: `src/analyzer/semantic/architectureSimpleLayout.ts`, `src/analyzer/semantic/architectureRouteLanes.test.ts`, `docs/technical/tab10-route-lanes-review-20260918.md`
 - memory: `agent-knowledge/entries/2026-09-18-route-bands-not-role-columns-7ad391.md`

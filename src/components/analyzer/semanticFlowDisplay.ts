@@ -6,6 +6,7 @@ import { architectureRequestSources } from './architectureSummary';
 import { architectureShortPath } from './architectureShortPath';
 
 export interface SemanticNodeDisplay {
+  matchedEndpoint?: string;
   title: string;
   location: string;
   tooltip: string;
