@@ -84,6 +84,14 @@
 - files: `src/analyzer/semantic/flowRegions.ts`, `src/components/analyzer/SemanticFlow3D.tsx`, `src/components/analyzer/semanticFlowLabels.ts` …
 - memory: `agent-knowledge/entries/2026-09-17-region-label-identity-915acd.md`
 
+### 簡易要約では補助用途より実際の所属を先に解決する
+- id: `rm-20260918-simple-ownership-before-auxiliary`
+- type: `failure`
+- maturity: `candidate`
+- tags: `simple-overview`, `auxiliary`, `ownership`, `internal-relations`
+- files: `src/analyzer/semantic/architectureSimple.ts`, `src/analyzer/semantic/architectureSimple.test.ts`, `src/analyzer/semantic/architectureSimplePolishActual.test.ts` …
+- memory: `agent-knowledge/entries/2026-09-18-simple-ownership-before-auxiliary-a631f2.md`
+
 ## analyzer-command-evidence
 
 ### CIコマンドを合成すると元範囲の座標系が変わる

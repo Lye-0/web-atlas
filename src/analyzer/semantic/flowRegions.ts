@@ -8,6 +8,7 @@ export interface SemanticFlowRegion extends SemanticRegionIdentity, SemanticMapR
 
 /** Source locations come from recorded paths; runtime-only objects retain their known group. */
 export function semanticRegionIdentity(node: SemanticNode): SemanticRegionIdentity {
+  if(node.attributes.simpleOverview&&typeof node.attributes.simpleRegionId==='string')return {id:`simple-region:${node.attributes.simpleRegionId}`,label:String(node.attributes.simpleRegionLabel),kind:'group'};
   if (typeof node.attributes.flowEnvironment === 'string') return { id: `architecture-environment:${node.attributes.flowEnvironment}`, label: node.attributes.flowEnvironment, kind: 'group' };
   if (node.architecture) return { id: node.architecture.parentId ?? 'architecture-project', label: node.group || 'プロジェクト', kind: 'group' };
   if (node.kind === 'external') return { id: 'group:unresolved-calls', label: '定義先が未特定の呼び出し', kind: 'group' };
@@ -25,11 +26,12 @@ export function semanticRegionIdentity(node: SemanticNode): SemanticRegionIdenti
 }
 
 export function semanticFlowRegionIdentity(node:SemanticNode,explorer?:SemanticExplorerModel){
-  return explorer && !node.attributes.flowEnvironment ? explorerRegionIdentity(explorer,node.id) : semanticRegionIdentity(node);
+  return explorer && !node.attributes.flowEnvironment && !node.attributes.simpleOverview ? explorerRegionIdentity(explorer,node.id) : semanticRegionIdentity(node);
 }
 export function semanticFlowRegions(positions: readonly SemanticPosition[], mode: '2d' | '3d', explorer?: SemanticExplorerModel): SemanticFlowRegion[] {
   const groups = new Map<string, { identity: SemanticRegionIdentity; positions: SemanticPosition[] }>();
   for (const position of positions) {
+    if(position.node.attributes.simpleOverview&&position.node.attributes.simpleRole==='context')continue;
     const identity = semanticFlowRegionIdentity(position.node,explorer);
     const group = groups.get(identity.id) ?? { identity, positions: [] };
     group.positions.push(position); groups.set(identity.id, group);

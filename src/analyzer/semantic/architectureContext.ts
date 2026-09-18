@@ -6,6 +6,7 @@ export type EnvironmentMeaning = 'definition' | 'shared' | 'explicit' | 'default
 const definitions = new Set(['application','code-package','component','shared-code','code-definition']);
 export function architectureEnvironmentContext(node:SemanticNode):{meaning:EnvironmentMeaning;label:string;environments:string[]} {
   const names=(node.architecture?.environments??[]).filter(n=>!n.startsWith('except:'));
+  if(node.attributes.simpleOverview&&node.attributes.simpleEnvironmentMixed)return {meaning:'explicit',label:String(node.attributes.simpleEnvironmentLabel),environments:names};
   const declared=Array.isArray(node.attributes.sharedEnvironments)?node.attributes.sharedEnvironments:[];
   if(declared.length>1)return {meaning:'shared',label:`共有：${declared.join(' / ')}`,environments:declared};
   if(definitions.has(node.architecture?.kind??''))return {meaning:'definition',label:'論理定義',environments:[]};

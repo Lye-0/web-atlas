@@ -133,6 +133,7 @@ function SemanticLocalFlow2D({ fitInitial, onVisibleRelation, showGroupBounds, g
         for (const path of paths) for (const point of path.points) { minX = Math.min(minX, point.x - 6); maxX = Math.max(maxX, point.x + 6); minY = Math.min(minY, point.y - 6); maxY = Math.max(maxY, point.y + 6); }
         const scale = Math.min(1.05, (viewport.width - 32) / (maxX - minX), (plot.height - 16) / (maxY - minY));
         if (graph.view === 'architecture-map' || scale >= .8) initial = { x: viewport.width / 2 - (minX + maxX) / 2 * scale, y: plot.centerY - (minY + maxY) / 2 * scale, scale };
+        if (fitInitial && graph.nodes.some(node=>node.attributes.simpleOverview) && scale<.75) initial={x:30-minX*.75,y:plot.top+40-minY*.75,scale:.75};
         if (!fitInitial && graph.nodes.some(node => node.attributes.unifiedFlow) && scale < .65) initial = { x: 30-minX*.65, y: plot.top+40-minY*.65, scale:.65 };
       }
       commit(initial);
@@ -209,7 +210,7 @@ function SemanticLocalFlow2D({ fitInitial, onVisibleRelation, showGroupBounds, g
         return <g key={point.node.id} transform={`translate(${point.x} ${point.y})`} role="button" tabIndex={0}
           aria-label={`${display.title}, ${roleLabel ? `${roleLabel}, ` : ''}${point.node.kind === 'external' && !point.node.architecture ? '呼び出し箇所の一例: ' : ''}${display.location}${point.node.attributes.overview ? `、${members.length}件を展開` : ''}`} aria-pressed={selected}
           className={`semantic-flow-node${selected ? ' is-selected' : ''}${matching ? ' is-match' : ''}${selectedNodes.has(point.node.id) ? ' is-connected' : ''}`}
-          data-composition-support={String(point.node.attributes.compositionRole??'').includes('補助')||undefined} data-node-id={point.node.id} data-architecture-node-id={graph.view === 'architecture-map' ? point.node.id : undefined} data-member-count={members.length} onClick={event => { event.stopPropagation(); if (!drag.current?.moved) { if (onArchitectureNodeClick) onArchitectureNodeClick(point.node.id, event); else onSelect(point.node.id); } drag.current = undefined; }}
+          data-simple-role={point.node.attributes.simpleRole} data-composition-support={String(point.node.attributes.compositionRole??'').includes('補助')||undefined} data-node-id={point.node.id} data-architecture-node-id={graph.view === 'architecture-map' ? point.node.id : undefined} data-member-count={members.length} onClick={event => { event.stopPropagation(); if (!drag.current?.moved) { if (onArchitectureNodeClick) onArchitectureNodeClick(point.node.id, event); else onSelect(point.node.id); } drag.current = undefined; }}
           data-flow-role={role} data-flow-emphasized={emphasis.nodeIds.has(point.node.id) || undefined} opacity={emphasis.edgeIds.size && !emphasis.nodeIds.has(point.node.id) ? explicitPathNodeIds?.has(point.node.id) ? .75 : .35 : undefined}
           {...semanticFlowHoverBindings<SVGGElement>(onHoverTarget, { kind: 'node', id: point.node.id }, `2d-node:${point.node.id}`)}
           onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); onSelect(point.node.id); } }}>

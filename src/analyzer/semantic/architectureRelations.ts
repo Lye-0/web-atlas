@@ -1,6 +1,7 @@
 import type { SemanticEdge, SemanticRelationSource } from './types';
 
 const labels: Record<string, string> = {
+  'simple-artifact-path':'ビルド成果物の受け渡し',
   'flow-input': '入力として使う', 'flow-starts': '起動する指定', 'flow-deploys': '公開する指定',
   'flow-generates': '生成する指定', 'flow-applies': 'DB変更を適用する指定', 'flow-serves': 'アプリのコードを配信',
   'flow-configures': '実行構成のコード', 'flow-invokes': 'scriptの呼出記述', 'flow-artifact': '同じ成果物パス',
@@ -24,6 +25,7 @@ const labels: Record<string, string> = {
 };
 const relationLabels = new WeakMap<SemanticRelationSource, string>();
 export function architectureRelationLabel(edge: SemanticRelationSource):string {
+  if(edge.kind==='simple-artifact-path')return labels[edge.kind]!;
   const cached=relationLabels.get(edge);if(cached)return cached;
   if ((edge as SemanticEdge).provenance?.edges.length) {
     const kinds=[...new Set(architectureRelationOriginals([edge]).map(original=>original.kind))];

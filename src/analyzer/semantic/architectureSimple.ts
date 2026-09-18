@@ -1,81 +1,93 @@
 import type {SemanticEdge,SemanticGraph,SemanticNode} from './types';
 import type {PreparedArchitectureScope} from './architectureProjection';
 import {uniqueArchitectureEvidence} from './architectureEvidence';
-
+import {simpleUsageIndex,simplePurposes,simplePurposeOrder} from './architectureSimpleUsage';
+import {layoutSimpleArchitecture} from './architectureSimpleLayout';
+import {architectureEnvironmentContext} from './architectureContext';
 
 export const SIMPLE_OVERVIEW='simple-overview';
-export interface SimpleUnit {id:string;anchorId?:string;members:string[];internalEdges:string[];reason:string}
-export interface SimpleRelation {kind:'direct'|'aggregate';edgeIds:string[]}
+export interface SimpleUnit {id:string;anchorId?:string;members:string[];internalEdges:string[];reason:string;role:'primary'|'support'|'context';targetIds:string[];purposes:string[]}
+export interface SimpleRelation {kind:'direct'|'aggregate'|'path';edgeIds:string[];paths?:{edgeIds:string[];nodeIds:string[]}[]}
 export interface ArchitectureSimple {graph:SemanticGraph;units:ReadonlyMap<string,SimpleUnit>;relations:ReadonlyMap<string,SimpleRelation>;owners:ReadonlyMap<string,string>;original:SemanticGraph}
 const cache=new WeakMap<PreparedArchitectureScope,Map<boolean,ArchitectureSimple>>();
 const key=(...values:unknown[])=>`architecture-simple:${JSON.stringify(values)}`;
 const major=new Set(['application','component','shared-code','code-package','resource','external-service','external-program']);
-const operationIO=new Set(['flow-input','flow-starts','flow-deploys','flow-generates','flow-applies','flow-artifact','build-output','publishes-artifact']);
-const purposes:Record<string,string>={start:'起動',serve:'開発配信',build:'ビルド',deploy:'公開',generate:'SQL生成',apply:'DB構造適用'};
+const auxRole=(n:SemanticNode)=>n.architecture?.auxiliary?'test':n.attributes.compositionRole==='開発・検証・記録の補助'?'support':n.attributes.compositionRole==='補助の用途を示す表記（推定）'?'inferred':undefined;
 
-/** Quotient of canonical membership, not a reachability graph. No invented multi-hop edges. */
+/** Canonical membership first, semantic support second; never infer general reachability. */
 export function architectureSimpleOverview(base:PreparedArchitectureScope,surroundings=true):ArchitectureSimple {
  let variants=cache.get(base);if(!variants){variants=new Map();cache.set(base,variants);}const old=variants.get(surroundings);if(old)return old;
- const original=base.model,byId=new Map(original.nodes.map(n=>[n.id,n])),allowed=new Set(base.allowed.map(n=>n.id));
+ const original=base.model,{byId,adjacent,usages}=simpleUsageIndex(original),allowed=new Set(base.allowed.map(n=>n.id));
  const owners=new Map<string,string>(),units=new Map<string,SimpleUnit>(),representatives=new Map<string,SemanticNode>();
- const adjacency=new Map<string,SemanticEdge[]>();for(const e of original.edges)for(const id of [e.source,e.target]){const list=adjacency.get(id)??[];list.push(e);adjacency.set(id,list);}
  const isAnchor=(n:SemanticNode)=>major.has(n.architecture?.kind??'')&&(n.architecture?.kind!=='component'||!n.architecture.parentId||n.architecture.entryPaths.length>0||n.architecture.parentId===base.scopeId);
- const logical=(n:SemanticNode)=>{const owner=n.attributes.logicalOwnerId;return typeof owner==='string'&&allowed.has(owner)&&major.has(byId.get(owner)?.architecture?.kind??'')?owner:undefined;};
  const parentAnchor=(n:SemanticNode)=>{let id=n.architecture?.parentId;const seen=new Set<string>();while(id&&!seen.has(id)){seen.add(id);const p=byId.get(id);if(!p)break;if(allowed.has(id)&&isAnchor(p))return id;id=p.architecture?.parentId;}return undefined;};
- const assign=(n:SemanticNode,id:string,reason:string,anchorId?:string,label?:string)=>{
-  owners.set(n.id,id);let u=units.get(id);if(!u){u={id,anchorId,members:[],internalEdges:[],reason};units.set(id,u);representatives.set(id,label?{...n,label}:n);}u.members.push(n.id);
+ const assign=(n:SemanticNode,id:string,reason:string,role:SimpleUnit['role'],anchorId?:string,label?:string,targetIds:string[]=[])=>{
+  owners.set(n.id,id);let u=units.get(id);if(!u){u={id,anchorId,members:[],internalEdges:[],reason,role,targetIds,purposes:[]};units.set(id,u);representatives.set(id,label?{...n,label}:n);}u.members.push(n.id);
+  const purpose=String(n.attributes.purpose??'');if(simplePurposeOrder.includes(purpose)&&!u.purposes.includes(purpose))u.purposes.push(purpose);
  };
- for(const n of base.allowed){const role=n.attributes.compositionRole;if(n.architecture?.auxiliary||role==='開発・検証・記録の補助'||role==='補助の用途を示す表記（推定）'){const type=n.architecture?.kind==='tool-operation'?'道具と起動設定':'構成';assign(n,key('auxiliary',role??'補助',type,n.architecture?.environments),'既存の用途判定に基づく補助構成の集合。各実体・使用は内訳で区別',undefined,`${type}の補助用途${role==='補助の用途を示す表記（推定）'?'（推定）':''}`);}}
- for(const n of base.allowed)if(!owners.has(n.id)&&isAnchor(n))assign(n,key('entity',n.id),'実際の構成要素と、その定義・環境別構成',n.id);
- for(const n of base.allowed){if(owners.has(n.id))continue;const kind=n.architecture?.kind,owner=logical(n);
-  if(kind==='component'){const parent=parentAnchor(n);if(parent){assign(n,key('entity',parent),'実行主体に属する内部責務の内訳',parent);continue;}}
-  if(owner&&(kind==='execution-config'||kind==='code-definition')){assign(n,key('entity',owner),'論理構成と、元IDを保持した環境別構成・定義',owner);continue;}
-  if(kind==='tool-operation'&&n.attributes.purpose!=='script'){
-   // Output IDs, input IDs, execution context and owner prevent unrelated uses merging.
-   const targets=(adjacency.get(n.id)??[]).filter(e=>operationIO.has(e.kind)).map(e=>[e.kind,e.source===n.id?'out':'in',e.source===n.id?e.target:e.source]).sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)));
-   const id=key('tool',n.attributes.dictionaryStackId??n.id,n.attributes.ownerPath??n.id,n.attributes.purpose,n.architecture?.environments,n.attributes.targetPlace,targets);
-   const tool=n.label.split('：')[0];assign(n,id,'同じ所有・用途・環境・入出力を持つ道具の使用',undefined,`${tool}：${purposes[String(n.attributes.purpose)]??String(n.attributes.purpose??'用途未特定')}`);continue;
-  }
+ for(const n of base.allowed)if(isAnchor(n)){
+  // An internal test component stays with its real app; only independently classified roots form auxiliary groups.
+  const parent=parentAnchor(n);if(parent&&n.architecture?.entryPaths.length===0&&n.architecture?.parentId!==base.scopeId)continue;
+  const role=auxRole(n);
+  if(role&&!parent){assign(n,key('auxiliary-roots',role),'既存の用途判定に基づく独立した補助構成の集合','context',undefined,role==='inferred'?'記録・実験を支える構成（推定）':role==='test'?'テストを支える構成':'開発・検証を支える構成');}
+  else assign(n,key('entity',n.id),'構成と、その内部・環境別の定義','code-package'===n.architecture?.kind?'context':'primary',n.id);
  }
- for(const n of base.allowed){if(owners.has(n.id))continue;const parent=parentAnchor(n),kind=n.architecture?.kind;
+ for(const n of base.allowed){if(owners.has(n.id)||!['component','execution-config','code-definition'].includes(n.architecture?.kind??''))continue;
+  const logical=n.attributes.logicalOwnerId,parent=typeof logical==='string'&&allowed.has(logical)&&owners.has(logical)?logical:parentAnchor(n),owner=parent&&owners.get(parent);
+  if(owner){const unit=units.get(owner)!;assign(n,owner,unit.reason,unit.role,unit.anchorId);}
+ }
+ for(const n of base.allowed){const usage=usages.get(n.id);if(owners.has(n.id)||!usage)continue;
+  const definition=String(n.attributes.definitionOwnerId??''),owner=owners.get(definition);
+  if(owner&&units.get(owner)?.role==='context'&&auxRole(byId.get(definition)!)){const unit=units.get(owner)!;assign(n,owner,unit.reason,'context');continue;}
+  const targets=usage.targets.filter(id=>allowed.has(id));
+  const id=usage.resolved?key('usage',usage.tool,targets,usage.family,usage.context):key('usage-unresolved',n.id);
+  assign(n,id,targets.length?'解決済みの対象を支える道具の使用。個々の環境・scriptは内訳で区別':'操作の対象が未特定の使用','support',undefined,n.label.split('：')[0],targets);
+ }
+ // Inputs/outputs that merely connect a unique producing use to consuming uses become a finite two-stage path.
+ const foldedArtifacts=new Map<string,{producer:string;edgeId:string}>();
+ for(const n of base.allowed){if(owners.has(n.id)||n.architecture?.kind!=='artifact')continue;const edges=adjacent.get(n.id)??[],incoming=edges.filter(e=>e.target===n.id),outgoing=edges.filter(e=>e.source===n.id);
+  if(incoming.length===1&&incoming[0]!.kind==='flow-generates'&&byId.get(incoming[0]!.source)?.attributes.purpose==='build'&&outgoing.length&&outgoing.every(e=>e.kind==='flow-input'&&usages.has(e.target))){const owner=owners.get(incoming[0]!.source);if(owner){const unit=units.get(owner)!;assign(n,owner,'生成する成果物を含むビルドの支援用途',unit.role);foldedArtifacts.set(n.id,{producer:incoming[0]!.source,edgeId:incoming[0]!.id});}}
+ }
+ for(const n of base.allowed){if(owners.has(n.id))continue;const kind=n.architecture?.kind;
   if(kind==='unresolved'){
-   const rawOwner=n.architecture?.request?.ownerId??parent??n.id,owner=owners.get(rawOwner)??rawOwner;
-   if(units.has(owner)){assign(n,owner,'構成と、その要求元に属する未特定要求の内訳');continue;}
-   assign(n,key('requests',owner,n.architecture?.request?.kind??'unknown',n.architecture?.environments),'要求元・種類・環境が同じ未特定要求の集合',undefined,'接続先未特定の要求');continue;
+   const requestOwner=n.architecture?.request?.ownerId??parentAnchor(n),owner=requestOwner&&owners.get(requestOwner);
+   if(owner){const unit=units.get(owner)!;assign(n,owner,unit.reason,unit.role,unit.anchorId);continue;}
+   assign(n,key('requests',requestOwner??n.id,n.architecture?.request?.kind),'要求元を保持した、接続先が未特定の要求','context',undefined,`${byId.get(requestOwner??'')?.label??'所属未判定'}の未特定要求`);continue;
   }
   if(kind==='tool-operation'&&n.attributes.purpose==='script'){
-   const targets=(adjacency.get(n.id)??[]).filter(e=>e.source===n.id&&e.kind==='flow-invokes').map(e=>owners.get(e.target)).filter((id):id is string=>Boolean(id));
-   const distinct=[...new Set(targets)];
-   if(distinct.length===1){assign(n,distinct[0]!,'道具の使用と、それを呼ぶ開始script');continue;}
-   const matching=base.allowed.filter(p=>major.has(p.architecture?.kind??'')&&(p.id===n.attributes.definitionOwnerId||typeof n.attributes.ownerPath==='string'&&p.architecture?.ownerPath===n.attributes.ownerPath));
-   if(matching.length===1){assign(n,key('entity',matching[0]!.id),'構成と、その開始scriptの内訳',matching[0]!.id);continue;}
+   const calls=(adjacent.get(n.id)??[]).filter(e=>e.source===n.id&&e.kind==='flow-invokes'),targets=[...new Set(calls.map(e=>owners.get(e.target)).filter((id):id is string=>Boolean(id)))];
+   const definition=typeof n.attributes.definitionOwnerId==='string'?owners.get(n.attributes.definitionOwnerId):undefined;
+   const owner=targets.length===1&&calls.every(e=>owners.has(e.target))?targets[0]:definition;
+   if(owner){const unit=units.get(owner)!;assign(n,owner,unit.reason,unit.role,unit.anchorId);continue;}
   }
-  if(parent&&(kind==='code-definition'||kind==='execution-config')){assign(n,key('entity',parent),'所属で確認できる構成の内訳',parent);continue;}
-  // Artifacts remain when they connect stages; unknown ownership is never guessed from a label.
-  assign(n,key('remaining',kind,n.attributes.ownerPath??parent??n.id,kind==='artifact'?n.id:'',n.architecture?.environments),'未分類または独立して説明が必要な補助対象',undefined,kind==='artifact'||kind==='code-definition'?n.label:`${parent?byId.get(parent)?.label+'：':''}${kind==='tool-operation'?'起動設定':kind==='execution-config'?'実行構成':'補助構成'}`);
+  const supportTargets=['artifact','code-definition','execution-config'].includes(kind??'')?[...new Set((adjacent.get(n.id)??[]).flatMap(e=>usages.get(e.source===n.id?e.target:e.source)?.targets??[]))]:[];
+  assign(n,key('unassigned',n.id),supportTargets.length?'元の操作との関係で確認できる入力・成果物・実行構成':'所属または使用先の対応が未特定。元の対象を保持',supportTargets.length?'support':'context',undefined,n.label,supportTargets);
  }
+ // Folded artifacts no longer need a separate card; preserve every canonical edge and its direction in the trace.
  const relations=new Map<string,SimpleRelation>(),edges=new Map<string,SemanticEdge>();
  for(const e of original.edges){const source=owners.get(e.source),target=owners.get(e.target);if(!source||!target)continue;
   if(source===target){units.get(source)!.internalEdges.push(e.id);continue;}
-  const id=key('relation',source,target,e.kind,e.confidence,e.details?.environment??'',e.details?.conditional??false,e.kind==='flow-precedes'||e.kind==='flow-invokes'?e.details?.contextId??e.id:'');
-  const entry=relations.get(id);if(entry){entry.edgeIds.push(e.id);entry.kind='aggregate';const edge=edges.get(id)!;edge.evidence=uniqueArchitectureEvidence([...edge.evidence,...e.evidence]);edge.provenance!.edges.push(...(e.provenance?.edges??[e]));}
-  else {relations.set(id,{kind:units.get(source)!.members.length===1&&units.get(target)!.members.length===1?'direct':'aggregate',edgeIds:[e.id]});edges.set(id,{...e,id,source,target,provenance:{edges:[...(e.provenance?.edges??[e])]},details:{...e.details,reason:'元の関係を保持し、所属する説明単位へ端点をまとめた表示。直接通信や連続実行を追加していません。'}});}
+  const folded=e.kind==='flow-input'?foldedArtifacts.get(e.source):undefined;
+  const id=key('relation',source,target,folded?'artifact-path':e.kind,e.confidence,e.details?.conditional??false,['flow-precedes','flow-invokes'].includes(e.kind)?e.label:'');
+  const pathSources=folded?[...(adjacent.get(e.source)??[]).filter(item=>item.id===folded.edgeId),e]:[e],evidence=uniqueArchitectureEvidence(pathSources.flatMap(item=>item.evidence)),provenance=pathSources.flatMap(item=>item.provenance?.edges??[item]);
+  const entry=relations.get(id),edgeIds=folded?[folded.edgeId,e.id]:[e.id],path=folded?{edgeIds,nodeIds:[folded.producer,e.source,e.target]}:undefined;
+  if(entry){entry.edgeIds=[...new Set([...entry.edgeIds,...edgeIds])];entry.kind=entry.kind==='path'?'path':'aggregate';if(path)entry.paths!.push(path);const edge=edges.get(id)!;edge.evidence=uniqueArchitectureEvidence([...edge.evidence,...evidence]);edge.provenance!.edges.push(...provenance);if(edge.details?.environment!==e.details?.environment)edge.details={...edge.details,environment:undefined};}
+  else {relations.set(id,{kind:folded?'path':e.provenance?.intermediateNodeIds?.length?'path':'direct',edgeIds,paths:path?[path]:undefined});edges.set(id,{...e,id,source,target,kind:folded?'simple-artifact-path':e.kind,evidence,label:folded?'ビルド成果物を渡す':e.label,provenance:{edges:provenance,intermediateNodeIds:folded?[e.source]:e.provenance?.intermediateNodeIds},details:{...e.details,reason:folded?'同じ成果物の生成と入力を短縮した経路。元の段階・環境・条件は内訳に保持':'元の関係を説明単位へ投影。実行順序を追加していません。'}});}
  }
  const within=(id:string)=>{if(!base.scopeId)return true;let node=byId.get(id);const seen=new Set<string>();while(node&&!seen.has(node.id)){if(node.id===base.scopeId)return true;seen.add(node.id);node=byId.get(node.architecture?.parentId??'');}return false;};
- const inside=new Set([...units].filter(([,u])=>u.members.some(within)).map(([id])=>id));
- const shown=new Set(inside);if(base.scopeId)for(const e of edges.values())if(inside.has(e.source)||inside.has(e.target)){shown.add(e.source);shown.add(e.target);}
+ const inside=new Set([...units].filter(([,u])=>u.members.some(within)).map(([id])=>id)),shown=new Set(inside);
+ if(base.scopeId)for(const e of edges.values())if(inside.has(e.source)||inside.has(e.target)){shown.add(e.source);shown.add(e.target);}
  if(base.scopeId&&surroundings)for(const [id,u]of units)if(u.anchorId)shown.add(id);
- const nodes:SemanticNode[]=[...units].filter(([id])=>shown.has(id)).map(([id,u])=>{const n=representatives.get(id)!,members=u.members.map(id=>byId.get(id)!);return {...n,id,confidence:members.some(n=>n.confidence==='unresolved')?'unresolved':members.some(n=>n.confidence==='inferred')||new Set(members.map(n=>n.confidence)).size>1?'inferred':n.confidence,evidence:uniqueArchitectureEvidence(members.flatMap(n=>n.evidence)),architecture:n.architecture?{...n.architecture,parentId:undefined,request:undefined,memberIds:[...u.members]}:undefined,attributes:{...n.attributes,simpleOverview:true,simpleMemberIds:[...u.members],architectureContext:!inside.has(id),architecturePeripheral:!inside.has(id),architectureScopeRole:base.scopeId?(inside.has(id)?'inside':'surrounding'):'',simpleAnchorId:u.anchorId??''}};});
- const visibleEdges=[...edges.values()].filter(e=>shown.has(e.source)&&shown.has(e.target));
- const graph:SemanticGraph={view:'architecture-map',nodes,edges:visibleEdges};
- // Keep supporting uses close to a confirmed owner without modifying canonical hierarchy.
- const nodeById=new Map(nodes.map(n=>[n.id,n])),placed=new Set<string>(),ordered:SemanticNode[]=[];
- const put=(n:SemanticNode)=>{if(!placed.has(n.id)){placed.add(n.id);ordered.push(n);}};
- const degree=new Map(nodes.map(n=>[n.id,visibleEdges.filter(e=>e.source===n.id||e.target===n.id).length]));
- for(const n of nodes.filter(n=>units.get(n.id)?.anchorId).sort((a,b)=>Number(b.architecture?.kind==='application')-Number(a.architecture?.kind==='application')||(degree.get(b.id)!-degree.get(a.id)!)||a.id.localeCompare(b.id))){put(n);for(const e of visibleEdges){const other=e.source===n.id?e.target:e.target===n.id?e.source:undefined;if(other&&nodeById.has(other)&&!units.get(other)?.anchorId)put(nodeById.get(other)!);}}
- for(const n of nodes)put(n);
- const columns=Math.max(1,Math.ceil(Math.sqrt(ordered.length*1.5))),positions2d=new Map(ordered.map((n,i)=>[n.id,{x:(i%columns)*310,y:Math.floor(i/columns)*160,z:0}]));
- const positions=new Map(ordered.map((n,i)=>[n.id,{x:(i%columns)*180,y:Math.floor(i/columns)*110,z:n.architecture?.kind==='tool-operation'?-100:n.architecture?.kind==='resource'||n.architecture?.kind==='external-service'?100:0}]));
+ const nodes:SemanticNode[]=[...units].filter(([id])=>shown.has(id)).map(([id,u])=>{const n=representatives.get(id)!,members=u.members.map(id=>byId.get(id)!),purpose=simplePurposeOrder.filter(p=>u.purposes.includes(p)).map(p=>simplePurposes[p]).join('・');
+  const configurations=members.filter(m=>m.architecture?.kind==='execution-config'),relevant=u.role==='support'&&u.purposes.length?members.filter(m=>m.architecture?.kind==='tool-operation'&&m.attributes.purpose!=='script'):u.anchorId&&configurations.length?configurations:members.filter(m=>m.architecture?.kind!=='unresolved'&&m.attributes.purpose!=='script'),contexts=relevant.map(architectureEnvironmentContext),environments=[...new Set(contexts.flatMap(c=>c.environments))];
+  const environmentLabels=[...new Set(contexts.map(c=>c.label))];
+  return {...n,id,label:u.role==='support'&&purpose?`${n.label}：${purpose}`:n.label,confidence:members.some(n=>n.confidence==='unresolved')?'unresolved':members.some(n=>n.confidence==='inferred')||new Set(members.map(n=>n.confidence)).size>1?'inferred':n.confidence,evidence:uniqueArchitectureEvidence(members.flatMap(n=>n.evidence)),architecture:n.architecture?{...n.architecture,parentId:undefined,request:undefined,memberIds:[...u.members],environments}:undefined,attributes:{...n.attributes,sharedEnvironments:[],simpleEnvironmentLabel:environmentLabels.join(' / '),simpleEnvironmentMixed:environmentLabels.length>1,simpleOverview:true,simpleRole:u.role,simpleMemberIds:[...u.members],architectureContext:!inside.has(id),architecturePeripheral:!inside.has(id),architectureScopeRole:base.scopeId?(inside.has(id)?'inside':'surrounding'):'',simpleAnchorId:u.anchorId??''}};
+ });
+ for(const n of nodes){const u=units.get(n.id)!,targets=[...new Set(u.targetIds.map(id=>owners.get(id)).filter((id):id is string=>Boolean(id)))],subject=u.role==='primary'?n.id:u.role==='support'&&targets.length===1?targets[0]:undefined;
+  n.attributes.simpleRegionId=subject??(u.role==='support'?key('shared-support',targets):'context');n.attributes.simpleRegionLabel=subject?(nodes.find(n=>n.id===subject)?.label??'構成')+' と支援':u.role==='support'?(targets.length?'複数対象への支援':'対象未特定の支援'):'補助・所属未判定の構成';
+ }
+ const visibleEdges=[...edges.values()].filter(e=>shown.has(e.source)&&shown.has(e.target)),graph:SemanticGraph={view:'architecture-map',nodes,edges:visibleEdges};
+ const {positions,positions2d}=layoutSimpleArchitecture(graph,units,owners);
  graph.architectureView={scopeId:base.scopeId,detailIds:nodes.filter(n=>inside.has(n.id)).map(n=>n.id),contextIds:nodes.filter(n=>!inside.has(n.id)).map(n=>n.id),peripheralIds:[],internalRelations:[],boundaryRelations:[],positions,positions2d,requestGroups:[],representedNodeIds:nodes.flatMap(n=>units.get(n.id)!.members),detailCount:inside.size,contextCount:nodes.length-inside.size,detailEntityCount:nodes.filter(n=>inside.has(n.id)).length,contextEntityCount:nodes.filter(n=>!inside.has(n.id)).length,requestCount:0,internalRecordCount:0,explicitNodeIds:[]};
  const result={graph,units,relations,owners,original};variants.set(surroundings,result);return result;
 }
