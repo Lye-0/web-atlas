@@ -38,3 +38,13 @@ export function simpleArgumentLabel(n:SemanticNode,peers:SemanticNode[]){
  const distinct=args.split(/\s+/).filter(token=>otherTokens.some(tokens=>!tokens.includes(token)));
  return distinct.length?`引数：${distinct.join(' ')}`:'引数指定あり';
 }
+
+/** Group by the original opposite endpoint, not its label or its displayed owner. */
+export function simpleCorrespondencePeers(edges:readonly SemanticEdge[],members:ReadonlySet<string>,nodes:ReadonlyMap<string,SemanticNode>){
+ const groups=new Map<string,{id:string;node:SemanticNode;labels:string[];edges:SemanticEdge[]}>();
+ for(const edge of edges){const outgoing=members.has(edge.source),id=outgoing?edge.target:edge.source,node=nodes.get(id);if(!node)continue;
+  const label=edge.kind==='flow-serves'?(outgoing?'配信対象':'配信する構成'):edge.kind==='flow-configures'?(outgoing?'コードを使用する構成':'使用するコード'):(outgoing?'論理定義に対応する構成':'対応する論理定義');
+  const group=groups.get(id)??{id,node,labels:[],edges:[]};if(!group.labels.includes(label))group.labels.push(label);if(!group.edges.some(e=>e.id===edge.id))group.edges.push(edge);groups.set(id,group);
+ }
+ return [...groups.values()];
+}

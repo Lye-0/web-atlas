@@ -1,5 +1,6 @@
 import type {SemanticGraph,SemanticNode} from './types';
 import {semanticDepths} from './presentation';
+import {separateSimpleShelves} from './architectureSimpleShelfBounds';
 import {simplePurposes} from './architectureSimpleUsage';
 
 type Point={x:number;y:number;z:number};
@@ -85,6 +86,7 @@ export function layoutSimpleArchitecture(graph:SemanticGraph){
   for(let i=0;i<list.length;i++){const n=list[i]!;put(n,i%width,yStart+Math.floor(i/width)*140,category);n.attributes.simplePlacementLabel=category==='shared'?'共有部分':category==='no-route'?'起動・公開経路は未確認':category==='context'?String(n.attributes.simpleSupportPurpose||'役割・所属未判定'):'利用・接続先';n.attributes.simpleRegionId=`shelf:${category}`;n.attributes.simpleRegionLabel=category==='context'?'補助・未確認の構成':String(n.attributes.simplePlacementLabel);}
   top=Math.max(top+height,...[...positions2d.values()].map(p=>p.y+180));
  }
+ separateSimpleShelves(graph,positions2d);
  for(const n of graph.nodes){const p=positions2d.get(n.id)!,own=[...origins.get(n.id)!],sourceYs=own.map(id=>positions2d.get(id)?.y).filter((y):y is number=>y!==undefined),center=sourceYs.length?sourceYs.reduce((a,b)=>a+b,0)/sourceYs.length:p.y;
   positions.set(n.id,{x:p.x*.62,y:p.y*.52,z:stage(n)==='source'||stage(n)==='arrival'?0:Math.max(-150,Math.min(150,(p.y-center)*.45))});n.attributes.simpleSourceIds=own;n.attributes.simpleColumn=rank.get(n.id)!;
  }

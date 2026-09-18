@@ -116,6 +116,14 @@
 - files: `src/analyzer/semantic/architectureSimple.ts`, `src/analyzer/semantic/architectureSimple.test.ts`, `src/analyzer/semantic/architectureSimplePolishActual.test.ts` …
 - memory: `agent-knowledge/entries/2026-09-18-simple-ownership-before-auxiliary-a631f2.md`
 
+### 領域再計算後でも見出し余白が別の構成を囲い込む
+- id: `rm-20260919-final-boundary-header-space`
+- type: `failure`
+- maturity: `candidate`
+- tags: `simple-overview`, `bounds`, `layout`
+- files: `src/analyzer/semantic/architectureSimpleShelfBounds.ts`, `src/analyzer/semantic/architectureHeadings.ts`, `src/analyzer/semantic/architectureShelfPolish.test.ts` …
+- memory: `agent-knowledge/entries/2026-09-19-final-boundary-header-space-8d14af.md`
+
 ## analyzer-command-evidence
 
 ### CIコマンドを合成すると元範囲の座標系が変わる
