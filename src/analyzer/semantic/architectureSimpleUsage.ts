@@ -21,7 +21,8 @@ export function simpleUsageIndex(model:SemanticGraph){
   if(!targets.size)for(const e of edges)if(e.source===n.id&&e.kind==='flow-generates'&&byId.get(e.target)?.architecture?.kind==='artifact')targets.add(e.target);
   const inputs=[...new Set(edges.filter(e=>e.target===n.id&&e.kind==='flow-input').map(e=>logical(e.source)??e.source))].sort();
   const outputs=[...new Set(edges.filter(e=>e.source===n.id&&['flow-generates','flow-starts','flow-deploys','flow-applies'].includes(e.kind)).map(e=>JSON.stringify([e.kind,e.target,e.details?.environment??'',e.details?.conditional??false])))].sort();
-  const context=[n.attributes.configurationPath??'',n.attributes.inputRoot??'',n.attributes.workingDirectory??n.attributes.ownerPath??(n.attributes.configurationPath||n.attributes.inputRoot?'':n.id),inputs,outputs,n.attributes.targetPlace??'', [...(n.architecture?.environments??[])].sort(),String(n.attributes.usageArguments??'').trim()];
+  const inputConditions=[...new Set(edges.filter(e=>e.target===n.id&&e.kind==='flow-input').map(e=>JSON.stringify([logical(e.source)??e.source,e.details?.environment??'',e.details?.conditional??false,e.confidence])))].sort();
+  const context=[n.attributes.configurationPath??'',n.attributes.inputRoot??'',n.attributes.workingDirectory??n.attributes.ownerPath??(n.attributes.configurationPath||n.attributes.inputRoot?'':n.id),inputs,outputs,inputConditions,n.attributes.targetPlace??'', [...(n.architecture?.environments??[])].sort(),String(n.attributes.usageArguments??'').trim(),n.attributes.configurationStatus??'',n.attributes.environmentMeaning??'',n.confidence];
   usages.set(n.id,{targets:[...targets].sort(),purpose,family:purpose||'unknown',tool:String(n.attributes.dictionaryStackId??n.label.split('：')[0]??n.id),context:JSON.stringify(context),resolved:targets.size>0||inputs.length>0});
  }
  return {byId,adjacent,usages};

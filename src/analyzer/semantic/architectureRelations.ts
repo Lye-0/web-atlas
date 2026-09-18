@@ -26,6 +26,7 @@ const labels: Record<string, string> = {
 const relationLabels = new WeakMap<SemanticRelationSource, string>();
 export function architectureRelationLabel(edge: SemanticRelationSource):string {
   if(edge.kind==='simple-artifact-path')return labels[edge.kind]!;
+  if(edge.kind==='simple-reference')return '参照・依存（種類は内訳）';
   const cached=relationLabels.get(edge);if(cached)return cached;
   if ((edge as SemanticEdge).provenance?.edges.length) {
     const kinds=[...new Set(architectureRelationOriginals([edge]).map(original=>original.kind))];

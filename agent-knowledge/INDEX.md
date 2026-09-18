@@ -92,6 +92,14 @@
 - files: `src/analyzer/semantic/architectureSimpleEvidence.ts`, `src/analyzer/semantic/architectureSimpleUsage.ts`, `src/analyzer/semantic/architectureSimpleBounds.test.ts` …
 - memory: `agent-knowledge/entries/2026-09-18-architecture-evidence-location-pair-d8f016.md`
 
+### 原本・操作・到着先の列だけを揃えても経路はまとまらない
+- id: `rm-20260918-route-bands-not-role-columns`
+- type: `failure`
+- maturity: `candidate`
+- tags: `simple-overview`, `layout`, `routes`
+- files: `src/analyzer/semantic/architectureSimpleLayout.ts`, `src/analyzer/semantic/architectureRouteLanes.test.ts`, `docs/technical/tab10-route-lanes-review-20260918.md`
+- memory: `agent-knowledge/entries/2026-09-18-route-bands-not-role-columns-7ad391.md`
+
 ### 論理所有者が同じでも公開の入力と到着先は同じ要約へ吸収しない
 - id: `rm-20260918-simple-deployment-arrival-role`
 - type: `failure`

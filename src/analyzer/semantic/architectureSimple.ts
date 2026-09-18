@@ -31,7 +31,7 @@ export function architectureSimpleOverview(base:PreparedArchitectureScope,surrou
  };
  for(const n of base.allowed)if(isAnchor(n)){
   // An internal test component stays with its real app; only independently classified roots form auxiliary groups.
-  const parent=parentAnchor(n);if(parent&&n.architecture?.entryPaths.length===0&&n.architecture?.parentId!==base.scopeId&&privateToParent(n,parent))continue;
+  const parent=parentAnchor(n);if(parent&&!['resource','external-service','external-program'].includes(n.architecture?.kind??'')&&n.architecture?.entryPaths.length===0&&n.architecture?.parentId!==base.scopeId&&privateToParent(n,parent))continue;
   const group=structuralGroups.get(n.id);if(group){assign(n,group.id,group.reason,group.category==='unconfirmed'?'context':'primary',undefined,group.label,group.targetIds);continue;}
   const role=auxRole(n);
   if(role&&!parent){assign(n,key('auxiliary-roots',role),'既存の用途判定に基づく独立した補助構成の集合','context',undefined,role==='inferred'?'記録・実験を支える構成（推定）':role==='test'?'テストを支える構成':'開発・検証を支える構成');}
@@ -74,11 +74,12 @@ export function architectureSimpleOverview(base:PreparedArchitectureScope,surrou
  for(const e of original.edges){const source=owners.get(e.source),target=owners.get(e.target);if(!source||!target)continue;
   if(source===target){units.get(source)!.internalEdges.push(e.id);continue;}
   const folded=e.kind==='flow-input'?foldedArtifacts.get(e.source):undefined;
-  const id=key('relation',source,target,folded?'artifact-path':e.kind,e.confidence,e.details?.conditional??false,['flow-precedes','flow-invokes'].includes(e.kind)?e.label:'');
+  const reference=['code-reference','declaration-dependency','calls','callback','handles','registers-event'].includes(e.kind);
+  const id=key('relation',source,target,folded?'artifact-path':reference?'reference':e.kind,e.confidence,e.details?.conditional??false,['flow-precedes','flow-invokes'].includes(e.kind)?e.label:'');
   const pathSources=folded?[...(adjacent.get(e.source)??[]).filter(item=>item.id===folded.edgeId),e]:[e],evidence=uniqueArchitectureEvidence(pathSources.flatMap(item=>item.evidence)),provenance=pathSources.flatMap(item=>item.provenance?.edges??[item]);
   const entry=relations.get(id),edgeIds=folded?[folded.edgeId,e.id]:[e.id],path=folded?{edgeIds,nodeIds:[folded.producer,e.source,e.target]}:undefined;
   if(entry){entry.edgeIds=[...new Set([...entry.edgeIds,...edgeIds])];entry.kind=entry.kind==='path'?'path':'aggregate';if(path)entry.paths!.push(path);const edge=edges.get(id)!;edge.evidence=uniqueArchitectureEvidence([...edge.evidence,...evidence]);edge.provenance!.edges.push(...provenance);if(edge.details?.environment!==e.details?.environment)edge.details={...edge.details,environment:undefined};}
-  else {relations.set(id,{kind:folded?'path':e.provenance?.intermediateNodeIds?.length?'path':'direct',edgeIds,paths:path?[path]:undefined});edges.set(id,{...e,id,source,target,kind:folded?'simple-artifact-path':e.kind,evidence,label:folded?'ビルド成果物を渡す':e.label,provenance:{edges:provenance,intermediateNodeIds:folded?[e.source]:e.provenance?.intermediateNodeIds},details:{...e.details,reason:folded?'同じ成果物の生成と入力を短縮した経路。元の段階・環境・条件は内訳に保持':'元の関係を説明単位へ投影。実行順序を追加していません。'}});}
+  else {relations.set(id,{kind:folded?'path':e.provenance?.intermediateNodeIds?.length?'path':'direct',edgeIds,paths:path?[path]:undefined});edges.set(id,{...e,id,source,target,kind:folded?'simple-artifact-path':reference?'simple-reference':e.kind,evidence,label:folded?'ビルド成果物を渡す':reference?'参照・依存（種類は内訳）':e.label,provenance:{edges:provenance,intermediateNodeIds:folded?[e.source]:e.provenance?.intermediateNodeIds},details:{...e.details,reason:folded?'同じ成果物の生成と入力を短縮した経路。元の段階・環境・条件は内訳に保持':'元の関係を説明単位へ投影。実行順序を追加していません。'}});}
  }
  const within=(id:string)=>{if(!base.scopeId)return true;let node=byId.get(id);const seen=new Set<string>();while(node&&!seen.has(node.id)){if(node.id===base.scopeId)return true;seen.add(node.id);node=byId.get(node.architecture?.parentId??'');}return false;};
  const inside=new Set([...units].filter(([,u])=>u.members.some(within)).map(([id])=>id)),shown=new Set(inside);
@@ -100,8 +101,16 @@ export function architectureSimpleOverview(base:PreparedArchitectureScope,surrou
   const databaseChange=u.role==='support'&&(u.purposes.some(p=>p==='generate'||p==='apply')||u.members.some(id=>['artifact','code-definition'].includes(byId.get(id)?.architecture?.kind??'')&&(adjacent.get(id)??[]).some(e=>['flow-input','flow-generates'].includes(e.kind)&&['generate','apply'].includes(usages.get(e.source===id?e.target:e.source)?.purpose??''))));
   n.attributes.simpleSupportPurpose=group?.category==='unconfirmed'?'実行用途未確認':databaseChange?'DB構造変更':n.architecture?.kind==='shared-code'?'共有コード':u.role==='context'?'補助・所属未判定':'';
   const kind=n.architecture?.kind??'';
-  n.attributes.simpleStage=group?.category==='destination'||group?.category==='runtime'?'arrival':kind==='artifact'?'artifact':u.role==='context'?'context':kind==='tool-operation'?'operation':['application','component','shared-code','code-definition'].includes(kind)?'source':'arrival';
+  const arrival=u.members.some(id=>(adjacent.get(id)??[]).some(e=>e.target===id&&['flow-starts','flow-deploys','flow-applies'].includes(e.kind)))&&!['application','component','shared-code','code-definition'].includes(kind);
+  n.attributes.simpleStage=group?.category==='destination'||group?.category==='runtime'||arrival?'arrival':kind==='artifact'?'artifact':u.role==='context'?'context':kind==='tool-operation'?'operation':['application','component','shared-code','code-definition'].includes(kind)?'source':'arrival';
   if(n.attributes.simpleStage==='source')u.reason='原本・定義と内部のコード。起動後の構成・公開先とは別の説明単位';
+ }
+ // Different uses must be distinguishable in both the canvas and the shared peer list.
+ const sameNames=new Map<string,SemanticNode[]>();for(const n of nodes.filter(n=>n.architecture?.kind==='tool-operation')){const list=sameNames.get(n.label)??[];list.push(n);sameNames.set(n.label,list);}
+ for(const list of sameNames.values())if(list.length>1)for(const n of list){const environment=String(n.attributes.simpleEnvironmentLabel),peers=list.filter(p=>p.attributes.simpleEnvironmentLabel===n.attributes.simpleEnvironmentLabel),args=String(n.attributes.usageArguments??'').trim();
+  const outputCaption=(node:SemanticNode)=>[...new Set(units.get(node.id)!.members.flatMap(id=>(adjacent.get(id)??[]).filter(e=>e.source===id&&['flow-starts','flow-deploys','flow-generates','flow-applies'].includes(e.kind)).map(e=>{const target=byId.get(e.target);return target?String(target.attributes.outputPath??target.path??target.label):'対象未確認';})))].join(' / ');
+  const context=peers.length>1?[args||'追加引数なし',new Set(peers.map(p=>p.attributes.configurationPath)).size>1?String(n.attributes.configurationPath??'設定未確認'):'',new Set(peers.map(p=>p.attributes.inputRoot)).size>1?String(n.attributes.inputRoot??'入力未確認'):'',new Set(peers.map(outputCaption)).size>1?`出力：${outputCaption(n)}`:'',new Set(peers.map(p=>p.attributes.configurationStatus)).size>1?String(n.attributes.configurationStatus??'設定確認状態不明'):''].filter(Boolean).join(' · '):'';
+  n.label+=`（${[environment,context].filter(Boolean).join(' · ')}）`;n.attributes.simpleUsageDisambiguation=context;
  }
  const visibleEdges=[...edges.values()].filter(e=>shown.has(e.source)&&shown.has(e.target)),graph:SemanticGraph={view:'architecture-map',nodes,edges:visibleEdges};
  const {positions,positions2d}=layoutSimpleArchitecture(graph);

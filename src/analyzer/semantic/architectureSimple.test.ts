@@ -60,7 +60,7 @@ it('does not combine opposite script conditions and retains mixed environments w
  const app=node('subject'),a=node('east','execution-config'),b=node('west','execution-config');for(const n of [a,b])n.attributes.logicalOwnerId=app.id;a.architecture!.environments=['preview-東'];b.architecture!.environments=['release-西'];
  const other=node('peer'),ok={...edge('success',app.id,other.id,'flow-precedes'),label:'成功時に続く記述',details:{conditional:true}},fail={...edge('failure',app.id,other.id,'flow-precedes'),label:'失敗時に続く記述',details:{conditional:true}};
  const simple=architectureSimpleOverview(prepareArchitectureScope({view:'architecture-map',nodes:[app,a,b,other],edges:[ok,fail]})),subject=simple.graph.nodes.find(n=>n.id===simple.owners.get(app.id))!;
- expect(simple.graph.edges).toHaveLength(2);expect(subject.attributes.simpleEnvironmentLabel).toBe('論理定義');expect(simple.graph.nodes.filter(n=>n.attributes.simpleCategory==='runtime').map(n=>n.attributes.simpleEnvironmentLabel).sort()).toEqual(['preview-東','release-西']);expect(subject.attributes.simpleRegionId).toBe('');
+ expect(simple.graph.edges).toHaveLength(2);expect(subject.attributes.simpleEnvironmentLabel).toBe('論理定義');expect(simple.graph.nodes.filter(n=>n.attributes.simpleCategory==='runtime').map(n=>n.attributes.simpleEnvironmentLabel).sort()).toEqual(['preview-東','release-西']);expect(subject.attributes.simplePlacement).toBe('no-route');
 });
 it('preserves evidence and branching stages when an artifact feeds two operations',()=>{
  const build=node('build','tool-operation'),artifact=node('bundle','artifact'),a=node('publish-a','tool-operation'),b=node('publish-b','tool-operation');build.attributes.purpose='build';a.attributes.purpose='deploy';b.attributes.purpose='deploy';

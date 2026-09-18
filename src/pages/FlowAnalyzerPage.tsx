@@ -124,6 +124,9 @@ export default function FlowAnalyzerPage({ view }: { view: SemanticExplorerViewI
       if(purpose){display.location=[purpose,display.location].filter(Boolean).join(' · ');display.disambiguation=[purpose,display.disambiguation].filter(Boolean).join(' · ');}
       if(node.attributes.simpleStage==='source'){display.location=['原本・定義',display.location].filter(Boolean).join(' · ');display.disambiguation=display.location;}
       if(node.attributes.simpleCategory==='destination'||node.attributes.simpleCategory==='runtime'){display.location=`${node.attributes.simpleCategory==='destination'?'公開先':'起動・実行先'}の設定 · ${node.attributes.simpleEnvironmentLabel}`;display.disambiguation=display.location;}
+      if(node.attributes.simplePlacementLabel){display.location=[String(node.attributes.simplePlacementLabel),display.location].filter(Boolean).join(' · ');display.disambiguation=display.location;}
+      if(node.attributes.simpleUsageDisambiguation){display.location=[String(node.attributes.simpleUsageDisambiguation),display.location].filter(Boolean).join(' · ');display.disambiguation=display.location;}
+      if(node.attributes.simpleBranchLabel)display.tooltip+='\n'+String(node.attributes.simpleBranchLabel);
       if(Array.isArray(node.attributes.simpleRows))display.tooltip+='\n'+node.attributes.simpleRows.join('\n');
     }
     return displays;
