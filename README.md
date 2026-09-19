@@ -19,6 +19,8 @@ Web開発の技術を調べ、手元のプロジェクトがどのように構�
 <details>
 <summary><strong>Map — 全体像から技術を探す</strong></summary>
 
+![DictionaryのMap画面。大カテゴリへの移動ボタンと技術の分類ツリー](docs/images/dictionary-map.png)
+
 分類と技術をツリーで俯瞰するタブです。線は分類上の親子関係を表します。
 
 1. 「言語と実行基盤」「UIとアプリケーション」「データとストレージ」「品質と検証」「開発と配信」の大カテゴリから、調べたい領域を探します。
@@ -33,6 +35,8 @@ Web開発の技術を調べ、手元のプロジェクトがどのように構�
 <details>
 <summary><strong>Categories — 分類の意味と階層を読む</strong></summary>
 
+![DictionaryのCategories画面。分類の階層と各分類の概要](docs/images/dictionary-categories.png)
+
 技術を分類する概念の一覧です。「この技術は何のためのものか」「似た分類はどう違うか」を整理するときに使います。
 
 1. 大カテゴリごとの一覧から、分類名を選びます。
@@ -45,6 +49,8 @@ Web開発の技術を調べ、手元のプロジェクトがどのように構�
 
 <details>
 <summary><strong>Stacks — 個別の技術を調べる</strong></summary>
+
+![DictionaryのStacks画面。分類の絞り込みと技術一覧](docs/images/dictionary-stacks.png)
 
 言語、フレームワーク、データベース、テストツール、配信サービス、開発用CLIなどの技術一覧です。
 
@@ -75,6 +81,8 @@ Web開発の技術を調べ、手元のプロジェクトがどのように構�
 
 <details open>
 <summary><strong>プロジェクトを読み込む・読み直す</strong></summary>
+
+![Analyzerの開始画面。プロジェクトフォルダの選択とブラウザ内解析の案内](docs/images/analyzer-project-picker.png)
 
 1. Analyzerで「プロジェクトフォルダを選択」を押します。
 2. 調べたいプロジェクトのルートフォルダを選びます。モノレポは、全体を含むルートを選ぶとパッケージ間の関係を確認しやすくなります。
