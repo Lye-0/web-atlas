@@ -133,6 +133,7 @@ export function isAnalyzerSourcePath(path: string): boolean {
     || name === 'pnpm-workspace.yml'
     || name === 'firebase.json'
     || name === '.firebaserc'
+    || name === '.vscodeignore'
     || name === 'wrangler.json'
     || name === 'wrangler.jsonc'
     || name === 'wrangler.toml'

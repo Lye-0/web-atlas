@@ -203,6 +203,7 @@ function classifyRange(source: string, start: number, end: number, operator?: Sh
   if (explicitScript && tokens[2]) return { text, start: range.start, end: range.end, kind: 'project-script', scriptName: tokens[2].value, toolName: first, children, ...(operator ? { operator } : {}) };
 
   const knownCliNames = new Set([
+    'next', 'vsce', '@vscode/vsce',
     'vite',
     'vitest',
     'wrangler', 'vercel', 'supabase',
@@ -238,9 +239,20 @@ function classifyRange(source: string, start: number, end: number, operator?: Sh
 }
 
 export function parseCommandExpression(command: string): CommandFragment[] {
-  return splitShellOperators(command)
+  const fragments=splitShellOperators(command)
     .map((segment) => classifyRange(command, segment.start, segment.end, segment.operator))
     .filter((fragment) => fragment.text.length > 0);
+  let cwd:string|undefined;
+  for(let i=0;i<fragments.length;i++){
+    const fragment=fragments[i]!,previous=i?commandArgv(fragments[i-1]!):[];
+    if(previous[0]==='cd'){
+      const target=previous.length===2?previous[1]:undefined;
+      cwd=fragment.operator==='&&'&&target&&!/[$`~]|^[\\/]|^[A-Za-z]:/.test(target)?[cwd,target].filter(Boolean).join('/'):'$UNRESOLVED_CWD';
+    }
+    if(cwd&&i>0&&fragment.operator!=='&&')cwd='$UNRESOLVED_CWD';
+    if(cwd){const inherit=(f:CommandFragment)=>{f.workingDirectory=[cwd,f.workingDirectory].filter(Boolean).join('/');f.children.forEach(inherit);};inherit(fragment);}
+  }
+  return fragments;
 }
 
 function isFlagToken(value: string): boolean {

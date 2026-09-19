@@ -54,7 +54,11 @@ for (const name of ['git-lines', 'vehicle-management', 'web-atlas']) it.skipIf(!
     const host = model.nodes.find(n => n.architecture?.context.includes('Extension Host') && n.architecture.kind === 'application')!;
     const webview = model.nodes.find(n => n.architecture?.context.includes('Webview / ブラウザ') && n.architecture.kind === 'application')!;
     const partners = architecturePartners(root.edges.filter(edge=>!edge.details?.structural), host.id);
-    expect(partners).toHaveLength(2);
+    const preparationPeers=partners.filter(partner=>root.edges.some(edge=>[edge.source,edge.target].includes(host.id)&&[edge.source,edge.target].includes(partner.otherId)&&['flow-generates','flow-loads'].includes(edge.kind)));
+    expect(preparationPeers).toHaveLength(2);
+    expect(partners.filter(partner=>!preparationPeers.includes(partner))).toHaveLength(2);
+    expect(root.edges.filter(edge=>edge.source===host.id&&edge.kind==='flow-loads').every(edge=>edge.evidence.some(e=>e.path==='package.json'))).toBe(true);
+    expect(root.edges.filter(edge=>edge.target===host.id&&edge.kind==='flow-generates').every(edge=>edge.evidence.some(e=>e.path==='scripts/build-extension.mjs'))).toBe(true);
     expect(root.edges.filter(edge=>edge.source===host.id&&edge.kind==='flow-definition').every(edge=>edge.details?.structural)).toBe(true);
     expect(partners.find(partner => partner.otherId === webview.id)?.direction).toBe('相手から・相手への関係あり');
     expect(host.architecture?.technologies?.find(t => t.name === 'react')?.usage).toBe('declared');

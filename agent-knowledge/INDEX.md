@@ -116,6 +116,14 @@
 - files: `src/analyzer/semantic/architectureSimple.ts`, `src/analyzer/semantic/architectureSimple.test.ts`, `src/analyzer/semantic/architectureSimplePolishActual.test.ts` …
 - memory: `agent-knowledge/entries/2026-09-18-simple-ownership-before-auxiliary-a631f2.md`
 
+### 成果物宣言の検出と、生成操作の対応は別の段階
+- id: `rm-20260919-build-declaration-invocation`
+- type: `constraint`
+- maturity: `candidate`
+- tags: `commands`, `provenance`, `static-analysis`
+- files: `src/analyzer/buildAdapters.ts`, `src/analyzer/semantic/architectureCommands.ts`, `src/analyzer/semantic/architecturePlatformFlows.ts` …
+- memory: `agent-knowledge/entries/2026-09-19-build-declaration-invocation-45fba1.md`
+
 ### 領域再計算後でも見出し余白が別の構成を囲い込む
 - id: `rm-20260919-final-boundary-header-space`
 - type: `failure`
@@ -123,6 +131,14 @@
 - tags: `simple-overview`, `bounds`, `layout`
 - files: `src/analyzer/semantic/architectureSimpleShelfBounds.ts`, `src/analyzer/semantic/architectureHeadings.ts`, `src/analyzer/semantic/architectureShelfPolish.test.ts` …
 - memory: `agent-knowledge/entries/2026-09-19-final-boundary-header-space-8d14af.md`
+
+### 操作経路がない原本を、サービス配置後の末尾へ置かない
+- id: `rm-20260919-unrouted-source-placement`
+- type: `failure`
+- maturity: `candidate`
+- tags: `simple-overview`, `layout`, `source-first`
+- files: `src/analyzer/semantic/architectureSimpleUnrouted.ts`, `src/analyzer/semantic/architectureSimpleLayout.ts`, `src/analyzer/semantic/architecturePlatformFlows.test.ts` …
+- memory: `agent-knowledge/entries/2026-09-19-unrouted-source-placement-91bfa2.md`
 
 ## analyzer-command-evidence
 

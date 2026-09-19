@@ -1,8 +1,8 @@
 import type {SemanticGraph,SemanticNode,SemanticEdge} from './types';
 import {simpleEvidenceLocation} from './architectureSimpleEvidence';
 
-export const simplePurposes:Record<string,string>={serve:'開発配信',build:'ビルド',start:'起動',deploy:'公開',generate:'SQL生成',apply:'DB適用',script:'開始script'};
-export const simplePurposeOrder=['serve','build','start','deploy','generate','apply'];
+export const simplePurposes:Record<string,string>={serve:'開発配信',build:'ビルド',start:'起動',deploy:'公開',generate:'SQL生成',apply:'DB適用',package:'パッケージ化',script:'開始script'};
+export const simplePurposeOrder=['serve','build','start','deploy','generate','apply','package'];
 export interface SimpleUsage {targets:string[];family:string;context:string;tool:string;purpose:string;resolved:boolean}
 export function simpleUsageIndex(model:SemanticGraph){
  const byId=new Map(model.nodes.map(n=>[n.id,n])),adjacent=new Map<string,SemanticEdge[]>();

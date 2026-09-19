@@ -4,12 +4,12 @@ import {architectureEnvironmentContext} from './architectureContext';
 export interface ArchitectureContentChoice {id:string;label:string;group:'overview'|'environment'|'composition'|'path';environment?:string;meaning?:string;members?:string[];path?:'start'|'publish'|'runtime'|'database'}
 export interface ArchitectureContentRange {graph:SemanticGraph;roles:ReadonlyMap<string,'core'|'peer'|'support'>;edgeIds:ReadonlySet<string>}
 const runtime=new Set(['http-request','service-use','data-operation','message','process-start','deployment-config','selects-workload','routes-to-service','proxy-pass','upstream-server','cdn-domain','delivery-origin']);
-const io=new Set(['flow-input','flow-starts','flow-deploys','flow-generates','flow-applies','flow-serves','flow-artifact','build-output','publishes-artifact']);
+const io=new Set(['flow-loads','flow-input','flow-starts','flow-deploys','flow-generates','flow-applies','flow-serves','flow-artifact','build-output','publishes-artifact']);
 const order=new Set(['flow-invokes','flow-precedes']);
 const structural=new Set(['flow-definition','flow-configures']);
 const purpose=(n:SemanticNode|undefined)=>String(n?.attributes.purpose??'');
 const isOp=(n:SemanticNode|undefined)=>n?.architecture?.kind==='tool-operation';
-const paths={start:['start','serve'],publish:['build','deploy'],database:['generate','apply']} as const;
+const paths={start:['start','serve'],publish:['build','package','deploy'],database:['generate','apply']} as const;
 const cache=new WeakMap<SemanticGraph,{choices:ArchitectureContentChoice[];ranges:Map<string,ArchitectureContentRange>}>();
 
 export function architectureContentChoices(model:SemanticGraph):ArchitectureContentChoice[]{

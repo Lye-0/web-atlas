@@ -1,15 +1,17 @@
 import type {SemanticGraph,SemanticNode} from './types';
 import {semanticDepths} from './presentation';
+import {layoutUnroutedSimple} from './architectureSimpleUnrouted';
 import {separateSimpleShelves} from './architectureSimpleShelfBounds';
 import {simplePurposes} from './architectureSimpleUsage';
 
 type Point={x:number;y:number;z:number};
-export const simplePipelineKinds=new Set(['flow-input','flow-generates','flow-starts','flow-deploys','flow-applies','simple-artifact-path','build-output','publishes-artifact']);
+export const simplePipelineKinds=new Set(['flow-loads','flow-input','flow-generates','flow-starts','flow-deploys','flow-applies','simple-artifact-path','build-output','publishes-artifact']);
 const purposeOrder=['serve','start','build','generate','deploy','apply'];
 /** Recorded route bands first; compact context second. Never enumerate all paths or invent edges. */
 export function layoutSimpleArchitecture(graph:SemanticGraph){
  const stage=(n:SemanticNode)=>String(n.attributes.simpleStage??'context'),byId=new Map(graph.nodes.map(n=>[n.id,n]));
  const pipeline=graph.edges.filter(e=>simplePipelineKinds.has(e.kind)&&byId.has(e.source)&&byId.has(e.target)&&!['source','context'].includes(stage(byId.get(e.target)!)));
+ if(!pipeline.length){const fallback=layoutUnroutedSimple(graph);if(fallback)return fallback;}
  const outgoing=new Map(graph.nodes.map(n=>[n.id,new Set<string>()])),incoming=new Map(graph.nodes.map(n=>[n.id,new Set<string>()]));
  for(const e of pipeline){outgoing.get(e.source)!.add(e.target);incoming.get(e.target)!.add(e.source);}
  const purpose=(n:SemanticNode)=>{const p=purposeOrder.indexOf(String(n.attributes.purpose??''));return p<0?purposeOrder.length:p;};
@@ -69,6 +71,19 @@ export function layoutSimpleArchitecture(graph:SemanticGraph){
  for(const category of ['service','no-route','context','shared']){
   const list=groups.get(category)??[];if(!list.length)continue;
   list.sort((a,b)=>{const ar=relatedRows(a),br=relatedRows(b);return (ar.length?Math.min(...ar):Infinity)-(br.length?Math.min(...br):Infinity)||compare(a,b);});
+  // Service families without a preparation route keep their recorded containment together.
+  // Families already participating in a route never enter this remaining-node shelf.
+  if(category==='service'){
+   const ids=new Set(list.map(n=>n.id)),contains=graph.edges.filter(e=>e.kind==='contains'&&ids.has(e.source)&&ids.has(e.target));
+   if(contains.length){const neighbours=new Map(list.map(n=>[n.id,new Set<string>()]));for(const e of contains){neighbours.get(e.source)!.add(e.target);neighbours.get(e.target)!.add(e.source);}const pending=new Set(ids),families:SemanticNode[][]=[];
+    while(pending.size){const first=pending.values().next().value!,members=[first];pending.delete(first);for(let i=0;i<members.length;i++)for(const id of neighbours.get(members[i]!)!)if(pending.delete(id))members.push(id);families.push(members.map(id=>byId.get(id)!));}
+    const columns=Math.min(3,Math.max(1,Math.ceil(Math.sqrt(families.length))));
+    const levels=Array.from({length:columns},()=>top);
+    for(const family of families.sort((a,b)=>b.length-a.length||a[0]!.id.localeCompare(b[0]!.id))){const col=levels.indexOf(Math.min(...levels));family.sort((a,b)=>Number(contains.some(e=>e.target===a.id))-Number(contains.some(e=>e.target===b.id))||compare(a,b));family.forEach((n,index)=>{put(n,col+1,levels[col]!+index*140,'service');n.attributes.simplePlacementLabel=contains.some(e=>e.target===n.id)?'内包される構成':'利用・接続先';});levels[col]!+=family.length*140+60;}
+    top=Math.max(...levels);
+    continue;
+   }
+  }
   if(category==='shared'||category==='service'){
    for(const n of list){const userIds=[...new Set(graph.edges.filter(e=>e.target===n.id&&e.kind==='simple-reference'&&e.source!==n.id).map(e=>e.source))],primary=userIds.filter(id=>byId.get(id)?.attributes.simpleRole!=='context'&&byId.get(id)?.architecture?.kind!=='shared-code'),users=(primary.length?primary:userIds).map(id=>positions2d.get(id)).filter((p):p is Point=>Boolean(p));const rows=(category==='shared'&&users.length?users.map(p=>p.y):relatedRows(n)).sort((a,b)=>a-b);let y=rows.length?rows[Math.floor(rows.length/2)]!:top;
     let column=category==='shared'&&users.length?Math.round(users.map(p=>p.x/350).sort((a,b)=>a-b)[Math.floor(users.length/2)]!)-1:sideColumn;

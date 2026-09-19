@@ -128,6 +128,7 @@ export default function FlowAnalyzerPage({ view }: { view: SemanticExplorerViewI
       if(node.attributes.simplePlacementLabel){display.location=[String(node.attributes.simplePlacementLabel),display.location].filter(Boolean).join(' · ');display.disambiguation=display.location;}
       if(node.attributes.simpleUsageDisambiguation){display.location=[String(node.attributes.simpleUsageDisambiguation),display.location].filter(Boolean).join(' · ');display.disambiguation=display.location;}
       if(node.attributes.simpleBranchLabel)display.tooltip+='\n'+String(node.attributes.simpleBranchLabel);
+      if(node.attributes.providerOriginLabel){display.location=String(node.attributes.providerOriginLabel)+' · '+display.location;display.disambiguation=display.location;}
       if(node.attributes.simpleReferenceLabel){display.disambiguation+=' · '+String(node.attributes.simpleReferenceLabel);display.tooltip+='\n'+String(node.attributes.simpleReferenceLabel);}
       if(Array.isArray(node.attributes.simpleRows))display.tooltip+='\n'+node.attributes.simpleRows.join('\n');
     }

@@ -8,7 +8,7 @@ export function simpleStructuralGroups(model:SemanticGraph,allowed:ReadonlySet<s
  for(const n of model.nodes){if(!allowed.has(n.id))continue;
   if(n.architecture?.kind==='execution-config'){
    const owner=typeof n.attributes.logicalOwnerId==='string'?n.attributes.logicalOwnerId:'',config=typeof n.attributes.configurationPath==='string'?n.attributes.configurationPath:'';
-   const published=destinations.has(n.id),label=published?'公開・配信先':starts.has(n.id)?'起動・配信先':'実行構成';
+   const published=destinations.has(n.id),label=published?'公開・配信先':typeof n.attributes.executionContextLabel==='string'?n.attributes.executionContextLabel:starts.has(n.id)?'起動・配信先':'実行構成';
    const id=`architecture-simple:${published?'destination':'runtime'}:${JSON.stringify(owner&&config?[owner,config,n.attributes.executionPlace??'',[...n.architecture.environments].sort()]:['original',n.id])}`;
    result.set(n.id,{id,label:`${byId.get(owner)?.label??n.label}：${label}`,category:published?'destination':'runtime',reason:published?'公開する指定の到着先。環境別の実行・配信構成を保持':starts.has(n.id)?'起動する指定の到着先。原本とは別の実行・配信構成':'確認できた実行構成の設定。対応する起動・公開操作は未確認',targetIds:owner?[owner]:[]});
   }

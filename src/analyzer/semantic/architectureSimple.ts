@@ -38,7 +38,10 @@ export function architectureSimpleOverview(base:PreparedArchitectureScope,surrou
   if(role&&!parent){assign(n,key('auxiliary-roots',role),'既存の用途判定に基づく独立した補助構成の集合','context',undefined,role==='inferred'?'記録・実験を支える構成（推定）':role==='test'?'テストを支える構成':'開発・検証を支える構成');}
   else assign(n,key('entity',n.id),'構成と、その内部・環境別の定義','code-package'===n.architecture?.kind?'context':'primary',n.id);
  }
- for(const n of base.allowed){if(owners.has(n.id))continue;const group=structuralGroups.get(n.id);if(group){assign(n,group.id,group.reason,'primary',undefined,group.label,group.targetIds);continue;}
+ for(const n of base.allowed){if(owners.has(n.id))continue;
+  const logicalOwner=typeof n.attributes.logicalOwnerId==='string'?n.attributes.logicalOwnerId:undefined,auxiliaryOwner=logicalOwner&&owners.get(logicalOwner);
+  if(auxiliaryOwner&&units.get(auxiliaryOwner)?.role==='context'&&auxRole(byId.get(logicalOwner!)!)&&!['flow-starts','flow-deploys'].some(kind=>(adjacent.get(n.id)??[]).some(e=>e.target===n.id&&e.kind===kind&&byId.get(e.source)?.attributes.definitionOwnerId!==logicalOwner))){const home=units.get(auxiliaryOwner)!;assign(n,auxiliaryOwner,home.reason,'context');continue;}
+  const group=structuralGroups.get(n.id);if(group){assign(n,group.id,group.reason,'primary',undefined,group.label,group.targetIds);continue;}
   if(!['component','execution-config','code-definition','shared-code'].includes(n.architecture?.kind??''))continue;
   const logical=n.attributes.logicalOwnerId,parent=typeof logical==='string'&&allowed.has(logical)&&owners.has(logical)?logical:parentAnchor(n),owner=parent&&owners.get(parent);
   if(owner){const unit=units.get(owner)!;assign(n,owner,unit.reason,unit.role,unit.anchorId);}
@@ -103,7 +106,7 @@ export function architectureSimpleOverview(base:PreparedArchitectureScope,surrou
   n.attributes.simpleSupportPurpose=group?.category==='unconfirmed'?'実行用途未確認':databaseChange?'DB構造変更':n.architecture?.kind==='shared-code'?'共有コード':u.role==='context'?'補助・所属未判定':'';
   const kind=n.architecture?.kind??'';
   const arrival=u.members.some(id=>(adjacent.get(id)??[]).some(e=>e.target===id&&['flow-starts','flow-deploys','flow-applies'].includes(e.kind)))&&!['application','component','shared-code','code-definition'].includes(kind);
-  n.attributes.simpleStage=group?.category==='destination'||group?.category==='runtime'||arrival?'arrival':kind==='artifact'?'artifact':u.role==='context'?'context':kind==='tool-operation'?'operation':['application','component','shared-code','code-definition'].includes(kind)?'source':'arrival';
+  n.attributes.simpleStage=group?.category==='destination'||group?.category==='runtime'||arrival?'arrival':kind==='artifact'?'artifact':u.role==='context'?'context':kind==='tool-operation'?'operation':['application','code-package','component','shared-code','code-definition'].includes(kind)?'source':'arrival';
   if(n.attributes.simpleStage==='source')u.reason='原本・定義と内部のコード。起動後の構成・公開先とは別の説明単位';
  }
  // Different uses must be distinguishable in both the canvas and the shared peer list.

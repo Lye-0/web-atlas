@@ -1,3 +1,4 @@
+import {platformTool,addPlatformOperation,finishPlatformFlows} from './architecturePlatformFlows';
 import { parseJsonc } from '../parsers';
 import { localPath } from '../projectPaths';
 import { architectureSyntax } from './architectureSyntax';
@@ -13,12 +14,12 @@ const key=(...parts:string[])=>`architecture:flow:${JSON.stringify(parts)}`;
 const dir=(p:string)=>p.split('/').slice(0,-1).join('/')||'.';
 const option=(args:string[],...keys:string[])=>{for(const k of keys){const i=args.indexOf(k);if(i>=0)return args[i+1]??'';const eq=args.find(a=>a.startsWith(k+'='));if(eq)return eq.slice(k.length+1);}return undefined;};
 const staticPath=(base:string,value:string|undefined)=>value&&!/[$`*]/.test(value)?localPath(base,value):undefined;
-const purposes:Record<string,string>={start:'起動',serve:'開発配信',build:'ビルド',deploy:'公開',generate:'SQL生成',apply:'DB変更の適用'};
+const purposes:Record<string,string>={start:'起動',serve:'開発配信',build:'ビルド',deploy:'公開',generate:'SQL生成',apply:'DB変更の適用',package:'パッケージ化'};
 
 /** Add usage-specific preparation paths to the same canonical architecture graph.
  * Source/configuration are data: never load or execute project modules. */
 export function addArchitectureToolFlows(model:ArchitectureModel,input:SemanticInput):void {
-  if(!input.commands?.length)return;
+  if(!input.commands)input={...input,commands:[]};
   const byId=new Map(model.nodes.map(n=>[n.id,n]));
   const initialEdges=[...model.edges];
   const sourcePaths=Object.keys(input.sources);
@@ -69,23 +70,25 @@ export function addArchitectureToolFlows(model:ArchitectureModel,input:SemanticI
     return runtime;
   };
   const operations=new Map<string,SemanticNode>();
-  for(const cmd of input.commands){
-    const a=cmd.argv,tool=a[0],sub=a[1];if(a.some(v=>['--help','-h','--version','-v'].includes(v)))continue;
-    const purpose=tool==='wrangler'?(sub==='dev'?'start':sub==='deploy'?'deploy':sub==='d1'&&a[2]==='migrations'&&a[3]==='apply'?'apply':undefined)
+  const platformContext={model,input,add,connect,source,artifact,at,owner};
+  for(const cmd of input.commands??[]){
+    const a=cmd.argv,platform=platformTool(cmd,input),tool=platform?.tool??a[0],sub=a[1];if(a.some(v=>['--help','-h','--version','-v'].includes(v)))continue;
+    const purpose=platform?.purpose??(tool==='wrangler'?(sub==='dev'?'start':sub==='deploy'?'deploy':sub==='d1'&&a[2]==='migrations'&&a[3]==='apply'?'apply':undefined)
       :tool==='vite'?(sub==='build'?'build':!sub||sub==='dev'||sub==='serve'||sub.startsWith('-')?'serve':undefined)
       :tool==='drizzle-kit'&&sub==='generate'?'generate':tool==='firebase'&&['emulators:start','emulators:exec'].includes(sub??'')?'start'
-      :['vercel','netlify','supabase'].includes(tool??'')&&['dev','start'].includes(sub??'')?'start':undefined;
+      :['vercel','netlify','supabase'].includes(tool??'')&&['dev','start'].includes(sub??'')?'start':undefined);
     if(!purpose)continue;
     const unit=owner(cmd.path);if(!unit)continue;
     const explicitEnvironment=option(a,'--env','-e','--mode');
-    const environment=explicitEnvironment??(tool==='vite'&&purpose==='serve'?'development':'');
+    const environment=tool==='next'?'':explicitEnvironment??(tool==='vite'&&purpose==='serve'?'development':'');
     const place=a.includes('--remote')?'cloud':a.includes('--local')||purpose==='serve'||purpose==='start'?'local':'unconfirmed';
-    const product=({firebase:'firebase-cli',vercel:'vercel-cli',netlify:'netlify-cli',supabase:'supabase-cli','drizzle-kit':'drizzle-orm'} as Record<string,string>)[tool!]??tool!;
-    const name=tool==='drizzle-kit'?'Drizzle Kit':input.stackMetadata?.[product]?.name??tool!;
+    const product=({next:'nextjs',firebase:'firebase-cli',vercel:'vercel-cli',netlify:'netlify-cli',supabase:'supabase-cli','drizzle-kit':'drizzle-orm'} as Record<string,string>)[tool!]??tool!;
+    const name=tool==='next'?'Next.js':tool==='vsce'?'VSCE':tool==='esbuild'?'esbuild':tool==='drizzle-kit'?'Drizzle Kit':input.stackMetadata?.[product]?.name??tool!;
     const op=add(key('operation',cmd.id),`${name}：${purposes[purpose]}`,'tool-operation',cmd.evidence,environment?[environment]:[],{scriptName:cmd.scriptName,workingDirectory:cmd.workingDirectory??cmd.directory,invocationLabel:cmd.invocationLabel??'',usageArguments:cmd.argv.slice(1).join(' '),sourceId:cmd.sourceCommandId??cmd.id,scriptId:cmd.sourceScriptId??cmd.scriptId,dictionaryStackId:product,purpose,executionPlace:'unconfirmed',targetPlace:place,command:cmd.label,ownerPath:unit.architecture?.ownerPath??'',resolution:'操作対象は未特定'});
     operations.set(cmd.id,op);op.architecture!.roles=[{label:`${name}で${purposes[purpose]}する操作の記述`,confidence:'source',reason:'実際のコマンドと設定を照合。実行・成功は未観測',evidence:cmd.evidence}];op.architecture!.technologyNames=[product];op.architecture!.context=['静的コマンド・実行未観測'];if(tool==='vite'&&purpose==='serve'&&explicitEnvironment===undefined)op.attributes.defaultEnvironment='Vite devの既定mode=development';
     const cwd=cmd.workingDirectory??option(a,'--cwd','--workdir');const base=cwd===undefined?cmd.directory:staticPath(cmd.directory,cwd);
     if(!base||/[$`]/.test(environment)){op.attributes.resolution='作業ディレクトリまたは環境指定が動的で静的に解決できない';continue;}
+    if(platform){addPlatformOperation(platformContext,cmd,op,unit,base,tool!);continue;}
     const explicit=option(a,'--config','-c');
     const candidates=explicit!==undefined?[staticPath(base,explicit)]:tool==='wrangler'?['wrangler.jsonc','wrangler.json','wrangler.toml'].map(p=>localPath(base,p)):tool==='vite'?['vite.config.ts','vite.config.js','vite.config.mts','vite.config.mjs'].map(p=>localPath(base,p)):tool==='drizzle-kit'?['drizzle.config.ts','drizzle.config.js','drizzle.config.json'].map(p=>localPath(base,p)):[];
     const paths=candidates.filter((p):p is string=>Boolean(p&&Object.hasOwn(input.sources,p)));
@@ -151,6 +154,7 @@ export function addArchitectureToolFlows(model:ArchitectureModel,input:SemanticI
       for(const r of targets){const target=model.nodes.find(n=>n.attributes.configurationOccurrence&&n.attributes.configurationOccurrence===r.attributes?.configurationOccurrence||n.id===`architecture:provider:${r.id}`);if(target){connect(op,target,'flow-starts','ローカル環境を起動する指定',evidence,'local');op.attributes.resolution='CLIと元の設定対象を照合。起動は未観測';}}
     }
   }
+  finishPlatformFlows(platformContext);
   if(!operations.size)return;
   // Bind declared artifacts by exact normalized path and environment. No tool-name matching.
   const artifacts=model.nodes.filter(n=>n.architecture?.kind==='artifact');
@@ -159,8 +163,8 @@ export function addArchitectureToolFlows(model:ArchitectureModel,input:SemanticI
     if(producers.length===1)connect(producers[0]!,incoming,'flow-artifact','同じ成果物パス',uniqueArchitectureEvidence([...producers[0]!.evidence,...incoming.evidence]));
   }
   // Keep script ancestry without treating the mixed graph as an observed execution trace.
-  const commands=new Map(input.commands.map(c=>[c.id,c]));
-  const scripts=new Map<string,ArchitectureCommand[]>();for(const c of input.commands){const list=scripts.get(c.scriptId)??[];list.push(c);scripts.set(c.scriptId,list);}
+  const commands=new Map((input.commands??[]).map(c=>[c.id,c]));
+  const scripts=new Map<string,ArchitectureCommand[]>();for(const c of input.commands??[]){const list=scripts.get(c.scriptId)??[];list.push(c);scripts.set(c.scriptId,list);}
   const reached=(id:string,seen=new Set<string>()):SemanticNode[]=>{if(seen.has(id))return[];seen.add(id);const op=operations.get(id);if(op)return[op];const cs=commands.has(id)?[commands.get(id)!]:scripts.get(id)??[];return cs.flatMap(c=>operations.has(c.id)?[operations.get(c.id)!]:c.calls.flatMap(link=>reached(link.target,seen)));};
   for(const cs of scripts.values())for(let i=1;i<cs.length;i++){
     const next=cs[i]!,previous=cs[i-1]!;if(!next.operator||next.id.includes(':child:')||previous.id.includes(':child:'))continue;
