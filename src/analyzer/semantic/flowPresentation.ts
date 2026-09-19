@@ -5,6 +5,7 @@ import type { SemanticEdge, SemanticGraph, SemanticNode } from './types';
 import { semanticRegionIdentity } from './flowRegions';
 import { layoutSemanticCloud } from './flowCloud';
 import type { SemanticExplorerModel } from './semanticExplorer';
+import { layoutArchitectureRelations } from './architectureLayout';
 
 export interface FlowPoint { x: number; y: number; z: number }
 export interface FlowEdgePath { edge: SemanticEdge; points: FlowPoint[]; svgPath: string; color: string; selected: boolean; direction?: 'incoming' | 'outgoing' | 'internal' }
@@ -28,7 +29,9 @@ export function semanticMemberIds(node: SemanticNode): string[] {
 /** SCC depth follows source→target; grouping never invents or reverses a relationship. */
 export function layoutSemanticFlow(graph: SemanticGraph, mode: '2d' | '3d', explorer?: SemanticExplorerModel): SemanticPosition[] {
   if (mode === '3d') return layoutSemanticCloud(graph, explorer);
+  if (graph.view === 'architecture-map' && graph.architectureView?.positions2d) return graph.nodes.map(node => ({ node, ...graph.architectureView!.positions2d!.get(node.id)! }));
   const depths = semanticDepths(graph);
+  if (graph.view === 'architecture-map' && graph.nodes.some(node => node.attributes.unifiedFlow)) return layoutArchitectureRelations(graph);
   if (graph.view === 'architecture-map') {
     const levels = new Map<number, SemanticNode[]>();
     for (const node of graph.nodes) { const depth = depths.get(node.id) ?? 0, members = levels.get(depth) ?? []; members.push(node); levels.set(depth, members); }

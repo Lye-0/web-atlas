@@ -1,4 +1,10 @@
-import type { RootState } from '@react-three/fiber';
+import { events, type RootState } from '@react-three/fiber';
+
+/** R3F can finish async Canvas configuration after its DOM ref was cleared. */
+export function guardDetachedCanvasEvents(manager: ReturnType<typeof events>): ReturnType<typeof events> {
+  return { ...manager, connect: target => { if (target) manager.connect?.(target); } };
+}
+export const semanticCanvasEvents: typeof events = store => guardDetachedCanvasEvents(events(store));
 
 const ignoreCanvasPointerMiss = () => {};
 

@@ -4,6 +4,7 @@ import { categoryById, dictionaryVisualGroups, stacks } from '../../data';
 import { getRootCategoryId } from '../../utils/categoryHierarchy';
 import { stackPath } from '../../utils/routes';
 import { stackStatusLabels } from '../../utils/stackStatus';
+import { StackFilterSelect } from './StackFilterSelect';
 
 interface StackFilter {
   id: string;
@@ -63,14 +64,8 @@ export function StackTable() {
     <div className="stack-index">
       <div className="stack-toolbar">
         <div className="stack-filter-control">
-          <label htmlFor="stack-category-filter">分類で絞り込む</label>
-          <select
-            id="stack-category-filter"
-            value={filterId}
-            onChange={(event) => setFilterId(event.target.value)}
-          >
-            {stackFilters.map((filter) => <option key={filter.id} value={filter.id}>{filter.label}</option>)}
-          </select>
+          <label id="stack-filter-label" htmlFor="stack-category-filter">分類で絞り込む</label>
+          <StackFilterSelect value={filterId} options={stackFilters} onChange={setFilterId} />
         </div>
         <span className="stack-result-count" aria-live="polite">{visibleStacks.length}件</span>
       </div>

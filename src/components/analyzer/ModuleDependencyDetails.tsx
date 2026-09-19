@@ -118,11 +118,11 @@ export function ModuleDependencyDetails({ node, region, edge, view, store, onSel
       </div>
     </header>
     {(node || region) && <>
-      <Section title="import先" direction="imports" count={outgoing.length} initiallyOpen={outgoing.length > 0}>
+      <Section title={outgoing.some(edge => edge.metadata.dependencyKind === 'build-entry') ? '参照先・ビルド入力' : 'import先'} direction="imports" count={outgoing.length} initiallyOpen={outgoing.length > 0}>
         <p className="analyzer-muted-copy">{new Set(outgoing.map(edge => edge.targetId)).size}対象 · {outgoing.length}関係</p>
         <Connections edges={outgoing} incoming={false} view={view} onSelectNode={onSelectNode} onFocusConnection={node ? onFocusConnection : undefined}/>
       </Section>
-      <Section title="import元" direction="imported-by" count={incoming.length} initiallyOpen={incoming.length > 0 && (outgoing.length === 0 || incoming.length <= 4)}>
+      <Section title={incoming.some(edge => edge.metadata.dependencyKind === 'build-entry') ? '参照・設定元' : 'import元'} direction="imported-by" count={incoming.length} initiallyOpen={incoming.length > 0 && (outgoing.length === 0 || incoming.length <= 4)}>
         <p className="analyzer-muted-copy">{new Set(incoming.map(edge => edge.sourceId)).size}対象 · {incoming.length}関係</p>
         <Connections edges={incoming} incoming view={view} onSelectNode={onSelectNode} onFocusConnection={node ? onFocusConnection : undefined}/>
       </Section>
@@ -150,8 +150,8 @@ export function ModuleDependencyDetails({ node, region, edge, view, store, onSel
     </>}
     {edge && <>
       <section className="analyzer-module-edge-endpoints">
-        <small>importする側</small><button type="button" className="analyzer-module-connection-name" onClick={() => onSelectNode(edge.sourceId,true)}>{source?.label ?? edge.sourceId}</button>
-        <span aria-hidden="true">↓</span><small>読み込まれる側</small><button type="button" className="analyzer-module-connection-name" onClick={() => onSelectNode(edge.targetId,true)}>{target?.label ?? edge.targetId}</button>
+        <small>{edge.metadata.dependencyKind === 'build-entry' ? 'ビルド設定' : 'importする側'}</small><button type="button" className="analyzer-module-connection-name" onClick={() => onSelectNode(edge.sourceId,true)}>{source?.label ?? edge.sourceId}</button>
+        <span aria-hidden="true">↓</span><small>{edge.metadata.dependencyKind === 'build-entry' ? 'ビルド入力' : '読み込まれる側'}</small><button type="button" className="analyzer-module-connection-name" onClick={() => onSelectNode(edge.targetId,true)}>{target?.label ?? edge.targetId}</button>
         {onFocusConnection && <button type="button" className="analyzer-focus-selected" onClick={() => onFocusConnection(edge.sourceId,edge.targetId)}>両端を表示</button>}
       </section>
       <Section title="依存情報" initiallyOpen><Info entries={[

@@ -1,11 +1,17 @@
+import { localDevelopmentStacks } from './localDevelopmentStacks';
 import type { StackEntry } from '../types';
+import { expandedStacks } from './expandedStacks';
+import { applicationStacks } from './applicationStacks';
+import { platformStacks } from './platformStacks';
+import { deliveryStacks } from './deliveryStacks';
+import { connectExpandedStacks } from './expansionLinks';
 
 const stack = (entry: Omit<StackEntry, 'status'> & { status?: StackEntry['status'] }): StackEntry => ({
   status: 'active',
   ...entry,
 });
 
-export const stacks: StackEntry[] = [
+const existingStacks: StackEntry[] = [
   stack({
     id: 'html',
     name: 'HTML',
@@ -87,7 +93,7 @@ export const stacks: StackEntry[] = [
     useCases: ['Web APIやサーバーを動かす', '開発ツールやビルドを実行する', 'CLIや自動化スクリプトを作る'],
     responsibilities: ['JavaScriptをサーバー側で実行する', 'ランタイムAPIを提供する'],
     relationships: [
-      { targetStackId: 'javascript', kind: 'runs-on', label: 'JavaScriptの実行環境' },
+      { targetStackId: 'javascript', kind: 'related-to', label: 'JavaScriptの実行環境' },
       { targetStackId: 'npm', kind: 'integrates-with', label: 'パッケージ管理と連携' },
       { targetStackId: 'pnpm', kind: 'integrates-with', label: 'ワークスペース管理と連携' },
     ],
@@ -216,7 +222,7 @@ export const stacks: StackEntry[] = [
     relationships: [
       { targetStackId: 'react-dom', kind: 'renders', label: 'ブラウザDOMへ描画' },
       { targetStackId: 'react-three-fiber', kind: 'renders', label: 'Three.jsのシーンへ描画' },
-      { targetStackId: 'nextjs', kind: 'built-on', label: 'Next.jsのUI基盤' },
+      { targetStackId: 'nextjs', kind: 'integrates-with', label: 'Next.jsのUI基盤として利用' },
     ],
     relatedStackIds: ['react-dom', 'react-three-fiber', 'nextjs', 'typescript', 'shadcn-ui'],
     packageNames: ['react'],
@@ -646,7 +652,7 @@ export const stacks: StackEntry[] = [
       { targetStackId: 'authjs', kind: 'related-to', label: '認証ライブラリとの比較対象' },
     ],
     relatedStackIds: ['firebase-storage', 'better-auth', 'authjs'],
-    packageNames: ['firebase'],
+    packageNames: ['@firebase/auth'],
     aliases: ['Firebase Auth', 'Firebase Authentication service'],
     officialUrl: 'https://firebase.google.com/docs/auth',
   }),
@@ -820,7 +826,7 @@ export const stacks: StackEntry[] = [
       { targetStackId: 'github', kind: 'integrates-with', label: 'GitHubからデプロイ' },
     ],
     relatedStackIds: ['nextjs', 'github', 'github-actions', 'cloudflare-pages'],
-    packageNames: ['vercel'],
+    packageNames: [],
     aliases: ['Vercel Platform'],
     officialUrl: 'https://vercel.com/',
   }),
@@ -862,3 +868,5 @@ export const stacks: StackEntry[] = [
     officialUrl: 'https://pages.cloudflare.com/',
   }),
 ];
+
+export const stacks: StackEntry[] = connectExpandedStacks([...existingStacks, ...expandedStacks, ...applicationStacks, ...platformStacks, ...deliveryStacks, ...localDevelopmentStacks]);

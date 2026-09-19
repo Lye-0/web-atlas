@@ -1,8 +1,12 @@
+import { architectureEnvironmentContext, architectureUsageContext } from '../../analyzer/semantic/architectureContext';
+import { architectureRequestTitle } from './architectureRequestPresentation';
 import { kindLabels, type SemanticNode } from '../../analyzer/semantic/types';
 import { architectureEnvironmentLabel, architectureKindLabels } from '../../analyzer/semantic/architectureMetadata';
 import { architectureRequestSources } from './architectureSummary';
+import { architectureShortPath } from './architectureShortPath';
 
 export interface SemanticNodeDisplay {
+  matchedEndpoint?: string;
   title: string;
   location: string;
   tooltip: string;
@@ -101,17 +105,18 @@ export function semanticNodeDisplay(node: SemanticNode): SemanticNodeDisplay {
     const binding = identity?.configurations[0]?.binding;
     const scopeRole = node.attributes.architectureScopeRole;
     const scope = scopeRole === 'inside' || scopeRole === 'direct' || scopeRole === 'surrounding' ? scopeRole : undefined;
-    const location = [node.attributes.architectureContext ? '表示範囲外・周辺概要' : '',
-      identity || ['resource', 'external-service'].includes(arch.kind) ? architectureEnvironmentLabel(arch.environments) : arch.context.join(' / '),
-      binding ? `${binding}${identity?.identifier ? ` · ID:${identity.identifier.slice(0, 8)}` : ' · 同一性未確認'}` : arch.request || node.attributes.architectureRequestGroup ? '' : arch.parentId ? node.group : arch.ownerPath,
-      Number(node.attributes.architectureInternalCount) > 0 ? `内部関係 ${node.attributes.architectureInternalCount}件` : '',
-    ].filter(Boolean).join(' · ') || node.path || '構成要素';
-    const kind = node.attributes.architectureRequestGroup ? '表示上の集合' : arch.request ? '相手は未特定' : architectureKindLabels[arch.kind];
-    const dataRole = scope ? `${({ inside: '内部', direct: '接続先', surrounding: '周辺' })[scope]} · ${arch.kind === 'component' ? 'コンポーネント' : kind}` : node.attributes.architectureContext ? `表示範囲外 · ${kind}` : kind;
-    const disambiguation = identity ? `${architectureEnvironmentLabel(arch.environments)}${binding ? ` · ${binding}` : ''}${identity.identifier ? ` · ID:${identity.identifier.length > 10 ? `${identity.identifier.slice(0, 4)}…${identity.identifier.slice(-4)}` : identity.identifier}` : ' · 同一性未確認'}`
-      : arch.request ? node.evidence[0] ? `${node.evidence[0].path}:${node.evidence[0].line}` : node.path ?? 'ソース箇所未確認'
-        : Number(node.attributes.architectureInternalCount) > 0 ? `内部関係 ${node.attributes.architectureInternalCount}件` : undefined;
-    return { title: node.label, location, dataRole, disambiguation, scopeRole: scope, tooltip: `${node.label}\n${dataRole}\n${location}\n${identity?.identifier ? `識別子: ${identity.identifier}\n` : ''}${arch.request?.expression ?? node.evidence[0]?.description ?? ''}` };
+    const environment = architectureEnvironmentContext(node);
+    const usage = architectureUsageContext(node);
+    const state = node.confidence === 'observed' ? '実測' : node.confidence === 'inferred' ? '推定' : identity?.status === 'unconfirmed' ? '同一性未確認' : '';
+    const location = [usage || arch.ownerPath || (arch.request ? node.path : ''), environment.label, node.attributes.compositionRole && String(node.attributes.compositionRole).includes('補助') ? String(node.attributes.compositionRole) : '',
+      arch.kind !== 'tool-operation' && ['local','cloud'].includes(String(node.attributes.executionPlace)) ? String(node.attributes.executionPlace) : '', state].filter(Boolean).join(' · ');
+    const role = String(node.attributes.compositionRole??'');
+    const kind = (arch.kind === 'application' ? '論理アプリ' : node.attributes.architectureRequestGroup ? '表示上の集合' : arch.request ? '接続先未特定' : architectureKindLabels[arch.kind]) + (role.includes('補助') ? role.includes('推定') ? ' · 補助（推定）' : ' · 補助' : '');
+    const dataRole = scope ? `${({ inside: '内部', direct: '外側の接続相手', surrounding: '周辺' })[scope]} · 種類：${kind}` : node.attributes.architectureContext ? `表示範囲外 · ${kind}` : kind;
+    const disambiguation = usage ? [usage,environment.meaning === 'explicit' || environment.meaning === 'default' ? environment.label : ''].filter(Boolean).join(' · ') : identity ? `${environment.label}${binding ? ` · ${binding}` : ''}${identity.identifier ? ` · ID:${identity.identifier.length > 10 ? `${identity.identifier.slice(0, 4)}…${identity.identifier.slice(-4)}` : identity.identifier}` : ' · 同一性未確認'}`
+      : arch.request ? node.evidence[0] ? `${node.evidence[0].path.split(/[\\/]/).at(-1)}:${node.evidence[0].line} · 範囲 ${node.evidence[0].start}–${node.evidence[0].end}` : node.path ?? 'ソース箇所未確認'
+        : [arch.ownerPath,environment.label,state].filter(Boolean).join(' · ');
+    return { title: architectureRequestTitle(node), location, dataRole, disambiguation, scopeRole: scope, tooltip: `${node.label}\n${dataRole}\n${location}\n${identity?.identifier ? `識別子: ${identity.identifier}\n` : ''}${arch.request?.expression ?? node.evidence[0]?.description ?? ''}` };
   }
   const initializer = node.kind === 'function' && node.attributes.initializer === true;
   const callee = (node.kind === 'external' || node.kind === 'operation') && typeof node.attributes.callee === 'string' ? node.attributes.callee : undefined;
@@ -169,22 +174,35 @@ export function semanticNodeDisplays(nodes: Iterable<SemanticNode>, contextNodes
     const members = collisions.get(key) ?? []; members.push(node); collisions.set(key, members);
   }
   for (const members of collisions.values()) if (members.length > 1) [...members].sort((a, b) => a.id.localeCompare(b.id)).forEach((node, index) => {
-    displays.get(node.id)!.location += ` · 対象 ${index + 1}`;
+    if (node.architecture?.kind !== 'tool-operation') displays.get(node.id)!.location += ` · 対象 ${index + 1}`;
   });
   const names = new Map<string, SemanticNode[]>();
   for (const node of items) {
     const name = displays.get(node.id)!.title, named = names.get(name) ?? [];
     named.push(node); names.set(name, named);
   }
+  const architectureNames=new Map<string,SemanticNode[]>();
+  for(const n of architectureNodes.values())if(n.architecture){const peers=architectureNames.get(n.label)??[];peers.push(n);architectureNames.set(n.label,peers);}
   for (const named of names.values()) {
-    if (named.length < 2) continue;
+    const peers=named.every(n=>n.architecture)?architectureNames.get(named[0]!.label)??named:named;
+    if (peers.length < 2) continue;
     if (named.every(node => node.architecture)) {
+      const ownerPath=(n:SemanticNode)=>n.architecture?.ownerPath??n.path??'';
+      const paths=peers.map(ownerPath);
+      const shortened=new Set<string>();
+      if(new Set(paths).size>1)for(const node of named)if(node.attributes.compositionRole&&!node.architecture?.request){
+        const display=displays.get(node.id)!,full=ownerPath(node),short=architectureShortPath(full,paths),usage=architectureUsageContext(node);
+        display.disambiguation=usage?short+(display.disambiguation??usage).slice((full||'root').length):`${short} · ${(display.disambiguation??display.location).replace(full?`${full} · `:'\0','')}`;
+        shortened.add(node.id);
+      }
       const identifiers = new Map<string | undefined, number>();
       for (const node of named) { const value = displays.get(node.id)?.disambiguation; identifiers.set(value, (identifiers.get(value) ?? 0) + 1); }
       for (const node of named) {
         const display = displays.get(node.id)!;
         const source = node.evidence[0];
+        if(shortened.has(node.id)&&display.disambiguation&&identifiers.get(display.disambiguation)===1)continue;
         if (node.architecture?.identity && display.disambiguation && identifiers.get(display.disambiguation) === 1) continue;
+        if (node.architecture?.kind === 'tool-operation' && display.disambiguation && identifiers.get(display.disambiguation) === 1) continue;
         const sourceLocation = source ? `${source.path}:${source.line}` : node.path;
         display.disambiguation = node.architecture?.request && source ? `${architectureRequestSources([node], architectureNodes).label} · 箇所 ${source.start}–${source.end} · ${source.path}:${source.line}`
           : `${display.disambiguation ?? display.location}${sourceLocation ? ` · ${sourceLocation}` : ''}`;

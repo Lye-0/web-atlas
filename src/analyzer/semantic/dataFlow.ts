@@ -5,7 +5,7 @@ import type { SemanticAnalysis, SemanticData, SemanticEdge, SemanticNode } from 
 
 type FunctionAst = ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction | ts.MethodDeclaration | ts.ConstructorDeclaration | ts.GetAccessorDeclaration | ts.SetAccessorDeclaration;
 type Environment = Map<ts.Symbol, { declarationId: string; values: string[] }>;
-interface Invocation { ast: ts.CallExpression | ts.NewExpression; operation: SemanticNode; result: SemanticNode; arguments: SemanticNode[]; target?: FunctionAst }
+interface Invocation { ast: ts.CallExpression | ts.NewExpression | ts.JsxElement | ts.JsxSelfClosingElement; operation: SemanticNode; result: SemanticNode; arguments: SemanticNode[]; target?: FunctionAst }
 interface Template { ast: ts.SourceFile | FunctionAst; owner: string; name: string; nodes: SemanticNode[]; edges: SemanticEdge[]; parameters: SemanticNode[]; returns: SemanticNode[]; calls: Invocation[]; }
 const isFunction = (node: ts.Node): node is FunctionAst => (ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node) || ts.isArrowFunction(node) || ts.isMethodDeclaration(node) || ts.isConstructorDeclaration(node) || ts.isGetAccessorDeclaration(node) || ts.isSetAccessorDeclaration(node)) && Boolean(node.body);
 const isAssignment = (operator: ts.SyntaxKind) => operator >= ts.SyntaxKind.FirstAssignment && operator <= ts.SyntaxKind.LastAssignment;
@@ -166,6 +166,22 @@ export function refineDataFlow(analysis: SemanticAnalysis, compiler: DataCompile
         return node(expression, 'literal', 'コールバック関数の値', { reasons: ['関数を渡すことを確認しています。実行や返却値の伝播は、この事実だけでは確定しません。'] });
       }
       if (ts.isStringLiteralLike(expression) || ts.isNumericLiteral(expression) || [ts.SyntaxKind.TrueKeyword, ts.SyntaxKind.FalseKeyword, ts.SyntaxKind.NullKeyword].includes(expression.kind)) return node(expression, 'literal', expression.getText().slice(0, 100));
+      if(ts.isJsxElement(expression)||ts.isJsxSelfClosingElement(expression)||ts.isJsxFragment(expression)){
+        const opening=ts.isJsxElement(expression)?expression.openingElement:ts.isJsxSelfClosingElement(expression)?expression:undefined;
+        const tag=opening?.tagName.getText()??'Fragment';const render=node(expression,'operation',`${tag} の描画値`,{resolution:'partial'});render.attributes.jsxRender=true;
+        if(opening){const props=node(opening.attributes,'operation',`${tag} のprops`,{resolution:'partial'});props.attributes.jsxProps=true;
+          for(const attribute of opening.attributes.properties){if(ts.isJsxSpreadAttribute(attribute)){const value=evaluate(attribute.expression);edge(value.id,props.id,'jsx-spread','propsとして展開する値',attribute);continue;}
+            const initializer=attribute.initializer;const input=initializer&&ts.isJsxExpression(initializer)?initializer.expression?evaluate(initializer.expression):undefined:initializer&&ts.isStringLiteral(initializer)?evaluate(initializer):undefined;
+            const prop=node(attribute,'property-write',`${tag}.${attribute.name.getText()}`,{propertyPath:[attribute.name.getText()],resolution:'resolved'});prop.attributes.jsxProp=true;
+            if(input)edge(input.id,prop.id,'jsx-prop-value','このJSX属性へ渡す値',attribute);edge(prop.id,props.id,'jsx-prop','component / elementへ渡すprops',attribute);
+          }
+          edge(props.id,render.id,'component-input','この描画要素の入力props',opening);
+          const target=/^[A-Z]/.test(tag)||tag.includes('.')?fnForSymbol(opening.tagName):undefined;
+          if(target&&!ts.isJsxFragment(expression))template.calls.push({ast:expression,operation:render,result:render,arguments:[props],target});
+        }
+        if(ts.isJsxElement(expression)||ts.isJsxFragment(expression))for(const child of expression.children){const input=ts.isJsxExpression(child)?child.expression?evaluate(child.expression):undefined:ts.isJsxElement(child)||ts.isJsxSelfClosingElement(child)||ts.isJsxFragment(child)?evaluate(child):ts.isJsxText(child)&&child.text.trim()?node(child,'literal',child.text.trim()):undefined;if(input)edge(input.id,render.id,'jsx-child','描画する子の値',child);}
+        return render;
+      }
       const operation = node(expression, 'operation', ts.isArrayLiteralExpression(expression) ? '配列を作る' : ts.isObjectLiteralExpression(expression) ? 'オブジェクトを作る' : expression.getText().slice(0, 100));
       const operands: ts.Expression[] = [];
       if (ts.isArrayLiteralExpression(expression)) operands.push(...expression.elements.filter(ts.isExpression));

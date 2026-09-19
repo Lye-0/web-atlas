@@ -33,8 +33,8 @@ export function semanticFlowDirectionLanguage(view: SemanticFlowLanguageView) {
     help: '項目の型を使うモデルから参照先へ、派生した型から元の型へ向かいます。外部キーは宣言元から参照先へ向かいます。青は選択対象から出る関係、橙は入る関係です。型の参照は実行時の値の流れではありません。',
   };
   if (view === 'module-dependency') return {
-    incoming: 'import元', outgoing: 'import先', caption: '矢印・粒子は import する側から読み込まれる側へ',
-    help: '矢印と粒子は、importするファイルから読み込まれるファイルへ向かいます。青は選択対象がimportする先、琥珀色は選択対象をimportする元、緑は選択範囲内の依存です。粒子は依存の向きを示し、実行順や実行時間は表しません。',
+    incoming: '参照・設定元', outgoing: '参照先・入力', caption: '矢印は import・ビルド設定の参照先へ。種類は線の詳細で確認',
+    help: 'importは読み込むファイルへ、ビルド設定は宣言された入力ファイルへ向かいます。青は選択対象から出る関係、琥珀色は入る関係、緑は選択範囲内の依存です。粒子は参照方向を示し、実行順やビルドの実施を表しません。',
   };
   if (view === 'function-call-flow') return {
     incoming: '呼び出し元', outgoing: '呼び出し先', caption: '矢印・粒子は呼び出しや登録などの関係の向き',

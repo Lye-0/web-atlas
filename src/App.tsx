@@ -1,15 +1,17 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AppHeader } from './components/layout/AppHeader';
 import { PageContainer } from './components/layout/PageContainer';
-import { AnalyzerPage } from './pages/AnalyzerPage';
+import {lazy,Suspense}from'react';
 import { CategoriesPage } from './pages/CategoriesPage';
 import { CategoryDetailPage } from './pages/CategoryDetailPage';
 import { MapPage } from './pages/MapPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { StackDetailPage } from './pages/StackDetailPage';
 import { StacksPage } from './pages/StacksPage';
-import { AnalyzerSessionProvider, useAnalyzerSession } from './analyzer';
+import {AnalyzerSessionProvider}from'./analyzer/sessionProvider';
+import {useAnalyzerSession}from'./analyzer/sessionContext';
 import { analyzerRoot, analyzerRoutes } from './utils/routes';
+const AnalyzerPage=lazy(()=>import('./pages/AnalyzerPage').then(module=>({default:module.AnalyzerPage})));
 
 export default function App() {
   return (
@@ -29,7 +31,7 @@ function AppRoutes() {
         <Routes>
           <Route path="/" element={<Navigate to="/dictionary/map" replace />} />
           <Route path={analyzerRoot} element={<AnalyzerIndexRedirect />} />
-          <Route path="/analyzer/:view" element={<AnalyzerPage />} />
+          <Route path="/analyzer/:view" element={<Suspense fallback={<p role="status">Analyzerを読み込んでいます…</p>}><AnalyzerPage /></Suspense>} />
           <Route path="/dictionary" element={<Navigate to="/dictionary/map" replace />} />
           <Route path="/dictionary/map" element={<MapPage />} />
           <Route path="/dictionary/categories" element={<CategoriesPage />} />

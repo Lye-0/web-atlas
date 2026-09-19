@@ -30,11 +30,11 @@ describe('Architecture readability preserves identity and relation meaning', () 
     const off = architectureScopeGraph(model, 'A', '', false, { mode: '3d', selectedNodeId: 'C', surroundings: false });
     const roles = (graph: SemanticGraph) => Object.fromEntries(graph.nodes.map(n => [n.id, n.attributes.architectureScopeRole]));
     expect(roles(normal)).toEqual({ inside: 'inside', B: 'direct', C: 'surrounding', D: 'surrounding' });
-    expect(roles(selected)).toEqual(roles(normal)); expect(roles(off)).toEqual(roles(normal));
+    expect(roles(selected)).toEqual(roles(normal)); expect(roles(off)).toEqual({ inside: 'inside', B: 'direct' });
     expect([...normal.architectureView!.positions]).toEqual([...selected.architectureView!.positions]);
     expect(JSON.stringify(model)).toBe(before);
     const display = semanticNodeDisplays(selected.nodes);
-    expect(display.get('inside')?.dataRole).toContain('内部'); expect(display.get('B')?.dataRole).toContain('接続先'); expect(display.get('C')?.dataRole).toContain('周辺');
+    expect(display.get('inside')?.dataRole).toContain('内部'); expect(display.get('B')?.dataRole).toContain('外側の接続相手'); expect(display.get('C')?.dataRole).toContain('周辺');
   });
   it('publishes temporary label promotion and demotion without changing the stable scope role or hit position', () => {
     const publish = vi.fn(), layer = new FlowLabelLayer(publish);
@@ -83,6 +83,31 @@ describe('Architecture readability preserves identity and relation meaning', () 
 
 async function open(details: HTMLDetailsElement) { await act(async () => { details.open = true; details.dispatchEvent(new Event('toggle')); }); }
 describe('Architecture summaries in the detail panel', () => {
+  it('keeps definition paths and inherited reasoning behind the existing classification disclosure', async () => {
+    const owner=node('owner'),artifact=node('artifact');owner.label='Owner app';artifact.architecture!.kind='artifact';
+    const path='deep/location/with/a/long/name/Owner/package.json';artifact.attributes={definitionPath:path,definitionOwnerId:owner.id,definitionLocation:'読込プロジェクト配下の個別定義 · deep/location/with/a/long/name/Owner',compositionRole:'実行構成として定義',compositionReason:'OWNER REASON',compositionEvidencePath:path,definitionWorkspace:['workspace.yaml']};
+    const graph:SemanticGraph={view:'architecture-map',nodes:[owner,artifact],edges:[]},host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+    try{
+      await act(async()=>root.render(<MemoryRouter><ArchitectureDetail node={artifact} graph={graph} visible={graph} analysis={analysis} store={store} sources={{}} onSelect={vi.fn()} onSelectEdge={vi.fn()} onOpen={vi.fn()} onReveal={vi.fn()} onJump={vi.fn()} onClose={vi.fn()}/></MemoryRouter>));
+      const summary=host.querySelector('.architecture-summary')!;expect(summary.textContent).toContain('成果物');expect(summary.textContent).toContain('定義元の構成の位置づけOwner app');expect(summary.textContent).toContain('package.json');expect(summary.textContent).not.toContain(path);expect(host.textContent).not.toContain('OWNER REASON');
+      const disclosure=[...host.querySelectorAll('details')].find(d=>d.querySelector('summary')?.textContent==='分類・同一性の判定理由')!;await open(disclosure);
+      expect(disclosure.textContent).toContain(path);expect(disclosure.textContent).toContain('OWNER REASON');expect(disclosure.textContent).toContain('workspace.yaml');expect(disclosure.textContent).toContain('定義パスをコピー');
+    }finally{await act(async()=>root.unmount());host.remove();}
+  });
+  it('gives known and unresolved peers independent preview budgets and access to every entry', async () => {
+    const owner=node('owner'), known=Array.from({length:5},(_,i)=>node(`known-${i}`)), unknown=Array.from({length:6},(_,i)=>request(`unknown-${i}`,owner.id));
+    const graph:SemanticGraph={view:'architecture-map',nodes:[owner,...known,...unknown],edges:[...unknown,...known].map(n=>edge(`edge-${n.id}`,owner.id,n.id))};
+    const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+    try {
+      await act(async()=>root.render(<MemoryRouter><ArchitectureDetail node={owner} graph={graph} visible={graph} analysis={analysis} store={store} sources={{}} onSelect={vi.fn()} onSelectEdge={vi.fn()} onOpen={vi.fn()} onReveal={vi.fn()} onJump={vi.fn()} onClose={vi.fn()}/></MemoryRouter>));
+      const knownSection=host.querySelector('section[aria-label="構成上の相手"]')!,unknownSection=host.querySelector('section[aria-label="接続先が未特定の要求"]')!;
+      expect(knownSection.querySelectorAll('[data-partner-id]')).toHaveLength(3);expect(unknownSection.querySelectorAll('[data-partner-id]')).toHaveLength(3);
+      await act(async()=>knownSection.querySelector('button')!.click());
+      expect(knownSection.querySelectorAll('[data-partner-id]')).toHaveLength(5);expect(unknownSection.querySelectorAll('[data-partner-id]')).toHaveLength(3);
+      await act(async()=>unknownSection.querySelector('button')!.click());
+      expect(unknownSection.querySelectorAll('[data-partner-id]')).toHaveLength(6);expect(unknownSection.textContent).toContain('未特定対象 6件 · 表示集合 0件');
+    } finally {await act(async()=>root.unmount());host.remove();}
+  });
   it('defers a node evidence collection until requested, then retains different descriptions at the same source site', async () => {
     const object = node('A'), read = vi.fn(() => [source, { ...source, description: 'another explanation' }]);
     Object.defineProperty(object, 'evidence', { get: read, enumerable: true });
@@ -119,7 +144,7 @@ describe('Architecture summaries in the detail panel', () => {
     const a = node('a'), b = node('b'), requests = [request('r1', 'a'), request('r2', 'b'), request('r3', 'unknown')], nodes = new Map([a, b, ...requests].map(n => [n.id, n]));
     const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
     try {
-      await act(async () => root.render(<ArchitectureRequestInspection group={{ id: 'g', label: 'HTTP接続先・未特定', memberIds: requests.map(n => n.id) }} nodes={nodes} expanded={false} onExpanded={vi.fn()} onSelect={vi.fn()} onClose={vi.fn()} />));
+      await act(async () => root.render(<ArchitectureRequestInspection group={{ id: 'g', label: 'HTTP接続先・未特定', memberIds: requests.map(n => n.id) }} nodes={nodes} visible={{ view: 'architecture-map', nodes: [], edges: [] }} expanded={false} onExpanded={vi.fn()} onSelect={vi.fn()} onClose={vi.fn()} />));
       expect(host.querySelector('.architecture-request-origin')?.textContent).toBe('要求元：複数の要求元');
       expect(host.textContent).toContain('要求元未確認');
       await open(host.querySelector('details')!); expect(host.textContent).toContain('要求元を確認できない要求も含みます');

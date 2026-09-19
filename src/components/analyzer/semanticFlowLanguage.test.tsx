@@ -6,7 +6,7 @@ import { semanticFlowDirectionLanguage, semanticNodeConfidence, semanticNodeExpl
 
 describe('Semantic direction and uncertainty language', () => {
   it.each([
-    ['module-dependency', 'import元', 'import先'], ['function-call-flow', '呼び出し元', '呼び出し先'], ['runtime-flow', '関係元', '関係先'],
+    ['module-dependency', '参照・設定元', '参照先・入力'], ['function-call-flow', '呼び出し元', '呼び出し先'], ['runtime-flow', '関係元', '関係先'],
   ] as const)('anchors %s directions on the selection with the existing palette', (view, incoming, outgoing) => {
     const host = document.createElement('div'); host.innerHTML = renderToStaticMarkup(<SemanticFlowLegend view={view} />);
     expect(host.querySelector('[data-direction="incoming"]')?.textContent).toBe(`${incoming} →`);

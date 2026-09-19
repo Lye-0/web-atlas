@@ -1,8 +1,9 @@
 export type ShellOperator = '&&' | '||' | ';';
 
-export type CommandFragmentKind = 'pnpm-script' | 'pnpm-exec' | 'cli' | 'concurrently' | 'unknown';
+export type CommandFragmentKind = 'pnpm-script' | 'project-script' | 'pnpm-exec' | 'cli' | 'concurrently' | 'unknown';
 
 export interface CommandFragment {
+  workingDirectory?:string;
   text: string;
   start: number;
   end: number;
@@ -197,10 +198,15 @@ function classifyRange(source: string, start: number, end: number, operator?: Sh
     }
   }
 
+  const explicitScript = first === 'npm' && tokens[1]?.value === 'run' || first === 'yarn' && tokens[1]?.value === 'run'
+    || first === 'deno' && tokens[1]?.value === 'task' || first === 'bun' && tokens[1]?.value === 'run' && !/\.[cm]?[jt]sx?$/.test(tokens[2]?.value ?? '');
+  if (explicitScript && tokens[2]) return { text, start: range.start, end: range.end, kind: 'project-script', scriptName: tokens[2].value, toolName: first, children, ...(operator ? { operator } : {}) };
+
   const knownCliNames = new Set([
+    'next', 'vsce', '@vscode/vsce',
     'vite',
     'vitest',
-    'wrangler',
+    'wrangler', 'vercel', 'supabase',
     'firebase',
     'node',
     'npm',
@@ -212,6 +218,8 @@ function classifyRange(source: string, start: number, end: number, operator?: Sh
     'biome',
     'dotnet',
     'drizzle-kit',
+    'bun', 'deno', 'python', 'python3', 'pip', 'pip3', 'uv', 'cargo', 'composer', 'nuget', 'mvn', 'mvnw', 'gradle', 'gradlew', 'java',
+    'go', 'ruby', 'php', 'webpack', 'esbuild', 'jest', 'pytest', 'cypress', 'docker', 'docker-compose', 'kubectl', 'netlify', 'nginx', 'httpd', 'apache2',
   ]);
   if (first === 'npx') {
     const toolToken = tokens.find((token, index) => index > 0 && !token.value.startsWith('-'));
@@ -220,15 +228,31 @@ function classifyRange(source: string, start: number, end: number, operator?: Sh
     }
   }
   if (knownCliNames.has(first)) {
+    if(first==='uv'){const run=tokens.findIndex(token=>token.value==='run');if(run>=0&&tokens[run+1]&&!tokens[run+1]!.value.startsWith('-')){const child=classifyRange(source,tokens[run+1]!.start,range.end);const directory=tokens.findIndex(token=>token.value==='--directory');child.workingDirectory=directory>=0?tokens[directory+1]?.value:tokens.find(token=>token.value.startsWith('--directory='))?.value.slice(12);children.push(child);}}
+    if((first==='python'||first==='python3')&&tokens[1]?.value==='-m'&&['pytest','pip'].includes(tokens[2]?.value??''))children.push(classifyRange(source,tokens[2]!.start,range.end));
+    if(first==='firebase'&&tokens[1]?.value==='emulators:exec'){
+      const command=tokens.at(-1);if(command&&command!==tokens[1]&&/^["']/.test(source.slice(command.start,command.end)))children.push(...extractQuotedFragments(source,command.start,command.end));
+    }
     return { text, start: range.start, end: range.end, kind: 'cli', toolName: tokens[0].value, children, ...(operator ? { operator } : {}) };
   }
   return { text, start: range.start, end: range.end, kind: 'unknown', children, ...(operator ? { operator } : {}) };
 }
 
 export function parseCommandExpression(command: string): CommandFragment[] {
-  return splitShellOperators(command)
+  const fragments=splitShellOperators(command)
     .map((segment) => classifyRange(command, segment.start, segment.end, segment.operator))
     .filter((fragment) => fragment.text.length > 0);
+  let cwd:string|undefined;
+  for(let i=0;i<fragments.length;i++){
+    const fragment=fragments[i]!,previous=i?commandArgv(fragments[i-1]!):[];
+    if(previous[0]==='cd'){
+      const target=previous.length===2?previous[1]:undefined;
+      cwd=fragment.operator==='&&'&&target&&!/[$`~]|^[\\/]|^[A-Za-z]:/.test(target)?[cwd,target].filter(Boolean).join('/'):'$UNRESOLVED_CWD';
+    }
+    if(cwd&&i>0&&fragment.operator!=='&&')cwd='$UNRESOLVED_CWD';
+    if(cwd){const inherit=(f:CommandFragment)=>{f.workingDirectory=[cwd,f.workingDirectory].filter(Boolean).join('/');f.children.forEach(inherit);};inherit(fragment);}
+  }
+  return fragments;
 }
 
 function isFlagToken(value: string): boolean {
@@ -251,4 +275,27 @@ export function commandInvocation(fragment: CommandFragment): { executable: stri
     ...(subcommand ? { subcommand } : {}),
     positionalArgs: afterExecutable,
   };
+}
+
+/** Ordered arguments, including flags and their values, for product-specific CLI contracts. */
+export function commandArgv(fragment: CommandFragment): string[] {
+  const values = tokenize(fragment.text, 0, fragment.text.length).map(token => token.value);
+  const executableIndex = values.findIndex(value => value.toLowerCase() === fragment.toolName?.toLowerCase());
+  return executableIndex >= 0 ? values.slice(executableIndex) : values;
+}
+
+/** Map decoded command offsets back through JSON/TOML quoting, retaining UTF-16 source positions. */
+export function commandSourceRange(source:string,script:{command:string;commandStartOffset:number;commandEndOffset:number;commandSourceOffsets?:number[]},fragment:{start:number;end:number}):{start:number;end:number}{
+  if(script.commandSourceOffsets){const offsets=script.commandSourceOffsets;return{start:offsets[fragment.start]??script.commandStartOffset,end:offsets[fragment.end]??script.commandEndOffset};}
+  const raw=source.slice(script.commandStartOffset,script.commandEndOffset);
+  const offset=(decodedOffset:number)=>{
+    if(raw===script.command)return script.commandStartOffset+decodedOffset;
+    let rawOffset=0,decoded=0;
+    while(decoded<decodedOffset&&rawOffset<raw.length){
+      if(raw[rawOffset]==='\\'&&raw[rawOffset+1]==='u'&&/^[\da-fA-F]{4}$/.test(raw.slice(rawOffset+2,rawOffset+6)))rawOffset+=6;
+      else if(raw[rawOffset]==='\\'&&/["\\/bfnrt]/.test(raw[rawOffset+1]??''))rawOffset+=2;
+      else rawOffset++;decoded++;
+    }
+    return script.commandStartOffset+rawOffset;
+  };return{start:offset(fragment.start),end:offset(fragment.end)};
 }

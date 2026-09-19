@@ -11,6 +11,14 @@ const region: SemanticFlowRegion = { id: 'directory:src/git', kind: 'directory',
 const sceneCamera = () => { const camera = new OrthographicCamera(-500, 500, 400, -400, .1, 1000); camera.position.set(0, 0, 100); camera.lookAt(0, 0, 0); return camera; };
 
 describe('semantic 3D label synchronization', () => {
+  it('follows a named architecture boundary on rotation and removes it when its regions disappear',()=>{
+    const camera=sceneCamera(),points=[positioned('node')],named={...region,id:'custom-id',label:'共有：長い任意環境 / quality-preview',nodeIds:['node'],depth:40};
+    const before=JSON.stringify(points),a=projectSemanticFlowLabels(camera,{width:1000,height:800},1,points,new Set(),new Set(),{view:'architecture-map',regions:[named]});
+    expect(a.find(l=>l.region)?.label).toBe(named.label);expect(a.find(l=>l.region)?.height).toBe(60);
+    camera.position.set(50,30,100);camera.lookAt(0,0,0);const b=projectSemanticFlowLabels(camera,{width:1000,height:800},1,points,new Set(),new Set(),{view:'architecture-map',regions:[named],previous:a});
+    expect(b.find(l=>l.region)?.id).toBe('flow-region:custom-id');expect(b.find(l=>l.region)?.pointX).not.toBe(a.find(l=>l.region)?.pointX);
+    expect(projectSemanticFlowLabels(camera,{width:1000,height:800},1,points,new Set(),new Set(),{view:'architecture-map',regions:[],previous:b}).some(l=>l.region)).toBe(false);expect(JSON.stringify(points)).toBe(before);
+  });
   it('never lets a forced label cover another important point or its enlarged connection area', () => {
     const points = [positioned('selected', -250), positioned('endpoint', -195), positioned('hover', -120), positioned('background', 180)];
     const labels = projectSemanticFlowLabels(sceneCamera(), { width: 1000, height: 800 }, 1, points, new Set(['selected']), new Set(), { priorityIds: new Set(['endpoint']), hoveredIds: new Set(['hover']) });

@@ -6,7 +6,8 @@ import type { AnalyzerGraphTransform, AnalyzerProjectStore, AnalyzerSemanticRegi
 import { AnalyzerDetailPanel } from '../components/analyzer/AnalyzerDetailPanel';
 import { AnalyzerEmptyState } from '../components/analyzer/AnalyzerEmptyState';
 import { AnalyzerGraphStage } from '../components/analyzer/AnalyzerGraphStage';
-import { AnalyzerToolbar } from '../components/analyzer/AnalyzerToolbar';
+import '../components/analyzer/analyzer-controls-workspace.css';
+import { AnalyzerToolbar, AnalyzerViewTabs } from '../components/analyzer/AnalyzerToolbar';
 import { useWorkspaceFullscreen } from '../components/analyzer/useWorkspaceFullscreen';
 import { isSemanticView } from '../analyzer/semantic/types';
 import { AnalyzerProjectHeader, AnalyzerViewHeading } from '../components/analyzer/AnalyzerViewChrome';
@@ -304,7 +305,7 @@ function LegacyAnalyzerPage() {
               }
               updateView(view, { entryScriptId: value || undefined });
             };
-  const entryControl=fullscreen.isFullscreen&&view==='command'?<CommandEntryControl compact scripts={scripts} entryScriptId={effectiveEntryScriptId} onChange={changeEntry}/>:undefined;
+  const entryControl=view==='command'?<CommandEntryControl compact scripts={scripts} entryScriptId={effectiveEntryScriptId} onChange={changeEntry}/>:undefined;
   return (
     <div className="page-stack analyzer-page">
       <AnalyzerProjectHeader onScanned={handleScanned} />
@@ -318,7 +319,10 @@ function LegacyAnalyzerPage() {
               <span>{store.facts.length} facts · {store.evidence.length} evidence</span>
           </AnalyzerViewHeading>
 
-          <AnalyzerToolbar
+          {view==='command'&&<AnalyzerViewTabs/>}
+          <div ref={view==='command'?fullscreen.root:undefined} className={view==='command'?`analyzer-controls-workspace${fullscreen.isFullscreen?' is-fullscreen':''}`:undefined} style={view==='command'?undefined:{display:'contents'}} role={view==='command'&&fullscreen.isFullscreen?'dialog':undefined} aria-modal={view==='command'&&fullscreen.isFullscreen||undefined} aria-label={view==='command'&&fullscreen.isFullscreen?'Command Flow 全画面表示':undefined} onKeyDownCapture={view==='command'?fullscreen.onKeyDownCapture:undefined}>
+          <div hidden={view==='command'&&fullscreen.isFullscreen} className={view==='command'?'analyzer-workspace-search':undefined} style={view==='command'?undefined:{display:'contents'}}>
+          <AnalyzerToolbar workspaceControls={view==='command'}
             view={view}
             search={search}
             onSearchChange={(value) => updateView(view, { search: value })}
@@ -352,9 +356,10 @@ function LegacyAnalyzerPage() {
               reason: matchAnalyzerSearch(analyzerEntitySearchDocument(result.item), search)?.reason }))}
             onSelect={id => { const result = searchResults.find(result => result.item.id === id); if (result?.kind === 'region') selectRegion(id, true); else selectNode(id, true); }} />
 
-          <div ref={fullscreen.root} className={`analyzer-workspace${detailOpen ? ' has-detail' : ''}${fullscreen.isFullscreen ? ' is-fullscreen' : ''}`}
-            role={fullscreen.isFullscreen ? 'dialog' : undefined} aria-modal={fullscreen.isFullscreen || undefined}
-            aria-label={fullscreen.isFullscreen ? `${analyzerViewLabels[view]} 全画面表示` : undefined} onKeyDownCapture={fullscreen.onKeyDownCapture}>
+          </div>
+          <div ref={view==='command'?undefined:fullscreen.root} className={`analyzer-workspace${detailOpen ? ' has-detail' : ''}${fullscreen.isFullscreen ? ' is-fullscreen' : ''}`}
+            role={view!=='command'&&fullscreen.isFullscreen ? 'dialog' : undefined} aria-modal={view!=='command'&&fullscreen.isFullscreen || undefined}
+            aria-label={fullscreen.isFullscreen ? `${analyzerViewLabels[view]} 全画面表示` : undefined} onKeyDownCapture={view==='command'?undefined:fullscreen.onKeyDownCapture}>
             {is3D ? (
               <AnalyzerRenderBoundary key={`3d-boundary:${view}:${session.scanVersion}`} onUnavailable={() => { setUnavailable3D(true); updateView(view, { graphMode: '2d' }); }}>
               <Suspense fallback={<div className="analyzer-graph-stage"><p role="status">3D表示を読み込み中…</p></div>}>
@@ -445,6 +450,7 @@ function LegacyAnalyzerPage() {
             )}
           </div>
 
+          </div>
           {model.warnings.length > 0 && (
             <section className="analyzer-warnings" aria-labelledby="analyzer-warnings-title">
               <div>

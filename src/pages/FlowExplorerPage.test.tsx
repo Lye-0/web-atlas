@@ -73,7 +73,7 @@ describe('Flow explorer locations and visits', () => {
     expect(center()).toBe('run'); expect(host.querySelector('.semantic-detail h3')?.textContent).toBe('save');
     await click(button('+')); const savedCamera = camera();
     await click(button('この要素を中心に見る'));
-    expect(center()).toBe('save'); expect(host.querySelector('.semantic-explorer-breadcrumb')?.textContent).toContain('db');
+    expect(center()).toBe('save'); expect(host.querySelector('nav.analyzer-breadcrumb')?.textContent).toContain('db');
     await click(button('戻る'));
     expect(center()).toBe('run'); expect(camera()).toEqual(savedCamera); expect(host.querySelector('.semantic-detail h3')?.textContent).toBe('save');
     await click(host.querySelector<HTMLButtonElement>('[data-browser-forward]')!); expect(center()).toBe('save');
@@ -82,7 +82,7 @@ describe('Flow explorer locations and visits', () => {
     expect(host.querySelector<HTMLDivElement>('.semantic-explorer-blocks')?.scrollTop).toBe(180);
     expect(host.querySelectorAll('[data-node-open-id]')).toHaveLength(31);
     await openBlock('run'); await click(button('親へ'));
-    expect(host.querySelector('.semantic-explorer-breadcrumb')?.textContent).toContain('run.ts'); expect(center()).toBeUndefined();
+    expect(host.querySelector('nav.analyzer-breadcrumb')?.textContent).toContain('run.ts'); expect(center()).toBeUndefined();
     await click(button('親へ'));
     expect([...host.querySelectorAll('.semantic-explorer-block strong')].map(item => item.textContent)).toEqual(['run.ts']);
   });
@@ -106,7 +106,7 @@ describe('Flow explorer locations and visits', () => {
     expect(host.querySelector('.semantic-explorer-blocks')?.getAttribute('data-explorer-scope')).toBe(scope);
     expect(host.querySelector('[role="option"]')?.textContent).toContain('src/db/save.ts:2');
     await click(host.querySelector<HTMLButtonElement>('[role="option"]')!);
-    expect(center()).toBe('save'); expect(host.querySelector('.semantic-explorer-breadcrumb')?.textContent).toContain('db');
+    expect(center()).toBe('save'); expect(host.querySelector('nav.analyzer-breadcrumb')?.textContent).toContain('db');
     expect(Number(camera()[2])).toBeLessThanOrEqual(1.05);
     const before = camera(); await search(''); expect(center()).toBe('save'); expect(camera()).toEqual(before);
     await click(button('戻る')); expect(host.querySelector('.semantic-explorer-blocks')?.getAttribute('data-explorer-scope')).toBe(scope);
@@ -224,8 +224,8 @@ describe('Flow explorer locations and visits', () => {
     expect(center()).toBe('run');
     await click(host.querySelector('[data-node-id="save"]')!); expect(center()).toBe('run');
     await click(button('この要素を中心に見る'));
-    expect(center()).toBe('save'); expect(host.querySelector('.semantic-explorer-breadcrumb')?.textContent).toContain('実行環境未判定・所属別表示');
-    expect(host.querySelector('.semantic-explorer-breadcrumb')?.textContent).toContain('db');
+    expect(center()).toBe('save'); expect(host.querySelector('nav.analyzer-breadcrumb')?.textContent).toContain('実行環境未判定・所属別表示');
+    expect(host.querySelector('nav.analyzer-breadcrumb')?.textContent).toContain('db');
     await click(button('3D上で位置を見る'));
     expect(host.querySelector('[data-cloud-count]')?.getAttribute('data-cloud-count')).toBe('3');
     expect(host.querySelector('.semantic-explorer-runtime-note')?.textContent).toContain('実行環境未判定・所属別表示');

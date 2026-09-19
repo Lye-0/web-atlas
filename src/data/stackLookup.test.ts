@@ -9,7 +9,7 @@ describe('canonical Dictionary Stack lookup', () => {
   });
 
   it('does not resolve ambiguous or unknown Analyzer tokens', () => {
-    expect(findCanonicalStackByPackageOrAlias('firebase')).toBeUndefined();
+    expect(findCanonicalStackByPackageOrAlias('firebase')).toMatchObject({ id: 'firebase' });
     expect(findCanonicalStackByPackageOrAlias('workspace-local-package')).toBeUndefined();
   });
 });

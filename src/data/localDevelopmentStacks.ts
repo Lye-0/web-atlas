@@ -1,0 +1,25 @@
+import { entry } from './expandedStacks';
+
+export const localDevelopmentStacks = [
+  entry('wrangler', 'Wrangler', 'local-development-cli', 'https://developers.cloudflare.com/workers/wrangler/',
+    'Workersのローカル開発、デプロイ、リソース管理を支援するCloudflareのCLI。',
+    'wrangler devでWorkerをローカル実行し、wrangler deployで公開します。Wranglerは操作ツール、workerdはコードを実行するランタイム、Miniflareはサービスの動作をローカルで再現する仕組みです。remote bindingなどでクラウド資源へ接続する構成もあり、ローカル実行が完全なオフライン動作や本番との完全一致を保証するわけではありません。',
+    ['ローカル開発サーバー', 'Workerのデプロイ', 'D1・R2・KVなどの操作'], ['公開前にWorkerを試す', '開発時の接続先を設定する', 'Workerを公開する'], ['開発環境を起動する', '公開と資源管理の操作を受け付ける'], ['cloudflare-workers', 'cloudflare-pages', 'cloudflare-d1', 'cloudflare-r2', 'cloudflare-kv'], ['wrangler']),
+  entry('vercel-cli', 'Vercel CLI', 'local-development-cli', 'https://vercel.com/docs/cli/dev',
+    'Vercel向けのローカル開発とデプロイ・設定管理を支援するCLI。',
+    'vercel devでVercel固有の機能を含む開発環境を起動し、デプロイや環境設定も操作します。Vercelという公開先のサービスとは別の開発ツールです。next devなどフレームワーク自身の開発コマンドで必要な機能を満たせる場合、vercel devを使う必要はありません。',
+    ['ローカル開発', 'デプロイ', '環境設定の管理'], ['公開前に動作を確認する', 'プレビューを公開する', 'プロジェクト設定を扱う'], ['ローカル開発を支援する', 'Vercelへの公開を操作する'], ['vercel'], ['vercel']),
+  entry('netlify-cli', 'Netlify CLI', 'local-development-cli', 'https://docs.netlify.com/api-and-cli-guides/cli-guides/local-development/',
+    'Netlify Devで開発サーバーとFunctions・配信規則を組み合わせるCLI。',
+    'netlify devによるローカル開発機能をNetlify Devと呼びます。フレームワークの開発サーバーにFunctions、redirects、headersなどの機能を組み合わせます。ビルドやデプロイも扱いますが、本番のCDNやインフラ全体をPCに再現するものではありません。',
+    ['Netlify Dev', 'Functionsと配信規則の検証', 'ビルドとデプロイ'], ['ローカルでFunctionsを試す', 'リダイレクトを確認する', 'サイトを公開する'], ['開発サーバーを統合する', 'Netlifyの公開操作を支援する'], ['netlify'], ['netlify-cli'], ['Netlify Dev']),
+  entry('firebase-cli', 'Firebase CLI', 'local-development-cli', 'https://firebase.google.com/docs/cli',
+    'Firebaseの設定・デプロイ・ローカルエミュレーターの起動を管理するCLI。',
+    'firebase-toolsとして配布され、firebase emulators:startでLocal Emulator Suiteを起動し、firebase deployで指定した対象を公開します。CLIは操作の入口であり、Emulator Suiteやアプリから利用するFirebase SDKとは別のものです。設定が存在するだけでは実際の起動や接続成功を意味しません。',
+    ['プロジェクト設定', 'Emulator Suiteの起動', '対象別デプロイ'], ['サービス連携をローカルで検証する', 'Hostingを公開する', 'Firebaseの設定を管理する'], ['エミュレーターの起動を管理する', '設定と公開の操作を受け付ける'], ['firebase', 'firebase-hosting', 'firebase-emulator-suite'], ['firebase-tools']),
+  entry('supabase-cli', 'Supabase CLI', 'local-development-cli', 'https://supabase.com/docs/guides/local-development/cli/getting-started',
+    'Supabaseのローカル環境とDBマイグレーションなどを管理するCLI。',
+    'supabase startでDocker互換のコンテナ環境を使い、PostgreSQL、Auth、Storageなどをローカル起動します。DBの変更管理や対応する機能の公開も扱います。Supabaseサービス本体、アプリ用SDK、各サービスの実行環境とは別の操作ツールです。',
+    ['コンテナによるローカル環境', 'DBマイグレーション', 'プロジェクト管理'], ['ローカルでサービス連携を試す', 'DB変更を共有する', '開発環境を再現する'], ['ローカルサービスを起動・管理する', 'DB変更と公開を支援する'], ['supabase', 'postgresql', 'docker'], ['supabase']),
+].map(stack => ({ ...stack, relationships: (stack.relatedStackIds ?? []).map(targetStackId => ({ targetStackId, kind: 'integrates-with' as const,
+  label: targetStackId === 'firebase-emulator-suite' ? 'エミュレーターの起動を管理' : targetStackId === 'docker' ? '互換コンテナ環境でローカルサービスを起動' : 'ローカル開発・設定・公開で連携' })) }));

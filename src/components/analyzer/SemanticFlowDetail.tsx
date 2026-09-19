@@ -1,4 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
+import { getStack } from '../../data';
+import { stackPath } from '../../utils/routes';
 import { uniqueSemanticEvidence } from '../../analyzer/semantic/presentation';
 import { kindLabels, semanticViewIds, type SemanticEdge, type SemanticEvidence, type SemanticNode, type SemanticRelationSource, type SemanticViewId, type SemanticExplorerViewId } from '../../analyzer/semantic/types';
 import { analyzerViewLabels } from '../../analyzer/types';
@@ -146,6 +149,7 @@ export function SemanticFlowDetail({ node, edge, nodes, edges, sources, view, on
       <div className="analyzer-detail-heading-top"><span className="analyzer-node-type">{node ? isUnresolvedCallNode(node) ? '呼び出し先' : kindLabels[node.kind] : '関係'}</span>
         <button type="button" className="analyzer-detail-close" aria-label="詳細を閉じる" onClick={onClose}>閉じる</button></div>
       <h3>{node ? view === 'data-flow' ? displays.get(node.id)?.title ?? node.label : node.label : semanticRelationLabel(edge!)}</h3>
+      {node&&typeof node.attributes.dictionaryStackId==='string'&&getStack(node.attributes.dictionaryStackId)&&<p><Link to={stackPath(node.attributes.dictionaryStackId)}>{getStack(node.attributes.dictionaryStackId)!.name} の辞書</Link></p>}
       {node?.data && <p>{displays.get(node.id)?.dataRole} · {String(node.attributes.ownerName ?? node.group)}</p>}
       {nodePath(node) && <p className="analyzer-module-detail-path">{isUnresolvedCallNode(node) ? '呼び出し箇所の一例: ' : ''}{nodePath(node)}</p>}
       {node && displays.get(node.id)?.disambiguation && <p className="semantic-flow-detail-identity">{displays.get(node.id)!.disambiguation}</p>}
@@ -164,6 +168,16 @@ export function SemanticFlowDetail({ node, edge, nodes, edges, sources, view, on
       {isUnresolvedCallNode(node) && callSiteCount > 0 && <small>{callSiteCount}箇所の呼び出しを確認。{callSiteCount > 1 ? '各箇所の定義先は個別に未特定です。' : ''}呼び出し元ごとの関係から根拠を開けます。</small>}
     </div>}
     {node && <>
+      {node.attributes.configurationOccurrence && <Section title="構成と接続先" initiallyOpen>
+        <p>ソースに宣言された設定です。稼働状態や通信結果は観測していません。</p>
+        <Info entries={[
+          ['環境',node.attributes.environment],['接続先',node.attributes.endpoint],['Origin',node.attributes.origin],['CDNドメイン',node.attributes.cdnDomains??node.attributes.cdnDomain],
+          ['Namespace',node.attributes.namespace],['Selector',node.attributes.selector],['Podラベル',node.attributes.podLabels],['ポート',node.attributes.ports??node.attributes.servicePorts],
+          ['Location',node.attributes.location],['Artifact',node.attributes.artifactName],['出力先',node.attributes.outputPath??node.attributes.publicDirectory],['Hosting target',node.attributes.hostingTarget],
+          ['VirtualHost',node.attributes.virtualHost],['DocumentRoot',node.attributes.documentRoot],['ServerName',node.attributes.serverName],
+          ['配信設定',node.attributes.deliverySettings],['Ingressルール',node.attributes.rules],
+        ]}/>
+      </Section>}
       <Section title={language.outgoing} count={outgoing.length} direction="imports" initiallyOpen={outgoing.length > 0}>
         <Connections edges={outgoing} nodes={nodes} onSelect={onSelect} onSelectEdge={onSelectEdge} interaction={interaction} />
       </Section>

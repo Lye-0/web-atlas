@@ -5,8 +5,8 @@ type: pattern
 status: active
 maturity: candidate
 created: 2026-09-10
-last_verified: 2026-09-10
-source_commit: "2f0beeaf8f87cdd13c82d006629815784d326b39"
+last_verified: 2026-09-13
+source_commit: "28bcfa195bd47323ab400111d1addfe232a3fbf3"
 related_files:
   - src/components/analyzer/useArchitectureNodeGesture.ts
   - src/components/analyzer/SemanticFlow2D.tsx
@@ -14,7 +14,9 @@ related_files:
   - src/components/analyzer/semanticFlowViewport.ts
   - src/components/analyzer/architectureNavigation.test.tsx
   - src/components/analyzer/semanticFlowViewport.test.ts
-  - docs/technical/architecture-navigation-review.md
+  - docs/technical/tab10-click-stable-scope-review-20260913.md
+  - src/components/analyzer/semanticFlowLabels.ts
+  - src/components/analyzer/architectureLabelPointer.test.ts
 tags:
   - architecture
   - selection
@@ -29,22 +31,27 @@ promoted_to: null
 
 ## Conclusion
 
-Architectureでは最初のクリックが詳細欄を開き、キャンバス幅と案内行の高さを変える。描画要素のonDoubleClickだけでは、2回目が背景・別ラベル・新しいパネルへ当たる可能性がある。最初の対象IDをワークスペースで保持し、同じ位置の2回目をcaptureで消費する。正規の内部を持つ場合だけopenし、葉や表示集合は最初の選択・内訳を保つ。即時選択を遅延タイマーへ置き換えない。
+タブ10の内部移動はnative click.detail=2と両クリックの同じ元対象IDを必要とする。ワークスペースcaptureで最初の対象へ2回目を転用しない。通常選択でscopeや基本投影を変えず、点・cameraは安定させる。3Dラベルは1回目の選択でパネル幅・ラベル寸法が変わるため、点の安定性だけではラベルへのdblclickを保証できない。
 
-画面位置も保持する。2Dは選択時の幅変更で再中央寄せせず、3Dはcamera／world座標を変えずview offsetの基準をcamera／visitへ保存する。明示Fitは基準を作り直す。対象の同一性と表示位置の両方を確認する必要がある。
+ポインターで押した同じDOMラベルの矩形を、操作中だけmanual popoverのtop layerで維持する。別ラベルのleave/blurは現在の保持IDを解除しない。leave/cancel、外側の操作、scroll/wheel/key、resize、visit変更、unmountでは解除する。タブ6〜9はこの保持を呼ばず従来操作を維持する。古いAPI環境では明示ボタンを維持する。
 
 ## Scope
 
-タブ10の2Dブロックと3D点の選択→内部移動に適用。3Dのタブ6〜9は既存pointerup選択を維持する。集約内訳、普通のボタン、葉を階層移動へ転用しない。
+タブ10の2Dブロック・3D点/ラベルの即時選択と内部移動。他タブ固有の単クリック階層移動に適用しない。ラベルをすべて常時固定したり、移動した別要素を最初のIDとして扱う一般規則ではない。
+
+## Failed Approach
+
+以前の同位置capture方式は、詳細パネルや別対象の2回目クリックを最初のIDへ転用していた。位置だけで同じ実体への操作とは判断できない。また、ラベル配置の選択後移動を放置すると、正しい対象ID照合を導入しても未選択からのdblclickが成立しない。
 
 ## Evidence
 
-- architectureNavigation.test.tsxは異なる2回目のDOM対象、二重open、ドラッグ、葉・表示集合、実際の祖先、Backの選択・カメラ復元を検証する。
-- semanticFlowViewport.test.tsはリサイズ前後の投影画面座標と不変のカメラ位置を検証する。
-- git-lines／vehicle-managementの未選択2D・3Dからの実ダブルクリックを確認。git-linesの詳細欄出現前後で2D中心・3D点の画面座標差は1px未満。上記HEADへの未コミット変更で検証した。
+- architectureNavigation.test.tsx: 同じIDのnative double、再単クリック、異対象同位置、取消、二重open、葉/表示集合、実祖先とBack。
+- architectureLabelPointer.test.ts: selectedにより候補矩形が変わっても同じDOMクリック領域を保持、ID付き解除、navigation/unmount解除。
+- 2026-09-13、Chessで2D/3D点の実クリック・実double、独立sampleで未選択3Dラベルの実doubleを再現/修正。追加1visit・移動後popover残留0。
+- 初期HEADからの未commit変更で検証。詳細はdocs/technical/tab10-click-stable-scope-review-20260913.md。
 
 ## Verification
 
-1. 上記2テストとSemanticFlow2D.test.tsxを実行する。
-2. 詳細欄を閉じた状態から実マウスでダブルクリックし、1回の移動・1件のvisitだけになることを確認する。
-3. 選択前後の画面座標とカメラを比較し、Back／明示Fit／狭幅でも保存基準が正しいことを確認する。
+1. 上記2テスト、SemanticFlow2D・SemanticFlow3DCamera・semanticFlowLabelsの回帰を実行する。
+2. 詳細なしの未選択対象へ実doubleし、scopeとvisitが1回だけ変わることを確認する。
+3. Canvas点とDOMラベルを別々に測り、単クリック後の既存点/camera/クリック領域、古い別対象のイベント、top layerの解除を確認する。

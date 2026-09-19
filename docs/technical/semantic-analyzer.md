@@ -10,7 +10,7 @@ Opening a semantic View starts `semantic/semantic.worker.ts` through `semantic/c
 
 ## Language and framework coverage
 
-The browser uses Tree-sitter grammars for TypeScript, TSX/JSX, JavaScript, Python, Java, C#, Go, Rust, Ruby, PHP, C, C++, Swift, Kotlin, Scala and Dart. Kotlin and Scala use an isolated legacy parser ABI; all other grammars use the current parser runtime. Vue and Svelte retain original offsets while parsing their script blocks; template analysis is reported as partial. SQL, Prisma and GraphQL use focused schema parsers, with comments excluded before extracting definitions.
+The browser uses Tree-sitter grammars for TypeScript, TSX/JSX, JavaScript, Python, Java, C#, Go, Rust, Ruby, PHP, C, C++, Swift, Kotlin, Scala and Dart. Kotlin and Scala use an isolated legacy parser ABI; all other grammars use the current parser runtime. Vue and Svelte retain original offsets while parsing their script blocks; explicit template elements, handlers, bindings and values retain source offsets; dynamic template semantics remain partial. SQL, Prisma and GraphQL use focused schema parsers, with comments excluded before extracting definitions.
 
 Framework handling is syntax-based, not dependent on running or installing the target project:
 
@@ -141,7 +141,7 @@ Semantic connections use cubic curves, including a gentle arc for single relatio
 
 For 3D, curve endpoints and arrow tips use the canonical point centers, including self-relations. This avoids the former world-space endpoint shortening diverging from the screen-sized points during zoom. Arrow and particle geometry use the same sampled curve, while a displaced label's leader separately connects to the point. The 2D endpoint and curve branches retain their existing geometry, covered by a pre-change golden snapshot.
 
-Tabs 6–9 use the Architecture breadcrumb presentation in their existing 2D navigation: paths longer than four entries collapse intermediate ancestors into an actionable ellipsis, and containers at most 740px wide also collapse intermediate ancestors. The project and current location remain visible. The separator beside history controls becomes a top border in the narrow stacked layout. Scope navigation preserves the existing visit history; after location changes, focus moves to the current breadcrumb without scrolling.
+Tabs 6–9 use the Architecture breadcrumb presentation in their existing 2D navigation: intermediate ancestors collapse into an actionable ellipsis only when the measured full path exceeds the available breadcrumb width. ResizeObserver re-evaluates that width for container changes, including normal/fullscreen transitions. Architecture Map uses the same component in 2D and 3D. The styled ancestor menu supports outside-pointer/focus dismissal, Escape and arrow-key navigation, and remains inside the fullscreen workspace. The project and current location remain visible. The separator beside history controls becomes a top border in the narrow stacked layout. Scope navigation preserves the existing visit history; after location changes, focus moves to the current breadcrumb without scrolling.
 
 `AnalyzerViewSession.explorer` stores visits with 2D scope/center/depth, 2D camera and scroll position, 3D camera, mode, canonical selection and detail-open state. A route state stamp identifies the visit; URL fields describe its destination. Back/Forward restores those recorded states within the current scan/session. Query, global filters, the effective direction setting and particle mode remain common state and are not rewound by visit history. Parent climbs ownership; project and breadcrumb actions create a visit at the corresponding scope. Pan, zoom, scroll and ordinary node/edge selection update the current visit without adding browser history. `semanticExplorerJump` distinguishes explicit related-View destinations from ordinary tab restoration.
 
@@ -168,3 +168,15 @@ The five-item point/edge/label/group comparison uses `WEB_ATLAS_POLISH_REVIEW=1`
 Browser verification must separately cover Worker/WASM loading, all five projections, detail navigation, 2D/3D interactions, fullscreen, responsive layout and the execution-data file chooser. Node parser tests alone do not establish browser compatibility.
 
 `SemanticFlow3D`も`recoverableWebGLRenderer`を使用し、R3Fの非同期renderer初期化失敗を`onUnavailable`へ伝えて2Dへ復旧する。
+
+## 2026-09-12 finite static profiles
+
+The 94 expansion entries have executable fixtures under src/analyzer/fixtures/stack-coverage. The registry describes selected static forms, not complete compiler/runtime/API compatibility. Required views are checked through shared Fact/IR projections and family-specific tests; unsupported dynamic expressions remain unresolved.
+
+- TSX and JSX are independent. Props/state/declaration/use/render relations share the existing Data Flow context. Vue/Svelte/Angular/Astro/WPF templates retain original source ranges and concrete handler/binding evidence.
+- Express, FastAPI, Flask and Django support explicit cross-file router registration and prefixes. Gin groups, Axum nesting/import aliases, Actix service registration and ASP.NET app-bound MapControllers preserve actual registration ownership. Fastify body and status-specific response schemas accept quoted property names.
+- Data adapters retain actual ORM/model fields, relationships, query inputs/results and storage/auth operations. Django Model.objects and Rails model queries connect only to scoped declared models. Shadowed parameters do not become DB operations.
+- pytest explicit fixtures connect same-module test arguments to fixture bodies. Test/auxiliary filtering remains opt-in in the page. Dynamic plugins, conftest discovery and autouse fixture resolution are outside this finite form.
+- Declared resource connections carry exact target IDs into Runtime and Architecture. No resource identity is established solely by a shared URL or brand. Native/WPF/Boot runtime entry, Clerk/Auth0 handlers and KV delete have permanent completion regressions.
+
+The final regression entry is src/analyzer/semantic/completion.test.ts. Additional dedicated suites cover registration, source provenance, templates, data, query, command, header and provider boundaries. See the [acceptance ledger](../plans/2026-09-12-dictionary-analyzer-acceptance.md).

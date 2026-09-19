@@ -20,7 +20,7 @@ export const dictionaryVisualGroups: DictionaryVisualGroup[] = [
     description: 'コードを書く・動かす・依存を揃える',
     side: 'right',
     order: 1,
-    rootCategoryIds: ['markup-language', 'stylesheet-language', 'programming-language', 'runtime', 'package-manager'],
+    rootCategoryIds: ['markup-language', 'stylesheet-language', 'programming-language', 'query-schema-language', 'runtime', 'package-manager'],
   },
   {
     id: 'application',
@@ -34,7 +34,7 @@ export const dictionaryVisualGroups: DictionaryVisualGroup[] = [
     id: 'data',
     label: 'データとストレージ',
     description: 'データを扱い、保存する仕組み',
-    side: 'right',
+    side: 'left',
     order: 3,
     rootCategoryIds: ['database', 'storage'],
   },
@@ -42,7 +42,7 @@ export const dictionaryVisualGroups: DictionaryVisualGroup[] = [
     id: 'quality',
     label: '品質と検証',
     description: '動作を確かめ、コードを整える',
-    side: 'left',
+    side: 'right',
     order: 4,
     rootCategoryIds: ['testing', 'code-quality'],
   },
@@ -52,7 +52,7 @@ export const dictionaryVisualGroups: DictionaryVisualGroup[] = [
     description: '変更を共有し、実行環境へ届ける',
     side: 'right',
     order: 5,
-    rootCategoryIds: ['version-control', 'development-platform', 'ci-cd', 'container', 'deployment-platform'],
+    rootCategoryIds: ['version-control', 'development-platform', 'ci-cd', 'container', 'deployment-platform', 'local-development-cli'],
   },
 ];
 

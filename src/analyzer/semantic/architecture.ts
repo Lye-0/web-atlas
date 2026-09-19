@@ -1,3 +1,4 @@
+import {staticSiteEntries} from '../staticSiteSources';
 import { findJsonPropertyValueRange, parseJsonc, stripJsonComments } from '../parsers';
 import { architectureSyntax } from './architectureSyntax';
 import { architectureToml } from './architectureToml';
@@ -7,10 +8,11 @@ import type { ArchitectureCodeUsage, ArchitectureIdentity, ArchitectureRequest, 
 import { populateArchitectureUsage } from './architectureUsage';
 import { architectureResourceIdentity } from './architectureIdentity';
 import { architectureFirstArgument } from './architectureArguments';
+import { parseManifest,type ManifestProject } from '../manifestAdapters';
 import { responsibility, semanticLanguage } from './languages';
 import type { SemanticAnalysis, SemanticConfidence, SemanticEdge, SemanticEvidence, SemanticGraph, SemanticInput, SemanticNode } from './types';
 
-export type ArchitectureKind = 'application' | 'component' | 'shared-code' | 'code-package' | 'resource' | 'external-service' | 'external-program' | 'unresolved';
+export type ArchitectureKind = 'application' | 'component' | 'shared-code' | 'code-package' | 'resource' | 'external-service' | 'external-program' | 'unresolved' | 'tool-operation' | 'artifact' | 'execution-config' | 'code-definition';
 export interface ArchitectureRole { label: string; confidence: SemanticConfidence; reason: string; evidence: SemanticEvidence[] }
 export interface ArchitectureEntity {
   kind: ArchitectureKind; parentId?: string; ownerPath?: string; entryPaths: string[];
@@ -107,6 +109,12 @@ export function buildArchitectureModel(input: SemanticInput, analysis: Pick<Sema
     }
   }
   const bindings: { owner: SemanticNode; node: SemanticNode; binding: string; environment: string; dir: string }[] = [];
+  const commonProjects:ManifestProject[]=[];const sourceMap=new Map(configs);
+  for(const[path,source]of configs)try{const project=parseManifest(path,source,sourceMap);if(project&&(project.ecosystem!=='npm'||/deno\.jsonc?$/.test(project.path))&&project.ecosystem!=='nuget'&&!project.attributes.solution)commonProjects.push(project,...(project.children??[]));}catch{/* invalid manifests are reported by the scan */}
+  for(const project of commonProjects){const dir=project.directory==='.'?'':project.directory;if(units.some(unit=>unit.dir===dir))continue;
+    const entries=analysis.nodes.filter(node=>node.path&&within(node.path,dir)&&!commonProjects.some(other=>other!==project&&other.directory!=='.'&&other.directory.length>project.directory.length&&within(node.path!,other.directory))&&node.kind==='entry'&&(node.attributes.endpoint||node.attributes.runtimeEntry)&&!node.attributes.test);
+    const node=add(['manifest',project.path,project.directory],project.name,entries.length?'application':'code-package',ev(project.path,project.name,`${project.ecosystem} manifestの宣言`),{ownerPath:dir,entryPaths:unique(entries.map(entry=>entry.path!)),context:[project.ecosystem],auxiliary:auxiliary(project.path)});units.push({dir,node});
+  }
   const assetRoutes: { owner: SemanticNode; directory: string; routes: string[]; environment: string; evidence: SemanticEvidence[] }[] = [];
   for (const [path, source] of configs.filter(([p]) => /(?:^|\/)wrangler\.(?:jsonc?|toml)$/.test(p))) {
     const toml = path.endsWith('.toml') ? architectureToml(source) : undefined;
@@ -193,6 +201,20 @@ export function buildArchitectureModel(input: SemanticInput, analysis: Pick<Sema
   for (const pkg of packages.filter(p => p.node.architecture?.context.includes('ブラウザ'))) {
     for (const [path] of configs.filter(([p]) => packageAt(p) === pkg && /\.[jt]sx?$/.test(p))) if (syntax.get(path)?.calls.some(c => /(?:^|\.)(?:createRoot|hydrateRoot)$/.test(c.callee))) { pkg.node.architecture!.entryPaths.push(path); entryOwners.set(path, pkg.node.id); }
   }
+  // Fill only unknown browser origins; established framework/manifest ownership wins.
+  for(const entry of staticSiteEntries(sources)){
+    const pkg=packageAt(entry.path),existing=units.filter(u=>within(entry.path,u.dir)).sort((a,b)=>b.dir.length-a.dir.length)[0]?.node??pkg?.node;
+    if(existing&&(existing.architecture!.kind!=='code-package'||existing.architecture!.context.length))continue;
+    // A nested HTML file under a manifest does not establish a second application.
+    if(pkg&&entry.root!==(pkg.dir||'.'))continue;
+    const evidence=entry.references.map(r=>architectureEvidence(entry.path,sources[entry.path]!,r.start,r.end-r.start,`ブラウザ入口が読み込むファイル: ${r.path}`));
+    const node=existing??add(['static-site',entry.root],entry.root==='.'?'静的Webサイト':entry.root.split('/').at(-1)!,'application',evidence,{ownerPath:entry.root==='.'?'':entry.root});
+    node.architecture!.kind='application';node.attributes.architectureKind='application';node.attributes.staticSite=true;
+    node.architecture!.context=['静的Webサイト・ブラウザ実行','HTML / CSS / JavaScript'];
+    node.architecture!.entryPaths.push(entry.path);node.architecture!.files.push(entry.path,...entry.references.map(r=>r.path));node.evidence.push(...evidence);
+    node.architecture!.roles.unshift({label:'ブラウザ用Webサイト',confidence:'source',reason:'HTML文書と入力内のJS・CSS参照を照合',evidence});
+    units.push({dir:node.architecture!.ownerPath??'',node});entryOwners.set(entry.path,node.id);
+  }
   const ownerAt = (path: string) => {
     const entry = nodes.get(entryOwners.get(path) ?? ''); if (entry) return entry;
     const unit = units.filter(item => within(path, item.dir)).sort((a, b) => b.dir.length - a.dir.length)[0], pkg = packageAt(path);
@@ -202,6 +224,7 @@ export function buildArchitectureModel(input: SemanticInput, analysis: Pick<Sema
     const config = parse(path, source), emulators = object(config.emulators), owner = ownerAt(path);
     for (const service of ['auth', 'firestore', 'storage', 'database']) {
       const setting = object(emulators[service]); if (!Object.keys(setting).length) continue;
+      if(input.resources.some(resource=>resource.path===path&&resource.attributes?.emulatorService===service&&resource.attributes.configurationOccurrence))continue;
       const host = string(setting.host), port = typeof setting.port === 'number' ? setting.port : undefined;
       const evidence = ev(path, JSON.stringify(service), `Firebase ${service}エミュレーターの設定。起動状態は未確認`);
       const node = add(['firebase-emulator-config', path, service], `Firebase ${service}エミュレーター${port ? ` :${port}` : ''}`, 'external-service', evidence,
@@ -224,7 +247,9 @@ export function buildArchitectureModel(input: SemanticInput, analysis: Pick<Sema
     const label = auxiliary(path) ? 'テスト・補助コード' : primary === 'Data models' && !modelOnly ? 'モデルを扱うコード' : primary === 'Shared logic' ? '役割未判定' : primary;
     const child = add(['component', owner.id, label], label, 'component', [], { parentId: owner.id, ownerPath: owner.architecture!.ownerPath, context: [...owner.architecture!.context], auxiliary: auxiliary(path),
       roles: [{ label, confidence: 'inferred', reason: detectedRole?.reason ?? (primary === 'Shared logic' ? 'ソースの所属は確認済み。構文・配置規約から具体的な役割は未判定' : `所属パスの分類規則: ${path}。機能の実装完了を保証しません`), evidence: ev(path, '', `役割推定の対象ファイル: ${path}`) }] });
-    child.architecture!.memberIds.push(...members.map(n => n.id)); child.architecture!.files.push(path);
+    // Bundled sources can contribute more members than the engine's argument limit.
+    for (const member of members) child.architecture!.memberIds.push(member.id);
+    child.architecture!.files.push(path);
     for (const member of members) for (const item of member.evidence) child.evidence.push(item);
     if (!members.length) child.evidence.push(...ev(path, '', '所属ソースファイル'));
     fileOwners.set(path, child.id);
@@ -268,7 +293,7 @@ export function buildArchitectureModel(input: SemanticInput, analysis: Pick<Sema
   }
   for (const request of analysis.nodes.filter(n => n.kind === 'request')) {
     const from = request.path ? fileOwners.get(request.path) : undefined; if (!from) continue;
-    const call = syntax.get(request.path!)?.calls.find(c => c.start === request.evidence[0]?.start);
+    const call = syntax.get(request.path!)?.calls.find(c => c.start === request.evidence[0]?.start && c.end === request.evidence[0]?.end);
     if (call && /(?:^|\.)(?:useQuery|useMutation)$/.test(call.callee)) continue;
     const endpoint = call ? call.literals[0] ?? call.args[0] ?? '' : string(request.attributes.endpoint);
     let origin = '';
@@ -283,6 +308,8 @@ export function buildArchitectureModel(input: SemanticInput, analysis: Pick<Sema
       request: absolute ? undefined : { kind: 'http', ownerId: owner?.id ?? from, expression: endpoint || '動的な接続先', sourceId: request.id } });
     node.evidence.push(...request.evidence); node.architecture!.memberIds.push(request.id); node.architecture!.files.push(request.path!);
     node.attributes.endpoints = unique([...(node.attributes.endpoints as string[] ?? []), endpoint || '動的な接続先']);
+    node.attributes.requestCall=call?.callee??String(request.attributes.callee??'');
+    if(!absolute)node.attributes.resolutionReason=endpoint.startsWith('/')?'相対要求は確認済み。対応する配信設定・実行時originは未特定':call?.literals[0]===undefined?'要求先は動的な式。静的なURLの値は未解決':'要求先の表記をURLとして解決できない';
     connect(from, node.id, 'http-request', `HTTP要求: ${endpoint || '動的な接続先'}（静的コード）`, request.evidence, absolute ? 'source' : 'unresolved');
   }
   for (const [path, raw] of configs.filter(([p]) => /\.[cm]?[jt]sx?$|\.cs$/.test(p))) {
@@ -305,7 +332,7 @@ export function buildArchitectureModel(input: SemanticInput, analysis: Pick<Sema
     }
     const parsed = syntax.get(path);
     if (parsed?.imports.has('firebase/auth')) {
-      const auth = parsed.calls.filter(c => /(?:^|\.)(?:getAuth|connectAuthEmulator|signInWith\w*)$/.test(c.callee));
+      const auth = parsed.calls.filter(c => /(?:^|\.)(?:getAuth|connectAuthEmulator|signInWith\w*)$/.test(c.callee)).filter(call=>!input.resources.some(resource=>resource.attributes?.dictionaryStackId==='firebase-authentication'&&resource.attributes.factoryPath===path&&(resource.attributes.projectIdentity||resource.attributes.endpoint)&&(resource.attributes.factoryStart===call.start||resource.attributes.connectionStart===call.start)));
       if (auth.length) {
         const emulator = auth.filter(c => c.callee.endsWith('connectAuthEmulator'));
         const evidence = auth.map(c => c.evidence);

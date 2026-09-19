@@ -28,6 +28,146 @@
 - files: `src/components/analyzer/useArchitectureNodeGesture.ts`, `src/components/analyzer/SemanticFlow2D.tsx`, `src/components/analyzer/SemanticFlow3D.tsx` …
 - memory: `agent-knowledge/entries/2026-09-10-architecture-selection-gesture-04c7e2.md`
 
+### 外側の選択を基本投影と配置の入力へ戻さない
+- id: `rm-20260913-architecture-selection-scope`
+- type: `constraint`
+- maturity: `candidate`
+- tags: `selection`, `projection`, `cache`, `layout`
+- files: `src/analyzer/semantic/architectureProjection.ts`, `src/analyzer/semantic/flowPresentation.ts`, `src/analyzer/semantic/flow3DInput.ts` …
+- memory: `agent-knowledge/entries/2026-09-13-architecture-selection-scope-318c64.md`
+
+### ツールの使用は操作文脈として同じArchitectureへ接続する
+- id: `rm-20260916-architecture-tool-context`
+- type: `decision`
+- maturity: `candidate`
+- tags: `tool-usage`, `environment`, `provenance`, `operation`
+- files: `src/analyzer/semantic/architectureCommands.ts`, `src/analyzer/semantic/architectureToolFlows.ts`, `src/analyzer/semantic/architectureToolFlows.test.ts` …
+- memory: `agent-knowledge/entries/2026-09-16-architecture-tool-context-e571c4.md`
+
+### 定義の所属と用途を分離し、workspace所属は関係の根拠で確認する
+- id: `rm-20260916-definition-ownership`
+- type: `constraint`
+- maturity: `candidate`
+- tags: `ownership`, `manifest`, `workspace`, `positioning`
+- files: `src/analyzer/semantic/architecturePositioning.ts`, `src/analyzer/semantic/client.ts`, `src/components/analyzer/architectureContextPolish.test.tsx` …
+- memory: `agent-knowledge/entries/2026-09-16-definition-ownership-8c417a.md`
+
+### 表示集合の範囲を正規ID集合へ表示IDで照合しない
+- id: `rm-20260917-content-coverage-original-ids`
+- type: `failure`
+- maturity: `candidate`
+- tags: `content-coverage`, `presentation-group`, `original-id`
+- files: `src/components/analyzer/architectureContentCoverage.ts`, `src/components/analyzer/architectureContentCoverage.test.tsx`, `src/components/analyzer/ArchitectureDetail.tsx` …
+- memory: `agent-knowledge/entries/2026-09-17-content-coverage-original-ids-ec50a7.md`
+
+### 表示内容の状態は実scopeと分離し、訪問履歴のカメラも同期する
+- id: `rm-20260917-content-scope-state`
+- type: `constraint`
+- maturity: `reused`
+- tags: `content-selection`, `scope`, `camera`, `session`
+- files: `src/analyzer/semantic/architectureContentState.ts`, `src/analyzer/semantic/architectureContent.test.ts`, `src/pages/FlowAnalyzerPage.tsx` …
+- memory: `agent-knowledge/entries/2026-09-17-content-scope-state-c62b18.md`
+
+### 囲いの論理定義区分を論理アプリプリセットの全探索起点にしない
+- id: `rm-20260917-definition-preset-boundary`
+- type: `constraint`
+- maturity: `candidate`
+- tags: `preset`, `definition`, `environment`
+- files: `src/analyzer/semantic/architectureContent.ts`, `src/analyzer/semantic/architectureContext.ts`, `src/analyzer/semantic/architectureContent.test.ts` …
+- memory: `agent-knowledge/entries/2026-09-17-definition-preset-boundary-6729ca.md`
+
+### 囲い生成とDOMラベルの所属索引で同じ領域IDを使う
+- id: `rm-20260917-region-label-identity`
+- type: `constraint`
+- maturity: `candidate`
+- tags: `regions`, `labels`, `identity`, `projection`
+- files: `src/analyzer/semantic/flowRegions.ts`, `src/components/analyzer/SemanticFlow3D.tsx`, `src/components/analyzer/semanticFlowLabels.ts` …
+- memory: `agent-knowledge/entries/2026-09-17-region-label-identity-915acd.md`
+
+### Architectureの代表パスとEvidence行は独立している
+- id: `rm-20260918-architecture-evidence-location-pair`
+- type: `failure`
+- maturity: `candidate`
+- tags: `evidence`, `source-location`, `display`
+- files: `src/analyzer/semantic/architectureSimpleEvidence.ts`, `src/analyzer/semantic/architectureSimpleUsage.ts`, `src/analyzer/semantic/architectureSimpleBounds.test.ts` …
+- memory: `agent-knowledge/entries/2026-09-18-architecture-evidence-location-pair-d8f016.md`
+
+### 原本・操作・到着先の列だけを揃えても経路はまとまらない
+- id: `rm-20260918-route-bands-not-role-columns`
+- type: `failure`
+- maturity: `reused`
+- tags: `simple-overview`, `layout`, `routes`
+- files: `src/analyzer/semantic/architectureSimpleLayout.ts`, `src/analyzer/semantic/architectureRouteLanes.test.ts`, `docs/technical/tab10-route-lanes-review-20260918.md`
+- memory: `agent-knowledge/entries/2026-09-18-route-bands-not-role-columns-7ad391.md`
+
+### 論理所有者が同じでも公開の入力と到着先は同じ要約へ吸収しない
+- id: `rm-20260918-simple-deployment-arrival-role`
+- type: `failure`
+- maturity: `reused`
+- tags: `simple-overview`, `deployment`, `projection`, `destination`
+- files: `src/analyzer/semantic/architectureSimple.ts`, `src/analyzer/semantic/architectureSimpleGroups.ts`, `src/analyzer/semantic/architectureSimpleDeployment.test.ts` …
+- memory: `agent-knowledge/entries/2026-09-18-simple-deployment-arrival-role-b8213a.md`
+
+### 簡易要約では補助用途より実際の所属を先に解決する
+- id: `rm-20260918-simple-ownership-before-auxiliary`
+- type: `failure`
+- maturity: `candidate`
+- tags: `simple-overview`, `auxiliary`, `ownership`, `internal-relations`
+- files: `src/analyzer/semantic/architectureSimple.ts`, `src/analyzer/semantic/architectureSimple.test.ts`, `src/analyzer/semantic/architectureSimplePolishActual.test.ts` …
+- memory: `agent-knowledge/entries/2026-09-18-simple-ownership-before-auxiliary-a631f2.md`
+
+### 成果物宣言の検出と、生成操作の対応は別の段階
+- id: `rm-20260919-build-declaration-invocation`
+- type: `constraint`
+- maturity: `candidate`
+- tags: `commands`, `provenance`, `static-analysis`
+- files: `src/analyzer/buildAdapters.ts`, `src/analyzer/semantic/architectureCommands.ts`, `src/analyzer/semantic/architecturePlatformFlows.ts` …
+- memory: `agent-knowledge/entries/2026-09-19-build-declaration-invocation-45fba1.md`
+
+### 出力宣言のパスを、読取可能な入力パスの制約で消さない
+- id: `rm-20260919-declared-output-path-boundary`
+- type: `constraint`
+- maturity: `candidate`
+- tags: `static-analysis`, `output-path`, `provenance`
+- files: `src/analyzer/staticNodeScript.ts`, `src/analyzer/semantic/architectureStaticSiteFlows.ts`, `src/analyzer/semantic/architectureStaticSite.test.ts`
+- memory: `agent-knowledge/entries/2026-09-19-declared-output-path-boundary-a870c4.md`
+
+### 領域再計算後でも見出し余白が別の構成を囲い込む
+- id: `rm-20260919-final-boundary-header-space`
+- type: `failure`
+- maturity: `candidate`
+- tags: `simple-overview`, `bounds`, `layout`
+- files: `src/analyzer/semantic/architectureSimpleShelfBounds.ts`, `src/analyzer/semantic/architectureHeadings.ts`, `src/analyzer/semantic/architectureShelfPolish.test.ts` …
+- memory: `agent-knowledge/entries/2026-09-19-final-boundary-header-space-8d14af.md`
+
+### 操作経路がない原本を、サービス配置後の末尾へ置かない
+- id: `rm-20260919-unrouted-source-placement`
+- type: `failure`
+- maturity: `candidate`
+- tags: `simple-overview`, `layout`, `source-first`
+- files: `src/analyzer/semantic/architectureSimpleUnrouted.ts`, `src/analyzer/semantic/architectureSimpleLayout.ts`, `src/analyzer/semantic/architecturePlatformFlows.test.ts` …
+- memory: `agent-knowledge/entries/2026-09-19-unrouted-source-placement-91bfa2.md`
+
+## analyzer-command-evidence
+
+### CIコマンドを合成すると元範囲の座標系が変わる
+- id: `rm-20260912-ci-command-source-offsets`
+- type: `failure`
+- maturity: `candidate`
+- tags: `analyzer`, `ci`, `source-range`
+- files: `src/analyzer/providerAdapters.ts`, `src/analyzer/yamlCommandOffsets.ts`, `src/analyzer/commandParser.ts` …
+- memory: `agent-knowledge/entries/2026-09-12-ci-command-source-offsets-b84d19.md`
+
+## analyzer-evidence
+
+### 呼出チェーンは開始位置だけで要求のASTを対応付けない
+- id: `rm-20260916-http-call-range`
+- type: `failure`
+- maturity: `candidate`
+- tags: `http`, `source-range`, `callback`, `binding`
+- files: `src/analyzer/semantic/architecture.ts`, `src/analyzer/semantic/architectureSyntax.ts`, `src/analyzer/semantic/httpFetchBinding.ts` …
+- memory: `agent-knowledge/entries/2026-09-16-http-call-range-7ea21c.md`
+
 ## analyzer-flow
 
 ### Flowの共有ホバーは入力元と表示寿命を区別する
@@ -147,6 +287,14 @@
 - tags: `scope`, `endpoint`, `identity`, `3d`
 - files: `src/analyzer/graph3DRegions.ts`, `src/components/analyzer/AnalyzerGraph3DStage.tsx`, `src/components/analyzer/graph3DLabels.test.ts` …
 - memory: `agent-knowledge/entries/2026-09-12-scope-render-port-identity-dc2a11.md`
+
+### Canvasの非同期初期化は破棄済みDOMへの接続を試み得る
+- id: `rm-20260916-canvas-detached-connect`
+- type: `failure`
+- maturity: `candidate`
+- tags: `r3f`, `lifecycle`, `canvas`
+- files: `src/components/analyzer/semanticCanvasLifecycle.ts`, `src/components/analyzer/semanticCanvasLifecycle.test.ts`, `src/components/analyzer/SemanticFlow3D.tsx`
+- memory: `agent-knowledge/entries/2026-09-16-canvas-detached-connect-05c4d7.md`
 
 ## analyzer-session
 

@@ -36,7 +36,7 @@ export type AnalyzerScopeEvidenceStrength = 'structural' | 'explicit-boundary' |
 
 export type AnalyzerDependencyType = 'dependency' | 'devDependency' | 'peerDependency' | 'optionalDependency' | 'workspaceDependency';
 
-export type AnalyzerModuleDependencyKind = 'import' | 'import-type' | 're-export' | 'dynamic-import' | 'require';
+export type AnalyzerModuleDependencyKind = 'import' | 'import-type' | 're-export' | 'dynamic-import' | 'require' | 'build-entry';
 
 export interface AnalyzerModuleImportReference {
   kind: AnalyzerModuleDependencyKind;
@@ -147,6 +147,7 @@ export interface AnalyzerSourceFile {
 }
 
 export interface PackageDependencyDeclaration {
+  ecosystem?: import('./stackRegistry').Ecosystem;
   packageName: string;
   versionRange: string;
   dependencyType: AnalyzerDependencyType;
@@ -172,7 +173,7 @@ export interface ProjectFact extends AnalyzerFactBase {
 
 export interface WorkspaceConfigFact extends AnalyzerFactBase {
   kind: 'workspace-config';
-  manager: 'pnpm';
+  manager: 'pnpm' | import('./stackRegistry').Ecosystem;
   patterns: string[];
 }
 
@@ -208,11 +209,13 @@ export interface PackageScriptFact extends AnalyzerFactBase {
   sourcePath: string;
   commandStartOffset: number;
   commandEndOffset: number;
+  /** Decoded command boundaries mapped to original configuration offsets. */
+  commandSourceOffsets?: number[];
 }
 
 export interface CommandFact extends AnalyzerFactBase {
   kind: 'command';
-  commandType: 'pnpm-script' | 'pnpm-exec' | 'cli' | 'concurrently' | 'unknown';
+  commandType: 'pnpm-script' | 'project-script' | 'pnpm-exec' | 'cli' | 'concurrently' | 'unknown';
   command: string;
   packageId?: string;
   scriptName?: string;
@@ -495,7 +498,7 @@ export const nodeTypeLabels: Record<AnalyzerNodeType, string> = {
   'stack-scope': 'Scope / Area',
   'stack-usage': 'Stack Usage',
   application: 'Application',
-  'workspace-package': 'Workspace Package',
+  'workspace-package': 'Project / Package',
   'workspace-config': 'Workspace Config',
   'workspace-pattern': 'Workspace Pattern',
   'package-script': 'Package Script',
@@ -504,7 +507,7 @@ export const nodeTypeLabels: Record<AnalyzerNodeType, string> = {
   technology: 'Technology',
   runtime: 'Runtime / Platform',
   resource: 'Resource',
-  'dotnet-project': '.NET Application',
+  'dotnet-project': '.NET Project',
   module: 'Module',
 };
 

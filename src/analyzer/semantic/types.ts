@@ -40,7 +40,7 @@ export interface SemanticEdge {
   /** Original source relations behind a display aggregate or compressed runtime path. */
   provenance?: { edges: SemanticRelationSource[]; intermediateNodeIds?: string[] };
   details?: { environment?: string; reason?: string; callSiteId?: string; argumentIndex?: number; fieldId?: string; propertyPath?: string[]; conditional?: boolean; contextId?: string; sourceEdgeIds?: string[];
-    architectureOrigin?: 'source' | 'architecture'; architectureRelation?: 'connection' | 'internal' | 'self'; configurationId?: string };
+    architectureOrigin?: 'source' | 'architecture'; architectureRelation?: 'connection' | 'internal' | 'self'; configurationId?: string; structural?: boolean };
 }
 export type SemanticRelationSource = Pick<SemanticEdge, 'id' | 'source' | 'target' | 'kind' | 'label' | 'confidence' | 'evidence' | 'details'>;
 export interface SemanticCoverage { path: string; language: string; status: 'parsed' | 'partial' | 'unsupported' | 'skipped'; message?: string }
@@ -52,11 +52,15 @@ export interface SemanticAnalysis {
   stats: { files: number; functions: number; models: number; unresolved: number; elapsedMs: number };
 }
 export interface SemanticInput {
+  commands?: import('./architectureCommands').ArchitectureCommand[];
+  developmentTools?: { stackId: string; path: string; declaration: boolean; evidence: SemanticEvidence }[];
+  stackMetadata?:Record<string,{name:string;aliases:string[]}>;
+  projectScopes?:{id:string;path:string;directory:string;workspaceDeclarations?:string[]}[];
   sources: Record<string, string>;
   imports: { from: string; to: string; specifier: string }[];
-  resources: { id: string; label: string; type: string; path?: string; binding?: string; entryPath?: string; evidence?: SemanticEvidence[] }[];
+  resources: { id: string; label: string; type: string; path?: string; binding?: string; entryPath?: string; evidence?: SemanticEvidence[]; attributes?: SemanticNode['attributes'] }[];
 }
-export interface SemanticGraph { view: SemanticViewId; nodes: SemanticNode[]; edges: SemanticEdge[]; architectureView?: import('./architectureProjection').ArchitectureProjection; }
+export interface SemanticGraph { view: SemanticViewId; nodes: SemanticNode[]; edges: SemanticEdge[]; architectureView?: import('./architectureProjection').ArchitectureProjection; architectureContentLayout?:'logical-definitions'; }
 
 export const confidenceLabels: Record<SemanticConfidence, string> = { source: 'ソースで確認', inferred: '推定', observed: '実測', unresolved: '未解決' };
 export const kindLabels: Record<SemanticKind, string> = { function: 'Function', entry: 'Entry point', request: 'API request', operation: 'Operation', value: 'Data', model: 'Model / Schema', resource: 'Resource', subsystem: 'Subsystem', external: 'External call', span: 'Span', log: 'Log' };

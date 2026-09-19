@@ -8,6 +8,8 @@ export interface SemanticFlowRegion extends SemanticRegionIdentity, SemanticMapR
 
 /** Source locations come from recorded paths; runtime-only objects retain their known group. */
 export function semanticRegionIdentity(node: SemanticNode): SemanticRegionIdentity {
+  if(node.attributes.simpleOverview&&typeof node.attributes.simpleRegionId==='string')return {id:`simple-region:${node.attributes.simpleRegionId}`,label:String(node.attributes.simpleRegionLabel),kind:'group'};
+  if (typeof node.attributes.flowEnvironment === 'string') return { id: `architecture-environment:${node.attributes.flowEnvironment}`, label: node.attributes.flowEnvironment, kind: 'group' };
   if (node.architecture) return { id: node.architecture.parentId ?? 'architecture-project', label: node.group || 'プロジェクト', kind: 'group' };
   if (node.kind === 'external') return { id: 'group:unresolved-calls', label: '定義先が未特定の呼び出し', kind: 'group' };
   const paths = node.path ? [node.path] : node.attributes.overview && Array.isArray(node.attributes.files) ? node.attributes.files : [];
@@ -23,14 +25,18 @@ export function semanticRegionIdentity(node: SemanticNode): SemanticRegionIdenti
   return { id: `group:${node.group}`, label: node.group || '所属情報なし', kind: 'group' };
 }
 
+export function semanticFlowRegionIdentity(node:SemanticNode,explorer?:SemanticExplorerModel){
+  return explorer && !node.attributes.flowEnvironment && !node.attributes.simpleOverview ? explorerRegionIdentity(explorer,node.id) : semanticRegionIdentity(node);
+}
 export function semanticFlowRegions(positions: readonly SemanticPosition[], mode: '2d' | '3d', explorer?: SemanticExplorerModel): SemanticFlowRegion[] {
   const groups = new Map<string, { identity: SemanticRegionIdentity; positions: SemanticPosition[] }>();
   for (const position of positions) {
-    const identity = explorer ? explorerRegionIdentity(explorer, position.node.id) : semanticRegionIdentity(position.node);
+    if(position.node.attributes.simpleOverview&&!position.node.attributes.simpleRegionId)continue;
+    const identity = semanticFlowRegionIdentity(position.node,explorer);
     const group = groups.get(identity.id) ?? { identity, positions: [] };
     group.positions.push(position); groups.set(identity.id, group);
   }
-  return [...groups.values()].map(({ identity, positions: members }) => {
+  return [...groups.values()].filter(({positions:members})=>!members[0]?.node.attributes.simpleOverview||members.length>1).map(({ identity, positions: members }) => {
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
     const ids = new Set<string>();
     for (const point of members) {
@@ -41,7 +47,7 @@ export function semanticFlowRegions(positions: readonly SemanticPosition[], mode
     const horizontal = mode === '2d' ? 132 : 18, above = mode === '2d' ? 64 : 18, below = mode === '2d' ? 48 : 18;
     return { ...identity, x: minX - horizontal, y: minY - above, width: maxX - minX + horizontal * 2, height: maxY - minY + above + below,
       z: minZ - 20, depth: maxZ - minZ + 40, count: ids.size, nodeIds: members.map(point => point.node.id) };
-  });
+  }).filter(region=>!region.id.startsWith('simple-region:')||!positions.some(p=>!region.nodeIds.includes(p.node.id)&&p.x>region.x&&p.x<region.x+region.width&&p.y>region.y&&p.y<region.y+region.height));
 }
 
 export function semanticMapBounds(regions: readonly SemanticMapRect[]): SemanticMapRect {

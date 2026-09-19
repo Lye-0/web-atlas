@@ -12,6 +12,7 @@ export interface AnalyzerViewSession {
   modelOpenChoiceIds?: string[];
   dataFineExpandedScopeIds?: string[];
   architecture?: { surroundings?: boolean; expandedRequestGroupIds?: string[] };
+  architectureContent?: {key:string;states:Record<string,Record<string,import('./semantic/architectureContentState').ContentSnapshot>>};
   aggregation?: { expandedGroupIds: string[]; collapsedGroupIds: string[]; activeGroupIds?: string[]; expandedRegionIds?: string[]; unresolved?: 'expanded' | 'collapsed' };
   selectedRegionId?: string;
   selectedEdgeId?: string;

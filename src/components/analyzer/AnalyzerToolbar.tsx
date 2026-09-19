@@ -7,6 +7,7 @@ import { AnalyzerSearchControl } from './AnalyzerViewChrome';
 export type { AnalyzerFilter } from '../../analyzer';
 
 interface AnalyzerToolbarProps {
+  workspaceControls?:boolean;
   view: AnalyzerViewId;
   search: string;
   onSearchChange: (value: string) => void;
@@ -73,11 +74,12 @@ export function AnalyzerToolbar({
   entryScriptId,
   onEntryChange,
   counts,
+  workspaceControls=false,
 }: AnalyzerToolbarProps) {
   const options = filterOptions(view);
   return (
     <div className="analyzer-toolbar">
-      <AnalyzerViewTabs />
+      {!workspaceControls&&<AnalyzerViewTabs />}
 
       <div className="analyzer-control-row">
         <AnalyzerSearchControl value={search} onChange={onSearchChange} />
@@ -87,7 +89,7 @@ export function AnalyzerToolbar({
             {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
         </label>
-        {view === 'command' && <CommandEntryControl scripts={scripts} entryScriptId={entryScriptId} onChange={onEntryChange} />}
+        {view === 'command' && !workspaceControls&&<CommandEntryControl scripts={scripts} entryScriptId={entryScriptId} onChange={onEntryChange} />}
         {view === 'dependencies' && (
           <button type="button" className={`analyzer-quiet-button${externalExpanded ? ' is-active' : ''}`} onClick={onToggleExternal} aria-expanded={externalExpanded}
             disabled={!externalToggleAvailable} title={externalToggleAvailable ? undefined : '展開する外部パッケージのまとまりはありません'}>

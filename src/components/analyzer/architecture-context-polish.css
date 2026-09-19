@@ -1,0 +1,8 @@
+.architecture-environment-name { fill:#92aa9e; font-size:12px; font-weight:400; }
+.semantic-flow-3d-labels button.is-region[data-architecture-region] { background:transparent; border:0; box-shadow:none; color:#92aa9e; }
+.semantic-flow-3d-labels button.is-region[data-architecture-region] > strong { font-size:12px; line-height:18px; font-weight:400; white-space:normal; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow-wrap:anywhere; }
+.semantic-flow-3d-labels button.is-region[data-architecture-region]:focus-visible { outline:1px solid #b4dfcd; outline-offset:2px; }
+.semantic-flow-node[data-composition-support]:not(.is-selected):not(.is-match):not(.is-connected) > rect { fill:#111b18; stroke-dasharray:4 3; }
+.semantic-flow-3d-labels button[data-composition-support]:not(.is-selected):not(.is-match):not(.is-related):not(.is-hovered) { background:#111b18; border-style:dashed; }
+.semantic-flow-3d-labels button[data-composition-support]:not(.is-selected):not(.is-match):not(.is-related):not(.is-hovered) > strong { font-weight:500; }
+.architecture-summary-partners + .architecture-summary-partners { margin-top:16px; }

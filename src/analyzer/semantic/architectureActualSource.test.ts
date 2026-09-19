@@ -53,8 +53,13 @@ for (const name of ['git-lines', 'vehicle-management', 'web-atlas']) it.skipIf(!
     expect(root.nodes.some(n => n.label === 'git（起動先の既定値）' && n.confidence === 'inferred')).toBe(true);
     const host = model.nodes.find(n => n.architecture?.context.includes('Extension Host') && n.architecture.kind === 'application')!;
     const webview = model.nodes.find(n => n.architecture?.context.includes('Webview / ブラウザ') && n.architecture.kind === 'application')!;
-    const partners = architecturePartners(root.edges, host.id);
-    expect(partners).toHaveLength(2);
+    const partners = architecturePartners(root.edges.filter(edge=>!edge.details?.structural), host.id);
+    const preparationPeers=partners.filter(partner=>root.edges.some(edge=>[edge.source,edge.target].includes(host.id)&&[edge.source,edge.target].includes(partner.otherId)&&['flow-generates','flow-loads'].includes(edge.kind)));
+    expect(preparationPeers).toHaveLength(2);
+    expect(partners.filter(partner=>!preparationPeers.includes(partner))).toHaveLength(2);
+    expect(root.edges.filter(edge=>edge.source===host.id&&edge.kind==='flow-loads').every(edge=>edge.evidence.some(e=>e.path==='package.json'))).toBe(true);
+    expect(root.edges.filter(edge=>edge.target===host.id&&edge.kind==='flow-generates').every(edge=>edge.evidence.some(e=>e.path==='scripts/build-extension.mjs'))).toBe(true);
+    expect(root.edges.filter(edge=>edge.source===host.id&&edge.kind==='flow-definition').every(edge=>edge.details?.structural)).toBe(true);
     expect(partners.find(partner => partner.otherId === webview.id)?.direction).toBe('相手から・相手への関係あり');
     expect(host.architecture?.technologies?.find(t => t.name === 'react')?.usage).toBe('declared');
     expect(webview.architecture?.technologies?.find(t => t.name === 'react')?.usage).toBe('source');
@@ -62,8 +67,13 @@ for (const name of ['git-lines', 'vehicle-management', 'web-atlas']) it.skipIf(!
   if (name === 'vehicle-management') {
     expect(root.nodes.some(n => n.label === 'vehicle-management-api')).toBe(true);
     expect(root.nodes.some(n => n.label === 'VehicleManagement.Companion' && n.architecture?.context.includes('.NET / WPF'))).toBe(true);
-    expect(model.environments).toEqual(['development', 'production']);
-    expect(root.nodes.some(n => n.label === 'Firebase authエミュレーター :9099')).toBe(true);
+    expect(model.environments).toEqual(expect.arrayContaining(['development', 'production', 'local', 'cloud']));
+    const suite=model.nodes.find(node=>node.attributes.dictionaryStackId==='firebase-emulator-suite')!;
+    const localAuth=model.nodes.find(node=>node.attributes.dictionaryStackId==='firebase-authentication'&&node.architecture?.environments.includes('local'))!;
+    expect(root.nodes.some(node=>node.id===suite.id)).toBe(true);
+    expect(localAuth.architecture?.parentId).toBe(suite.id);
+    expect(String(localAuth.attributes.endpoint)).toMatch(/127\.0\.0\.1:9099\/?$/);
+    expect(model.edges.some(edge=>edge.source===suite.id&&edge.target===localAuth.id&&edge.kind==='contains')).toBe(true);
     const production = architectureScopeGraph(model, undefined, 'production');
     const development = architectureScopeGraph(model, undefined, 'development');
     expect(production.nodes.filter(n => n.architecture?.kind === 'resource').every(n => n.architecture!.environments.includes('production'))).toBe(true);

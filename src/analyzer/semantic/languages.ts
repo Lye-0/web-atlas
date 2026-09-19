@@ -1,11 +1,18 @@
 export const languageExtensions: Record<string, string> = {
-  ts: 'typescript', mts: 'typescript', cts: 'typescript', tsx: 'tsx', js: 'javascript', mjs: 'javascript', cjs: 'javascript', jsx: 'tsx',
+  ts: 'typescript', mts: 'typescript', cts: 'typescript', tsx: 'tsx', js: 'javascript', mjs: 'javascript', cjs: 'javascript', jsx: 'jsx',
   py: 'python', pyi: 'python', java: 'java', cs: 'c_sharp', go: 'go', rs: 'rust', rb: 'ruby', php: 'php',
   c: 'c', h: 'c', cc: 'cpp', cpp: 'cpp', cxx: 'cpp', hpp: 'cpp', swift: 'swift', kt: 'kotlin', kts: 'kotlin', scala: 'scala', dart: 'dart',
-  vue: 'typescript', svelte: 'typescript', sql: 'sql', prisma: 'prisma', graphql: 'graphql', gql: 'graphql',
+  vue: 'vue', svelte: 'svelte', astro: 'astro', html: 'html', xaml: 'xaml', sql: 'sql', prisma: 'prisma', graphql: 'graphql', gql: 'graphql',
 };
 export function semanticLanguage(path: string): string | undefined { return languageExtensions[path.split('.').at(-1)?.toLowerCase() ?? '']; }
-export const languageLabels: Record<string, string> = { typescript: 'TypeScript', tsx: 'TSX / JSX', javascript: 'JavaScript', python: 'Python', java: 'Java', c_sharp: 'C#', go: 'Go', rust: 'Rust', ruby: 'Ruby', php: 'PHP', c: 'C', cpp: 'C++', swift: 'Swift', kotlin: 'Kotlin', scala: 'Scala', dart: 'Dart', sql: 'SQL', prisma: 'Prisma', graphql: 'GraphQL' };
+export const languageLabels: Record<string, string> = { typescript: 'TypeScript', tsx: 'TSX', jsx: 'JSX', vue: 'Vue', svelte: 'Svelte', astro: 'Astro', html: 'HTML', xaml: 'XAML', javascript: 'JavaScript', python: 'Python', java: 'Java', c_sharp: 'C#', go: 'Go', rust: 'Rust', ruby: 'Ruby', php: 'PHP', c: 'C', cpp: 'C++', swift: 'Swift', kotlin: 'Kotlin', scala: 'Scala', dart: 'Dart', sql: 'SQL', prisma: 'Prisma', graphql: 'GraphQL' };
+
+/** Grammar implementation is independent of the public source/coverage language. */
+export function grammarLanguage(language: string, source = ''): string {
+  if (language === 'jsx') return 'tsx';
+  if (['vue', 'svelte', 'astro', 'html'].includes(language)) return /<script\b[^>]*\blang=["'](?:js|javascript)["']/.test(source) ? 'javascript' : 'typescript';
+  return language;
+}
 
 export function responsibility(path: string, source: string): string {
   if (/(?:^|\/)(?:__tests__|tests?|specs?)(?:\/|\.)|\.(?:test|spec)\./i.test(path)) return 'Tests';

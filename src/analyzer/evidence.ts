@@ -1,4 +1,5 @@
 import type { AnalyzerEvidence, AnalyzerEvidenceKind, AnalyzerEvidenceRole, AnalyzerScopeEvidenceStrength, SourcePosition } from './types';
+import { maskUrlSecrets } from './urlPrivacy';
 
 export interface OffsetRange {
   start: number;
@@ -149,7 +150,7 @@ export function maskSensitiveSource(source: string): string {
     match = keyPattern.exec(source);
   }
 
-  return masked;
+  return maskUrlSecrets(masked);
 }
 
 export function sourceLines(source: string): string[] {

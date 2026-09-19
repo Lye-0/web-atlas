@@ -19,7 +19,7 @@ const pageSections = [
   { href: '#features', label: '主な特徴' },
   { href: '#use-cases', label: '使われる場面' },
   { href: '#relationships', label: '他の技術との関係' },
-  { href: '#related-stacks', label: 'よく一緒に使う技術' },
+  { href: '#related-stacks', label: '関連する技術' },
   { href: '#official', label: '公式サイト' },
 ];
 
@@ -111,7 +111,7 @@ export function StackDetail({ stack }: { stack: StackEntry }) {
 
         <section className="document-section" id="related-stacks" aria-labelledby="related-stacks-title">
           <p className="section-kicker">関連技術</p>
-          <h2 id="related-stacks-title">よく一緒に使う技術</h2>
+          <h2 id="related-stacks-title">関連する技術</h2>
           {relatedStacks.length > 0 ? (
             <div className="document-link-list">
               {relatedStacks.map((related) => (

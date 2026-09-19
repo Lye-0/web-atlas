@@ -14,7 +14,8 @@ const graph: SemanticGraph = { view: 'function-call-flow', nodes, edges: [
 const positions = nodes.map((node, index) => ({ node, x: [0, 400, 400, 404][index]!, y: [0, 180, -120, -118][index]!, z: [0, 0, 0, 0][index]! }));
 
 describe('polish geometry scope', () => {
-  // Recorded before the 3D fix from fcd28d02eb4c4329dabe5287c261e9c44282d61b.
+  // Original 3D regression baseline; 2026-09-13 updates only 2D approach handles
+  // that entered the target card. Ports, short-edge fallback and 3D stay fixed.
   it('freezes every 2D curve sample and SVG port/path across straight, reciprocal, self, vertical and short edges', () => {
     const paths = semanticFlowEdgePaths(graph, positions, new Set(['a']), undefined, '2d');
     expect(paths.map(path => ({ id: path.edge.id, svg: path.svgPath, samples: createHash('sha256').update(JSON.stringify(path.points)).digest('hex') }))).toMatchSnapshot();

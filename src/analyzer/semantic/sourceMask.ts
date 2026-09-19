@@ -4,7 +4,7 @@ const hide = (value: string) => value.replace(/[^\r\n]/g, '•');
 /** Keep quotes, escapes, line numbers and UTF-16 offsets valid for syntax parsing. */
 export function maskSemanticSource(source: string): string {
   const tokens = /\/\*[\s\S]*?\*\/|\/\/[^\r\n]*|"""[\s\S]*?"""|'''[\s\S]*?'''|"(?:\\[\s\S]|[^"\\])*"|'(?:\\[\s\S]|[^'\\])*'|`(?:\\[\s\S]|[^`\\])*`/g;
-  return source.replace(tokens, (token: string, offset: number) => {
+  return maskUrlSecrets(source.replace(tokens, (token: string, offset: number) => {
     if (/^(?:\/\/|\/\*)/.test(token)) return token;
     const before = source.slice(Math.max(0, offset - 160), offset);
     const key = before.match(/([\w$.-]+)["']?\s*(?::|=)\s*[$rbu@]*\s*$/i)?.[1];
@@ -14,5 +14,6 @@ export function maskSemanticSource(source: string): string {
       return quoted + body.replace(/\\(?:u[\da-fA-F]{4}|x[\da-fA-F]{2}|[\s\S])|[^\\]+/g, part => part.startsWith('\\') ? part : hide(part)) + quoted;
     }
     return quoted + body.replace(/(Bearer\s+)[A-Za-z0-9_.~-]{12,}/g, (value, prefix: string) => prefix + hide(value.slice(prefix.length))) + quoted;
-  });
+  }));
 }
+import { maskUrlSecrets } from '../urlPrivacy';

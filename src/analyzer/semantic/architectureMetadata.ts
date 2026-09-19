@@ -24,9 +24,10 @@ export interface ArchitectureRequest {
 }
 
 export const architectureKindLabels = {
-  application: 'アプリ・実行単位', component: '内部コンポーネント', 'shared-code': '共有コード',
+  application: '論理アプリ', component: '内部コンポーネント', 'shared-code': '共有コード',
   'code-package': 'コードパッケージ', resource: 'リソース', 'external-service': '外部サービス',
   'external-program': '外部プログラム', unresolved: '相手が未特定の要求',
+  'tool-operation': '操作・ツール使用', artifact: '成果物', 'execution-config': '実行構成', 'code-definition': 'コード・定義',
 };
 
 export function architectureEnvironmentLabel(environments: readonly string[]) {

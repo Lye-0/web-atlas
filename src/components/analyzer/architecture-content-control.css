@@ -1,0 +1,12 @@
+.architecture-content-control {display:flex;align-items:center;gap:8px;max-width:100%;min-width:0;color:var(--muted);font-size:12px;}
+.architecture-content-control > span {white-space:nowrap;}
+.architecture-content-control select {width:clamp(200px,25vw,360px);max-width:calc(100vw - 110px);min-width:0;height:34px;padding:4px 8px;border:1px solid var(--line);border-radius:5px;background:var(--surface);color:var(--text);text-overflow:ellipsis;}
+.architecture-content-control select:focus-visible {outline:2px solid var(--accent);outline-offset:2px;}
+.architecture-content-note {padding:8px 12px;margin:6px 0;background:var(--surface);color:var(--muted);font-size:12px;overflow-wrap:anywhere;}
+.architecture-content-note button {margin:4px 8px 0 0;padding:5px 9px;border:1px solid var(--line);border-radius:5px;color:var(--text);background:var(--surface);}
+.architecture-content-name {display:block;color:var(--text);font-size:13px;white-space:normal;overflow-wrap:anywhere;}
+.architecture-content-note p {margin:5px 0;}
+.architecture-content-actions {display:flex;align-items:baseline;flex-wrap:wrap;gap:8px;}
+.architecture-content-actions details {min-width:0;max-width:100%;}
+.architecture-content-actions details[open] {flex-basis:100%;}
+.architecture-content-actions summary {cursor:pointer;padding:5px 0;}

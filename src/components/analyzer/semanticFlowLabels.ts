@@ -77,10 +77,10 @@ export function projectSemanticFlowLabels(camera: Camera, size: { width: number;
     if (y >= top && y <= bottom && !context.obstacles?.some(obstacle => coversPoint(obstacle, x, y))) projected.push({ item, x, y });
   }
   const budget = Math.max(6, Math.min(24, Math.floor(size.width * size.height / 28000)));
-  const {labels,place} = createSpatialLabelPlacer(projected.map(p=>({id:p.item.node.id,x:p.x,y:p.y})),size,top,bottom,context,selectedIds,previous);
+  const {labels,place} = createSpatialLabelPlacer(projected.map(p=>({id:p.item.node.id,x:p.x,y:p.y})),size,top,bottom,{...context,regionLineWrap:context.view==='architecture-map'},selectedIds,previous);
   const nodeLabel = (item: SemanticPosition): FlowLabelContent => {
     const display = context.displays?.get(item.node.id), role = context.roles?.get(item.node.id);
-    return { id: item.node.id, label: typeof item.node.attributes.shortLabel === 'string' ? item.node.attributes.shortLabel : context.view === 'data-flow' ? display?.title ?? item.node.label : item.node.label, path: item.node.attributes.displayAggregate === true ? `${Number(item.node.attributes.targetCount).toLocaleString()}対象${Number(item.node.attributes.matchingCount) > 0 ? ` · ${Number(item.node.attributes.matchingCount)}件一致` : ''}` : `${item.node.kind === 'external' && !item.node.architecture ? '定義先未特定 · 呼び出し箇所 ' : ''}${display?.location ?? `${item.node.path ?? item.node.group}${item.node.line ? `:${item.node.line}` : ''}`}`,
+    return { id: item.node.id, label: typeof item.node.attributes.shortLabel === 'string' ? item.node.attributes.shortLabel : (context.view === 'data-flow' || context.view === 'architecture-map') ? display?.title ?? item.node.label : item.node.label, path: item.node.attributes.displayAggregate === true ? `${Number(item.node.attributes.targetCount).toLocaleString()}対象${Number(item.node.attributes.matchingCount) > 0 ? ` · ${Number(item.node.attributes.matchingCount)}件一致` : ''}` : `${item.node.kind === 'external' && !item.node.architecture ? '定義先未特定 · 呼び出し箇所 ' : ''}${display?.location ?? `${item.node.path ?? item.node.group}${item.node.line ? `:${item.node.line}` : ''}`}`,
       ...(item.node.attributes.displayAggregate === true ? { tooltip: `表示上の集約\n${String(item.node.attributes.fullLabel ?? item.node.label)}\n${Number(item.node.attributes.targetCount).toLocaleString()}対象` } : {}),
       ...(display ? { disambiguation: display.disambiguation, tooltip: display.tooltip } : {}),
       ...(display?.scopeRole ? { scopeRole: display.scopeRole, scopeActive: context.scopeActiveIds?.has(item.node.id) } : {}),
@@ -113,6 +113,19 @@ export function projectSemanticFlowLabels(camera: Camera, size: { width: number;
   if (!nodesById) { nodesById = new Map(ordered.map(item => [item.node.id, item.node])); nodeIndexes.set(ordered, nodesById); }
   for (const region of [...context.regions ?? []].sort((a, b) => Number(previous.has(`flow-region:${b.id}`)) - Number(previous.has(`flow-region:${a.id}`)) || b.count - a.count || a.label.localeCompare(b.label))) {
     if (regionCount >= (context.quietBackground ? 4 : 16)) break;
+    if(context.view==='architecture-map'){
+      // Names attach to the projected wire boundary, not the current set of visible member dots.
+      const corners=[region.z,region.z+(region.depth??0)].flatMap(z=>[[region.x,region.y],[region.x+region.width,region.y],[region.x,region.y+region.height],[region.x+region.width,region.y+region.height]].map(([x,y])=>{
+        point.set(x!,y!,z).applyMatrix4(projection);return{x:(point.x+1)*size.width/2,y:(1-point.y)*size.height/2,z:point.z};
+      }));
+      const anchors=[...corners];
+      for(const [a,b] of [[0,1],[0,2],[1,3],[2,3],[4,5],[4,6],[5,7],[6,7],[0,4],[1,5],[2,6],[3,7]]){
+        const p=corners[a!]!,q=corners[b!]!;for(const t of [.25,.5,.75])anchors.push({x:p.x+(q.x-p.x)*t,y:p.y+(q.y-p.y)*t,z:p.z+(q.z-p.z)*t});
+      }
+      const label={id:`flow-region:${region.id}`,label:region.label,path:`${region.count.toLocaleString()}対象`,selected:false,match:false,region:true};
+      if(anchors.filter(p=>p.z>=-1&&p.z<=1&&p.x>=12&&p.x<=size.width-12&&p.y>=top&&p.y<=bottom).sort((a,b)=>a.y-b.y||a.x-b.x).some(p=>place(label,p.x,p.y,false)))regionCount++;
+      continue;
+    }
     const members = region.nodeIds.flatMap(id => { const p = projectedById.get(id); return p ? [{ x: p.x, y: p.y, z: 0 }] : []; });
     const corners = members.length ? members : [region.z, region.z + (region.depth ?? 0)].flatMap(z => [[region.x, region.y], [region.x + region.width, region.y], [region.x, region.y + region.height], [region.x + region.width, region.y + region.height]].map(([x, y]) => {
       point.set(x!, y!, z).project(camera); return { x: (point.x + 1) * size.width / 2, y: (1 - point.y) * size.height / 2, z: point.z };
@@ -151,8 +164,33 @@ export class FlowLabelLayer {
   private placements = new Map<string, FlowLabelPlacement>();
   private content: FlowLabelContent[] = [];
   private active = true;
+  private pointerLabel?: { id: string; element: HTMLElement; rect: DOMRect };
 
   constructor(private publish: (content: FlowLabelContent[]) => void) {}
+
+  /** Keep the actual clicked label (not a substitute target) under the pointer.
+   * A manual top-layer box survives the detail panel clipping the canvas. */
+  pinPointerLabel(id: string) {
+    if (this.pointerLabel?.id === id) return;
+    this.releasePointerLabel();
+    const element = this.elements.get(id);
+    if (!element || typeof element.showPopover !== 'function') return;
+    const rect = element.getBoundingClientRect();
+    this.pointerLabel = { id, element, rect };
+    element.setAttribute('popover', 'manual');
+    this.place(id, element);
+    element.showPopover();
+  }
+
+  releasePointerLabel(id?: string) {
+    const pinned = this.pointerLabel; if (!pinned) return;
+    if (id !== undefined && pinned.id !== id) return;
+    this.pointerLabel = undefined;
+    if (pinned.element.isConnected) pinned.element.hidePopover();
+    pinned.element.removeAttribute('popover');
+    for (const key of ['position', 'left', 'top', 'margin']) pinned.element.style.removeProperty(key);
+    this.place(pinned.id, pinned.element);
+  }
 
   private place(id: string, element: HTMLElement) {
     const position = this.active ? this.placements.get(id) : undefined;
@@ -161,13 +199,18 @@ export class FlowLabelLayer {
     element.tabIndex = position ? 0 : -1;
     element.setAttribute('aria-hidden', String(!position));
     if (position) {
-      element.style.transform = `translate3d(${position.x}px, ${position.y}px, 0) translate(${labelInset(position)}px, -50%)`;
-      if (position.width !== undefined) element.style.width = `${position.width}px`;
-      if (position.height !== undefined) element.style.height = `${position.height}px`;
+      const pinned = this.pointerLabel?.id === id ? this.pointerLabel : undefined;
+      if (pinned) {
+        Object.assign(element.style, { position: 'fixed', left: `${pinned.rect.left}px`, top: `${pinned.rect.top}px`, margin: '0', transform: 'none', width: `${pinned.rect.width}px`, height: `${pinned.rect.height}px` });
+      } else {
+        element.style.transform = `translate3d(${position.x}px, ${position.y}px, 0) translate(${labelInset(position)}px, -50%)`;
+        if (position.width !== undefined) element.style.width = `${position.width}px`;
+        if (position.height !== undefined) element.style.height = `${position.height}px`;
+      }
     }
     const leader = this.leaders.get(id);
     if (leader) {
-      const visible = position && !position.region && position.pointX !== undefined && position.pointY !== undefined;
+      const visible = position && position.pointX !== undefined && position.pointY !== undefined;
       leader.style.visibility = visible ? 'visible' : 'hidden';
       if (visible) {
         leader.setAttribute('x1', String(position.pointX)); leader.setAttribute('y1', String(position.pointY));
@@ -207,6 +250,7 @@ export class FlowLabelLayer {
       if (ids.has(label.id) || !Number.isFinite(label.x) || !Number.isFinite(label.y)) return false;
       ids.add(label.id); return true;
     });
+    if (this.pointerLabel && !ids.has(this.pointerLabel.id)) this.releasePointerLabel();
     this.placements = new Map(next.map(label => [label.id, label]));
     for (const [id, element] of this.elements) this.place(id, element);
     if (next.length === this.content.length && next.every((label, index) => {
@@ -220,6 +264,7 @@ export class FlowLabelLayer {
   resume() { this.active = true; }
 
   suspend() {
+    this.releasePointerLabel();
     this.active = false;
     this.placements.clear(); this.content = [];
     for (const [id, element] of this.elements) this.place(id, element);

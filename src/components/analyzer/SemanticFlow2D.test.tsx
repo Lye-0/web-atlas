@@ -55,6 +55,29 @@ describe('semantic 2D drawing and selection layers', () => {
     expect(host.querySelector('[data-particle-route="a-b"]')?.getAttribute('d')).not.toBe(host.querySelector('[data-particle-route="a-c"]')?.getAttribute('d'));
   });
 
+  it('fits the first content overview while preserving the legacy overview and saved cameras',async()=>{
+    const wide:SemanticGraph={view:'architecture-map',nodes:Array.from({length:40},(_,i)=>({...graph.nodes[0]!,id:`wide-${i}`,attributes:{unifiedFlow:true}})),edges:[]};
+    await render(undefined,{graph:wide,camera:undefined,visitId:'whole',selectedIds:new Set()});
+    const scale=()=>Number(host.querySelector('.semantic-flow-2d')?.getAttribute('data-camera-scale'));
+    expect(scale()).toBe(.65);
+    await render(undefined,{graph:wide,camera:undefined,fitInitial:true,visitId:'content',selectedIds:new Set()});expect(scale()).toBeLessThan(.65);
+    await render(undefined,{graph:wide,camera:{x:12,y:24,scale:.9},fitInitial:true,visitId:'saved',selectedIds:new Set()});expect(scale()).toBe(.9);
+  });
+
+  it('anchors the arrow tip at the same endpoint when selection thickens the line', async () => {
+    const path = () => host.querySelector('[data-edge-id="a-b"] > path')!;
+    const before = path().getAttribute('d');
+    for (const selectedIds of [new Set<string>(), new Set(['b'])]) {
+      await render(undefined, { selectedIds });
+      expect(path().getAttribute('d')).toBe(before);
+      const marker = host.querySelector(path().getAttribute('marker-end')!.slice(4, -1))!;
+      // The triangle's tip is (10, 5); its reference point must be identical
+      // regardless of the selected strokeWidth used to size the marker.
+      expect(marker.getAttribute('refX')).toBe('10');
+      expect(marker.getAttribute('refY')).toBe('5');
+    }
+  });
+
   it('advances short and long connections by the same distance and supports reduced/off/hidden motion', async () => {
     const particles = [...host.querySelectorAll('[data-flow-particle]')];
     const offsets = () => particles.map(path => Number(path.getAttribute('transform')?.match(/translate\(([^ ]+)/)?.[1]));

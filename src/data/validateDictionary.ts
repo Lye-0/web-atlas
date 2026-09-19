@@ -53,6 +53,7 @@ export function validateDictionary(
   }
 
   const packageOwners = new Map<string, string>();
+  const aliases = new Map<string, Set<string>>();
   for (const stack of stacks) {
     if (!idPattern.test(stack.id)) errors.push(`Stack ID cannot be used in a URL: ${stack.id}`);
     if (!categoryIdSet.has(stack.categoryId)) {
@@ -67,12 +68,20 @@ export function validateDictionary(
       }
     }
     for (const packageName of stack.packageNames ?? []) {
-      const previousOwner = packageOwners.get(packageName);
+      const normalized = packageName.trim().toLowerCase();
+      const previousOwner = packageOwners.get(normalized);
       if (previousOwner && previousOwner !== stack.id) {
         errors.push(`Package name ${packageName} is assigned to both ${previousOwner} and ${stack.id}`);
       }
-      packageOwners.set(packageName, stack.id);
+      packageOwners.set(normalized, stack.id);
     }
+    for (const alias of stack.aliases ?? []) { const normalized = alias.trim().toLowerCase(); aliases.set(normalized, new Set([...(aliases.get(normalized) ?? []), stack.id])); }
+  }
+  for (const [alias, owners] of aliases) {
+    if (owners.size < 2) continue;
+    // Legacy search-only term. Lookup deliberately returns no canonical product.
+    if (alias === 'cloud storage' && [...owners].every(id => ['firebase-storage', 'google-cloud-storage'].includes(id))) continue;
+    errors.push(`Alias ${alias} is assigned to multiple stacks: ${[...owners].join(', ')}`);
   }
 
   const mapCategoryIds: string[] = [];
@@ -91,6 +100,24 @@ export function validateDictionary(
   }
   for (const id of stackIds) {
     if (!mapStackIds.includes(id)) errors.push(`Stack ${id} is not present in the map`);
+  }
+
+  const categoryById = new Map(categories.map(category => [category.id, category]));
+  const stackById = new Map(stacks.map(stack => [stack.id, stack]));
+  const checkParents = (node: MapNode, parentCategoryId?: string): void => {
+    if (node.kind === 'stack') {
+      if (stackById.has(node.stackId) && stackById.get(node.stackId)?.categoryId !== parentCategoryId) errors.push(`Map stack ${node.stackId} has an incorrect category parent`);
+      return;
+    }
+    if (node.kind === 'category') {
+      if (categoryById.has(node.categoryId) && categoryById.get(node.categoryId)?.parentCategoryId !== parentCategoryId) errors.push(`Map category ${node.categoryId} has an incorrect category parent`);
+      node.children.forEach(child => checkParents(child, node.categoryId));
+    } else node.children.forEach(child => checkParents(child, parentCategoryId));
+  };
+  checkParents(map);
+  for (const category of categories) {
+    const ancestors = new Set<string>([category.id]); let parent = category.parentCategoryId;
+    while (parent) { if (ancestors.has(parent)) { errors.push(`Category parent cycle: ${category.id}`); break; } ancestors.add(parent); parent = categoryById.get(parent)?.parentCategoryId; }
   }
 
   return errors;

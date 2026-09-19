@@ -18,10 +18,11 @@ function importOrigin(compiler: DataCompiler, expression: ts.Expression, depth =
   // Read import declarations directly: external modules intentionally do not load into the compiler host.
   for (const statement of root.getSourceFile().statements) if (ts.isImportDeclaration(statement) && ts.isStringLiteral(statement.moduleSpecifier)) {
     const clause = statement.importClause;
+    if (clause?.isTypeOnly) continue;
     const sameBinding = (binding: ts.Identifier) => compiler.checker.getSymbolAtLocation(root) === compiler.checker.getSymbolAtLocation(binding);
     if (clause?.name?.text === root.text && sameBinding(clause.name)) return { module: statement.moduleSpecifier.text, name: 'default' };
     if (clause?.namedBindings && ts.isNamespaceImport(clause.namedBindings) && clause.namedBindings.name.text === root.text && sameBinding(clause.namedBindings.name)) return { module: statement.moduleSpecifier.text, name: '*' };
-    if (clause?.namedBindings && ts.isNamedImports(clause.namedBindings)) for (const item of clause.namedBindings.elements) if (item.name.text === root.text) {
+    if (clause?.namedBindings && ts.isNamedImports(clause.namedBindings)) for (const item of clause.namedBindings.elements) if (!item.isTypeOnly && item.name.text === root.text) {
       // A local declaration with the same spelling must not acquire the import's authority.
       const symbol = compiler.checker.getSymbolAtLocation(root), imported = compiler.checker.getSymbolAtLocation(item.name);
       if (symbol && imported && symbol !== imported) return undefined;
@@ -126,6 +127,13 @@ export function refineDataSchemas(analysis: SemanticAnalysis, compiler: DataComp
         if (get('primaryKey')?.kind === ts.SyntaxKind.TrueKeyword) { field.key = 'primary'; field.nullable = false; constraint(model, 'primary-key', [name], member); }
         if (get('unique')?.kind === ts.SyntaxKind.TrueKeyword) constraint(model, 'unique', [name], member);
         for (const key of ['min', 'max', 'minlength', 'maxlength', 'enum', 'match']) if (get(key)) field.constraints!.push(`${key}: ${get(key)!.getText()}`);
+        const reference = get('ref');
+        if (family === 'mongoose' && reference) {
+          const lexicalOwner = (node: ts.Node): ts.Node => { let parent = node.parent; while (parent && !ts.isSourceFile(parent) && !ts.isFunctionLike(parent)) parent = parent.parent; return parent; };
+          const targets = ts.isStringLiteralLike(reference) ? records.filter(record => record.family === 'mongoose' && nameOf(record.call.expression) === 'model' && literal(record.call.arguments?.[0]) === reference.text && record.ast.getSourceFile() === member.getSourceFile() && lexicalOwner(record.ast) === lexicalOwner(member)) : [];
+          if (targets.length === 1) { field.referenceIds = [targets[0]!.model.id]; field.target = targets[0]!.model.label; constraint(model, 'orm-relation', [name], reference, targets[0]!.model); }
+          else { model.model!.expansion = 'partial'; model.model!.reasons.push(`refの登録先を一意に特定できません: ${reference.getText()}`); }
+        }
         model.model!.reasons = ['静的な明示項目を表示しています。フック、プラグイン、動的な定義追加やライブDBへの適用は評価していません。'];
         return field;
       }

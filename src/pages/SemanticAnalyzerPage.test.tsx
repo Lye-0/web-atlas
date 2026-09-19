@@ -53,6 +53,43 @@ describe('semantic Analyzer exploration', () => {
     await import('./SemanticAnalyzerPage'); await render();
   });
   afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.clearAllMocks(); vi.unstubAllGlobals(); });
+  it('keeps loading distinct from an empty graph and below the control overlays',async()=>{
+    vi.mocked(getSemanticAnalysis).mockImplementation(()=>({promise:new Promise(()=>{}),unsubscribe:()=>{}}));
+    await render({...store,scannedAt:'pending-analysis'});
+    await act(async()=>host.querySelector<HTMLAnchorElement>('a[href="/analyzer/architecture-map"]')!.click());
+    const placeholder=host.querySelector<HTMLElement>('.semantic-stage-placeholder')!;
+    expect(placeholder.textContent).toContain('構成図を準備しています');expect(placeholder.getAttribute('role')).toBe('status');
+    expect(Number.parseFloat(placeholder.style.top)).toBeGreaterThan(80);expect(host.querySelector('.semantic-empty-result')).toBeNull();
+    expect(host.querySelector('select[aria-label="表示内容"]')).not.toBeNull();
+  });
+  it('keeps overview state separate, limits search, preserves mode selection, and shows empty content in a real scope',async()=>{
+    const base=analysis.architecture!.nodes[0]!;
+    const make=(id:string,kind:NonNullable<typeof base.architecture>['kind'],purpose='')=>({...base,id,label:id,attributes:{purpose,unifiedFlow:true},architecture:{...base.architecture!,kind,parentId:undefined as string|undefined,request:undefined,auxiliary:false}});
+    const app=make('app-a','application'),child=make('child','component'),op=make('generate','tool-operation','generate'),sql=make('sql','artifact'),other=make('outside','external-service');child.architecture.parentId=app.id;
+    const edge=(id:string,source:string,target:string,kind:string)=>({...analysis.edges[0]!,id,source,target,kind,views:['architecture-map' as const]});
+    const architecture={view:'architecture-map' as const,nodes:[app,child,op,sql,other],edges:[edge('generated','generate','sql','flow-generates'),edge('outside-edge','sql','outside','data-operation')],environments:[],limitations:[]};
+    vi.mocked(getSemanticAnalysis).mockImplementation(()=>({promise:Promise.resolve({...analysis,architecture}),unsubscribe:()=>{}}));await render({...store,scannedAt:'content'});
+    await act(async()=>host.querySelector<HTMLAnchorElement>('a[href="/analyzer/architecture-map"]')!.click());
+    const content=()=>host.querySelector<HTMLSelectElement>('select[aria-label="表示内容"]')!;
+    const change=async(value:string)=>act(async()=>{content().value=value;content().dispatchEvent(new Event('change',{bubbles:true}));});
+    const ids=()=>[...host.querySelectorAll('[data-node-id]')].map(e=>e.getAttribute('data-node-id'));
+    const camera=()=>host.querySelector('.semantic-flow-2d')?.getAttribute('data-camera-scale');
+    expect(content().value).toBe('all');await search('app-a');const original=ids(),originalCamera=camera(),jobs=vi.mocked(getSemanticAnalysis).mock.calls.length;
+    const searchInput=host.querySelector<HTMLInputElement>('input[type="search"]')!,selector=content();
+    await act(async()=>host.querySelector<HTMLButtonElement>('[aria-label="全画面表示"]')!.click());expect(searchInput.closest('.analyzer-workspace-search')?.hasAttribute('hidden')).toBe(true);expect(host.querySelector('.analyzer-controls-workspace.is-fullscreen')!.contains(selector)).toBe(true);
+    await act(async()=>host.querySelector<HTMLButtonElement>('[aria-label="全画面を終了"]')!.click());expect(content()).toBe(selector);expect(host.querySelector('input[type="search"]')).toBe(searchInput);expect(searchInput.value).toBe('app-a');expect(searchInput.closest('.analyzer-workspace-search')?.hasAttribute('hidden')).toBe(false);
+    await change('simple-overview');expect(ids().every(id=>id?.startsWith('architecture-simple:'))).toBe(true);const simpleIds=ids(),simpleCamera=camera();
+    await search('child');expect(host.querySelector('[role="option"]')?.textContent).toContain('要約の内訳に一致');await act(async()=>host.querySelector<HTMLElement>('[role="option"]')!.click());expect(host.querySelector('.architecture-detail')?.textContent).toContain('child');expect(camera()).toBe(simpleCamera);expect(ids()).toEqual(simpleIds);
+    await act(async()=>button('3D').click());expect(host.querySelector('.architecture-detail h3')?.textContent).toBe('app-a');await act(async()=>button('2D').click());await change('all');expect(ids()).toEqual(original);expect(camera()).toBe(originalCamera);expect(host.querySelector<HTMLInputElement>('input[type="search"]')!.value).toBe('app-a');
+    await change('simple-overview');expect(host.querySelector<HTMLInputElement>('input[type="search"]')!.value).toBe('child');expect(host.querySelector('.architecture-detail h3')?.textContent).toBe('app-a');await act(async()=>button('全体で詳しく見る：child').click());expect(content().value).toBe('all');expect(host.querySelector('.architecture-detail h3')?.textContent).toBe('child');
+    await act(async()=>button('プロジェクトへ').click());await search('app-a');
+    await change('path:database');expect(ids()).toContain('generate');expect(ids()).not.toContain('outside');await search('outside');expect(host.querySelectorAll('[role="option"]')).toHaveLength(0);
+    await search('sql');await act(async()=>host.querySelector('[data-node-id="sql"]')!.dispatchEvent(new MouseEvent('click',{bubbles:true})));
+    expect(host.querySelector('.semantic-detail')?.textContent).toContain('この表示範囲の外側');await act(async()=>button('3D').click());expect(content().value).toBe('path:database');expect(host.querySelector('.semantic-detail h3')?.textContent).toBe('sql');
+    await act(async()=>button('2D').click());await change('all');expect(ids()).toEqual(original);expect(camera()).toBe(originalCamera);expect(host.querySelector<HTMLInputElement>('input[type="search"]')!.value).toBe('app-a');
+    await act(async()=>host.querySelector('[data-node-id="app-a"]')!.dispatchEvent(new MouseEvent('click',{bubbles:true})));await act(async()=>button('内部を開く').click());await change('path:database');
+    expect(host.querySelector('[aria-label="構成図の現在地"] [aria-current="page"]')?.textContent).toBe('app-a');expect(ids()).toHaveLength(0);expect(host.textContent).toContain('現在の階層には、この内容の中心となる対象や直接の相手がありません');expect(vi.mocked(getSemanticAnalysis).mock.calls.length).toBe(jobs);
+  });
   it('keeps selections and 3D mode per view while separating models from function calls', async () => {
     expect(host.querySelectorAll('.analyzer-view-tabs a')).toHaveLength(10);
     expect(host.querySelector('.semantic-object-list')).toBeNull();
@@ -250,8 +287,10 @@ describe('semantic Analyzer exploration', () => {
     await act(async () => button('3D').click()); await act(async () => button('3Dテスト移動').click());
     await chooseArchitecture(ids.B!); expect(current()).toBe('A');
     expect(host.querySelector('.semantic-detail')?.textContent).toContain('表示範囲外');
+    await act(async()=>button('表示設定').click());
     await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="周辺構成"]')!.click());
-    expect([...host.querySelectorAll<HTMLElement>('[data-node-id]')].map(element => element.dataset.nodeId)).toContain(ids.B);
+    expect([...host.querySelectorAll<HTMLElement>('[data-node-id]')].map(element => element.dataset.nodeId)).not.toContain(ids.B);
+    expect(host.querySelector('.semantic-detail h3')?.textContent).toBe('B');
     expect([...host.querySelectorAll<HTMLElement>('[data-node-id]')].map(element => element.dataset.nodeId)).not.toContain(ids.C);
     expect(host.querySelector('[data-orbit]')?.getAttribute('data-camera-zoom')).toBe('0.72');
     await act(async () => button('この構成を開く').click());
