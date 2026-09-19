@@ -84,7 +84,7 @@ https://web-atlas.lye-0.workers.dev/
 
 ### 読み込みと共通操作
 
-<details open>
+<details>
 <summary><strong>プロジェクトを読み込む・読み直す</strong></summary>
 
 ![Analyzerの開始画面。プロジェクトフォルダの選択とブラウザ内解析の案内](docs/images/analyzer-project-picker.png)
