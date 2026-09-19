@@ -1,3 +1,4 @@
+import {staticSiteFlowAdapter} from './architectureStaticSiteFlows';
 import {platformTool,addPlatformOperation,finishPlatformFlows} from './architecturePlatformFlows';
 import { parseJsonc } from '../parsers';
 import { localPath } from '../projectPaths';
@@ -71,23 +72,25 @@ export function addArchitectureToolFlows(model:ArchitectureModel,input:SemanticI
   };
   const operations=new Map<string,SemanticNode>();
   const platformContext={model,input,add,connect,source,artifact,at,owner};
+  const customAdapter=staticSiteFlowAdapter(platformContext);customAdapter.documents();
   for(const cmd of input.commands??[]){
-    const a=cmd.argv,platform=platformTool(cmd,input),tool=platform?.tool??a[0],sub=a[1];if(a.some(v=>['--help','-h','--version','-v'].includes(v)))continue;
-    const purpose=platform?.purpose??(tool==='wrangler'?(sub==='dev'?'start':sub==='deploy'?'deploy':sub==='d1'&&a[2]==='migrations'&&a[3]==='apply'?'apply':undefined)
+    const a=cmd.argv,platform=platformTool(cmd,input),custom=platform?undefined:customAdapter.detect(cmd),tool=platform?.tool??a[0],sub=a[1];if(a.some(v=>['--help','-h','--version','-v'].includes(v)))continue;
+    const purpose=platform?.purpose??custom?.purpose??(tool==='wrangler'?(sub==='dev'?'start':sub==='deploy'?'deploy':sub==='d1'&&a[2]==='migrations'&&a[3]==='apply'?'apply':undefined)
       :tool==='vite'?(sub==='build'?'build':!sub||sub==='dev'||sub==='serve'||sub.startsWith('-')?'serve':undefined)
       :tool==='drizzle-kit'&&sub==='generate'?'generate':tool==='firebase'&&['emulators:start','emulators:exec'].includes(sub??'')?'start'
       :['vercel','netlify','supabase'].includes(tool??'')&&['dev','start'].includes(sub??'')?'start':undefined);
     if(!purpose)continue;
     const unit=owner(cmd.path);if(!unit)continue;
     const explicitEnvironment=option(a,'--env','-e','--mode');
-    const environment=tool==='next'?'':explicitEnvironment??(tool==='vite'&&purpose==='serve'?'development':'');
+    const environment=tool==='next'||custom?'':explicitEnvironment??(tool==='vite'&&purpose==='serve'?'development':'');
     const place=a.includes('--remote')?'cloud':a.includes('--local')||purpose==='serve'||purpose==='start'?'local':'unconfirmed';
-    const product=({next:'nextjs',firebase:'firebase-cli',vercel:'vercel-cli',netlify:'netlify-cli',supabase:'supabase-cli','drizzle-kit':'drizzle-orm'} as Record<string,string>)[tool!]??tool!;
+    const product=({node:'nodejs',next:'nextjs',firebase:'firebase-cli',vercel:'vercel-cli',netlify:'netlify-cli',supabase:'supabase-cli','drizzle-kit':'drizzle-orm'} as Record<string,string>)[tool!]??tool!;
     const name=tool==='next'?'Next.js':tool==='vsce'?'VSCE':tool==='esbuild'?'esbuild':tool==='drizzle-kit'?'Drizzle Kit':input.stackMetadata?.[product]?.name??tool!;
     const op=add(key('operation',cmd.id),`${name}：${purposes[purpose]}`,'tool-operation',cmd.evidence,environment?[environment]:[],{scriptName:cmd.scriptName,workingDirectory:cmd.workingDirectory??cmd.directory,invocationLabel:cmd.invocationLabel??'',usageArguments:cmd.argv.slice(1).join(' '),sourceId:cmd.sourceCommandId??cmd.id,scriptId:cmd.sourceScriptId??cmd.scriptId,dictionaryStackId:product,purpose,executionPlace:'unconfirmed',targetPlace:place,command:cmd.label,ownerPath:unit.architecture?.ownerPath??'',resolution:'操作対象は未特定'});
     operations.set(cmd.id,op);op.architecture!.roles=[{label:`${name}で${purposes[purpose]}する操作の記述`,confidence:'source',reason:'実際のコマンドと設定を照合。実行・成功は未観測',evidence:cmd.evidence}];op.architecture!.technologyNames=[product];op.architecture!.context=['静的コマンド・実行未観測'];if(tool==='vite'&&purpose==='serve'&&explicitEnvironment===undefined)op.attributes.defaultEnvironment='Vite devの既定mode=development';
     const cwd=cmd.workingDirectory??option(a,'--cwd','--workdir');const base=cwd===undefined?cmd.directory:staticPath(cmd.directory,cwd);
     if(!base||/[$`]/.test(environment)){op.attributes.resolution='作業ディレクトリまたは環境指定が動的で静的に解決できない';continue;}
+    if(custom){customAdapter.apply(custom,cmd,op);continue;}
     if(platform){addPlatformOperation(platformContext,cmd,op,unit,base,tool!);continue;}
     const explicit=option(a,'--config','-c');
     const candidates=explicit!==undefined?[staticPath(base,explicit)]:tool==='wrangler'?['wrangler.jsonc','wrangler.json','wrangler.toml'].map(p=>localPath(base,p)):tool==='vite'?['vite.config.ts','vite.config.js','vite.config.mts','vite.config.mjs'].map(p=>localPath(base,p)):tool==='drizzle-kit'?['drizzle.config.ts','drizzle.config.js','drizzle.config.json'].map(p=>localPath(base,p)):[];

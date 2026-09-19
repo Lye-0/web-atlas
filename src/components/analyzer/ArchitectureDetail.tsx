@@ -1,3 +1,4 @@
+import {ArchitectureStaticSiteInfo} from './ArchitectureStaticSiteInfo';
 import {architectureContentCoverage} from './architectureContentCoverage';
 import {architectureDefinitionPresentation} from './architectureDefinitionPresentation';
 import { architectureEnvironmentContext, architectureUsageContext, architectureTargetSummary } from '../../analyzer/semantic/architectureContext';
@@ -110,6 +111,7 @@ export function ArchitectureDetail({ node, edge, graph, visible, sources, store,
     <div className="analyzer-detail-heading"><h3>{title}</h3><button type="button" aria-label="詳細を閉じる" onClick={onClose}>×</button></div>
     {node && arch && <>
       <p className="architecture-detail-kind"><strong>選択中</strong> · {architectureKindLabels[arch.kind]}</p>
+      <ArchitectureStaticSiteInfo node={node} sources={sources}/>
       {node.attributes.providedContent && <p className="architecture-context-note">提供内容：{String(node.attributes.providedContent)}</p>}
       {arch.request && <section className="architecture-request-expression"><h4>記録された要求</h4><code>{publicUrlText(arch.request.expression ?? '式未記録')}</code><p>接続先未特定。式の実行・補完は行わず、記録されたコードを表示しています。</p>
         {node.attributes.requestCall && <p>確認した呼び出し：<code>{String(node.attributes.requestCall)}</code></p>}{node.attributes.resolutionReason && <p>{String(node.attributes.resolutionReason)}</p>}

@@ -1,3 +1,4 @@
+import {staticSiteEntries} from '../staticSiteSources';
 import { findJsonPropertyValueRange, parseJsonc, stripJsonComments } from '../parsers';
 import { architectureSyntax } from './architectureSyntax';
 import { architectureToml } from './architectureToml';
@@ -199,6 +200,20 @@ export function buildArchitectureModel(input: SemanticInput, analysis: Pick<Sema
   }
   for (const pkg of packages.filter(p => p.node.architecture?.context.includes('ブラウザ'))) {
     for (const [path] of configs.filter(([p]) => packageAt(p) === pkg && /\.[jt]sx?$/.test(p))) if (syntax.get(path)?.calls.some(c => /(?:^|\.)(?:createRoot|hydrateRoot)$/.test(c.callee))) { pkg.node.architecture!.entryPaths.push(path); entryOwners.set(path, pkg.node.id); }
+  }
+  // Fill only unknown browser origins; established framework/manifest ownership wins.
+  for(const entry of staticSiteEntries(sources)){
+    const pkg=packageAt(entry.path),existing=units.filter(u=>within(entry.path,u.dir)).sort((a,b)=>b.dir.length-a.dir.length)[0]?.node??pkg?.node;
+    if(existing&&(existing.architecture!.kind!=='code-package'||existing.architecture!.context.length))continue;
+    // A nested HTML file under a manifest does not establish a second application.
+    if(pkg&&entry.root!==(pkg.dir||'.'))continue;
+    const evidence=entry.references.map(r=>architectureEvidence(entry.path,sources[entry.path]!,r.start,r.end-r.start,`ブラウザ入口が読み込むファイル: ${r.path}`));
+    const node=existing??add(['static-site',entry.root],entry.root==='.'?'静的Webサイト':entry.root.split('/').at(-1)!,'application',evidence,{ownerPath:entry.root==='.'?'':entry.root});
+    node.architecture!.kind='application';node.attributes.architectureKind='application';node.attributes.staticSite=true;
+    node.architecture!.context=['静的Webサイト・ブラウザ実行','HTML / CSS / JavaScript'];
+    node.architecture!.entryPaths.push(entry.path);node.architecture!.files.push(entry.path,...entry.references.map(r=>r.path));node.evidence.push(...evidence);
+    node.architecture!.roles.unshift({label:'ブラウザ用Webサイト',confidence:'source',reason:'HTML文書と入力内のJS・CSS参照を照合',evidence});
+    units.push({dir:node.architecture!.ownerPath??'',node});entryOwners.set(entry.path,node.id);
   }
   const ownerAt = (path: string) => {
     const entry = nodes.get(entryOwners.get(path) ?? ''); if (entry) return entry;

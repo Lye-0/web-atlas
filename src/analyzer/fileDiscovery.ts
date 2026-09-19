@@ -134,6 +134,7 @@ export function isAnalyzerSourcePath(path: string): boolean {
     || name === 'firebase.json'
     || name === '.firebaserc'
     || name === '.vscodeignore'
+    || name === 'readme.md'
     || name === 'wrangler.json'
     || name === 'wrangler.jsonc'
     || name === 'wrangler.toml'

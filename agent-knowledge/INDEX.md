@@ -124,6 +124,14 @@
 - files: `src/analyzer/buildAdapters.ts`, `src/analyzer/semantic/architectureCommands.ts`, `src/analyzer/semantic/architecturePlatformFlows.ts` …
 - memory: `agent-knowledge/entries/2026-09-19-build-declaration-invocation-45fba1.md`
 
+### 出力宣言のパスを、読取可能な入力パスの制約で消さない
+- id: `rm-20260919-declared-output-path-boundary`
+- type: `constraint`
+- maturity: `candidate`
+- tags: `static-analysis`, `output-path`, `provenance`
+- files: `src/analyzer/staticNodeScript.ts`, `src/analyzer/semantic/architectureStaticSiteFlows.ts`, `src/analyzer/semantic/architectureStaticSite.test.ts`
+- memory: `agent-knowledge/entries/2026-09-19-declared-output-path-boundary-a870c4.md`
+
 ### 領域再計算後でも見出し余白が別の構成を囲い込む
 - id: `rm-20260919-final-boundary-header-space`
 - type: `failure`
