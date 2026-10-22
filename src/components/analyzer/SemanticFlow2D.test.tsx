@@ -196,7 +196,7 @@ describe('semantic 2D drawing and selection layers', () => {
 describe('local relation entry readiness', () => {
   let host: HTMLDivElement, root: Root;
   let measured = { width: 0, height: 0 };
-  const observers: { callback: ResizeObserverCallback; target?: Element; disconnect: ReturnType<typeof vi.fn> }[] = [];
+  const observers: { callback: ResizeObserverCallback; target?: Element; disconnect: ReturnType<typeof vi.fn<() => void>> }[] = [];
   const onCamera = vi.fn();
   const show = (visitId: string, centerId = 'a', extras: Partial<ComponentProps<typeof SemanticFlow2D>> = {}) => act(async () => root.render(
     <SemanticFlow2D graph={graph} visitId={visitId} location={{ scopeId: 'file', centerId, depth: 1, direction: 'both' }} selectedIds={new Set([centerId])} matchIds={new Set()}
