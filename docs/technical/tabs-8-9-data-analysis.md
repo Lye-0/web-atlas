@@ -26,7 +26,7 @@ Views 8–9 use the [shared 3D display aggregation contract](semantic-analyzer.m
 
 The existing Tree-sitter pass and multi-language framework resolver remain the source of Views 6–7. Data-specific TypeScript/JavaScript refinement runs after that pass through:
 
-- `dataCompiler.ts`: a closed in-memory TypeScript compiler host, using the already installed TypeScript dependency. It parses supplied source and resolves supplied module facts or explicit relative files. It never reads the filesystem, imports project configuration, resolves external package contents, or executes target code.
+- `dataCompiler.ts`: a closed in-memory TypeScript compiler host, using the already installed TypeScript dependency. It parses supplied source and resolves supplied module facts or explicit relative files. It never reads the filesystem, imports project configuration, resolves external package contents, or executes target code. Embedded scripts from `.astro`, `.vue`, `.svelte` and `.html` retain their original filenames and offset-preserving source masks. Resolved component modules explicitly report `ts.Extension.Ts` to the compiler because those masks are parsed as TypeScript; `allowNonTsExtensions` alone does not prevent TypeScript from asserting on an unknown imported extension. Native JS/TS extensions keep their existing resolution behavior. This metadata does not add template analysis or execute framework compilation.
 - `dataModels.ts`: direct structural members, lexical/import-bound model references and bounded type expansion.
 - `dataSchemas.ts`: import-grounded static validation/ORM factories and declaration-level constraints.
 - `dataSchemaFiles.ts`: focused SQL/Prisma/GraphQL metadata, provenance and historical schema-file boundaries.

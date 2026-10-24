@@ -246,6 +246,14 @@
 - files: `src/analyzer/semantic/dataModels.ts`, `src/analyzer/semantic/dataCompiler.ts`, `src/analyzer/semantic/types.ts` …
 - memory: `agent-knowledge/entries/2026-09-08-model-definition-expansion-c23e054.md`
 
+### コンポーネント参照には元パスと解析用の拡張子メタデータを両方渡す
+- id: `rm-20261024-component-module-extension`
+- type: `failure`
+- maturity: `candidate`
+- tags: `typescript`, `component-import`, `evidence`
+- files: `src/analyzer/semantic/dataCompiler.ts`, `src/analyzer/sourceSyntax.ts`, `src/analyzer/semantic/dataCompiler.test.ts` …
+- memory: `agent-knowledge/entries/2026-10-24-component-module-extension-c73e15.md`
+
 ## analyzer-rendering
 
 ### R3Fの最後の購読とRootStateからrenderの参照を切る

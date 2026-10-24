@@ -25,7 +25,12 @@ export function createDataCompiler(input: SemanticInput) {
     getSourceFile: name => files.get(name), getDefaultLibFileName: () => '', writeFile: () => undefined,
     getCurrentDirectory: () => '', getDirectories: () => [], fileExists: name => files.has(name), readFile: name => files.get(name)?.text,
     getCanonicalFileName: name => name, useCaseSensitiveFileNames: () => true, getNewLine: () => '\n',
-    resolveModuleNames: (names, from) => names.map(name => { const resolvedFileName = resolve(name, from); return resolvedFileName ? { resolvedFileName } : undefined; }),
+    resolveModuleNames: (names, from) => names.map(name => {
+      const resolvedFileName = resolve(name, from);
+      // Component scripts are already extracted as TypeScript. Keep their real
+      // paths for identity/Evidence, but do not let TS infer an unknown extension.
+      return resolvedFileName ? { resolvedFileName, ...(/\.(?:vue|svelte|astro|html)$/.test(resolvedFileName) ? { extension: ts.Extension.Ts } : {}) } : undefined;
+    }),
   };
   const program = ts.createProgram([...files.keys()], options, host), checker = program.getTypeChecker();
   const symbol = (node: ts.Node) => {
