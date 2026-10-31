@@ -15,6 +15,12 @@ const excludedDirectories = new Set([
   '.next',
   '.vite',
   '.cache',
+  '.venv',
+  'venv',
+  '__pycache__',
+  '.pytest_cache',
+  '.ruff_cache',
+  '.mypy_cache',
   'tmp',
   'temp',
   'bin',
@@ -85,8 +91,7 @@ export function sourceFilesFromInput(files: FileList | File[]): AnalyzerSourceFi
     .filter((file) => !isExcludedPath(file.relativePath));
 }
 
-async function collectDirectoryFiles(directory: DirectoryHandleLike, parentPath = ''): Promise<AnalyzerSourceFile[]> {
-  const files: AnalyzerSourceFile[] = [];
+async function collectDirectoryFiles(directory: DirectoryHandleLike, parentPath = '', files: AnalyzerSourceFile[] = []): Promise<AnalyzerSourceFile[]> {
   for await (const entry of directory.values()) {
     const relativePath = normalizeRelativePath(parentPath ? `${parentPath}/${entry.name}` : entry.name);
     if (entry.kind === 'directory') {
@@ -95,7 +100,7 @@ async function collectDirectoryFiles(directory: DirectoryHandleLike, parentPath 
         continue;
       }
       if (!entry.values) continue;
-      files.push(...await collectDirectoryFiles(entry as DirectoryHandleLike, relativePath));
+      await collectDirectoryFiles(entry as DirectoryHandleLike, relativePath, files);
       continue;
     }
     if (!entry.getFile || isExcludedPath(relativePath)) continue;
