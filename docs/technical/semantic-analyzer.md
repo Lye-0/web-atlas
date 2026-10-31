@@ -16,6 +16,8 @@ A project pick has a request generation. Unmounting the picker invalidates pendi
 
 On the browser UI path, `semanticInput(store, true)` sends serializable scan data without `files`/reader callbacks. `analyzeSemanticSources` expands the command catalogue inside the Worker. The eager `semanticInput(store)` path remains available for existing direct callers. The catalogue uses the same resolver as Command Flow, traverses each script once across all roots, and shares Evidence/adjacency/line-offset indexes. It preserves command IDs, targets, call-site arguments and source ranges; it does not add a user-command entry per catalogue root to the diagram. UI Command Flow still projects its selected entry alone.
 
+Literal forwarded arguments use separate invocation contexts derived from immutable command declarations. A queue propagates arguments through nested script calls; each copy owns its argv/calls and child-command references. Arguments append to the final top-level shell command, not all sequential or concurrently children. Original command/script IDs and call-site Evidence remain available. Dynamic arguments, cycles, depth beyond 32 and more than 10,000 contextual command copies stop further expansion with explicit analysis warnings; the source declarations and call relationships remain intact. These limits apply to contextual copies, not the number of original commands.
+
 Relationship depth calculation uses iterative Tarjan traversal, preserving SCC/longest-path semantics without consuming call stack proportional to graph depth. It does not change node ordering, selection, camera state or renderer contracts.
 
 ## Language and framework coverage

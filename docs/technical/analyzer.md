@@ -6,6 +6,15 @@ Analyzerは、ブラウザでユーザーが選択したローカルProject Fold
 
 実装の入口は [`src/pages/AnalyzerPage.tsx`](../../src/pages/AnalyzerPage.tsx) です。`showDirectoryPicker()` を優先し、未対応Browserでは `webkitdirectory` のfile inputへフォールバックします。
 
+### Module解決とコマンド引数の境界
+
+Module resolverは入力単位で正規化済みファイル集合を共有し、Data Compilerはfrom/specifierの索引を一度作る。supplied importが重複した場合は従来どおり最初の対応を優先する。tsconfigの適用候補は設定ファイルのあるdirectoryで選び、`baseUrl`はalias参照先の基準としてのみ使う。`baseUrl`配下にないtests/toolsからでも同じ設定範囲ならpathsを適用する。baseUrlが別directoryを指していても、そのdirectoryのファイルへ設定の適用範囲を拡張しない。
+
+字句ベースのmodule検出は`.`/`?.`の後ろのrequire/importメソッドを通常のmodule参照へ変換しない。間の空白・コメントも無視して区別する。これは完全な名前束縛解析を追加するものではない。
+
+`concurrently`はargvを先に読み、既知オプションの値を除いて子コマンドの原文範囲を抽出する。`--names`、`--prefix`、`--prefix-colors`等の値を実行branchへ追加しない。対応は[公式のprefix/name/color説明](https://github.com/open-cli-tools/concurrently/blob/main/docs/cli/prefixing.md)を参照。未対応オプションは推測でコマンド化せず、未確定範囲と理由を警告する。元の親コマンドとEvidenceは保持する。
+
+
 ## Pipeline
 
 タブ1〜5の任意切り替え3D、元データと表示の境界、モード別カメラ・手動開閉は[2D／3Dの技術仕様](analyzer-tabs-1-5-3d.md)を参照。既存2Dは初期表示として維持し、3Dは遅延読み込みする。

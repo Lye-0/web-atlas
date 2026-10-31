@@ -52,6 +52,8 @@ If statements, ternary expressions and short-circuit expressions fork both symbo
 
 Property writes replace the preceding write on the current path; a write in one mutually exclusive branch cannot become an origin for a read in its sibling. This is conservative source analysis, not execution: arbitrary predicates, loop iteration counts, exception paths, heap aliases and runtime values remain outside a full path-sensitive interpreter. Existing bounded per-call instantiation and other View memberships remain intact. Per-template edge-ID sets avoid repeated linear duplicate searches without changing edge IDs or insertion order.
 
+前置・後置の`++`/`--`は更新操作と代入を作り、後続のreadへ更新後の値をつなぐ。後置式の返却値は更新前のread、前置式は更新後の代入と区別する。propertyのreceiverは一度だけ評価し、分岐内の更新は既存の条件付き状態合流へ従う。
+
 ## Data Flow relation mapping
 
 | Internal kind | Direction and meaning |

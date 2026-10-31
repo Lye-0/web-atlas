@@ -272,6 +272,16 @@
 - files: `src/analyzer/semantic/dataCompiler.ts`, `src/analyzer/sourceSyntax.ts`, `src/analyzer/semantic/dataCompiler.test.ts` …
 - memory: `agent-knowledge/entries/2026-10-24-component-module-extension-c73e15.md`
 
+## analyzer-modules
+
+### aliasの設定適用範囲と参照先基準を分ける
+- id: `rm-20261031-module-alias-config-scope`
+- type: `failure`
+- maturity: `candidate`
+- tags: `alias`, `config-scope`, `module-resolution`
+- files: `src/analyzer/moduleResolver.ts`, `src/analyzer/moduleResolver.test.ts`, `src/analyzer/scan.ts` …
+- memory: `agent-knowledge/entries/2026-10-31-module-alias-config-scope-f836b1.md`
+
 ## analyzer-rendering
 
 ### R3Fの最後の購読とRootStateからrenderの参照を切る
