@@ -85,8 +85,8 @@ export function refineDataFlow(analysis: SemanticAnalysis, compiler: DataCompile
       if (declaration && 'type' in declaration) linkType(value, declaration.type as ts.TypeNode | undefined);
       return value;
     };
-    const property = (expression: ts.PropertyAccessExpression | ts.ElementAccessExpression, write: boolean, input?: SemanticNode) => {
-      const object = evaluate(expression.expression);
+    const property = (expression: ts.PropertyAccessExpression | ts.ElementAccessExpression, write: boolean, input?: SemanticNode, receiver?: SemanticNode) => {
+      const object = receiver ?? evaluate(expression.expression);
       const key = ts.isPropertyAccessExpression(expression) ? expression.name.text : expression.argumentExpression && (ts.isStringLiteralLike(expression.argumentExpression) || ts.isNumericLiteral(expression.argumentExpression)) ? expression.argumentExpression.text : undefined;
       const objectId = object.data?.objectId ?? object.data?.declarationId ?? object.id, propertyPath = key ? [...(object.data?.propertyPath ?? []), key] : undefined;
       const value = node(expression, write ? 'property-write' : 'property-read', expression.getText(), { objectId, propertyPath,
@@ -158,6 +158,20 @@ export function refineDataFlow(analysis: SemanticAnalysis, compiler: DataCompile
           }
         }
         template.calls.push({ ast: expression, operation, result, arguments: args, target }); return result;
+      }
+      if ((ts.isPrefixUnaryExpression(expression) || ts.isPostfixUnaryExpression(expression))
+        && [ts.SyntaxKind.PlusPlusToken, ts.SyntaxKind.MinusMinusToken].includes(expression.operator)) {
+        let operand: ts.Expression = expression.operand;
+        while (ts.isParenthesizedExpression(operand)) operand = operand.expression;
+        const access = ts.isPropertyAccessExpression(operand) || ts.isElementAccessExpression(operand) ? operand : undefined;
+        const receiver = access ? evaluate(access.expression) : undefined;
+        const before = access ? property(access, false, undefined, receiver) : evaluate(operand);
+        const operation = node(expression, 'operation', expression.getText());
+        edge(before.id, operation.id, 'transform', expression.operator === ts.SyntaxKind.PlusPlusToken ? '1を加える更新' : '1を減らす更新', expression);
+        const assigned = ts.isIdentifier(operand) ? bind(operand, operation, expression, undefined, false)
+          : access ? property(access, true, operation, receiver) : undefined;
+        // Postfix returns the old value while both forms update subsequent reads.
+        return ts.isPostfixUnaryExpression(expression) ? before : assigned ?? operation;
       }
       if (ts.isConditionalExpression(expression)) {
         const condition = evaluate(expression.condition), operation = node(expression, 'operation', expression.getText().slice(0, 100));

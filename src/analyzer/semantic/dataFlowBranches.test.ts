@@ -47,3 +47,28 @@ it('drops overwritten property origins only on paths that execute the write', ()
   expect(analysis.edges.filter(e => e.kind === 'origin' && e.target === reads[0]!.id).map(e => e.source)).toEqual([writes[1]!.id]);
   expect(analysis.edges.filter(e => e.kind === 'origin' && e.target === reads[1]!.id).map(e => e.source).sort()).toEqual([writes[1]!.id, writes[2]!.id].sort());
 });
+
+it.each(['x++','++x','x--','--x'])('links the updated value after %s', expression => {
+  const analysis = analyze(`function f() { let x = 0; ${expression}; return x; }`);
+  const assignment = analysis.nodes.find(n => n.data?.role === 'assignment' && n.data.expression === expression)!;
+  expect(assignment).toBeDefined();
+  const use = analysis.nodes.filter(n => n.data?.role === 'use' && n.label === 'x').at(-1)!;
+  expect(analysis.edges.filter(e => e.kind === 'origin' && e.target === use.id).map(e => e.source)).toEqual([assignment.id]);
+  expect(analysis.edges.some(e => e.kind === 'assign' && e.target === assignment.id)).toBe(true);
+});
+it.each(['x++','++x','x--','--x'])('distinguishes the expression result from the later value for %s', expression => {
+  const analysis = analyze(`function f() { let x = 0; const y = ${expression}; return x + y; }`);
+  const y = analysis.nodes.find(n => n.data?.role === 'declaration' && n.label === 'y')!;
+  const incoming = analysis.edges.find(e => e.kind === 'assign' && e.target === y.id)!;
+  const result = analysis.nodes.find(n => n.id === incoming.source)!;
+  expect(result.data?.role).toBe(expression.startsWith('x') ? 'use' : 'assignment');
+});
+it('updates a property using one receiver evaluation and preserves conditional alternatives', () => {
+  const analysis = analyze('function f(flag: boolean, obj: {count:number}) { obj.count = 0; if (flag) obj.count++; return obj.count; } function g() { getObject().count++; }');
+  const read = analysis.nodes.filter(n => n.data?.role === 'property-read' && n.data.expression === 'obj.count').at(-1)!;
+  expect(origins(analysis, read)).toHaveLength(2);
+  const operations = analysis.nodes.filter(n => n.data?.role === 'operation' && n.data.expression === 'getObject()');
+  expect(operations).toHaveLength(1);
+  const calls = analysis.nodes.filter(n => n.data?.role === 'call-result' && n.data.expression === 'getObject()');
+  expect(calls).toHaveLength(1);
+});
