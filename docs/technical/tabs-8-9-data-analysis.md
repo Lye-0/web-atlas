@@ -46,6 +46,14 @@ Object/field accesses retain an object identity and a property path. Fields and 
 
 Confidence and expansion are independent. A model definition may be source-confirmed while its structure is unexpanded. A field definition can be known while its named reference is unresolved. Explicit empty structures are distinguished from failed, partial and unexpanded definitions. Malformed definitions receive a failed expansion state; file coverage remains separately visible.
 
+## Conditional value state
+
+If statements, ternary expressions and short-circuit expressions fork both symbol bindings and property-write histories from the same pre-branch state. Each branch is evaluated independently; only the resulting states are merged. A skipped short-circuit branch retains the prior value, while an origin overwritten on every branch is not retained. `&&=`, `||=` and `??=` use the same conditional-write treatment. Conditional writes and alternative reaching origins retain inferred confidence and source-based IDs/Evidence.
+
+Property writes replace the preceding write on the current path; a write in one mutually exclusive branch cannot become an origin for a read in its sibling. This is conservative source analysis, not execution: arbitrary predicates, loop iteration counts, exception paths, heap aliases and runtime values remain outside a full path-sensitive interpreter. Existing bounded per-call instantiation and other View memberships remain intact. Per-template edge-ID sets avoid repeated linear duplicate searches without changing edge IDs or insertion order.
+
+前置・後置の`++`/`--`は更新操作と代入を作り、後続のreadへ更新後の値をつなぐ。後置式の返却値は更新前のread、前置式は更新後の代入と区別する。propertyのreceiverは一度だけ評価し、分岐内の更新は既存の条件付き状態合流へ従う。
+
 ## Data Flow relation mapping
 
 | Internal kind | Direction and meaning |

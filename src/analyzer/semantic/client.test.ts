@@ -30,3 +30,21 @@ it('disposes an engine error before allowing a fresh request', async () => {
   workers[0]!.onerror!({ message: 'failed' }); await rejected;
   expect(workers[0]!.onmessage).toBeNull(); expect(workers[0]!.onerror).toBeNull();
 });
+
+it('defers command projection to the Worker and excludes file reader functions from its payload', async () => {
+  const project = store(); project.files.push({ relativePath: 'input.ts', name: 'input.ts', extension: '.ts', size: 1, readText: async () => 'x' });
+  const job = getSemanticAnalysis(project), payload = workers[0]!.postMessage.mock.calls[0]![0] as import('./types').SemanticInput;
+  expect(payload.commands).toBeUndefined(); expect(payload.commandStore).toBeDefined(); expect(payload.commandStore).not.toHaveProperty('files');
+  expect(() => structuredClone(payload)).not.toThrow();
+  const cancelled = expect(job.promise).rejects.toThrow(); cancelSemanticAnalysis(project); await cancelled;
+});
+it('disposes a synchronous postMessage failure and permits retry instead of caching the rejection', async () => {
+  const original = FakeWorker;
+  class FailingWorker extends original { constructor() { super(); this.postMessage.mockImplementation(() => { throw new Error('cannot clone'); }); } }
+  vi.stubGlobal('Worker', FailingWorker);
+  const project = store(), job = getSemanticAnalysis(project);
+  await expect(job.promise).rejects.toThrow('cannot clone'); expect(workers[0]!.terminate).toHaveBeenCalledTimes(1); expect(workers[0]!.onmessage).toBeNull();
+  vi.stubGlobal('Worker', FakeWorker);
+  const retry = getSemanticAnalysis(project); expect(workers).toHaveLength(2);
+  const cancelled = expect(retry.promise).rejects.toThrow(); cancelSemanticAnalysis(project); await cancelled;
+});

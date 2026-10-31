@@ -967,6 +967,7 @@ function commandNode(
     evidenceIds,
     metadata: {
       commandType: fragment.kind,
+      ...(fragment.parseWarning ? { commandParseWarning: fragment.parseWarning } : {}),
       ...(fragment.workingDirectory ? { workingDirectory: fragment.workingDirectory } : {}),
       ...(fragment.operator ? { operator: fragment.operator } : {}),
       ...(fragment.packageSelector ? { packageSelector: fragment.packageSelector } : {}),
@@ -991,6 +992,15 @@ function addViewEdge(edges: Map<string, AnalyzerViewEdge>, edge: AnalyzerViewEdg
 }
 
 export function projectCommand(store: AnalyzerProjectStore, requestedEntryScriptId?: string): AnalyzerViewModel {
+  return projectCommandEntries(store, requestedEntryScriptId);
+}
+
+/** Complete command catalogue, sharing the traversal and Evidence index across roots. */
+export function projectCommandCatalog(store: AnalyzerProjectStore): AnalyzerViewModel {
+  return projectCommandEntries(store, undefined, true);
+}
+
+function projectCommandEntries(store: AnalyzerProjectStore, requestedEntryScriptId?: string, allEntries = false): AnalyzerViewModel {
   const allScripts = scriptFacts(store);
   const packages = packageFacts(store);
   const scripts = new Map(allScripts.map((script) => [script.id, script]));
@@ -1038,6 +1048,7 @@ export function projectCommand(store: AnalyzerProjectStore, requestedEntryScript
     });
   };
   const addFragment = (script: PackageScriptFact, fragment: CommandFragment, parentCommandId: string | undefined, context: CommandExecutionContext): void => {
+    if (fragment.parseWarning) addCommandWarning(warnings, fragment.parseWarning, script);
     const evidenceIds = evidenceForCommandFragment(store, script, fragment);
     evidenceIds.forEach((evidenceId) => {
       if (!generatedEvidence.has(evidenceId) && store.sources[script.sourcePath]) {
@@ -1078,7 +1089,7 @@ export function projectCommand(store: AnalyzerProjectStore, requestedEntryScript
     }
 
     if (fragment.kind === 'concurrently') {
-      if (fragment.children.length === 0) addCommandWarning(warnings, 'concurrently has no quoted command branches', script);
+      if (fragment.children.length === 0 && !fragment.parseWarning) addCommandWarning(warnings, 'concurrently has no quoted command branches', script);
       fragment.children.forEach((child, index) => addFragment(script, child, commandId, {
         executionRank: context.executionRank + 1,
         executionDepth: context.executionDepth + 1,
@@ -1165,7 +1176,9 @@ export function projectCommand(store: AnalyzerProjectStore, requestedEntryScript
     active.delete(script.id);
   };
 
-  if (entry) {
+  if (allEntries) {
+    for (const script of allScripts) buildScript(script, { executionRank: 1, executionDepth: 1, branchPath: 'root', laneId: ANALYZER_COMMAND_COMMON_LANE_ID, laneLabel: 'COMMON' });
+  } else if (entry) {
     const manager=/(?:^|\/)deno\.jsonc?$/.test(entry.sourcePath)?'deno task':/(?:^|\/)composer\.json$/.test(entry.sourcePath)?'composer run':/\.gradle(?:\.kts)?$/.test(entry.sourcePath)?'gradle':/\.ya?ml$/.test(entry.sourcePath)?'Job':/pyproject\.toml$/.test(entry.sourcePath)?'':`${(store.sources['package.json']??'').match(/"packageManager"\s*:\s*"(pnpm|yarn|bun|npm)@/)?.[1]??'npm'} run`;
     const entryNode: AnalyzerViewNode = {
       id: `user-command:${entry.id}`,

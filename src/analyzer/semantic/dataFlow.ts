@@ -4,6 +4,8 @@ import type { DataModelIndex } from './dataModels';
 import type { SemanticAnalysis, SemanticData, SemanticEdge, SemanticNode } from './types';
 
 type FunctionAst = ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction | ts.MethodDeclaration | ts.ConstructorDeclaration | ts.GetAccessorDeclaration | ts.SetAccessorDeclaration;
+type PropertyValues = Map<string, { id: string; conditional: boolean }[]>;
+interface FlowState { environment: Environment; properties: PropertyValues }
 type Environment = Map<ts.Symbol, { declarationId: string; values: string[] }>;
 interface Invocation { ast: ts.CallExpression | ts.NewExpression | ts.JsxElement | ts.JsxSelfClosingElement; operation: SemanticNode; result: SemanticNode; arguments: SemanticNode[]; target?: FunctionAst }
 interface Template { ast: ts.SourceFile | FunctionAst; owner: string; name: string; nodes: SemanticNode[]; edges: SemanticEdge[]; parameters: SemanticNode[]; returns: SemanticNode[]; calls: Invocation[]; }
@@ -55,7 +57,12 @@ export function refineDataFlow(analysis: SemanticAnalysis, compiler: DataCompile
     const { ast, owner } = template, file = ast.getSourceFile();
     let environment = cloneEnvironment(globals), conditional = false;
     if (!ts.isSourceFile(ast)) for (const [symbol, binding] of capturedEnvironments.get(ast) ?? []) environment.set(symbol, { ...binding, values: [...binding.values] });
-    const propertyValues = new Map<string, { id: string; conditional: boolean }[]>();
+    let propertyValues: PropertyValues = new Map();
+    const edgeIds = new Set<string>();
+    const addEdge = (value: SemanticEdge) => {
+      if (edgeIds.has(value.id)) return;
+      edgeIds.add(value.id); template.edges.push(value);
+    };
     const made = new Map<string, SemanticNode>();
     const node = (source: ts.Node, role: SemanticData['role'], label: string, extra: Partial<SemanticData> = {}, suffix = '') => {
       const ev = sourceEvidence(source, `${label}（${role}）`), id = `data:${file.fileName}:${ev.start}-${ev.end}:${role}${suffix}`;
@@ -67,7 +74,7 @@ export function refineDataFlow(analysis: SemanticAnalysis, compiler: DataCompile
     };
     const edge = (source: string, target: string, kind: string, label: string, ast: ts.Node, inferred = conditional) => {
       const ev = sourceEvidence(ast, label), id = `${kind}:${source}:${target}:${ev.start}-${ev.end}`;
-      if (!template.edges.some(item => item.id === id)) template.edges.push({ id, source, target, kind, label, views: ['data-flow'], confidence: inferred ? 'inferred' : 'source', evidence: [ev], details: { reason: label, conditional: inferred } });
+      addEdge({ id, source, target, kind, label, views: ['data-flow'], confidence: inferred ? 'inferred' : 'source', evidence: [ev], details: { reason: label, conditional: inferred } });
     };
     const readSymbol = (identifier: ts.Identifier): SemanticNode => {
       const symbol = compiler.symbol(identifier), binding = symbol && environment.get(symbol);
@@ -78,8 +85,8 @@ export function refineDataFlow(analysis: SemanticAnalysis, compiler: DataCompile
       if (declaration && 'type' in declaration) linkType(value, declaration.type as ts.TypeNode | undefined);
       return value;
     };
-    const property = (expression: ts.PropertyAccessExpression | ts.ElementAccessExpression, write: boolean, input?: SemanticNode) => {
-      const object = evaluate(expression.expression);
+    const property = (expression: ts.PropertyAccessExpression | ts.ElementAccessExpression, write: boolean, input?: SemanticNode, receiver?: SemanticNode) => {
+      const object = receiver ?? evaluate(expression.expression);
       const key = ts.isPropertyAccessExpression(expression) ? expression.name.text : expression.argumentExpression && (ts.isStringLiteralLike(expression.argumentExpression) || ts.isNumericLiteral(expression.argumentExpression)) ? expression.argumentExpression.text : undefined;
       const objectId = object.data?.objectId ?? object.data?.declarationId ?? object.id, propertyPath = key ? [...(object.data?.propertyPath ?? []), key] : undefined;
       const value = node(expression, write ? 'property-write' : 'property-read', expression.getText(), { objectId, propertyPath,
@@ -88,7 +95,7 @@ export function refineDataFlow(analysis: SemanticAnalysis, compiler: DataCompile
       if (input) edge(input.id, value.id, 'property-write', key ? `${key}項目へ設定` : '動的な項目へ設定（キー未解決）', expression);
       if (propertyPath) {
         const identity = `${objectId}:${JSON.stringify(propertyPath)}`, preceding = propertyValues.get(identity) ?? [];
-        if (write) propertyValues.set(identity, [...(conditional ? preceding : []), { id: value.id, conditional }]);
+        if (write) propertyValues.set(identity, [{ id: value.id, conditional }]);
         else for (const assigned of preceding) edge(assigned.id, value.id, 'origin', `${propertyPath.join('.')}項目への先行する設定`, expression, conditional || assigned.conditional || preceding.length > 1);
       }
       const symbol = compiler.symbol(ts.isPropertyAccessExpression(expression) ? expression.name : expression), definition = symbol?.declarations?.[0];
@@ -145,12 +152,48 @@ export function refineDataFlow(analysis: SemanticAnalysis, compiler: DataCompile
         if (ts.isPropertyAccessExpression(expression.expression) && ['parse', 'safeParse', 'parseAsync', 'safeParseAsync'].includes(expression.expression.name.text)) {
           const symbol = compiler.symbol(expression.expression.expression), schema = symbol && models.symbols.get(symbol);
           if (schema?.model?.domain === 'validation') {
-            template.edges.push({ id: `validated-by:${operation.id}:${schema.id}`, source: operation.id, target: schema.id, kind: 'validated-by', label: `検証に使用: ${schema.label}.${expression.expression.name.text}`, views: ['data-flow'], confidence: 'source', evidence: [...operation.evidence, ...schema.evidence], details: { callSiteId: operation.id, reason: '解決した検証スキーマのメソッド呼び出し。検証成功やすべての経路での実行は保証しません。' } });
+            addEdge({ id: `validated-by:${operation.id}:${schema.id}`, source: operation.id, target: schema.id, kind: 'validated-by', label: `検証に使用: ${schema.label}.${expression.expression.name.text}`, views: ['data-flow'], confidence: 'source', evidence: [...operation.evidence, ...schema.evidence], details: { callSiteId: operation.id, reason: '解決した検証スキーマのメソッド呼び出し。検証成功やすべての経路での実行は保証しません。' } });
             operation.links = [{ targetId: schema.id, view: 'data-model', reason: 'この呼び出しで使う検証スキーマ', evidence: [...operation.evidence, ...schema.evidence] }];
             schema.links ??= []; schema.links.push({ targetId: operation.id, view: 'data-flow', reason: `検証に使用: ${operation.path}:${operation.line}`, evidence: [...operation.evidence, ...schema.evidence] });
           }
         }
         template.calls.push({ ast: expression, operation, result, arguments: args, target }); return result;
+      }
+      if ((ts.isPrefixUnaryExpression(expression) || ts.isPostfixUnaryExpression(expression))
+        && [ts.SyntaxKind.PlusPlusToken, ts.SyntaxKind.MinusMinusToken].includes(expression.operator)) {
+        let operand: ts.Expression = expression.operand;
+        while (ts.isParenthesizedExpression(operand)) operand = operand.expression;
+        const access = ts.isPropertyAccessExpression(operand) || ts.isElementAccessExpression(operand) ? operand : undefined;
+        const receiver = access ? evaluate(access.expression) : undefined;
+        const before = access ? property(access, false, undefined, receiver) : evaluate(operand);
+        const operation = node(expression, 'operation', expression.getText());
+        edge(before.id, operation.id, 'transform', expression.operator === ts.SyntaxKind.PlusPlusToken ? '1を加える更新' : '1を減らす更新', expression);
+        const assigned = ts.isIdentifier(operand) ? bind(operand, operation, expression, undefined, false)
+          : access ? property(access, true, operation, receiver) : undefined;
+        // Postfix returns the old value while both forms update subsequent reads.
+        return ts.isPostfixUnaryExpression(expression) ? before : assigned ?? operation;
+      }
+      if (ts.isConditionalExpression(expression)) {
+        const condition = evaluate(expression.condition), operation = node(expression, 'operation', expression.getText().slice(0, 100));
+        edge(condition.id, operation.id, 'transform', '値を選ぶ条件', expression.condition);
+        alternatives([expression.whenTrue, expression.whenFalse].map(branch => () => {
+          const value = evaluate(branch); edge(value.id, operation.id, 'transform', '条件による値の候補', branch);
+        }));
+        return operation;
+      }
+      if (ts.isBinaryExpression(expression) && [ts.SyntaxKind.AmpersandAmpersandToken, ts.SyntaxKind.BarBarToken, ts.SyntaxKind.QuestionQuestionToken,
+        ts.SyntaxKind.AmpersandAmpersandEqualsToken, ts.SyntaxKind.BarBarEqualsToken, ts.SyntaxKind.QuestionQuestionEqualsToken].includes(expression.operatorToken.kind)) {
+        const left = evaluate(expression.left), operation = node(expression, 'operation', expression.getText().slice(0, 100));
+        edge(left.id, operation.id, 'transform', '短絡評価の左側の値・条件', expression.left);
+        alternatives([() => {
+          const right = evaluate(expression.right);
+          edge(right.id, operation.id, 'transform', '短絡条件を満たす場合の値', expression.right);
+          if (isAssignment(expression.operatorToken.kind)) {
+            if (ts.isIdentifier(expression.left)) bind(expression.left, right, expression, undefined, false);
+            else if (ts.isPropertyAccessExpression(expression.left) || ts.isElementAccessExpression(expression.left)) property(expression.left, true, right);
+          }
+        }, () => {}]);
+        return operation;
       }
       if (ts.isBinaryExpression(expression) && isAssignment(expression.operatorToken.kind)) {
         let input = evaluate(expression.right);
@@ -194,12 +237,35 @@ export function refineDataFlow(analysis: SemanticAnalysis, compiler: DataCompile
       for (const operand of operands) { const input = evaluate(operand); edge(input.id, operation.id, 'transform', ts.isArrayLiteralExpression(expression) ? '配列要素として使う' : ts.isObjectLiteralExpression(expression) ? 'オブジェクトの項目として使う' : '加工・式の入力', operand); }
       return operation;
     };
-    const merge = (before: Environment, alternatives: Environment[]) => {
-      environment = cloneEnvironment(before);
-      for (const branch of alternatives) for (const [symbol, binding] of branch) {
-        const initial = before.get(symbol); if (!initial) continue;
-        const current = environment.get(symbol)!; current.values = [...new Set([...current.values, ...binding.values])];
+    const snapshot = (): FlowState => ({ environment: cloneEnvironment(environment), properties: new Map([...propertyValues].map(([key, values]) => [key, [...values]])) });
+    const restore = (state: FlowState) => {
+      environment = cloneEnvironment(state.environment);
+      propertyValues = new Map([...state.properties].map(([key, values]) => [key, [...values]]));
+    };
+    const merge = (before: FlowState, branches: FlowState[]) => {
+      restore(before);
+      // Each branch starts from before. Keep the pre-branch value only on paths
+      // that actually leave it unchanged, not after every branch overwrites it.
+      for (const binding of environment.values()) binding.values = [];
+      propertyValues.clear();
+      for (const branch of branches) {
+        for (const [symbol, binding] of branch.environment) {
+          const current = environment.get(symbol); if (!current) continue;
+          current.values = [...new Set([...current.values, ...binding.values])];
+        }
+        for (const [key, values] of branch.properties) {
+          const merged = new Map((propertyValues.get(key) ?? []).map(value => [value.id, value]));
+          for (const value of values) merged.set(value.id, value);
+          propertyValues.set(key, [...merged.values()]);
+        }
       }
+    };
+    const alternatives = (branches: (() => void)[]) => {
+      const before = snapshot(), previous = conditional;
+      const states: FlowState[] = [];
+      conditional = true;
+      for (const branch of branches) { restore(before); branch(); states.push(snapshot()); }
+      merge(before, states); conditional = previous;
     };
     const process = (statement: ts.Node) => {
       if (isFunction(statement)) { capturedEnvironments.set(statement, cloneEnvironment(environment)); return; }
@@ -211,13 +277,12 @@ export function refineDataFlow(analysis: SemanticAnalysis, compiler: DataCompile
       }
       if (ts.isExpressionStatement(statement)) { evaluate(statement.expression); return; }
       if (ts.isIfStatement(statement)) {
-        evaluate(statement.expression); const before = cloneEnvironment(environment), oldConditional = conditional; conditional = true;
-        process(statement.thenStatement); const yes = cloneEnvironment(environment); environment = cloneEnvironment(before);
-        if (statement.elseStatement) process(statement.elseStatement); const no = cloneEnvironment(environment);
-        merge(before, [yes, no]); conditional = oldConditional; return;
+        evaluate(statement.expression);
+        alternatives([() => process(statement.thenStatement), () => { if (statement.elseStatement) process(statement.elseStatement); }]);
+        return;
       }
       if (ts.isForStatement(statement) || ts.isForOfStatement(statement) || ts.isForInStatement(statement) || ts.isWhileStatement(statement) || ts.isDoStatement(statement) || ts.isSwitchStatement(statement) || ts.isTryStatement(statement)) {
-        const before = cloneEnvironment(environment), oldConditional = conditional; conditional = true; statement.forEachChild(process); merge(before, [environment]); conditional = oldConditional; return;
+        alternatives([() => statement.forEachChild(process), () => {}]); return;
       }
       if (ts.isExpression(statement)) { evaluate(statement); return; }
       statement.forEachChild(process);

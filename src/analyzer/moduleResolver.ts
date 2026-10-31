@@ -220,6 +220,7 @@ function parseKeywordRequire(source: string, start: number): { item?: ParsedModu
 export function parseModuleImports(source: string): ParsedModuleImport[] {
   const imports: ParsedModuleImport[] = [];
   let index = 0;
+  let previousSignificant = '';
   while (index < source.length) {
     const commentEnd = skipComment(source, index);
     if (commentEnd !== undefined) {
@@ -230,6 +231,7 @@ export function parseModuleImports(source: string): ParsedModuleImport[] {
     if (character === '"' || character === "'") {
       const literal = skipQuoted(source, index, character);
       index = literal ? literal.end + 1 : source.length;
+      previousSignificant = 'literal';
       continue;
     }
     if (character === '`') {
@@ -246,9 +248,12 @@ export function parseModuleImports(source: string): ParsedModuleImport[] {
         end += 1;
       }
       index = end;
+      previousSignificant = 'literal';
       continue;
     }
-    const parsed = isWordAt(source, index, 'import')
+    // A member named require/import is not the language/module-loading form.
+    // Comments and whitespace leave the preceding significant token intact.
+    const parsed = previousSignificant === '.' ? undefined : isWordAt(source, index, 'import')
       ? parseKeywordImport(source, index)
       : isWordAt(source, index, 'export')
         ? parseKeywordExport(source, index)
@@ -257,9 +262,11 @@ export function parseModuleImports(source: string): ParsedModuleImport[] {
           : undefined;
     if (parsed) {
       if (parsed.item) imports.push(parsed.item);
+      previousSignificant = 'reference';
       index = Math.max(index + 1, parsed.next);
       continue;
     }
+    if (!/\s/.test(character ?? '')) previousSignificant = character ?? '';
     index += 1;
   }
   return imports;
@@ -320,6 +327,7 @@ function resolveCandidatePaths(candidates: readonly string[], filePaths: Readonl
 }
 
 interface AliasConfig {
+  configDirectory: string;
   basePath: string;
   aliases: Array<{ pattern: string; targets: string[] }>;
 }
@@ -345,19 +353,19 @@ function aliasConfigs(sources: readonly ModuleResolverSource[]): AliasConfig[] {
           .filter((entry): entry is [string, unknown[]] => Array.isArray(entry[1]) && entry[1].every((value) => typeof value === 'string'))
           .map(([pattern, targets]) => ({ pattern, targets: targets as string[] }))
           .sort((first, second) => second.pattern.length - first.pattern.length || first.pattern.localeCompare(second.pattern));
-        return aliases.length > 0 ? [{ basePath: baseUrl, aliases }] : [];
+        return aliases.length > 0 ? [{ configDirectory, basePath: baseUrl, aliases }] : [];
       } catch {
         return [];
       }
     })
-    .sort((first, second) => second.basePath.length - first.basePath.length);
+    .sort((first, second) => second.configDirectory.length - first.configDirectory.length);
 }
 
 function nearestAliasConfig(sourcePath: string, configs: readonly AliasConfig[]): AliasConfig | undefined {
   const sourceDirectory = directoryPath(sourcePath);
   return configs
-    .filter((config) => config.basePath === '.' || sourceDirectory === config.basePath || sourceDirectory.startsWith(`${config.basePath}/`))
-    .sort((first, second) => second.basePath.length - first.basePath.length)[0];
+    .filter((config) => config.configDirectory === '.' || sourceDirectory === config.configDirectory || sourceDirectory.startsWith(`${config.configDirectory}/`))
+    .sort((first, second) => second.configDirectory.length - first.configDirectory.length)[0];
 }
 
 function resolveAlias(
@@ -440,11 +448,10 @@ function resolvePackageImport(
 function resolveSpecifier(
   sourcePath: string,
   specifier: string,
-  sources: readonly ModuleResolverSource[],
+  filePaths: ReadonlySet<string>,
   packages: readonly ModuleResolverPackage[],
   configs: readonly AliasConfig[],
 ): { path?: string; reason?: 'external' | 'unresolved' | 'ambiguous' } {
-  const filePaths = new Set(sources.map((source) => normalizeRelativePath(source.relativePath)));
   if (specifier.startsWith('.') || specifier.startsWith('/')) {
     if (specifier.startsWith('/')) return { reason: 'unresolved' };
     const base = safeJoin(directoryPath(sourcePath), specifier);
@@ -475,6 +482,7 @@ export function resolveModuleGraph(
 ): ModuleGraphResult {
   const sortedSources = [...sources].sort((first, second) => normalizeRelativePath(first.relativePath).localeCompare(normalizeRelativePath(second.relativePath)));
   const configs = aliasConfigs([...sortedSources, ...configSources]);
+  const filePaths = new Set(sortedSources.map(source => normalizeRelativePath(source.relativePath)));
   const modules = sortedSources.map((source): ResolvedModule => {
     const path = normalizeRelativePath(source.relativePath);
     const packageFact = packages
@@ -483,7 +491,7 @@ export function resolveModuleGraph(
       .find((candidate) => candidate.packagePath === '.' || path.startsWith(`${candidate.packagePath}/`));
     const imports = parseModuleImports(source.source).map((parsed): ResolvedModuleImport => {
       if (parsed.computed) return { ...parsed, reason: 'computed' };
-      const resolved = resolveSpecifier(path, parsed.specifier, sortedSources, packages, configs);
+      const resolved = resolveSpecifier(path, parsed.specifier, filePaths, packages, configs);
       return { ...parsed, ...(resolved.path ? { resolvedPath: resolved.path } : {}), ...(resolved.reason ? { reason: resolved.reason } : {}) };
     });
     return {

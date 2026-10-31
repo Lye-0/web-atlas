@@ -127,3 +127,29 @@ describe('module resolver', () => {
     ]);
   });
 });
+
+describe('module resolver scope and work bounds', () => {
+  it('applies root aliases to files outside baseUrl, and nested aliases by configuration directory', () => {
+    const graph = resolveModuleGraph([
+      source('tests/a.ts', "import { value } from '@/value';"), source('src/value.ts', 'export const value = 1;'),
+      source('apps/web/tests/b.ts', "import { value } from '@/value';"), source('apps/web/lib/value.ts', 'export const value = 2;'),
+    ], [], [source('tsconfig.json', JSON.stringify({compilerOptions:{baseUrl:'src',paths:{'@/*':['*']}}})), source('apps/web/tsconfig.json', JSON.stringify({compilerOptions:{baseUrl:'lib',paths:{'@/*':['*']}}}))]);
+    expect(module('tests/a.ts', graph)?.imports[0]?.resolvedPath).toBe('src/value.ts');
+    expect(module('apps/web/tests/b.ts', graph)?.imports[0]?.resolvedPath).toBe('apps/web/lib/value.ts');
+  });
+  it('does not apply an alias to files outside its configuration directory even if baseUrl points there', () => {
+    const graph = resolveModuleGraph([source('shared/use.ts', "import '@/value';"), source('shared/value.ts', '')], [], [source('app/tsconfig.json', JSON.stringify({compilerOptions:{baseUrl:'../shared',paths:{'@/*':['*']}}}))]);
+    expect(module('shared/use.ts', graph)?.imports[0]?.resolvedPath).toBeUndefined();
+  });
+  it('does not classify member calls as module references, including trivia and optional access', () => {
+    const imports = parseModuleImports(`const checker = {}; checker.require('react'); checker . /* note */ require('vue'); checker?.require('svelte'); checker.import('fake'); checker?.import('also-fake'); require('real'); void import('dynamic');`);
+    expect(imports.map(i => i.specifier)).toEqual(['real', 'dynamic']);
+  });
+  it('constructs the file index once instead of reading every path for every import', () => {
+    let reads = 0;
+    const sources = Array.from({length:400}, (_, i) => ({get relativePath() { reads++; return `file${i}.ts`; }, source: `import './file${(i+1)%400}'; import 'external';`}));
+    const graph = resolveModuleGraph(sources);
+    expect(graph.modules).toHaveLength(400); expect(graph.modules.every(m => m.imports[0]?.resolvedPath)).toBe(true);
+    expect(reads).toBeLessThan(30000);
+  });
+});
