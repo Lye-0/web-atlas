@@ -3,6 +3,7 @@ export type ShellOperator = '&&' | '||' | ';';
 export type CommandFragmentKind = 'pnpm-script' | 'project-script' | 'pnpm-exec' | 'cli' | 'concurrently' | 'unknown';
 
 export interface CommandFragment {
+  parseWarning?: string;
   workingDirectory?:string;
   text: string;
   start: number;
@@ -146,6 +147,35 @@ function extractQuotedFragments(source: string, start: number, end: number): Com
   return fragments;
 }
 
+/** Parse concurrently's argv before extracting command strings. Quoted option
+ * values are metadata, not commands. Keep original offsets for Evidence. */
+function concurrentCommands(source: string, tokens: Token[]): { children: CommandFragment[]; parseWarning?: string } {
+  const values = new Set(['--names', '-n', '--prefix', '-p', '--prefix-colors', '-c', '--prefix-length', '-l',
+    '--max-processes', '-m', '--success', '-s', '--restart-tries', '--restart-after', '--timestamp-format',
+    '--default-input-target', '--name-separator', '--hide', '--kill-signal', '--kill-timeout', '--cwd', '--shell']);
+  const booleans = new Set(['--raw', '-r', '--kill-others', '-k', '--kill-others-on-fail', '--handle-input', '-i',
+    '--no-color', '--no-colors', '--color', '--group', '-g', '--timings', '--pad-prefix', '--passthrough-arguments', '-P',
+    '--help', '-h', '--version', '-v', '-V']);
+  const children: CommandFragment[] = [];
+  for (let index = 1; index < tokens.length; index++) {
+    const token = tokens[index]!, option = token.value.split('=')[0]!;
+    // Trailing positional replacement arguments are not additional commands.
+    if (token.value === '--') break;
+    if (values.has(option)) {
+      if (!token.value.includes('=')) {
+        if (!tokens[index + 1]) return { children, parseWarning: `concurrentlyの${option}の値がありません。` };
+        index++;
+      }
+      continue;
+    }
+    if (booleans.has(token.value)) continue;
+    if (token.value.startsWith('-')) return { children, parseWarning: `concurrentlyの未対応オプション ${option} 以降はコマンドを確定できません。` };
+    const quote = source[token.start], quoted = (quote === '"' || quote === "'") && source[token.end - 1] === quote;
+    children.push(classifyRange(source, token.start + (quoted ? 1 : 0), token.end - (quoted ? 1 : 0)));
+  }
+  return { children };
+}
+
 function classifyRange(source: string, start: number, end: number, operator?: ShellOperator): CommandFragment {
   const range = trimRange(source, start, end);
   const text = source.slice(range.start, range.end);
@@ -155,8 +185,7 @@ function classifyRange(source: string, start: number, end: number, operator?: Sh
   if (!first) return { text, start: range.start, end: range.end, kind: 'unknown', children, ...(operator ? { operator } : {}) };
 
   if (first === 'concurrently') {
-    children.push(...extractQuotedFragments(source, range.start, range.end));
-    return { text, start: range.start, end: range.end, kind: 'concurrently', children, ...(operator ? { operator } : {}) };
+    return { text, start: range.start, end: range.end, kind: 'concurrently', ...concurrentCommands(source, tokens), ...(operator ? { operator } : {}) };
   }
 
   if (first === 'pnpm') {

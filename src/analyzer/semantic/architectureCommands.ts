@@ -8,6 +8,7 @@ export interface ArchitectureCommand {
   scriptName: string; sourceScriptId?: string; sourceCommandId?: string;
   operator?: string;
   invocationLabel?: string;
+  argumentResolution?: string;
   argv: string[]; workingDirectory?: string; evidence: SemanticEvidence[];
   targets: string[]; calls: {target:string; id:string; operator?:string; parallel:boolean; evidence:SemanticEvidence[]}[];
 }
@@ -45,20 +46,48 @@ export function architectureCommands(store: AnalyzerProjectStore): ArchitectureC
     const links = outgoing.get(node.id) ?? [];
     const fragment=parseCommandExpression(node.label)[0];if(!fragment)continue;
     output.set(node.id,{id:node.id,scriptId:owner.id,scriptName:owner.scriptName,label:node.label,path:owner.sourcePath,directory:owner.packagePath,
+      argumentResolution: typeof node.metadata.commandParseWarning === 'string' ? node.metadata.commandParseWarning : undefined,
       argv:commandArgv(fragment),operator:typeof node.metadata.operator==='string'?node.metadata.operator:undefined,workingDirectory:typeof node.metadata.workingDirectory==='string'?node.metadata.workingDirectory:fragment.workingDirectory,evidence:evidence(node.evidenceIds),
       targets:links.filter(e=>['starts','uses'].includes(e.kind)).map(e=>e.targetId),
       calls:links.filter(e=>['resolves-to','starts'].includes(e.kind)).map(e=>({target:e.targetId,id:e.id,operator:typeof node.metadata.operator==='string'?node.metadata.operator:undefined,parallel:e.metadata.parallel===true,evidence:evidence(e.evidenceIds)}))});
   }
-  // Forwarded literal arguments are an invocation context, not a rewrite of the
-  // target script. Keep the original declaration and the call-site evidence.
-  for(const wrapper of [...output.values()]) {
-    const split=wrapper.argv.indexOf('--');if(split<0||split===wrapper.argv.length-1)continue;
-    const extra=wrapper.argv.slice(split+1);if(extra.some(arg=>/[$`]/.test(arg)))continue;
-    for(const call of wrapper.calls) {
-      const children=[...output.values()].filter(c=>c.scriptId===call.target);if(!children.length)continue;
-      const context=`${call.target}:invocation:${wrapper.id}`;
-      for(const child of children) output.set(`${child.id}:invocation:${wrapper.id}`,{...child,id:`${child.id}:invocation:${wrapper.id}`,sourceCommandId:child.id,sourceScriptId:child.scriptId,scriptId:context,invocationLabel:`${wrapper.directory||'root'} / ${wrapper.scriptName}`,argv:[...child.argv,...extra],label:`${child.label} ${extra.join(' ')}`,evidence:[...child.evidence,...call.evidence]});
-      call.target=context;
+  // Work from immutable declarations. Every invocation owns its calls/argv;
+  // expanding one wrapper must never retarget a sibling or the source script.
+  const declarations = [...output.values()].map(command => ({ ...command, calls: command.calls.map(call => ({ ...call })) }));
+  const byScript = new Map<string, ArchitectureCommand[]>();
+  const nestedIds = new Set(declarations.flatMap(command => command.calls.filter(call => output.has(call.target)).map(call => call.target)));
+  for (const command of declarations) {
+    const list = byScript.get(command.scriptId) ?? []; list.push(command); byScript.set(command.scriptId, list);
+  }
+  const lastCommand = new Map([...byScript].map(([script, commands]) => [script, commands.filter(c => !nestedIds.has(c.id))
+    .sort((a, b) => (a.evidence[0]?.start ?? 0) - (b.evidence[0]?.start ?? 0)).at(-1)?.id]));
+  const pending = [...output.values()].map(wrapper => ({ wrapper, ancestors: new Set([wrapper.scriptId]) }));
+  let forwarded = 0;
+  for (let index = 0; index < pending.length; index++) {
+    const { wrapper, ancestors } = pending[index]!;
+    const split = wrapper.argv.indexOf('--'); if (split < 0 || split === wrapper.argv.length - 1) continue;
+    const extra = wrapper.argv.slice(split + 1);
+    for (const call of wrapper.calls) {
+      const children = byScript.get(call.target); if (!children?.length) continue;
+      if (extra.some(arg => /[$`]/.test(arg))) { wrapper.argumentResolution = '動的な転送引数のため、呼出先の引数を確定できません。'; continue; }
+      if (ancestors.has(call.target)) { wrapper.argumentResolution = 'script呼出しが循環するため、以降の引数転送は未特定です。'; continue; }
+      if (ancestors.size >= 32 || forwarded + children.length > 10000) { wrapper.argumentResolution = '引数転送の展開上限に達しました。元scriptと呼出関係は保持しています。'; continue; }
+      forwarded += children.length;
+      const script = call.target, context = `${script}:invocation:${wrapper.id}`;
+      const ids = new Map(children.map(child => [child.id, `${child.id}:invocation:${wrapper.id}`]));
+      const nextAncestors = new Set(ancestors).add(script);
+      for (const child of children) {
+        // Shell arguments are appended to the complete script, so only its last
+        // top-level command receives them (not every &&/parallel branch).
+        const append = child.id === lastCommand.get(script);
+        const copy: ArchitectureCommand = { ...child, id: ids.get(child.id)!, sourceCommandId: child.id, sourceScriptId: script, scriptId: context,
+          invocationLabel: `${wrapper.directory || 'root'} / ${wrapper.scriptName}`,
+          argv: append ? [...child.argv, ...extra] : [...child.argv], label: append ? `${child.label} ${extra.join(' ')}` : child.label,
+          evidence: [...child.evidence, ...call.evidence], targets: child.targets.map(target => ids.get(target) ?? target),
+          calls: child.calls.map(link => ({ ...link, target: ids.get(link.target) ?? link.target })) };
+        output.set(copy.id, copy); pending.push({ wrapper: copy, ancestors: nextAncestors });
+      }
+      call.target = context;
     }
   }
   return [...output.values()];

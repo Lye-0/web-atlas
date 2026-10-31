@@ -967,6 +967,7 @@ function commandNode(
     evidenceIds,
     metadata: {
       commandType: fragment.kind,
+      ...(fragment.parseWarning ? { commandParseWarning: fragment.parseWarning } : {}),
       ...(fragment.workingDirectory ? { workingDirectory: fragment.workingDirectory } : {}),
       ...(fragment.operator ? { operator: fragment.operator } : {}),
       ...(fragment.packageSelector ? { packageSelector: fragment.packageSelector } : {}),
@@ -1047,6 +1048,7 @@ function projectCommandEntries(store: AnalyzerProjectStore, requestedEntryScript
     });
   };
   const addFragment = (script: PackageScriptFact, fragment: CommandFragment, parentCommandId: string | undefined, context: CommandExecutionContext): void => {
+    if (fragment.parseWarning) addCommandWarning(warnings, fragment.parseWarning, script);
     const evidenceIds = evidenceForCommandFragment(store, script, fragment);
     evidenceIds.forEach((evidenceId) => {
       if (!generatedEvidence.has(evidenceId) && store.sources[script.sourcePath]) {
@@ -1087,7 +1089,7 @@ function projectCommandEntries(store: AnalyzerProjectStore, requestedEntryScript
     }
 
     if (fragment.kind === 'concurrently') {
-      if (fragment.children.length === 0) addCommandWarning(warnings, 'concurrently has no quoted command branches', script);
+      if (fragment.children.length === 0 && !fragment.parseWarning) addCommandWarning(warnings, 'concurrently has no quoted command branches', script);
       fragment.children.forEach((child, index) => addFragment(script, child, commandId, {
         executionRank: context.executionRank + 1,
         executionDepth: context.executionDepth + 1,

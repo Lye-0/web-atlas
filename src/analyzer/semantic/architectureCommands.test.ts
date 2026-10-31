@@ -49,3 +49,53 @@ it.skipIf(!process.env.WEB_ATLAS_STABILITY_BENCH)('compares repeated root projec
   const { mkdir, writeFile } = await import('node:fs/promises'); await mkdir('.cache/stability-review', {recursive: true});
   await writeFile('.cache/stability-review/commands.json', JSON.stringify({ scripts: scripts.length, evidence: store.evidence.length, repeatedProjectionMs, catalogueMs, commands: commands.length }, null, 2));
 });
+
+it('forwards literal arguments through multiple wrapper scripts without changing the originals or siblings', async () => {
+  const store = await scan({'package.json':JSON.stringify({scripts:{dev:'vite',via:'npm run dev --',prod:'npm run via -- --mode production',stage:'npm run via -- --mode staging'},devDependencies:{vite:'*'}})});
+  const commands = architectureCommands(store), vite = commands.filter(c => c.argv[0] === 'vite');
+  expect(vite.map(c => c.argv)).toEqual(expect.arrayContaining([['vite'],['vite','--mode','production'],['vite','--mode','staging']]));
+  expect(vite.filter(c => c.argv.includes('production'))).toHaveLength(1); expect(vite.filter(c => c.argv.includes('staging'))).toHaveLength(1);
+  expect(vite.find(c => c.argv.includes('production'))?.sourceCommandId).toBe(vite.find(c => c.argv.length === 1)?.id);
+});
+it('appends arguments to the last shell command, not every command in the target script', async () => {
+  const store = await scan({'package.json':JSON.stringify({scripts:{build:'tsc && vite build',prod:'npm run build -- --mode production'},devDependencies:{vite:'*',typescript:'*'}})});
+  const commands = architectureCommands(store).filter(c => c.sourceCommandId);
+  expect(commands.find(c => c.argv[0] === 'tsc')?.argv).toEqual(['tsc']);
+  expect(commands.find(c => c.argv[0] === 'vite')?.argv).toEqual(['vite','build','--mode','production']);
+});
+it('keeps a cyclic forwarding path finite and explains why further forwarding is unresolved', async () => {
+  const store = await scan({'package.json':JSON.stringify({scripts:{a:'npm run b -- --flag a',b:'npm run a -- --flag b'}})});
+  const commands = architectureCommands(store);
+  expect(commands.length).toBeLessThan(20);
+  expect(commands.some(c => c.argumentResolution?.includes('循環'))).toBe(true);
+});
+
+it('keeps simultaneous child calls inside their own invocation context', async () => {
+  const store = await scan({'package.json':JSON.stringify({scripts:{dev:'concurrently "vite" "node server.js"',wrap:'npm run dev -- --raw'},devDependencies:{vite:'*'}})});
+  const commands = architectureCommands(store), group = commands.find(c => c.sourceCommandId && c.argv[0] === 'concurrently')!;
+  expect(group.argv.at(-1)).toBe('--raw'); expect(group.calls).toHaveLength(2);
+  for (const call of group.calls) {
+    const child = commands.find(c => c.id === call.target)!;
+    expect(child.sourceCommandId).toBeDefined(); expect(child.scriptId).toBe(group.scriptId); expect(child.argv).not.toContain('--raw');
+  }
+});
+it('keeps dynamic forwarding and unknown concurrently options explicit in analysis warnings', async () => {
+  const store = await scan({'package.json':JSON.stringify({scripts:{dev:'vite',wrap:'npm run dev -- --mode $MODE',unknown:'concurrently --unknown "vite"'},devDependencies:{vite:'*'}})});
+  const analysis = await analyzeSemanticSources(semanticInput(store, true), testLanguage, undefined, testParser);
+  expect(analysis.warnings.some(w => w.includes('動的な転送'))).toBe(true); expect(analysis.warnings.some(w => w.includes('未対応オプション'))).toBe(true);
+  expect(architectureCommands(store).filter(c => c.argv[0] === 'vite')).toHaveLength(1);
+});
+it('bounds deep forwarding without deleting the original script commands', async () => {
+  const scripts = Object.fromEntries(Array.from({length:36}, (_, i) => [`step${i}`, i === 35 ? 'vite' : `npm run step${i+1} -- --flag${i}`]));
+  const store = await scan({'package.json':JSON.stringify({scripts,devDependencies:{vite:'*'}})}), commands = architectureCommands(store);
+  expect(commands.some(c => c.argumentResolution?.includes('上限'))).toBe(true);
+  expect(commands.filter(c => !c.sourceCommandId)).toHaveLength(36); expect(commands.length).toBeLessThan(2000);
+});
+it('carries independently forwarded modes into the actual Architecture operations', async () => {
+  const store = await scan({'package.json':JSON.stringify({name:'fixture',scripts:{build:'vite build',via:'npm run build --',prod:'npm run via -- --mode production',stage:'npm run via -- --mode staging'},devDependencies:{vite:'*'}}), 'index.html':'<script type="module" src="/src/main.ts"></script>', 'src/main.ts':'export const value = 1;', 'vite.config.ts':'export default {build:{outDir:"out"}};'});
+  const analysis = await analyzeSemanticSources(semanticInput(store, true), testLanguage, undefined, testParser);
+  const operations = analysis.architecture!.nodes.filter(n => n.attributes.dictionaryStackId === 'vite' && n.attributes.purpose === 'build');
+  expect(operations.some(n => n.architecture?.environments.includes('production'))).toBe(true);
+  expect(operations.some(n => n.architecture?.environments.includes('staging'))).toBe(true);
+  expect(new Set(operations.map(n => n.id)).size).toBe(operations.length);
+});
