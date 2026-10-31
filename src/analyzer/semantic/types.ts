@@ -52,6 +52,8 @@ export interface SemanticAnalysis {
   stats: { files: number; functions: number; models: number; unresolved: number; elapsedMs: number };
 }
 export interface SemanticInput {
+  /** Serializable scan data; only the Worker expands commands on the UI path. */
+  commandStore?: Omit<import('../types').AnalyzerProjectStore, 'files'>;
   commands?: import('./architectureCommands').ArchitectureCommand[];
   developmentTools?: { stackId: string; path: string; declaration: boolean; evidence: SemanticEvidence }[];
   stackMetadata?:Record<string,{name:string;aliases:string[]}>;

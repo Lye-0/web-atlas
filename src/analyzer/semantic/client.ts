@@ -5,11 +5,14 @@ import type { SemanticAnalysis, SemanticInput } from './types';
 import{stacks}from'../../data';
 const stackMetadata=Object.fromEntries(stacks.map(stack=>[stack.id,{name:stack.name,aliases:stack.aliases??[]}]));
 
-export function semanticInput(store: AnalyzerProjectStore): SemanticInput {
+export function semanticInput(store: AnalyzerProjectStore, deferCommands = false): SemanticInput {
+  const evidenceById = new Map(store.evidence.map(e => [e.id, e]));
+  const factEvidence = (ids: string[]) => ids.flatMap(id => { const item = evidenceById.get(id); return item ? [item] : []; });
   const evidencePaths=new Map(store.evidence.map(e=>[e.id,e.filePath])),workspacePatterns=new Set(store.facts.filter(f=>f.kind==='workspace-pattern').map(f=>f.id)),workspaceDeclarations=new Map<string,Set<string>>();
   for(const r of store.relations)if(r.kind==='matches'&&workspacePatterns.has(r.sourceId)){const paths=workspaceDeclarations.get(r.targetId)??new Set<string>();for(const id of r.evidenceIds){const path=evidencePaths.get(id);if(path)paths.add(path);}workspaceDeclarations.set(r.targetId,paths);}
-  return { sources: store.semanticSources ?? store.sources,stackMetadata, commands: architectureCommands(store),
-    developmentTools: store.facts.flatMap(fact => fact.kind === 'technology' && localDevelopmentCliIds.some(id => id === fact.dictionaryStackId) ? store.evidence.filter(item => fact.evidenceIds.includes(item.id)).map(item => {
+  return { sources: store.semanticSources ?? store.sources,stackMetadata, commands: deferCommands ? undefined : architectureCommands(store),
+    ...(deferCommands ? { commandStore: { facts: store.facts, relations: store.relations, evidence: store.evidence, sources: store.sources, semanticSources: store.semanticSources, warnings: store.warnings, scannedAt: store.scannedAt } } : {}),
+    developmentTools: store.facts.flatMap(fact => fact.kind === 'technology' && localDevelopmentCliIds.some(id => id === fact.dictionaryStackId) ? factEvidence(fact.evidenceIds).map(item => {
       const range = item.highlightRanges[0], line = range?.start.line ?? item.contextStartLine, endLine = range?.end.line ?? line;
       const lines = (store.sources[item.filePath] ?? '').split('\n');
       const offset = (row: number, column: number) => lines.slice(0, row - 1).reduce((n, value) => n + value.length + 1, 0) + column - 1;
@@ -20,7 +23,7 @@ export function semanticInput(store: AnalyzerProjectStore): SemanticInput {
     resources: store.facts.flatMap(fact => fact.kind === 'runtime' || fact.kind === 'resource' ? [{ id: fact.id, label: fact.label, type: fact.kind === 'runtime' ? 'runtime' : fact.resourceType, path: fact.filePath, binding: fact.kind === 'resource' ? fact.binding : undefined,
       attributes: Object.fromEntries(Object.entries(fact.metadata).filter((entry): entry is [string, string | number | boolean | string[]] => entry[1] !== undefined)),
       entryPath: typeof fact.metadata.entryPath === 'string' ? fact.metadata.entryPath : typeof fact.metadata.main === 'string' ? `${fact.filePath?.split('/').slice(0, -1).join('/')}/${fact.metadata.main}`.replace(/^\//, '').replaceAll('/./', '/') : undefined,
-      evidence: store.evidence.filter(item => fact.evidenceIds.includes(item.id)).map(item => { const range = item.highlightRanges[0]; const line = range?.start.line ?? item.contextStartLine; const endLine = range?.end.line ?? line; const source = store.sources[item.filePath] ?? ''; const lines = source.split('\n'); const start = lines.slice(0, line - 1).reduce((offset, value) => offset + value.length + 1, 0) + (range?.start.column ?? 1) - 1; const end = lines.slice(0, endLine - 1).reduce((offset, value) => offset + value.length + 1, 0) + (range?.end.column ?? (lines[endLine - 1]?.length ?? 0) + 1) - 1; return { path: item.filePath, start, end, line, endLine, description: item.description ?? 'Runtime / resource configuration' }; }),
+      evidence: factEvidence(fact.evidenceIds).map(item => { const range = item.highlightRanges[0]; const line = range?.start.line ?? item.contextStartLine; const endLine = range?.end.line ?? line; const source = store.sources[item.filePath] ?? ''; const lines = source.split('\n'); const start = lines.slice(0, line - 1).reduce((offset, value) => offset + value.length + 1, 0) + (range?.start.column ?? 1) - 1; const end = lines.slice(0, endLine - 1).reduce((offset, value) => offset + value.length + 1, 0) + (range?.end.column ?? (lines[endLine - 1]?.length ?? 0) + 1) - 1; return { path: item.filePath, start, end, line, endLine, description: item.description ?? 'Runtime / resource configuration' }; }),
     }] : []),
   };
 }
@@ -49,9 +52,11 @@ export function getSemanticAnalysis(store: AnalyzerProjectStore, onProgress?: (p
         if (data.type === 'error') { stopWorker(); jobs.delete(store); reject(new Error(String(data.message))); }
       };
       worker.onerror = event => { stopWorker(); jobs.delete(store); reject(new Error(event.message || '解析エンジンでエラーが発生しました')); };
-      worker.postMessage(semanticInput(store));
+      try { worker.postMessage(semanticInput(store, true)); }
+      catch (error) { stopWorker(); reject(error); }
     });
     job = { promise, listeners, cancel, progress }; jobs.set(store, job);
+    void promise.catch(() => { if (jobs.get(store)?.promise === promise) jobs.delete(store); });
   }
   if (onProgress) { job.listeners.add(onProgress); onProgress(job.progress); }
   return { promise: job.promise, unsubscribe: () => { if (onProgress) job!.listeners.delete(onProgress); } };

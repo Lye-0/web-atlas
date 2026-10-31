@@ -50,15 +50,32 @@ export function semanticDepths(graph: SemanticGraph): Map<string, number> {
   for (const edge of graph.edges) if (outgoing.has(edge.source) && outgoing.has(edge.target)) outgoing.get(edge.source)!.push(edge.target);
   const index = new Map<string, number>(), low = new Map<string, number>(), component = new Map<string, number>();
   const stack: string[] = []; const active = new Set<string>(); let next = 0, count = 0;
-  const visit = (id: string) => {
+  // Iterative Tarjan DFS: graph depth must not consume the JavaScript call stack.
+  const enter = (id: string) => {
     index.set(id, next); low.set(id, next++); stack.push(id); active.add(id);
-    for (const target of outgoing.get(id) ?? []) {
-      if (!index.has(target)) { visit(target); low.set(id, Math.min(low.get(id)!, low.get(target)!)); }
-      else if (active.has(target)) low.set(id, Math.min(low.get(id)!, index.get(target)!));
-    }
-    if (low.get(id) === index.get(id)) { let member: string; do { member = stack.pop()!; active.delete(member); component.set(member, count); } while (member !== id); count++; }
+    return { id, cursor: 0 };
   };
-  for (const node of graph.nodes) if (!index.has(node.id)) visit(node.id);
+  for (const node of graph.nodes) {
+    if (index.has(node.id)) continue;
+    const frames = [enter(node.id)];
+    while (frames.length) {
+      const frame = frames[frames.length - 1]!, targets = outgoing.get(frame.id)!;
+      if (frame.cursor < targets.length) {
+        const target = targets[frame.cursor++]!;
+        if (!index.has(target)) frames.push(enter(target));
+        else if (active.has(target)) low.set(frame.id, Math.min(low.get(frame.id)!, index.get(target)!));
+        continue;
+      }
+      frames.pop();
+      if (low.get(frame.id) === index.get(frame.id)) {
+        let member: string;
+        do { member = stack.pop()!; active.delete(member); component.set(member, count); } while (member !== frame.id);
+        count++;
+      }
+      const parent = frames[frames.length - 1];
+      if (parent) low.set(parent.id, Math.min(low.get(parent.id)!, low.get(frame.id)!));
+    }
+  }
   const links = Array.from({ length: count }, () => new Set<number>()), incoming = Array.from({ length: count }, () => 0), depths = incoming.slice();
   for (const edge of graph.edges) { const a = component.get(edge.source), b = component.get(edge.target); if (a !== undefined && b !== undefined && a !== b && !links[a]!.has(b)) { links[a]!.add(b); incoming[b]!++; } }
   const queue = incoming.flatMap((value, id) => value ? [] : [id]);
