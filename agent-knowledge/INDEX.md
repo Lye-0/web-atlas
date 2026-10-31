@@ -148,6 +148,14 @@
 - files: `src/analyzer/semantic/architectureSimpleUnrouted.ts`, `src/analyzer/semantic/architectureSimpleLayout.ts`, `src/analyzer/semantic/architecturePlatformFlows.test.ts` …
 - memory: `agent-knowledge/entries/2026-09-19-unrouted-source-placement-91bfa2.md`
 
+### コマンドの全体カタログと選択entryの投影は用途を分離する
+- id: `rm-20261031-command-catalog-worker`
+- type: `failure`
+- maturity: `candidate`
+- tags: `worker`, `commands`, `performance`, `evidence`
+- files: `src/analyzer/projectors.ts`, `src/analyzer/semantic/architectureCommands.ts`, `src/analyzer/semantic/client.ts` …
+- memory: `agent-knowledge/entries/2026-10-31-command-catalog-worker-a571c8.md`
+
 ## analyzer-command-evidence
 
 ### CIコマンドを合成すると元範囲の座標系が変わる
@@ -157,6 +165,16 @@
 - tags: `analyzer`, `ci`, `source-range`
 - files: `src/analyzer/providerAdapters.ts`, `src/analyzer/yamlCommandOffsets.ts`, `src/analyzer/commandParser.ts` …
 - memory: `agent-knowledge/entries/2026-09-12-ci-command-source-offsets-b84d19.md`
+
+## analyzer-data
+
+### Data Flowの枝分離は変数とプロパティ履歴を同時に行う
+- id: `rm-20261031-data-flow-branch-state`
+- type: `failure`
+- maturity: `candidate`
+- tags: `data-flow`, `branches`, `provenance`, `properties`
+- files: `src/analyzer/semantic/dataFlow.ts`, `src/analyzer/semantic/dataFlowBranches.test.ts`, `docs/technical/tabs-8-9-data-analysis.md`
+- memory: `agent-knowledge/entries/2026-10-31-data-flow-branch-state-5a9c12.md`
 
 ## analyzer-evidence
 
@@ -313,6 +331,14 @@
 - tags: `worker`, `cache`, `project-replacement`, `heap`
 - files: `src/analyzer/semantic/client.ts`, `src/analyzer/semantic/client.test.ts`, `src/analyzer/sessionProvider.tsx` …
 - memory: `agent-knowledge/entries/2026-09-09-analysis-store-release-3de82c.md`
+
+### プロジェクト交換の保護はWorkerだけでなくPickerの要求寿命にも必要
+- id: `rm-20261031-picker-request-lifetime`
+- type: `failure`
+- maturity: `candidate`
+- tags: `async`, `project-replacement`, `picker`, `race`
+- files: `src/components/analyzer/AnalyzerProjectPicker.tsx`, `src/components/analyzer/AnalyzerProjectPicker.test.tsx`, `src/analyzer/sessionProvider.tsx`
+- memory: `agent-knowledge/entries/2026-10-31-picker-request-lifetime-841a6c.md`
 
 ## analyzer-spatial
 

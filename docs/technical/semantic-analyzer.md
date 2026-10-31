@@ -8,6 +8,16 @@ Opening a semantic View starts `semantic/semantic.worker.ts` through `semantic/c
 
 `semantic/analyze.ts` produces a separate `SemanticAnalysis`, preserving the existing `AnalyzerFact` model and projectors. The new page calls `projectSemanticView`; sending a semantic View to the older synchronous `projectAnalyzerView` is an error rather than a fallback to an unrelated View.
 
+## Input and scheduling stability
+
+Directory enumeration accumulates into a shared result array without argument spreading. Standard Python virtual environments (`.venv`, `venv`), bytecode caches and pytest/ruff/mypy caches are excluded consistently for directory handles and directory-upload input. Authored Python/C/C++ sources remain supported; the existing `build/compile_commands.json` exception remains. Each file still uses the existing size/sensitive-input guards. This is not a global memory or elapsed-time limit.
+
+A project pick has a request generation. Unmounting the picker invalidates pending enumeration/scan results; an older success, failure or completion must not replace a later project or clear its busy state. Store replacement separately cancels the old semantic Worker as before.
+
+On the browser UI path, `semanticInput(store, true)` sends serializable scan data without `files`/reader callbacks. `analyzeSemanticSources` expands the command catalogue inside the Worker. The eager `semanticInput(store)` path remains available for existing direct callers. The catalogue uses the same resolver as Command Flow, traverses each script once across all roots, and shares Evidence/adjacency/line-offset indexes. It preserves command IDs, targets, call-site arguments and source ranges; it does not add a user-command entry per catalogue root to the diagram. UI Command Flow still projects its selected entry alone.
+
+Relationship depth calculation uses iterative Tarjan traversal, preserving SCC/longest-path semantics without consuming call stack proportional to graph depth. It does not change node ordering, selection, camera state or renderer contracts.
+
 ## Language and framework coverage
 
 The browser uses Tree-sitter grammars for TypeScript, TSX/JSX, JavaScript, Python, Java, C#, Go, Rust, Ruby, PHP, C, C++, Swift, Kotlin, Scala and Dart. Kotlin and Scala use an isolated legacy parser ABI; all other grammars use the current parser runtime. Vue and Svelte retain original offsets while parsing their script blocks; explicit template elements, handlers, bindings and values retain source offsets; dynamic template semantics remain partial. SQL, Prisma and GraphQL use focused schema parsers, with comments excluded before extracting definitions.
