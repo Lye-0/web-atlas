@@ -14,8 +14,14 @@ export function createDataCompiler(input: SemanticInput) {
   const files = new Map(Object.entries(input.sources).filter(([path]) => dataScriptPath(path)).map(([path, source]) =>
     [path, ts.createSourceFile(path, scriptSource(path,source), ts.ScriptTarget.Latest, true, /x$/.test(path) ? ts.ScriptKind.TSX : /\.([cm]?js)$/.test(path) ? ts.ScriptKind.JS : ts.ScriptKind.TS)]));
   const options: ts.CompilerOptions = { noLib: true, allowJs: true, allowNonTsExtensions: true, checkJs: false, noEmit: true, target: ts.ScriptTarget.Latest, module: ts.ModuleKind.ESNext, strictNullChecks: true };
+  const importsBySource = new Map<string, Map<string, string>>();
+  for (const item of input.imports) {
+    let references = importsBySource.get(item.from);
+    if (!references) { references = new Map(); importsBySource.set(item.from, references); }
+    if (!references.has(item.specifier)) references.set(item.specifier, item.to);
+  }
   const resolve = (specifier: string, from: string) => {
-    const supplied = input.imports.find(item => item.from === from && item.specifier === specifier)?.to;
+    const supplied = importsBySource.get(from)?.get(specifier);
     if (supplied && files.has(supplied)) return supplied;
     if (!specifier.startsWith('.')) return undefined;
     const base = normalize(`${from.split('/').slice(0, -1).join('/')}/${specifier}`).replace(/\.js$/, '');

@@ -30,3 +30,14 @@ describe('data compiler component module resolution',()=>{
   const paths=new Set<string>();visitSource(compiler.files.get('A.astro')!,n=>{if(ts.isTypeReferenceNode(n)){const declaration=compiler.symbol(n.typeName)?.declarations?.[0];if(declaration)paths.add(declaration.getSourceFile().fileName);}});expect(paths).toEqual(new Set(['B.astro','native.ts']));
  });
 });
+
+it('indexes supplied imports once and preserves the first mapping for duplicate keys', () => {
+  let reads = 0;
+  const sources = Object.fromEntries(Array.from({length:300}, (_, i) => [`file${i}.ts`, `import {value} from 'mapped'; export const value = ${i};`]));
+  const imports = Array.from({length:300}, (_, i) => ({get from() { reads++; return `file${i}.ts`; }, specifier:'mapped', to:`file${(i+1)%300}.ts`}));
+  imports.push({from:'file0.ts',specifier:'mapped',to:'file2.ts'});
+  const compiler = createDataCompiler(input(sources,imports));
+  const imported = compiler.files.get('file0.ts')!.statements[0] as ts.ImportDeclaration;
+  expect(compiler.symbol((imported.importClause!.namedBindings as ts.NamedImports).elements[0]!.name)?.declarations?.[0]?.getSourceFile().fileName).toBe('file1.ts');
+  expect(reads).toBeLessThan(3000);
+});
